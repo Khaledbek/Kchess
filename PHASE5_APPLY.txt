@@ -1,0 +1,40 @@
+Kchess Phase 5 source update
+===========================
+
+This bundle is based on the trimmed source ZIP uploaded in the conversation.
+Copy/merge these files into the corresponding paths of the full Kchess project.
+Do not replace your omitted third_party/, platform build folders, Stockfish source,
+or local build configuration with anything from this trimmed bundle.
+
+Phase 5 adds:
+- cross-month Favorites/Downloads library behavior
+- Favorites for local PGN/FEN entries
+- explicit deletion of local PGN/FEN entries
+- conservative provider month-cache cleanup that preserves downloaded,
+  favorited, or analysed games
+- downloaded/not-downloaded filtering
+- focused persistence and widget tests
+
+Native ABI additions:
+- kc_delete_local_game
+- kc_clear_cached_month
+
+Verification performed here:
+- database.cpp C++20 syntax check: PASS
+- core_api.cpp C++20 syntax check: PASS
+- focused SQLite persistence executable: 18/18 assertions PASS
+
+Not run in this environment:
+- flutter analyze / flutter test (Flutter SDK not available in this container)
+- full native build with vendored Stockfish/nlohmann/sqlite sources
+- Android/Windows builds
+
+Recommended after copying into the full project:
+1. dart format lib test
+2. flutter analyze
+3. flutter test test/app_test.dart
+4. build/run the focused native provider persistence test
+5. run the app and manually verify Downloads, Favorites, local delete and month-cache cleanup
+
+Full historical Stockfish/provider/opening-book regression suites do not need to be
+re-run unless your merge modifies those components.

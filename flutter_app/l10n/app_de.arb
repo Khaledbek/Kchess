@@ -1,0 +1,267 @@
+{
+  "@@locale": "de",
+  "appTitle": "KChess",
+  "firstRunTitle": "Dein lokaler Schachbereich",
+  "firstRunBody": "Wähle eine Quelle. Öffentliche Online-Profile benötigen kein Passwort.",
+  "chessCom": "Chess.com",
+  "lichess": "Lichess",
+  "localPgnFen": "PGN / FEN",
+  "username": "Benutzername",
+  "profileName": "Profilname",
+  "continueLabel": "Weiter",
+  "requiredField": "Bitte einen Wert eingeben.",
+  "games": "Partien",
+  "downloads": "Downloads",
+  "favorites": "Favoriten",
+  "profile": "Profil",
+  "settings": "Einstellungen",
+  "analysis": "Analyse",
+  "addAccount": "Konto anlegen",
+  "switchAccount": "Konto wechseln",
+  "demoNotice": "Lokale Partie",
+  "tapToAnalyze": "Öffnen und analysieren",
+  "importData": "PGN / FEN importieren",
+  "importPgnFile": "PGN-Datei auswählen",
+  "pastePgn": "PGN-Text einfügen",
+  "importFen": "FEN-Stellung importieren",
+  "pgnText": "PGN-Text",
+  "pgnLabel": "Partie-PGN",
+  "fenText": "Vollständige FEN",
+  "positionName": "Name der Stellung",
+  "importAction": "Importieren",
+  "noGames": "Noch keine lokalen Partien oder Stellungen. Importiere eine PGN-Datei, PGN-Text oder eine FEN-Stellung.",
+  "emptySection": "Dieser Bereich ist für lokale Daten vorbereitet.",
+  "loading": "Lokaler Kern wird geladen…",
+  "coreUnavailable": "Der lokale Kern konnte nicht gestartet werden.",
+  "retry": "Erneut versuchen",
+  "summary": "Zusammenfassung",
+  "analyzing": "Jeder Halbzug wird analysiert…",
+  "analysisComplete": "Vollanalyse abgeschlossen",
+  "analysisCancelled": "Analyse abgebrochen – vorhandene Ergebnisse bleiben gespeichert.",
+  "cancelAnalysis": "Analyse abbrechen",
+  "classificationPending": "Die Klassifizierung für diesen Zug ist noch nicht verfügbar.",
+  "bestMove": "Bester Zug",
+  "evaluation": "Bewertung",
+  "engineLines": "Engine-Linien",
+  "currentMove": "Aktueller Zug",
+  "boardArrows": "Brett-Pfeile anzeigen",
+  "boardArrowsHelp": "Nur Darstellung; Umschalten startet keine neue Analyse.",
+  "engine": "Engine",
+  "enginePreset": "Mittel · Tiefe 18 · 3 Linien",
+  "depth": "Tiefe",
+  "numberOfLines": "Anzahl der Linien",
+  "timeLimitSeconds": "Zeitlimit (Sekunden)",
+  "noTimeLimit": "Aus",
+  "secondsShort": "s",
+  "deleteAccount": "Konto löschen",
+  "deleteAccountQuestion": "Konto löschen?",
+  "deleteOnlineProfileBody": "Dieses Profil und seine lokal gespeicherten Daten werden von KChess entfernt. Das Chess.com-/Lichess-Konto selbst wird nicht verändert.",
+  "deleteLocalProfileBody": "Dieses Profil und seine lokal gespeicherten PGN-/FEN-Daten werden von KChess entfernt.",
+  "cancelAction": "Abbrechen",
+  "deleteAction": "Löschen",
+  "language": "Sprache",
+  "theme": "Design",
+  "systemTheme": "System",
+  "lightTheme": "Hell",
+  "darkTheme": "Dunkel",
+  "engineSettingsSubtitle": "Tiefe, Linien, Zeitlimit, Threads und Hash",
+  "analysisSettingsTitle": "Analyse",
+  "analysisSettingsSubtitle": "Pfeile, Bewertung und Analyseanzeige",
+  "analysisBoardGuidance": "Brett-Hinweise",
+  "analysisInformation": "Analyseinformationen",
+  "bestMoveArrow": "Bestzug-Pfeil",
+  "bestMoveArrowHelp": "Zeigt den besten Engine-Zug auf dem Brett.",
+  "threatArrow": "Bedrohungs-Pfeil",
+  "threatArrowHelp": "Zeigt den stärksten gegnerischen Zug als Warnpfeil, wenn der Gegner am Zug ist.",
+  "evaluationBarSetting": "Bewertungsleiste",
+  "evaluationBarSettingHelp": "Zeigt die aktuelle Engine-Bewertung.",
+  "showEngineLinesSetting": "Engine-Linien anzeigen",
+  "showEngineLinesSettingHelp": "Zeigt die berechneten Hauptvarianten (MultiPV).",
+  "showClassificationsSetting": "Zugklassifikationen anzeigen",
+  "showClassificationsSettingHelp": "Zeigt Theorie, Brillant, Kritisch, Bester und die weiteren Zugkategorien.",
+  "showAccuracySetting": "Accuracy anzeigen",
+  "showAccuracySettingHelp": "Zeigt die lokal berechneten Accuracy-Werte.",
+  "showTheorySetting": "Theorieinformationen anzeigen",
+  "showTheorySettingHelp": "Zeigt Eröffnungsbuch-Informationen und Theorie-Zähler.",
+  "designSettingsTitle": "Design",
+  "designSettingsSubtitle": "Darstellung, Theme, Brett und Figuren",
+  "generalSettingsTitle": "Allgemein",
+  "generalSettingsSubtitle": "Sprache und App-Verhalten",
+  "dataStorageSettingsTitle": "Daten & Speicher",
+  "dataStorageSettingsSubtitle": "Analyse-Cache, Downloads und lokale Daten",
+  "dataStoragePlaceholder": "Speicher- und Cache-Optionen werden in einem nächsten Schritt ergänzt.",
+  "licensesAbout": "Lizenzen & Über",
+  "stockfishPending": "Stockfish 18 · lokal · GPLv3",
+  "provider": "Anbieter",
+  "localProfile": "Lokales Profil",
+  "theory": "Theorie",
+  "brilliant": "Brillant",
+  "critical": "Kritischer Zug",
+  "best": "Bester",
+  "excellent": "Ausgezeichnet",
+  "okay": "Okay",
+  "miss": "Verpasst",
+  "mistake": "Fehler",
+  "blunder": "Patzer",
+  "totalMoves": "Halbzüge",
+  "localAccuracy": "Lokale Genauigkeit",
+  "close": "Schließen",
+  "previous": "Zurück",
+  "next": "Weiter",
+  "first": "Erster Zug",
+  "last": "Letzter Zug",
+  "playPause": "Abspielen oder pausieren",
+  "player": "Spieler",
+  "bothPlayers": "Beide",
+  "whitePlayer": "Weiß",
+  "blackPlayer": "Schwarz",
+  "analyzedMoves": "Klassifizierte Züge",
+  "bookGames": "Book-Partien",
+  "expectedLoss": "Erwartungswertverlust",
+  "versions": "Versionen",
+  "classifierVersionLabel": "Klassifikator",
+  "accuracyVersionLabel": "Accuracy",
+  "analyzingGame": "Partie wird analysiert",
+  "analyzedMovesProgress": "{completed} / {total} Halbzüge analysiert",
+  "@analyzedMovesProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "openAnalysis": "Analyse öffnen",
+  "bestMoveText": "{move} ist der beste Zug.",
+  "@bestMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "moveComparisonText": "{played} war {classification}. {best} ist der beste Zug.",
+  "@moveComparisonText": {
+    "placeholders": {
+      "played": {
+        "type": "String"
+      },
+      "classification": {
+        "type": "String"
+      },
+      "best": {
+        "type": "String"
+      }
+    }
+  },
+  "theoryMoveText": "{move} ist ein Theorie-Zug.",
+  "@theoryMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "triedMove": "Du hast {move} ausprobiert.",
+  "@triedMove": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "analyzingVariation": "Die temporäre Variante wird analysiert…",
+  "evaluationComparison": "Bewertung: {before} → {after}",
+  "@evaluationComparison": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "bestContinuation": "Beste Fortsetzung: {line}",
+  "@bestContinuation": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "returnToMainLine": "Zur Hauptlinie zurückkehren",
+  "illegalOrFailedMove": "Der Zug ist nicht legal oder konnte nicht analysiert werden: {message}",
+  "@illegalOrFailedMove": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "myPlayer": "Mein Spieler",
+  "opponent": "Gegner",
+  "variationStartingPosition": "Ausgangsstellung der Variante",
+  "variationStart": "Anfang der Variante",
+  "engineQualityTitle": "Analysequalität",
+  "engineResourcesTitle": "Ressourcen",
+  "depthHelp": "Maximale Suchtiefe pro Stellung. Höhere Werte dauern in der Regel länger.",
+  "numberOfLinesHelp": "Wie viele beste Varianten Stockfish gleichzeitig berechnet.",
+  "timeLimitHelp": "Optionales Limit pro Stellung. Aus nutzt nur die Tiefe; sonst endet die Suche, sobald Tiefe oder Zeit zuerst erreicht ist.",
+  "threads": "Threads",
+  "threadsHelp": "CPU-Threads für Stockfish. Mehr kann schneller sein, benötigt aber mehr Rechenleistung und Akku.",
+  "hashMemory": "Hash-Speicher",
+  "hashMemoryHelp": "Arbeitsspeicher für Stockfishs Transposition Table. Mehr Speicher kann die Suche in wiederkehrenden Stellungen verbessern.",
+  "boardDisplayTitle": "Brettdarstellung",
+  "showBoardCoordinates": "Brettkoordinaten",
+  "showBoardCoordinatesHelp": "Zeigt Linien- und Reihennamen (a–h / 1–8) am Brett.",
+  "highlightLastMove": "Letzten Zug hervorheben",
+  "highlightLastMoveHelp": "Markiert Start- und Zielfeld des zuletzt gespielten Zuges.",
+  "highlightSelectedSquare": "Ausgewähltes Feld hervorheben",
+  "highlightSelectedSquareHelp": "Markiert das Feld, das du für eine Variante ausgewählt hast.",
+  "behaviorTitle": "Verhalten",
+  "autoSyncOnline": "Online-Profile automatisch aktualisieren",
+  "autoSyncOnlineHelp": "Synchronisiert Chess.com und Lichess beim Start und beim Profilwechsel automatisch.",
+  "confirmBeforeDelete": "Vor dem Löschen bestätigen",
+  "confirmBeforeDeleteHelp": "Fragt vor dem Löschen von Profilen oder lokalen Partien nach.",
+  "analysisCacheTitle": "Analyse-Cache",
+  "useGlobalAnalysisCache": "Globalen Stellungs-Cache verwenden",
+  "useGlobalAnalysisCacheHelp": "Verwendet bereits analysierte identische Stellungen auch in anderen Partien wieder.",
+  "clearAnalysisCache": "Analyse-Cache leeren",
+  "clearAnalysisCacheHelp": "Löscht nur den globalen Stellungs-Cache. Gespeicherte Partien und vollständige Partieanalysen bleiben erhalten.",
+  "clearAnalysisCacheQuestion": "Analyse-Cache leeren?",
+  "clearAnalysisCacheBody": "Der globale Stellungs-Cache wird gelöscht. Deine Partien, Favoriten, Downloads und vollständigen Partieanalysen bleiben erhalten.",
+  "analysisCacheCleared": "Analyse-Cache wurde geleert.",
+  "diagnosticsTitle": "Diagnose",
+  "diagnosticLogging": "Diagnoseprotokoll",
+  "diagnosticLoggingHelp": "Schreibt begrenzte technische Logs für die Fehlersuche. Vollständige PGNs, FENs und Provider-Antworten werden nicht protokolliert.",
+  "deleteLocalGameQuestion": "Lokalen Eintrag löschen?",
+  "deleteLocalGameBody": "Die gespeicherte PGN/FEN und ihre lokale Analyse werden dauerhaft entfernt.",
+  "favoriteCollectionsTitle": "Sammlungen",
+  "favoriteNoCollections": "Noch keine Sammlungen. Erstelle eine Sammlung, um Favoriten zu gruppieren.",
+  "favoriteLooseTitle": "Lose Favoriten",
+  "favoriteCreateCollection": "Sammlung erstellen",
+  "favoriteRenameCollection": "Sammlung umbenennen",
+  "favoriteDeleteCollection": "Sammlung löschen",
+  "favoriteCollectionName": "Name der Sammlung",
+  "favoriteDeleteCollectionBody": "Die Sammlung wird gelöscht. Ihre Partien bleiben als lose Favoriten erhalten.",
+  "favoriteEmptyCollection": "Diese Sammlung enthält noch keine Partien.",
+  "favoriteNoLooseGames": "Keine losen Favoriten.",
+  "favoriteCollectionRule": "Sammlungen sind nur eine Ebene tief und können nicht verschachtelt werden.",
+  "favoriteMoveToCollection": "Sammlung ändern",
+  "favoriteMoveHelp": "Partien können lose in Favoriten liegen oder genau einer Sammlung zugeordnet werden.",
+  "profileRatings": "Ratings",
+  "profileGameOverview": "Partieübersicht",
+  "profileWins": "Siege",
+  "profileDraws": "Remis",
+  "profileLosses": "Niederlagen",
+  "ratingRapid": "Rapid",
+  "ratingBlitz": "Blitz",
+  "ratingBullet": "Bullet",
+  "ratingDaily": "Daily",
+  "ratingClassical": "Klassisch",
+  "ratingChess960": "Chess960",
+  "ratingFide": "FIDE"
+}

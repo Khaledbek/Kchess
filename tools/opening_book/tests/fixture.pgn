@@ -1,0 +1,65 @@
+[Event "rated blitz game"]
+[Site "https://lichess.org/fixture01"]
+[Date "2026.01.01"]
+[White "Alpha"]
+[Black "Beta"]
+[WhiteElo "1800"]
+[BlackElo "1800"]
+[Result "1-0"]
+
+1. Nf3 d5 2. g3 Nf6 3. Bg2 e6 1-0
+
+[Event "rated rapid game"]
+[Site "https://lichess.org/fixture02"]
+[Date "2026.01.01"]
+[White "Gamma"]
+[Black "Delta"]
+[WhiteElo "1900"]
+[BlackElo "1850"]
+[Result "0-1"]
+
+1. g3 Nf6 2. Nf3 d5 3. Bg2 e6 0-1
+
+[Event "rated blitz game"]
+[Site "https://lichess.org/fixture03"]
+[Date "2026.01.01"]
+[White "Epsilon"]
+[Black "Zeta"]
+[WhiteElo "2000"]
+[BlackElo "1950"]
+[Result "1/2-1/2"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1/2-1/2
+
+[Event "rated classical game"]
+[Site "https://lichess.org/fixture04"]
+[Date "2026.01.01"]
+[White "Eta"]
+[Black "Theta"]
+[WhiteElo "2100"]
+[BlackElo "2050"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 1-0
+
+[Event "rated blitz game"]
+[Site "https://lichess.org/fixture05"]
+[Date "2026.01.01"]
+[White "Iota"]
+[Black "Kappa"]
+[WhiteElo "1700"]
+[BlackElo "1750"]
+[Result "0-1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 0-1
+
+[Event "rated rapid game"]
+[Site "https://lichess.org/fixture06"]
+[Date "2026.01.01"]
+[White "Lambda"]
+[Black "Mu"]
+[WhiteElo "1600"]
+[BlackElo "1650"]
+[Result "1/2-1/2"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 1/2-1/2

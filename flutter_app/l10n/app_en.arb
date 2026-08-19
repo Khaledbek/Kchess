@@ -1,0 +1,267 @@
+{
+  "@@locale": "en",
+  "appTitle": "KChess",
+  "firstRunTitle": "Your local chess workspace",
+  "firstRunBody": "Choose a source. Public online profiles do not require a password.",
+  "chessCom": "Chess.com",
+  "lichess": "Lichess",
+  "localPgnFen": "PGN / FEN",
+  "username": "Username",
+  "profileName": "Profile name",
+  "continueLabel": "Continue",
+  "requiredField": "Please enter a value.",
+  "games": "Games",
+  "downloads": "Downloads",
+  "favorites": "Favorites",
+  "favoriteCollectionsTitle": "Collections",
+  "favoriteNoCollections": "No collections yet. Create one to group your favorite games.",
+  "favoriteLooseTitle": "Loose favorites",
+  "favoriteCreateCollection": "Create collection",
+  "favoriteRenameCollection": "Rename collection",
+  "favoriteDeleteCollection": "Delete collection",
+  "favoriteCollectionName": "Collection name",
+  "favoriteDeleteCollectionBody": "The collection will be deleted. Its games will remain as loose favorites.",
+  "favoriteEmptyCollection": "This collection does not contain any games yet.",
+  "favoriteNoLooseGames": "No loose favorites.",
+  "favoriteCollectionRule": "Collections are one level only and cannot be nested.",
+  "favoriteMoveToCollection": "Change collection",
+  "favoriteMoveHelp": "Games can stay as loose favorites or belong to exactly one collection.",
+  "profile": "Profile",
+  "settings": "Settings",
+  "analysis": "Analysis",
+  "addAccount": "Add account",
+  "switchAccount": "Switch account",
+  "demoNotice": "Local game",
+  "tapToAnalyze": "Open and analyze",
+  "importData": "Import PGN / FEN",
+  "importPgnFile": "Choose PGN file",
+  "pastePgn": "Paste PGN text",
+  "importFen": "Import FEN position",
+  "pgnText": "PGN text",
+  "pgnLabel": "Game PGN",
+  "fenText": "Complete FEN",
+  "positionName": "Position name",
+  "importAction": "Import",
+  "noGames": "No local games or positions yet. Import a PGN file, PGN text, or a FEN position.",
+  "emptySection": "This section is ready for local data.",
+  "loading": "Loading local core…",
+  "coreUnavailable": "The local core could not be started.",
+  "retry": "Retry",
+  "summary": "Summary",
+  "analyzing": "Analyzing every half-move…",
+  "analysisComplete": "Full analysis complete",
+  "analysisCancelled": "Analysis cancelled — existing results remain saved.",
+  "cancelAnalysis": "Cancel analysis",
+  "classificationPending": "Classification is not available for this move yet.",
+  "bestMove": "Best move",
+  "evaluation": "Evaluation",
+  "engineLines": "Engine lines",
+  "currentMove": "Current move",
+  "boardArrows": "Show board arrows",
+  "boardArrowsHelp": "Display only; changing this never restarts analysis.",
+  "engine": "Engine",
+  "enginePreset": "Medium · depth 18 · 3 lines",
+  "depth": "Depth",
+  "numberOfLines": "Number of lines",
+  "timeLimitSeconds": "Time Limit (seconds)",
+  "noTimeLimit": "Off",
+  "secondsShort": "s",
+  "deleteAccount": "Delete account",
+  "deleteAccountQuestion": "Delete account?",
+  "deleteOnlineProfileBody": "This profile and its locally stored data will be removed from KChess. The Chess.com/Lichess account itself will not be changed.",
+  "deleteLocalProfileBody": "This profile and its locally stored PGN/FEN data will be removed from KChess.",
+  "cancelAction": "Cancel",
+  "deleteAction": "Delete",
+  "language": "Language",
+  "theme": "Theme",
+  "systemTheme": "System",
+  "lightTheme": "Light",
+  "darkTheme": "Dark",
+  "engineSettingsSubtitle": "Depth, lines, time limit, threads and hash",
+  "analysisSettingsTitle": "Analysis",
+  "analysisSettingsSubtitle": "Arrows, evaluation and analysis display",
+  "analysisBoardGuidance": "Board guidance",
+  "analysisInformation": "Analysis information",
+  "bestMoveArrow": "Best move arrow",
+  "bestMoveArrowHelp": "Shows the engine’s best move on the board.",
+  "threatArrow": "Threat arrow",
+  "threatArrowHelp": "Shows the opponent’s strongest next move as a warning arrow when the opponent is to move.",
+  "evaluationBarSetting": "Evaluation bar",
+  "evaluationBarSettingHelp": "Shows the current engine evaluation.",
+  "showEngineLinesSetting": "Show engine lines",
+  "showEngineLinesSettingHelp": "Shows the calculated principal variations (MultiPV).",
+  "showClassificationsSetting": "Show move classifications",
+  "showClassificationsSettingHelp": "Shows Theory, Brilliant, Critical, Best and the other move labels.",
+  "showAccuracySetting": "Show accuracy",
+  "showAccuracySettingHelp": "Shows the locally calculated accuracy values.",
+  "showTheorySetting": "Show theory information",
+  "showTheorySettingHelp": "Shows opening-book information and theory counts.",
+  "designSettingsTitle": "Design",
+  "designSettingsSubtitle": "Appearance, theme, board and pieces",
+  "generalSettingsTitle": "General",
+  "generalSettingsSubtitle": "Language and app behavior",
+  "dataStorageSettingsTitle": "Data & storage",
+  "dataStorageSettingsSubtitle": "Analysis cache, downloads and local data",
+  "dataStoragePlaceholder": "Storage and cache controls will be added in a following step.",
+  "licensesAbout": "Licenses & about",
+  "stockfishPending": "Stockfish 18 · local · GPLv3",
+  "provider": "Provider",
+  "localProfile": "Local profile",
+  "theory": "Theory",
+  "brilliant": "Brilliant",
+  "critical": "Critical Move",
+  "best": "Best",
+  "excellent": "Excellent",
+  "okay": "Okay",
+  "miss": "Miss",
+  "mistake": "Mistake",
+  "blunder": "Blunder",
+  "totalMoves": "Half-moves",
+  "localAccuracy": "Local accuracy",
+  "close": "Close",
+  "previous": "Previous",
+  "next": "Next",
+  "first": "First",
+  "last": "Last",
+  "playPause": "Play or pause",
+  "player": "Player",
+  "bothPlayers": "Both",
+  "whitePlayer": "White",
+  "blackPlayer": "Black",
+  "analyzedMoves": "Classified moves",
+  "bookGames": "Book games",
+  "expectedLoss": "Expected-score loss",
+  "versions": "Versions",
+  "classifierVersionLabel": "Classifier",
+  "accuracyVersionLabel": "Accuracy",
+  "analyzingGame": "Analyzing game",
+  "analyzedMovesProgress": "{completed} / {total} half-moves analyzed",
+  "@analyzedMovesProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "openAnalysis": "Open analysis",
+  "bestMoveText": "{move} is the best move.",
+  "@bestMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "moveComparisonText": "{played} was {classification}. {best} is the best move.",
+  "@moveComparisonText": {
+    "placeholders": {
+      "played": {
+        "type": "String"
+      },
+      "classification": {
+        "type": "String"
+      },
+      "best": {
+        "type": "String"
+      }
+    }
+  },
+  "theoryMoveText": "{move} is a theory move.",
+  "@theoryMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "triedMove": "You tried {move}.",
+  "@triedMove": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "analyzingVariation": "Analyzing the temporary variation…",
+  "evaluationComparison": "Evaluation: {before} → {after}",
+  "@evaluationComparison": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "bestContinuation": "Best continuation: {line}",
+  "@bestContinuation": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "returnToMainLine": "Return to main line",
+  "illegalOrFailedMove": "The move is illegal or could not be analyzed: {message}",
+  "@illegalOrFailedMove": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "myPlayer": "My player",
+  "opponent": "Opponent",
+  "variationStartingPosition": "Variation starting position",
+  "variationStart": "Start of variation",
+  "engineQualityTitle": "Analysis quality",
+  "engineResourcesTitle": "Resources",
+  "depthHelp": "Maximum search depth per position. Higher values usually take longer.",
+  "numberOfLinesHelp": "How many top engine variations Stockfish calculates at the same time.",
+  "timeLimitHelp": "Optional limit per position. Off uses depth only; otherwise the search stops when depth or time is reached first.",
+  "threads": "Threads",
+  "threadsHelp": "CPU threads used by Stockfish. More can be faster, but uses more processor power and battery.",
+  "hashMemory": "Hash memory",
+  "hashMemoryHelp": "RAM for Stockfish’s transposition table. More memory can improve repeated-position search.",
+  "boardDisplayTitle": "Board display",
+  "showBoardCoordinates": "Board coordinates",
+  "showBoardCoordinatesHelp": "Shows file and rank labels (a–h / 1–8) on the board.",
+  "highlightLastMove": "Highlight last move",
+  "highlightLastMoveHelp": "Highlights the origin and destination squares of the last played move.",
+  "highlightSelectedSquare": "Highlight selected square",
+  "highlightSelectedSquareHelp": "Highlights the square you selected while exploring a variation.",
+  "behaviorTitle": "Behavior",
+  "autoSyncOnline": "Automatically sync online profiles",
+  "autoSyncOnlineHelp": "Synchronizes Chess.com and Lichess automatically at startup and when switching profiles.",
+  "confirmBeforeDelete": "Confirm before deleting",
+  "confirmBeforeDeleteHelp": "Asks for confirmation before deleting profiles or local games.",
+  "analysisCacheTitle": "Analysis cache",
+  "useGlobalAnalysisCache": "Use shared position cache",
+  "useGlobalAnalysisCacheHelp": "Reuses compatible analysis of identical positions across different games.",
+  "clearAnalysisCache": "Clear analysis cache",
+  "clearAnalysisCacheHelp": "Clears only the shared position cache. Saved games and completed game analyses are kept.",
+  "clearAnalysisCacheQuestion": "Clear analysis cache?",
+  "clearAnalysisCacheBody": "The shared position cache will be deleted. Your games, favorites, downloads, and completed game analyses will be kept.",
+  "analysisCacheCleared": "Analysis cache cleared.",
+  "diagnosticsTitle": "Diagnostics",
+  "diagnosticLogging": "Diagnostic logging",
+  "diagnosticLoggingHelp": "Writes bounded technical logs for troubleshooting. Full PGNs, FENs, and provider responses are not logged.",
+  "deleteLocalGameQuestion": "Delete local entry?",
+  "deleteLocalGameBody": "The stored PGN/FEN and its local analysis will be permanently removed.",
+  "profileRatings": "Ratings",
+  "profileGameOverview": "Game overview",
+  "profileWins": "Wins",
+  "profileDraws": "Draws",
+  "profileLosses": "Losses",
+  "ratingRapid": "Rapid",
+  "ratingBlitz": "Blitz",
+  "ratingBullet": "Bullet",
+  "ratingDaily": "Daily",
+  "ratingClassical": "Classical",
+  "ratingChess960": "Chess960",
+  "ratingFide": "FIDE"
+}

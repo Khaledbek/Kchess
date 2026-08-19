@@ -1,0 +1,108 @@
+﻿# =========================================================
+# Kchess
+# Keep source code and required runtime assets.
+# Ignore generated builds, caches, local data and secrets.
+# =========================================================
+
+# Windows / OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+.vs/
+*.iml
+*.code-workspace
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Flutter / Dart
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.pub/
+flutter_app/.pub-cache/
+flutter_app/build/
+flutter_app/coverage/
+flutter_app/pubspec_overrides.yaml
+
+# Windows Flutter generated files
+flutter_app/windows/flutter/ephemeral/
+
+# Android generated files
+flutter_app/android/.gradle/
+flutter_app/android/local.properties
+flutter_app/android/**/build/
+flutter_app/android/captures/
+
+# Android signing secrets
+**/key.properties
+**/*.jks
+**/*.keystore
+
+# Native / CMake generated files
+native/build/
+native/out/
+native/.cache/
+
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/CTestTestfile.cmake
+**/build.ninja
+**/.ninja_deps
+**/.ninja_log
+
+# Compiled files
+*.exe
+*.dll
+*.pdb
+*.obj
+*.o
+*.a
+*.lib
+*.exp
+*.ilk
+
+# Local databases / runtime data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Logs / temporary files
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+
+# Archives / update packages
+*.zip
+*.7z
+*.rar
+
+# Backup files
+*.bak
+*.backup
+*.old
+*~
+
+# Do NOT ignore pubspec.lock for an application
+
+# Temporary Kchess update folders
+Kchess_Update_*/

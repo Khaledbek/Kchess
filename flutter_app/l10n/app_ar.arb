@@ -1,0 +1,267 @@
+{
+  "@@locale": "ar",
+  "appTitle": "KChess",
+  "firstRunTitle": "مساحة الشطرنج المحلية",
+  "firstRunBody": "اختر مصدرًا. الملفات العامة على الإنترنت لا تحتاج إلى كلمة مرور.",
+  "chessCom": "Chess.com",
+  "lichess": "Lichess",
+  "localPgnFen": "PGN / FEN",
+  "username": "اسم المستخدم",
+  "profileName": "اسم الملف الشخصي",
+  "continueLabel": "متابعة",
+  "requiredField": "يرجى إدخال قيمة.",
+  "games": "المباريات",
+  "downloads": "التنزيلات",
+  "favorites": "المفضلة",
+  "favoriteCollectionsTitle": "المجموعات",
+  "favoriteNoCollections": "لا توجد مجموعات بعد. أنشئ مجموعة لتنظيم مبارياتك المفضلة.",
+  "favoriteLooseTitle": "مفضلة بدون مجموعة",
+  "favoriteCreateCollection": "إنشاء مجموعة",
+  "favoriteRenameCollection": "إعادة تسمية المجموعة",
+  "favoriteDeleteCollection": "حذف المجموعة",
+  "favoriteCollectionName": "اسم المجموعة",
+  "favoriteDeleteCollectionBody": "سيتم حذف المجموعة، وستبقى مبارياتها ضمن المفضلة بدون مجموعة.",
+  "favoriteEmptyCollection": "لا تحتوي هذه المجموعة على مباريات بعد.",
+  "favoriteNoLooseGames": "لا توجد مباريات مفضلة بدون مجموعة.",
+  "favoriteCollectionRule": "المجموعات بمستوى واحد فقط ولا يمكن إنشاء مجموعات داخلها.",
+  "favoriteMoveToCollection": "تغيير المجموعة",
+  "favoriteMoveHelp": "يمكن أن تبقى المباراة ضمن المفضلة بدون مجموعة أو تنتمي إلى مجموعة واحدة فقط.",
+  "profile": "الملف الشخصي",
+  "settings": "الإعدادات",
+  "analysis": "التحليل",
+  "addAccount": "إضافة حساب",
+  "switchAccount": "تبديل الحساب",
+  "demoNotice": "مباراة محلية",
+  "tapToAnalyze": "فتح وتحليل",
+  "importData": "استيراد PGN / FEN",
+  "importPgnFile": "اختيار ملف PGN",
+  "pastePgn": "لصق نص PGN",
+  "importFen": "استيراد وضعية FEN",
+  "pgnText": "نص PGN",
+  "pgnLabel": "PGN المباراة",
+  "fenText": "FEN كامل",
+  "positionName": "اسم الوضعية",
+  "importAction": "استيراد",
+  "noGames": "لا توجد مباريات أو وضعيات محلية بعد. استورد ملف PGN أو نص PGN أو وضعية FEN.",
+  "emptySection": "هذا القسم جاهز للبيانات المحلية.",
+  "loading": "جارٍ تحميل النواة المحلية…",
+  "coreUnavailable": "تعذر تشغيل النواة المحلية.",
+  "retry": "إعادة المحاولة",
+  "summary": "الملخص",
+  "analyzing": "جارٍ تحليل كل نقلة نصفية…",
+  "analysisComplete": "اكتمل التحليل الكامل",
+  "analysisCancelled": "تم إلغاء التحليل — بقيت النتائج الموجودة محفوظة.",
+  "cancelAnalysis": "إلغاء التحليل",
+  "classificationPending": "تصنيف هذه النقلة غير متاح بعد.",
+  "bestMove": "أفضل نقلة",
+  "evaluation": "التقييم",
+  "engineLines": "خطوط المحرك",
+  "currentMove": "النقلة الحالية",
+  "boardArrows": "إظهار أسهم الرقعة",
+  "boardArrowsHelp": "للعرض فقط؛ التبديل لا يعيد التحليل.",
+  "engine": "المحرك",
+  "enginePreset": "متوسط · عمق 18 · 3 خطوط",
+  "depth": "العمق",
+  "numberOfLines": "عدد الخطوط",
+  "timeLimitSeconds": "الحد الزمني (بالثواني)",
+  "noTimeLimit": "متوقف",
+  "secondsShort": "ث",
+  "deleteAccount": "حذف الحساب",
+  "deleteAccountQuestion": "حذف الحساب؟",
+  "deleteOnlineProfileBody": "سيُزال هذا الملف الشخصي وبياناته المحفوظة محليًا من KChess. لن يتغير حساب Chess.com أو Lichess نفسه.",
+  "deleteLocalProfileBody": "سيُزال هذا الملف الشخصي وبيانات PGN/FEN المحفوظة محليًا من KChess.",
+  "cancelAction": "إلغاء",
+  "deleteAction": "حذف",
+  "language": "اللغة",
+  "theme": "المظهر",
+  "systemTheme": "النظام",
+  "lightTheme": "فاتح",
+  "darkTheme": "داكن",
+  "engineSettingsSubtitle": "العمق والخطوط والحد الزمني وخيوط المعالجة وذاكرة Hash",
+  "analysisSettingsTitle": "التحليل",
+  "analysisSettingsSubtitle": "الأسهم والتقييم وطريقة عرض التحليل",
+  "analysisBoardGuidance": "إرشادات الرقعة",
+  "analysisInformation": "معلومات التحليل",
+  "bestMoveArrow": "سهم أفضل نقلة",
+  "bestMoveArrowHelp": "يعرض أفضل نقلة يقترحها المحرك على الرقعة.",
+  "threatArrow": "سهم التهديد",
+  "threatArrowHelp": "يعرض أقوى نقلة تالية للخصم كسهم تحذير عندما يكون الدور على الخصم.",
+  "evaluationBarSetting": "شريط التقييم",
+  "evaluationBarSettingHelp": "يعرض تقييم المحرك الحالي.",
+  "showEngineLinesSetting": "إظهار خطوط المحرك",
+  "showEngineLinesSettingHelp": "يعرض الخطوط الرئيسية المحسوبة (MultiPV).",
+  "showClassificationsSetting": "إظهار تصنيفات النقلات",
+  "showClassificationsSettingHelp": "يعرض النظرية والبارعة والحاسمة والأفضل وبقية تصنيفات النقلات.",
+  "showAccuracySetting": "إظهار الدقة",
+  "showAccuracySettingHelp": "يعرض قيم الدقة المحسوبة محليًا.",
+  "showTheorySetting": "إظهار معلومات النظرية",
+  "showTheorySettingHelp": "يعرض معلومات كتاب الافتتاح وعدّادات النقلات النظرية.",
+  "designSettingsTitle": "التصميم",
+  "designSettingsSubtitle": "المظهر والسمة والرقعة والقطع",
+  "generalSettingsTitle": "عام",
+  "generalSettingsSubtitle": "اللغة وسلوك التطبيق",
+  "dataStorageSettingsTitle": "البيانات والتخزين",
+  "dataStorageSettingsSubtitle": "ذاكرة التحليل والتنزيلات والبيانات المحلية",
+  "dataStoragePlaceholder": "ستُضاف خيارات التخزين وذاكرة التخزين المؤقت في خطوة لاحقة.",
+  "licensesAbout": "التراخيص وحول التطبيق",
+  "stockfishPending": "Stockfish 18 · محلي · GPLv3",
+  "provider": "المزود",
+  "localProfile": "ملف محلي",
+  "theory": "النظرية",
+  "brilliant": "بارعة",
+  "critical": "نقلة حاسمة",
+  "best": "الأفضل",
+  "excellent": "ممتازة",
+  "okay": "جيدة",
+  "miss": "فرصة ضائعة",
+  "mistake": "خطأ",
+  "blunder": "خطأ فادح",
+  "totalMoves": "أنصاف النقلات",
+  "localAccuracy": "الدقة المحلية",
+  "close": "إغلاق",
+  "previous": "السابق",
+  "next": "التالي",
+  "first": "الأولى",
+  "last": "الأخيرة",
+  "playPause": "تشغيل أو إيقاف",
+  "player": "اللاعب",
+  "bothPlayers": "كلاهما",
+  "whitePlayer": "الأبيض",
+  "blackPlayer": "الأسود",
+  "analyzedMoves": "النقلات المصنفة",
+  "bookGames": "مباريات الافتتاح",
+  "expectedLoss": "خسارة التوقع",
+  "versions": "الإصدارات",
+  "classifierVersionLabel": "المصنّف",
+  "accuracyVersionLabel": "الدقة",
+  "analyzingGame": "جارٍ تحليل المباراة",
+  "analyzedMovesProgress": "تم تحليل {completed} / {total} نصف نقلة",
+  "@analyzedMovesProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "openAnalysis": "فتح التحليل",
+  "bestMoveText": "{move} هي أفضل نقلة.",
+  "@bestMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "moveComparisonText": "كانت {played} مصنفة: {classification}. ‏{best} هي أفضل نقلة.",
+  "@moveComparisonText": {
+    "placeholders": {
+      "played": {
+        "type": "String"
+      },
+      "classification": {
+        "type": "String"
+      },
+      "best": {
+        "type": "String"
+      }
+    }
+  },
+  "theoryMoveText": "{move} نقلة نظرية.",
+  "@theoryMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "triedMove": "جرّبت {move}.",
+  "@triedMove": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "analyzingVariation": "جارٍ تحليل الخط المؤقت…",
+  "evaluationComparison": "التقييم: {before} ← {after}",
+  "@evaluationComparison": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "bestContinuation": "أفضل متابعة: {line}",
+  "@bestContinuation": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "returnToMainLine": "العودة إلى الخط الرئيسي",
+  "illegalOrFailedMove": "النقلة غير قانونية أو تعذر تحليلها: {message}",
+  "@illegalOrFailedMove": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "myPlayer": "لاعبي",
+  "opponent": "الخصم",
+  "variationStartingPosition": "وضع بداية الخط",
+  "variationStart": "بداية الخط",
+  "engineQualityTitle": "جودة التحليل",
+  "engineResourcesTitle": "الموارد",
+  "depthHelp": "أقصى عمق بحث لكل وضعية. القيم الأعلى تستغرق عادة وقتًا أطول.",
+  "numberOfLinesHelp": "عدد أفضل الخطوط التي يحسبها Stockfish في الوقت نفسه.",
+  "timeLimitHelp": "حد اختياري لكل وضعية. عند إيقافه يُستخدم العمق فقط، وإلا يتوقف البحث عند بلوغ العمق أو الوقت أولًا.",
+  "threads": "خيوط المعالجة",
+  "threadsHelp": "عدد خيوط المعالج التي يستخدمها Stockfish. الزيادة قد تسرّع التحليل لكنها تستهلك معالجًا وبطارية أكثر.",
+  "hashMemory": "ذاكرة Hash",
+  "hashMemoryHelp": "ذاكرة RAM لجدول النقل في Stockfish. زيادة الذاكرة قد تحسن البحث في الوضعيات المتكررة.",
+  "boardDisplayTitle": "عرض الرقعة",
+  "showBoardCoordinates": "إحداثيات الرقعة",
+  "showBoardCoordinatesHelp": "يعرض أسماء الأعمدة والصفوف (a–h / 1–8) على الرقعة.",
+  "highlightLastMove": "تمييز آخر نقلة",
+  "highlightLastMoveHelp": "يميز مربع البداية ومربع النهاية لآخر نقلة تم لعبها.",
+  "highlightSelectedSquare": "تمييز المربع المحدد",
+  "highlightSelectedSquareHelp": "يميز المربع الذي اخترته أثناء استكشاف تفريع.",
+  "behaviorTitle": "السلوك",
+  "autoSyncOnline": "مزامنة الحسابات عبر الإنترنت تلقائيًا",
+  "autoSyncOnlineHelp": "يزامن Chess.com وLichess تلقائيًا عند بدء التطبيق وعند تبديل الحساب.",
+  "confirmBeforeDelete": "التأكيد قبل الحذف",
+  "confirmBeforeDeleteHelp": "يطلب التأكيد قبل حذف الحسابات أو المباريات المحلية.",
+  "analysisCacheTitle": "ذاكرة التحليل المؤقتة",
+  "useGlobalAnalysisCache": "استخدام ذاكرة المواقف المشتركة",
+  "useGlobalAnalysisCacheHelp": "يعيد استخدام تحليل متوافق للمواقف المتطابقة بين مباريات مختلفة.",
+  "clearAnalysisCache": "مسح ذاكرة التحليل",
+  "clearAnalysisCacheHelp": "يمسح ذاكرة المواقف المشتركة فقط. تبقى المباريات المحفوظة والتحليلات المكتملة.",
+  "clearAnalysisCacheQuestion": "مسح ذاكرة التحليل؟",
+  "clearAnalysisCacheBody": "سيتم حذف ذاكرة المواقف المشتركة. ستبقى مبارياتك والمفضلة والتنزيلات والتحليلات المكتملة.",
+  "analysisCacheCleared": "تم مسح ذاكرة التحليل.",
+  "diagnosticsTitle": "التشخيص",
+  "diagnosticLogging": "سجل التشخيص",
+  "diagnosticLoggingHelp": "يكتب سجلات تقنية محدودة لاستكشاف الأخطاء. لا يتم تسجيل PGN أو FEN الكامل أو ردود مزودي الخدمة.",
+  "deleteLocalGameQuestion": "حذف الإدخال المحلي؟",
+  "deleteLocalGameBody": "سيتم حذف PGN/FEN المحفوظ وتحليله المحلي نهائيًا.",
+  "profileRatings": "التصنيفات",
+  "profileGameOverview": "نظرة عامة على المباريات",
+  "profileWins": "انتصارات",
+  "profileDraws": "تعادلات",
+  "profileLosses": "خسائر",
+  "ratingRapid": "سريع",
+  "ratingBlitz": "خاطف",
+  "ratingBullet": "رصاصة",
+  "ratingDaily": "يومي",
+  "ratingClassical": "كلاسيكي",
+  "ratingChess960": "شطرنج 960",
+  "ratingFide": "FIDE"
+}
