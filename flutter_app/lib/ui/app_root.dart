@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../localization/generated/app_localizations.dart';
 import '../shared/models/models.dart';
@@ -3306,11 +3307,11 @@ class _OverviewContent extends StatelessWidget {
           Text(labels.recentForm, style: _overviewSectionLabel(theme)),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               for (final outcome in overview.recentForm)
-                _FormChip(outcome: outcome),
+                _ResultIcon(outcome: outcome, size: 30),
             ],
           ),
         ],
@@ -3368,29 +3369,33 @@ class _StatBig extends StatelessWidget {
   }
 }
 
-class _FormChip extends StatelessWidget {
-  const _FormChip({required this.outcome});
+class _ResultIcon extends StatelessWidget {
+  const _ResultIcon({required this.outcome, this.size = 30});
 
-  final String outcome;
+  final String outcome; // win | loss | draw
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    final (color, letter) = _outcomeStyle(outcome);
-    return Container(
-      width: 24,
-      height: 24,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        letter,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-        ),
+    final asset = switch (outcome) {
+      'win' => 'assets/analysis_img/result_win.svg',
+      'loss' => 'assets/analysis_img/result_loss.svg',
+      'draw' => 'assets/analysis_img/result_draw.svg',
+      _ => null,
+    };
+    if (asset == null) return SizedBox(width: size, height: size);
+    final label = switch (outcome) {
+      'win' => 'Win',
+      'loss' => 'Loss',
+      _ => 'Draw',
+    };
+    return SizedBox(
+      width: size,
+      height: size,
+      child: SvgPicture.asset(
+        asset,
+        fit: BoxFit.contain,
+        semanticsLabel: label,
       ),
     );
   }
@@ -3473,13 +3478,6 @@ String _formatPercent(double? value) =>
 
 String _formatRecord(StatTally tally) =>
     '${tally.wins}–${tally.draws}–${tally.losses}';
-
-(Color, String) _outcomeStyle(String outcome) => switch (outcome) {
-  'win' => (const Color(0xFF2E7D32), 'W'),
-  'draw' => (const Color(0xFF757575), 'D'),
-  'loss' => (const Color(0xFFC62828), 'L'),
-  _ => (const Color(0xFF9E9E9E), '?'),
-};
 
 TextStyle? _overviewSectionLabel(ThemeData theme) =>
     theme.textTheme.labelLarge?.copyWith(
