@@ -83,6 +83,8 @@ add_library(kchess_core SHARED
   src/services/profile_service.cpp
   src/services/provider_service.cpp
   src/services/settings_service.cpp
+  src/services/statistics_service.cpp
+  src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
   src/theory/position_key.cpp
 )
@@ -138,6 +140,7 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     src/engine/stockfish_engine.cpp
     src/persistence/database.cpp
     src/providers/provider_models.cpp
+    src/theory/opening_name_index.cpp
     src/theory/opening_theory_provider.cpp
     src/theory/position_key.cpp
   )

@@ -108,6 +108,24 @@ Builder-Version und Zeitstempel. Vollständige Buildstatistiken stehen in
 `tools/opening_book/BUILD_METADATA.md`. Es findet keine Online-Abfrage zur
 Laufzeit statt und es werden keine Lichess-Marken in der UI verwendet.
 
+Zusätzlich liefert KChess einen vollständig offline genutzten
+KCO1-Eröffnungsnamen-Index aus, der Partien einen ECO-Code und einen
+Eröffnungs-/Variantennamen zuordnet:
+
+- Quelle: `lichess-org/chess-openings`, Upstream-Commit
+  `4b8622759e7ae6f93f011cc6c83a3823401ab45e` (2026-08-04)
+- Lizenz des Katalogs: CC0 1.0
+- verwendete Dateien: `a.tsv`, `b.tsv`, `c.tsv`, `d.tsv`, `e.tsv` (SHA-256 in
+  `tools/opening_names/BUILD_METADATA.md`)
+- Builder/Format: `kco-builder-1` / KCO1 Version 1
+- Ergebnis: 3.810 Einträge, 228.888 Byte, SHA-256
+  `b4207c778ce0e37d34a3242e1936935c9242b9d6712c5f0d6f1d23704114c1bc`
+
+Der KCO-Header enthält `source=lichess`, `license=CC0-1.0`, Builder-Version und
+Zeitstempel. Der Positionsschlüssel ist identisch zu dem des KCB-Books; es
+findet keine Online-Abfrage zur Laufzeit statt und es werden keine
+Lichess-Marken in der UI verwendet.
+
 Nur für das Development-Tool werden `chess` 1.11.2 (GPL-3.0-or-later) und
 `zstandard` 0.25.0 (BSD-3-Clause) benötigt. Weder Python noch diese Pakete
 werden in Android- oder Windows-Binaries eingebettet.

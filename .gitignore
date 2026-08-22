@@ -106,3 +106,7 @@ temp/
 
 # Temporary Kchess update folders
 Kchess_Update_*/
+
+# Python build-tool caches (tools/opening_book, tools/opening_names)
+__pycache__/
+*.pyc

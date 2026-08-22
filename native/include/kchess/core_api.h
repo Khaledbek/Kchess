@@ -107,6 +107,8 @@ KCHESS_API kc_status kc_cancel_provider_job(
 KCHESS_API char* kc_provider_overview_json(
     kc_core_handle handle,
     const char* profile_id_utf8);
+KCHESS_API char* kc_statistics_overview_json(kc_core_handle handle);
+KCHESS_API char* kc_statistics_openings_json(kc_core_handle handle);
 KCHESS_API kc_status kc_set_game_favorite(
     kc_core_handle handle,
     const char* game_id_utf8,

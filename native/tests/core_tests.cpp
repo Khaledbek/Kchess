@@ -16,6 +16,7 @@
 #include "engine/chess_engine.h"
 #include "kchess/core_api.h"
 #include "persistence/database.h"
+#include "theory/opening_name_index.h"
 #include "theory/opening_theory_provider.h"
 #include "theory/position_key.h"
 
@@ -45,6 +46,11 @@ std::string json_string_field(const std::string& json, const std::string& field)
 std::filesystem::path bundled_book_path() {
   return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
       / "flutter_app" / "assets" / "opening_book.kcb";
+}
+
+std::filesystem::path bundled_names_path() {
+  return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
+      / "flutter_app" / "assets" / "opening_names.kco";
 }
 
 void test_smoke() {
@@ -140,6 +146,42 @@ void test_opening_book() {
   truncated.pop_back();
   expect_invalid("truncated.kcb", std::move(truncated));
   std::filesystem::remove_all(directory);
+}
+
+void test_opening_names() {
+  const auto path = bundled_names_path();
+  expect(std::filesystem::exists(path), "Bundled KCO name index must exist");
+  const kchess::KcoOpeningNameIndex index(path);
+  const auto metadata = index.metadata();
+  expect(metadata.format_version == 1 && metadata.entry_count > 3000,
+         "Bundled KCO1 must expose a full named-opening catalog");
+  expect(metadata.source == "lichess" && metadata.license == "CC0-1.0"
+             && metadata.builder_version == "kco-builder-1",
+         "Bundled KCO index must retain CC0 provenance and builder version");
+  expect(index.max_ply() >= 20, "Named lines must reach a realistic opening depth");
+
+  // The empty (start) position is not a named opening.
+  expect(!index.lookup(kchess::stockfish_position_key(kchess::kStartFen)).has_value(),
+         "Start position must not resolve to a named opening");
+
+  // Classify by walking a game: the deepest matching ply wins. Success here also
+  // proves the C++ Stockfish key matches the Python-built asset key.
+  auto classify = [&](const std::string& pgn, const std::string& label) {
+    const auto parsed = kchess::parse_pgn(pgn);
+    expect(parsed.valid, "Classification fixture must parse: " + label);
+    return kchess::classify_opening(index, parsed.game.moves);
+  };
+
+  const auto ruy = classify(
+      "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 *", "Ruy Lopez");
+  expect(ruy.has_value() && ruy->name.find("Ruy Lopez") != std::string::npos
+             && !ruy->eco.empty() && ruy->eco.front() == 'C',
+         "A Ruy Lopez game must classify as a Ruy Lopez (ECO C..)");
+
+  const auto marshall = classify("1. d4 d5 2. c4 Nf6 *", "QGD Marshall Defense");
+  expect(marshall.has_value() && marshall->eco == "D06"
+             && marshall->name.find("Marshall Defense") != std::string::npos,
+         "1.d4 d5 2.c4 Nf6 must classify as D06 QGD Marshall Defense");
 }
 
 void test_classifier_and_accuracy() {
@@ -451,6 +493,7 @@ int main() {
   try {
     test_smoke();
     test_opening_book();
+    test_opening_names();
     test_classifier_and_accuracy();
     test_fen_validation();
     test_pgn_parser();

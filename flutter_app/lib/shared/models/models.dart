@@ -165,6 +165,152 @@ class ProviderOverview {
   final int retryAfterSeconds;
 }
 
+/// A win/draw/loss tally from the profile's perspective, with derived rates.
+/// [winRate] and [scorePercent] are null when no game has a decided result.
+class StatTally {
+  const StatTally({
+    this.games = 0,
+    this.wins = 0,
+    this.draws = 0,
+    this.losses = 0,
+    this.undecided = 0,
+    this.winRate,
+    this.scorePercent,
+  });
+
+  factory StatTally.fromJson(Map<String, Object?> json) => StatTally(
+    games: json['games'] as int? ?? 0,
+    wins: json['wins'] as int? ?? 0,
+    draws: json['draws'] as int? ?? 0,
+    losses: json['losses'] as int? ?? 0,
+    undecided: json['undecided'] as int? ?? 0,
+    winRate: (json['winRate'] as num?)?.toDouble(),
+    scorePercent: (json['scorePercent'] as num?)?.toDouble(),
+  );
+
+  final int games;
+  final int wins;
+  final int draws;
+  final int losses;
+  final int undecided;
+  final double? winRate;
+  final double? scorePercent;
+
+  int get decided => wins + draws + losses;
+}
+
+/// One time-control bucket (bullet, blitz, rapid, ...) with its tally.
+class StatTimeControl {
+  const StatTimeControl({required this.type, required this.tally});
+
+  factory StatTimeControl.fromJson(Map<String, Object?> json) => StatTimeControl(
+    type: json['type'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+  );
+
+  final String type;
+  final StatTally tally;
+}
+
+/// Aggregated performance overview for the active profile.
+class StatisticsOverview {
+  const StatisticsOverview({
+    this.hasProfile = false,
+    this.totalGames = 0,
+    this.overall = const StatTally(),
+    this.white = const StatTally(),
+    this.black = const StatTally(),
+    this.byTimeControl = const [],
+    this.recentForm = const [],
+  });
+
+  factory StatisticsOverview.fromJson(Map<String, Object?> json) {
+    final byColor = json['byColor'] as Map<String, Object?>? ?? const {};
+    return StatisticsOverview(
+      hasProfile: json['hasProfile'] as bool? ?? false,
+      totalGames: json['totalGames'] as int? ?? 0,
+      overall: StatTally.fromJson(
+        json['overall'] as Map<String, Object?>? ?? const {},
+      ),
+      white: StatTally.fromJson(
+        byColor['white'] as Map<String, Object?>? ?? const {},
+      ),
+      black: StatTally.fromJson(
+        byColor['black'] as Map<String, Object?>? ?? const {},
+      ),
+      byTimeControl: (json['byTimeControl'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(StatTimeControl.fromJson)
+          .toList(growable: false),
+      recentForm: (json['recentForm'] as List<Object?>? ?? const [])
+          .cast<String>(),
+    );
+  }
+
+  final bool hasProfile;
+  final int totalGames;
+  final StatTally overall;
+  final StatTally white;
+  final StatTally black;
+  final List<StatTimeControl> byTimeControl;
+  final List<String> recentForm;
+
+  bool get isEmpty => totalGames == 0;
+}
+
+/// Performance in one named opening playing a given color, from the profile's
+/// perspective.
+class OpeningStat {
+  const OpeningStat({
+    required this.eco,
+    required this.name,
+    required this.color,
+    required this.tally,
+  });
+
+  factory OpeningStat.fromJson(Map<String, Object?> json) => OpeningStat(
+    eco: json['eco'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    color: json['color'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+  );
+
+  final String eco;
+  final String name;
+  final String color; // white | black | unknown
+  final StatTally tally;
+}
+
+/// Win-rate-by-opening for the active profile, most played first.
+class OpeningsStats {
+  const OpeningsStats({
+    this.hasProfile = false,
+    this.gamesWithOpening = 0,
+    this.gamesWithoutOpening = 0,
+    this.distinctOpenings = 0,
+    this.openings = const [],
+  });
+
+  factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
+    hasProfile: json['hasProfile'] as bool? ?? false,
+    gamesWithOpening: json['gamesWithOpening'] as int? ?? 0,
+    gamesWithoutOpening: json['gamesWithoutOpening'] as int? ?? 0,
+    distinctOpenings: json['distinctOpenings'] as int? ?? 0,
+    openings: (json['openings'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(OpeningStat.fromJson)
+        .toList(growable: false),
+  );
+
+  final bool hasProfile;
+  final int gamesWithOpening;
+  final int gamesWithoutOpening;
+  final int distinctOpenings;
+  final List<OpeningStat> openings;
+
+  bool get isEmpty => gamesWithOpening == 0;
+}
+
 enum AppThemeMode {
   system,
   light,
