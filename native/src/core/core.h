@@ -34,10 +34,12 @@ class Core {
       const std::string& provider_username);
   void set_active_profile(const std::string& profile_id);
   void delete_profile(const std::string& profile_id);
+  void merge_local_profile(const std::string& source_profile_id, const std::string& target_profile_id);
   std::string active_profile_json();
 
   std::string settings_json();
   void set_engine_settings(int depth, int multi_pv, int time_limit_seconds);
+  void set_analysis_depth_range(int minimum_depth, int maximum_depth);
   void set_engine_resources(int threads, int hash_mb);
   void set_show_board_arrows(bool enabled);
   void set_boolean_setting(const std::string& key, bool enabled);
@@ -45,6 +47,7 @@ class Core {
   void set_locale(const std::string& locale);
 
   std::string games_json();
+  std::string favorite_games_json();
   std::string game_json(const std::string& game_id);
   std::string import_pgn_json(const std::string& pgn);
   std::string import_fen_json(const std::string& fen, const std::string& display_name);
@@ -70,6 +73,7 @@ class Core {
   std::string start_analysis_json(const std::string& game_id);
   std::string analysis_status_json(const std::string& game_id);
   std::string move_analysis_status_json(const std::string& game_id, int ply);
+  std::string start_move_refinement_json(const std::string& game_id, int ply);
   void cancel_analysis(const std::string& game_id);
   void clear_engine_cache();
   std::string start_variation_analysis_json(
@@ -82,6 +86,7 @@ class Core {
       int threads,
       int hash_mb);
   std::string variation_analysis_status_json(const std::string& job_id);
+  void cancel_variation_analysis(const std::string& job_id);
 
   const std::string& last_error() const noexcept { return last_error_; }
   int32_t last_status() const noexcept { return last_status_; }

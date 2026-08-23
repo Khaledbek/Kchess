@@ -179,6 +179,7 @@ enum AppThemeMode {
 
 class AppSettings {
   const AppSettings({
+    this.minAnalysisDepth = 12,
     this.depth = 18,
     this.multiPv = 3,
     this.timeLimitSeconds = 0,
@@ -203,7 +204,8 @@ class AppSettings {
   });
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
-    depth: json['depth'] as int? ?? 18,
+    minAnalysisDepth: json['minAnalysisDepth'] as int? ?? 12,
+    depth: (json['maxAnalysisDepth'] as int?) ?? (json['depth'] as int?) ?? 18,
     multiPv: json['multiPv'] as int? ?? 3,
     timeLimitSeconds: json['timeLimitSeconds'] as int? ?? 0,
     threads: json['threads'] as int? ?? 2,
@@ -229,6 +231,7 @@ class AppSettings {
     locale: json['locale'] as String? ?? 'de',
   );
 
+  final int minAnalysisDepth;
   final int depth;
   final int multiPv;
   final int timeLimitSeconds;
@@ -256,6 +259,7 @@ class AppSettings {
   bool get showBoardArrows => showBestMoveArrow;
 
   AppSettings copyWith({
+    int? minAnalysisDepth,
     int? depth,
     int? multiPv,
     int? timeLimitSeconds,
@@ -279,6 +283,7 @@ class AppSettings {
     AppThemeMode? themeMode,
     String? locale,
   }) => AppSettings(
+    minAnalysisDepth: minAnalysisDepth ?? this.minAnalysisDepth,
     depth: depth ?? this.depth,
     multiPv: multiPv ?? this.multiPv,
     timeLimitSeconds: timeLimitSeconds ?? this.timeLimitSeconds,
@@ -697,6 +702,8 @@ class AnalysisSnapshot {
     required this.totalPlies,
     required this.progress,
     required this.currentPly,
+    this.liveDepth = 0,
+    this.qualityComplete = false,
     required this.bestMove,
     required this.recommendedMove,
     required this.engineVersion,
@@ -725,6 +732,8 @@ class AnalysisSnapshot {
         totalPlies: json['totalPlies']! as int,
         progress: (json['progress']! as num).toDouble(),
         currentPly: json['currentPly'] as int? ?? -1,
+        liveDepth: json['liveDepth'] as int? ?? 0,
+        qualityComplete: json['qualityComplete'] as bool? ?? false,
         bestMove: json['bestMove'] as String? ?? '',
         recommendedMove: json['recommendedMove'] as String? ?? '',
         engineVersion: json['engineVersion'] as String? ?? '',
@@ -759,6 +768,8 @@ class AnalysisSnapshot {
   final int totalPlies;
   final double progress;
   final int currentPly;
+  final int liveDepth;
+  final bool qualityComplete;
   final String bestMove;
   final String recommendedMove;
   final String engineVersion;
@@ -791,6 +802,7 @@ class VariationAnalysisSnapshot {
     required this.fen,
     required this.bestMove,
     required this.lines,
+    this.liveDepth = 0,
     this.moverEvaluationCp,
     this.moverMateIn,
     this.error,
@@ -804,6 +816,7 @@ class VariationAnalysisSnapshot {
         playedSan: json['playedSan'] as String? ?? '',
         fen: json['fen'] as String? ?? '',
         bestMove: json['bestMove'] as String? ?? '',
+        liveDepth: json['liveDepth'] as int? ?? 0,
         moverEvaluationCp: json['moverEvaluationCp'] as int?,
         moverMateIn: json['moverMateIn'] as int?,
         error: json['error'] as String?,
@@ -819,6 +832,7 @@ class VariationAnalysisSnapshot {
   final String playedSan;
   final String fen;
   final String bestMove;
+  final int liveDepth;
   final int? moverEvaluationCp;
   final int? moverMateIn;
   final String? error;
@@ -826,4 +840,27 @@ class VariationAnalysisSnapshot {
 
   bool get isRunning => status == 'running';
   bool get isComplete => status == 'complete';
+  bool get isPaused => status == 'paused';
+
+  VariationAnalysisSnapshot copyWith({
+    String? status,
+    String? bestMove,
+    int? liveDepth,
+    int? moverEvaluationCp,
+    int? moverMateIn,
+    String? error,
+    List<EngineLine>? lines,
+  }) => VariationAnalysisSnapshot(
+    jobId: jobId,
+    status: status ?? this.status,
+    playedMove: playedMove,
+    playedSan: playedSan,
+    fen: fen,
+    bestMove: bestMove ?? this.bestMove,
+    liveDepth: liveDepth ?? this.liveDepth,
+    moverEvaluationCp: moverEvaluationCp ?? this.moverEvaluationCp,
+    moverMateIn: moverMateIn ?? this.moverMateIn,
+    error: error ?? this.error,
+    lines: lines ?? this.lines,
+  );
 }

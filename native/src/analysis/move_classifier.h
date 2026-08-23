@@ -10,17 +10,16 @@
 namespace kchess {
 
 struct MoveClassifierConfig {
-  static constexpr int version = 4;
+  static constexpr int version = 6;
   double best_loss{0.005};
   double excellent_loss{0.03};
   double okay_loss{0.08};
-  double mistake_loss{0.20};
-  // Brilliant is deliberately rare: an exact engine-best move, outside theory,
-  // from a non-forced/non-check position, with a real alternative and a
-  // verified material sacrifice. Pure eval gaps are not a tactical motif.
+  // Brilliant is deliberately rare: a near-best move outside theory, from a
+  // non-forced/non-check position, with a verified material sacrifice and
+  // tactical justification (forced mate or a uniquely strong best line).
   double brilliant_gap{0.15};
   double brilliant_min_best_score{0.60};
-  double critical_gap{0.20};
+  double critical_gap{0.18};
   double critical_min_best_score{0.45};
   double miss_best_score{0.70};
   double miss_played_ceiling{0.55};

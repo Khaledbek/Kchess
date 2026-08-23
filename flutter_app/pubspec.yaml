@@ -26,6 +26,6 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
+    - assets/
     - assets/analysis_img/
     - ../img/
-    - assets/opening_book.kcb

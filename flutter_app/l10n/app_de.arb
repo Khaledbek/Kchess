@@ -96,7 +96,7 @@
   "localProfile": "Lokales Profil",
   "theory": "Theorie",
   "brilliant": "Brillant",
-  "critical": "Kritischer Zug",
+  "critical": "Großartiger Zug",
   "best": "Bester",
   "excellent": "Ausgezeichnet",
   "okay": "Okay",
@@ -172,6 +172,21 @@
       }
     }
   },
+  "sidelineEngineTitle": "Side-Line-Engine",
+  "sidelineEngineSubtitle": "Diese Werte gelten nur für die Live-Analyse eigener Varianten.",
+  "mainLineLabel": "Hauptlinie",
+  "sidelineLabel": "Eigene Variante",
+  "liveEngineTheorySkipped": "Theorie: Live-Analyse übersprungen",
+  "liveEngineTargetReached": "Stockfish: Analyseziel erreicht",
+  "liveEngineProgress": "Stockfish analysiert live · {percent}%",
+  "@liveEngineProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "sidelineAnalysisPaused": "Live-Analyse pausiert",
   "analyzingVariation": "Die temporäre Variante wird analysiert…",
   "evaluationComparison": "Bewertung: {before} → {after}",
   "@evaluationComparison": {
@@ -211,7 +226,7 @@
   "numberOfLinesHelp": "Wie viele beste Varianten Stockfish gleichzeitig berechnet.",
   "timeLimitHelp": "Optionales Limit pro Stellung. Aus nutzt nur die Tiefe; sonst endet die Suche, sobald Tiefe oder Zeit zuerst erreicht ist.",
   "threads": "Threads",
-  "threadsHelp": "CPU-Threads für Stockfish. Mehr kann schneller sein, benötigt aber mehr Rechenleistung und Akku.",
+  "threadsHelp": "CPU-Threads pro Stockfish-Worker. Kchess erkennt deinen PC automatisch und erlaubt höchstens die Hälfte der logischen CPU-Threads.",
   "hashMemory": "Hash-Speicher",
   "hashMemoryHelp": "Arbeitsspeicher für Stockfishs Transposition Table. Mehr Speicher kann die Suche in wiederkehrenden Stellungen verbessern.",
   "boardDisplayTitle": "Brettdarstellung",

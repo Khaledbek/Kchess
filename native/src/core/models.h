@@ -59,6 +59,7 @@ struct AppSettings {
   static constexpr int max_time_limit_seconds = kTimeLimitSetting.max_int;
   static constexpr int default_time_limit_seconds = kTimeLimitSetting.default_int;
 
+  int min_analysis_depth{12};
   int depth{default_depth};
   int multi_pv{default_multi_pv};
   int time_limit_seconds{default_time_limit_seconds};

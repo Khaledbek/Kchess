@@ -86,6 +86,19 @@ void Core::delete_profile(const std::string& profile_id) {
   profile_service_.delete_profile_storage(*profile);
 }
 
+void Core::merge_local_profile(
+    const std::string& source_profile_id,
+    const std::string& target_profile_id) {
+  validate_token(source_profile_id, "source profile id");
+  validate_token(target_profile_id, "target profile id");
+
+  provider_service_.cancel_jobs_for_profile(source_profile_id);
+  const auto game_ids = database_.profile_game_ids(source_profile_id);
+  analysis_service_.cancel_jobs_for_games(game_ids);
+
+  profile_service_.merge_local_profile(source_profile_id, target_profile_id);
+}
+
 std::string Core::active_profile_json() {
   return profile_service_.active_profile_json();
 }
@@ -97,6 +110,11 @@ std::string Core::settings_json() {
 void Core::set_engine_settings(
     const int depth, const int multi_pv, const int time_limit_seconds) {
   settings_service_.set_engine_settings(depth, multi_pv, time_limit_seconds);
+}
+
+void Core::set_analysis_depth_range(
+    const int minimum_depth, const int maximum_depth) {
+  settings_service_.set_analysis_depth_range(minimum_depth, maximum_depth);
 }
 
 void Core::set_engine_resources(const int threads, const int hash_mb) {
@@ -121,6 +139,10 @@ void Core::set_locale(const std::string& locale) {
 
 std::string Core::games_json() {
   return game_library_service_.games_json();
+}
+
+std::string Core::favorite_games_json() {
+  return game_library_service_.favorite_games_json();
 }
 
 std::string Core::game_json(const std::string& game_id) {
@@ -211,6 +233,11 @@ std::string Core::move_analysis_status_json(
   return analysis_service_.move_analysis_status_json(game_id, ply);
 }
 
+std::string Core::start_move_refinement_json(
+    const std::string& game_id, const int ply) {
+  return analysis_service_.start_move_refinement_json(game_id, ply);
+}
+
 void Core::cancel_analysis(const std::string& game_id) {
   analysis_service_.cancel_analysis(game_id);
 }
@@ -237,6 +264,10 @@ std::string Core::start_variation_analysis_with_settings_json(
 
 std::string Core::variation_analysis_status_json(const std::string& job_id) {
   return analysis_service_.variation_analysis_status_json(job_id);
+}
+
+void Core::cancel_variation_analysis(const std::string& job_id) {
+  analysis_service_.cancel_variation_analysis(job_id);
 }
 
 }  // namespace kchess

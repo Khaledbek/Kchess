@@ -258,8 +258,8 @@ constexpr const char* kGameColumns =
     "g.provider_ended_at,EXISTS(SELECT 1 FROM favorites f WHERE f.profile_id=g.profile_id "
     "AND f.game_id=g.id),(SELECT f.collection_id FROM favorites f WHERE "
     "f.profile_id=g.profile_id AND f.game_id=g.id),"
-    "EXISTS(SELECT 1 FROM downloads d WHERE d.profile_id=g.profile_id "
-    "AND d.game_id=g.id),(ar.id IS NOT NULL)";
+    "EXISTS(SELECT 1 FROM favorites f JOIN favorite_collections c ON c.id=f.collection_id "
+    "WHERE f.game_id=g.id AND c.name='Downloads' COLLATE NOCASE),(ar.id IS NOT NULL)";
 
 constexpr const char* kGameJoins =
     " FROM games g LEFT JOIN game_sources gs ON gs.game_id=g.id "
@@ -661,6 +661,79 @@ CREATE INDEX favorites_collection_idx
 PRAGMA user_version = 10;
 )sql";
 
+// Favorite collections are application-wide. Games themselves still belong to
+// exactly one profile, but their favorite membership can be surfaced together
+// across every profile. Rebuilding both tables preserves existing memberships
+// while removing collection ownership/cascade from a profile.
+constexpr const char* kMigration11 = R"sql(
+CREATE TABLE favorite_collections_global (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL CHECK(length(trim(name)) > 0),
+  created_at INTEGER NOT NULL
+);
+INSERT INTO favorite_collections_global(id,name,created_at)
+  SELECT id,name,created_at FROM favorite_collections;
+CREATE TABLE favorites_global (
+  profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  collection_id TEXT REFERENCES favorite_collections_global(id) ON DELETE SET NULL,
+  PRIMARY KEY(profile_id, game_id)
+);
+INSERT INTO favorites_global(profile_id,game_id,created_at,collection_id)
+  SELECT profile_id,game_id,created_at,collection_id FROM favorites;
+DROP TABLE favorites;
+DROP TABLE favorite_collections;
+ALTER TABLE favorite_collections_global RENAME TO favorite_collections;
+ALTER TABLE favorites_global RENAME TO favorites;
+CREATE INDEX favorite_collections_created_idx
+  ON favorite_collections(created_at ASC);
+CREATE INDEX favorite_collections_name_idx
+  ON favorite_collections(name COLLATE NOCASE);
+CREATE INDEX favorites_collection_idx
+  ON favorites(collection_id, created_at DESC);
+CREATE INDEX favorites_game_idx
+  ON favorites(game_id);
+PRAGMA user_version = 11;
+)sql";
+
+// The old download flag is no longer an independent state. Existing saved
+// provider games become normal global favorites inside a top-level Downloads
+// collection. The legacy downloads table stays empty only for schema/backward
+// compatibility with older binaries.
+constexpr const char* kMigration12 = R"sql(
+INSERT INTO favorite_collections(id,name,created_at)
+SELECT
+  'system-downloads',
+  'Downloads',
+  COALESCE((SELECT MIN(downloaded_at) FROM downloads), CAST(strftime('%s','now') AS INTEGER))
+WHERE EXISTS(SELECT 1 FROM downloads)
+  AND NOT EXISTS(
+    SELECT 1 FROM favorite_collections WHERE name='Downloads' COLLATE NOCASE
+  );
+
+INSERT OR IGNORE INTO favorites(profile_id,game_id,created_at,collection_id)
+SELECT
+  d.profile_id,
+  d.game_id,
+  d.downloaded_at,
+  (SELECT id FROM favorite_collections
+   WHERE name='Downloads' COLLATE NOCASE
+   ORDER BY created_at ASC LIMIT 1)
+FROM downloads d;
+
+UPDATE favorites
+SET collection_id=(
+  SELECT id FROM favorite_collections
+  WHERE name='Downloads' COLLATE NOCASE
+  ORDER BY created_at ASC LIMIT 1
+)
+WHERE game_id IN (SELECT game_id FROM downloads);
+
+DELETE FROM downloads;
+PRAGMA user_version = 12;
+)sql";
+
 }  // namespace
 
 Database::Database(std::filesystem::path data_directory)
@@ -703,6 +776,8 @@ void Database::open_and_migrate() {
     if (version < 8) execute(kMigration8);
     if (version < 9) execute(kMigration9);
     if (version < 10) execute(kMigration10);
+    if (version < 11) execute(kMigration11);
+    if (version < 12) execute(kMigration12);
 
     // Privacy hardening for online profiles. Earlier builds could persist public
     // real-world/account metadata returned by provider profile endpoints. Kchess
@@ -930,6 +1005,362 @@ std::vector<std::string> Database::profile_game_ids(
   return result;
 }
 
+
+void Database::merge_local_profile(
+    const std::string& source_profile_id,
+    const std::string& target_profile_id) {
+  if (source_profile_id == target_profile_id) {
+    throw std::invalid_argument("Source and target profile must be different");
+  }
+
+  const auto source_profile = profile(source_profile_id);
+  const auto target_profile = profile(target_profile_id);
+  if (!source_profile.has_value() || !target_profile.has_value()) {
+    throw std::runtime_error("Profile not found");
+  }
+  if (source_profile->type != ProfileType::local_pgn_fen) {
+    throw std::invalid_argument("Only a local PGN/FEN profile can be merged");
+  }
+  if (target_profile->type == ProfileType::local_pgn_fen) {
+    throw std::invalid_argument("Merge target must be a Chess.com or Lichess profile");
+  }
+
+  struct AnalysisRunCandidate {
+    std::string id;
+    std::string analysis_version;
+    std::string status;
+    int completed_plies{0};
+  };
+
+  const auto source_game_ids = profile_game_ids(source_profile_id);
+
+  execute("BEGIN IMMEDIATE;");
+  try {
+    for (const auto& source_game_id : source_game_ids) {
+      auto source_game = prepare(
+          db_,
+          "SELECT kind,COALESCE(starting_fen,''),pgn,white_name,black_name,result,game_date "
+          "FROM games WHERE id=? AND profile_id=?;");
+      sqlite3_bind_text(
+          source_game.get(), 1, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(
+          source_game.get(), 2, source_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+      if (sqlite3_step(source_game.get()) != SQLITE_ROW) continue;
+
+      const auto kind = text_column(source_game.get(), 0);
+      const auto starting_fen = text_column(source_game.get(), 1);
+      const auto pgn = text_column(source_game.get(), 2);
+      const auto white_name = text_column(source_game.get(), 3);
+      const auto black_name = text_column(source_game.get(), 4);
+      const auto result = text_column(source_game.get(), 5);
+      const auto game_date = text_column(source_game.get(), 6);
+      std::optional<std::string> duplicate_id;
+
+      if (kind == "fen") {
+        auto duplicate = prepare(
+            db_,
+            "SELECT id FROM games "
+            "WHERE profile_id=? AND kind='fen' "
+            "AND TRIM(COALESCE(starting_fen,''))=TRIM(?) "
+            "ORDER BY created_at ASC LIMIT 1;");
+        sqlite3_bind_text(
+            duplicate.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            duplicate.get(), 2, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(duplicate.get()) == SQLITE_ROW) {
+          duplicate_id = text_column(duplicate.get(), 0);
+        }
+      } else {
+        int source_move_count = 0;
+        auto move_count = prepare(
+            db_, "SELECT COUNT(*) FROM game_moves WHERE game_id=?;");
+        sqlite3_bind_text(
+            move_count.get(), 1, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(move_count.get()) == SQLITE_ROW) {
+          source_move_count = sqlite3_column_int(move_count.get(), 0);
+        }
+
+        if (source_move_count > 0) {
+          auto duplicate = prepare(
+              db_,
+              "SELECT g.id FROM games g "
+              "WHERE g.profile_id=? AND g.kind='pgn' "
+              "AND COALESCE(g.starting_fen,'')=? "
+              "AND LOWER(TRIM(g.white_name))=LOWER(TRIM(?)) "
+              "AND LOWER(TRIM(g.black_name))=LOWER(TRIM(?)) "
+              "AND g.result=? "
+              "AND ((?<>'' AND TRIM(g.game_date)=TRIM(?)) "
+              "     OR (?='' AND TRIM(g.pgn)=TRIM(?))) "
+              "AND (SELECT COUNT(*) FROM game_moves tm WHERE tm.game_id=g.id)=? "
+              "AND NOT EXISTS("
+              "  SELECT 1 FROM game_moves sm "
+              "  LEFT JOIN game_moves tm "
+              "    ON tm.game_id=g.id AND tm.ply_index=sm.ply_index "
+              "  WHERE sm.game_id=? AND (tm.uci IS NULL OR tm.uci<>sm.uci)"
+              ") "
+              "ORDER BY g.created_at ASC LIMIT 1;");
+          sqlite3_bind_text(
+              duplicate.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 2, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 3, white_name.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 4, black_name.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 5, result.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 6, game_date.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 7, game_date.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 8, game_date.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              duplicate.get(), 9, pgn.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_int(duplicate.get(), 10, source_move_count);
+          sqlite3_bind_text(
+              duplicate.get(), 11, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+          if (sqlite3_step(duplicate.get()) == SQLITE_ROW) {
+            duplicate_id = text_column(duplicate.get(), 0);
+          }
+        } else if (!pgn.empty()) {
+          auto duplicate = prepare(
+              db_,
+              "SELECT id FROM games "
+              "WHERE profile_id=? AND kind='pgn' AND TRIM(pgn)=TRIM(?) "
+              "ORDER BY created_at ASC LIMIT 1;");
+          sqlite3_bind_text(
+              duplicate.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(duplicate.get(), 2, pgn.c_str(), -1, SQLITE_TRANSIENT);
+          if (sqlite3_step(duplicate.get()) == SQLITE_ROW) {
+            duplicate_id = text_column(duplicate.get(), 0);
+          }
+        }
+      }
+
+      if (!duplicate_id.has_value()) {
+        auto move_game = prepare(
+            db_, "UPDATE games SET profile_id=? WHERE id=? AND profile_id=?;");
+        sqlite3_bind_text(
+            move_game.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            move_game.get(), 2, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            move_game.get(), 3, source_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        check(sqlite3_step(move_game.get()), db_, "move local game to target profile");
+
+        auto move_favorite = prepare(
+            db_, "UPDATE favorites SET profile_id=? WHERE game_id=? AND profile_id=?;");
+        sqlite3_bind_text(
+            move_favorite.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            move_favorite.get(), 2, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            move_favorite.get(), 3, source_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        check(sqlite3_step(move_favorite.get()), db_, "move favorite ownership");
+
+        auto move_download = prepare(
+            db_, "UPDATE downloads SET profile_id=? WHERE game_id=? AND profile_id=?;");
+        sqlite3_bind_text(
+            move_download.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            move_download.get(), 2, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            move_download.get(), 3, source_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+        check(sqlite3_step(move_download.get()), db_, "move legacy download ownership");
+        continue;
+      }
+
+      const auto& target_game_id = *duplicate_id;
+
+      std::optional<std::int64_t> source_favorite_created;
+      std::optional<std::string> source_collection;
+      {
+        auto favorite = prepare(
+            db_, "SELECT created_at,collection_id FROM favorites WHERE game_id=?;");
+        sqlite3_bind_text(
+            favorite.get(), 1, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(favorite.get()) == SQLITE_ROW) {
+          source_favorite_created = sqlite3_column_int64(favorite.get(), 0);
+          source_collection = optional_text_column(favorite.get(), 1);
+        }
+      }
+
+      if (source_favorite_created.has_value()) {
+        std::optional<std::int64_t> target_favorite_created;
+        std::optional<std::string> target_collection;
+        auto target_favorite = prepare(
+            db_, "SELECT created_at,collection_id FROM favorites WHERE game_id=?;");
+        sqlite3_bind_text(
+            target_favorite.get(), 1, target_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(target_favorite.get()) == SQLITE_ROW) {
+          target_favorite_created = sqlite3_column_int64(target_favorite.get(), 0);
+          target_collection = optional_text_column(target_favorite.get(), 1);
+        }
+
+        if (!target_favorite_created.has_value()) {
+          auto insert = prepare(
+              db_,
+              "INSERT INTO favorites(profile_id,game_id,created_at,collection_id) "
+              "VALUES(?,?,?,?);");
+          sqlite3_bind_text(
+              insert.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              insert.get(), 2, target_game_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_int64(insert.get(), 3, *source_favorite_created);
+          bind_optional_text(insert.get(), 4, source_collection);
+          check(sqlite3_step(insert.get()), db_, "preserve favorite during profile merge");
+        } else {
+          const auto created_at =
+              std::min(*source_favorite_created, *target_favorite_created);
+          const auto collection =
+              source_collection.has_value() ? source_collection : target_collection;
+          auto update = prepare(
+              db_,
+              "UPDATE favorites SET profile_id=?,created_at=?,collection_id=? "
+              "WHERE game_id=?;");
+          sqlite3_bind_text(
+              update.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_int64(update.get(), 2, created_at);
+          bind_optional_text(update.get(), 3, collection);
+          sqlite3_bind_text(
+              update.get(), 4, target_game_id.c_str(), -1, SQLITE_TRANSIENT);
+          check(sqlite3_step(update.get()), db_, "merge duplicate favorite");
+        }
+
+        auto remove_source_favorite =
+            prepare(db_, "DELETE FROM favorites WHERE game_id=?;");
+        sqlite3_bind_text(
+            remove_source_favorite.get(),
+            1,
+            source_game_id.c_str(),
+            -1,
+            SQLITE_TRANSIENT);
+        check(
+            sqlite3_step(remove_source_favorite.get()),
+            db_,
+            "remove duplicate source favorite");
+      }
+
+      std::vector<AnalysisRunCandidate> source_runs;
+      {
+        auto runs = prepare(
+            db_,
+            "SELECT id,analysis_version,status,completed_plies "
+            "FROM analysis_runs WHERE game_id=?;");
+        sqlite3_bind_text(runs.get(), 1, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        while (sqlite3_step(runs.get()) == SQLITE_ROW) {
+          source_runs.push_back({
+              .id = text_column(runs.get(), 0),
+              .analysis_version = text_column(runs.get(), 1),
+              .status = text_column(runs.get(), 2),
+              .completed_plies = sqlite3_column_int(runs.get(), 3),
+          });
+        }
+      }
+
+      for (const auto& source_run : source_runs) {
+        std::optional<AnalysisRunCandidate> target_run;
+        auto candidate = prepare(
+            db_,
+            "SELECT id,analysis_version,status,completed_plies "
+            "FROM analysis_runs WHERE game_id=? AND analysis_version=? LIMIT 1;");
+        sqlite3_bind_text(
+            candidate.get(), 1, target_game_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(
+            candidate.get(),
+            2,
+            source_run.analysis_version.c_str(),
+            -1,
+            SQLITE_TRANSIENT);
+        if (sqlite3_step(candidate.get()) == SQLITE_ROW) {
+          target_run = AnalysisRunCandidate{
+              .id = text_column(candidate.get(), 0),
+              .analysis_version = text_column(candidate.get(), 1),
+              .status = text_column(candidate.get(), 2),
+              .completed_plies = sqlite3_column_int(candidate.get(), 3),
+          };
+        }
+
+        if (!target_run.has_value()) {
+          auto move_run =
+              prepare(db_, "UPDATE analysis_runs SET game_id=? WHERE id=?;");
+          sqlite3_bind_text(
+              move_run.get(), 1, target_game_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              move_run.get(), 2, source_run.id.c_str(), -1, SQLITE_TRANSIENT);
+          check(sqlite3_step(move_run.get()), db_, "move analysis to duplicate game");
+          continue;
+        }
+
+        const bool source_complete = source_run.status == "complete";
+        const bool target_complete = target_run->status == "complete";
+        const bool source_is_better =
+            (source_complete && !target_complete) ||
+            (source_complete == target_complete &&
+             source_run.completed_plies > target_run->completed_plies);
+
+        if (source_is_better) {
+          auto remove_target =
+              prepare(db_, "DELETE FROM analysis_runs WHERE id=?;");
+          sqlite3_bind_text(
+              remove_target.get(), 1, target_run->id.c_str(), -1, SQLITE_TRANSIENT);
+          check(sqlite3_step(remove_target.get()), db_, "replace duplicate analysis");
+          auto move_run =
+              prepare(db_, "UPDATE analysis_runs SET game_id=? WHERE id=?;");
+          sqlite3_bind_text(
+              move_run.get(), 1, target_game_id.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(
+              move_run.get(), 2, source_run.id.c_str(), -1, SQLITE_TRANSIENT);
+          check(sqlite3_step(move_run.get()), db_, "preserve better analysis");
+        } else {
+          auto remove_source =
+              prepare(db_, "DELETE FROM analysis_runs WHERE id=?;");
+          sqlite3_bind_text(
+              remove_source.get(), 1, source_run.id.c_str(), -1, SQLITE_TRANSIENT);
+          check(sqlite3_step(remove_source.get()), db_, "remove duplicate analysis");
+        }
+      }
+
+      // The target record is the canonical provider/local copy. Once favorites
+      // and the best available analyses have been retained, the duplicate local
+      // record can be removed safely together with its duplicate move rows.
+      auto remove_source_game =
+          prepare(db_, "DELETE FROM games WHERE id=? AND profile_id=?;");
+      sqlite3_bind_text(
+          remove_source_game.get(), 1, source_game_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(
+          remove_source_game.get(), 2, source_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+      check(sqlite3_step(remove_source_game.get()), db_, "remove duplicate local game");
+    }
+
+    auto activate_target =
+        prepare(db_, "UPDATE profiles SET last_opened_at=? WHERE id=?;");
+    sqlite3_bind_int64(activate_target.get(), 1, unix_time_seconds());
+    sqlite3_bind_text(
+        activate_target.get(), 2, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(activate_target.get()), db_, "activate merge target");
+
+    auto save_active = prepare(
+        db_,
+        "INSERT INTO app_settings(key,value) VALUES('activeProfileId',?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value;");
+    sqlite3_bind_text(
+        save_active.get(), 1, target_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(save_active.get()), db_, "save merge target");
+
+    auto remove_profile = prepare(db_, "DELETE FROM profiles WHERE id=?;");
+    sqlite3_bind_text(
+        remove_profile.get(), 1, source_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(remove_profile.get()), db_, "delete merged local profile");
+
+    execute("COMMIT;");
+  } catch (...) {
+    sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+    throw;
+  }
+}
+
 std::optional<std::string> Database::setting(const std::string& key) const {
   auto statement = prepare(db_, "SELECT value FROM app_settings WHERE key=?;");
   sqlite3_bind_text(statement.get(), 1, key.c_str(), -1, SQLITE_TRANSIENT);
@@ -958,6 +1389,13 @@ AppSettings Database::settings() const {
   result.diagnostic_logging = setting("diagnosticLogging").value_or("true") == "true";
   result.theme_mode = setting("themeMode").value_or("system");
   result.locale = setting("locale").value_or("de");
+  try {
+    result.min_analysis_depth = std::clamp(
+        std::stoi(setting("minAnalysisDepth").value_or("12")),
+        AppSettings::min_depth, AppSettings::max_depth);
+  } catch (...) {
+    result.min_analysis_depth = 12;
+  }
   const auto active_id = setting("activeProfileId");
   if (active_id.has_value()) {
     auto statement = prepare(
@@ -976,6 +1414,7 @@ AppSettings Database::settings() const {
           AppSettings::min_time_limit_seconds, AppSettings::max_time_limit_seconds);
       result.threads = std::clamp(sqlite3_column_int(statement.get(), 3), kThreadsSetting.min_int, kThreadsSetting.max_int);
       result.hash_mb = std::clamp(sqlite3_column_int(statement.get(), 4), kHashMbSetting.min_int, kHashMbSetting.max_int);
+      result.min_analysis_depth = std::min(result.min_analysis_depth, result.depth);
     }
   }
   return result;
@@ -1324,119 +1763,114 @@ int Database::upsert_provider_games(
 }
 
 void Database::set_favorite(
-    const std::string& profile_id, const std::string& game_id, const bool value) {
-  auto owned = prepare(db_, "SELECT 1 FROM games WHERE id=? AND profile_id=?;");
-  sqlite3_bind_text(owned.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(owned.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  if (sqlite3_step(owned.get()) != SQLITE_ROW) throw std::runtime_error("Game not found");
-  auto statement = value
-      ? prepare(db_, "INSERT OR IGNORE INTO favorites(profile_id,game_id,created_at) VALUES(?,?,?);")
-      : prepare(db_, "DELETE FROM favorites WHERE profile_id=? AND game_id=?;");
-  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
-  if (value) sqlite3_bind_int64(statement.get(), 3, unix_time_seconds());
-  check(sqlite3_step(statement.get()), db_, "update favorite");
+    const std::string& /*profile_id*/, const std::string& game_id, const bool value) {
+  auto game = prepare(db_, "SELECT profile_id FROM games WHERE id=?;");
+  sqlite3_bind_text(game.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(game.get()) != SQLITE_ROW) throw std::runtime_error("Game not found");
+  const auto owner_profile_id = text_column(game.get(), 0);
+
+  if (value) {
+    auto statement = prepare(
+        db_,
+        "INSERT OR IGNORE INTO favorites(profile_id,game_id,created_at,collection_id) "
+        "VALUES(?,?,?,NULL);");
+    sqlite3_bind_text(statement.get(), 1, owner_profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(statement.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(statement.get(), 3, unix_time_seconds());
+    check(sqlite3_step(statement.get()), db_, "favorite game");
+  } else {
+    auto statement = prepare(db_, "DELETE FROM favorites WHERE game_id=?;");
+    sqlite3_bind_text(statement.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(statement.get()), db_, "unfavorite game");
+  }
 }
 
 std::vector<FavoriteCollectionRecord> Database::favorite_collections(
-    const std::string& profile_id) const {
+    const std::string& /*profile_id*/) const {
   auto statement = prepare(
       db_,
-      "SELECT c.id,c.profile_id,c.name,COUNT(f.game_id),c.created_at "
+      "SELECT c.id,c.name,COUNT(f.game_id),c.created_at "
       "FROM favorite_collections c "
-      "LEFT JOIN favorites f ON f.profile_id=c.profile_id AND f.collection_id=c.id "
-      "WHERE c.profile_id=? "
-      "GROUP BY c.id,c.profile_id,c.name,c.created_at "
+      "LEFT JOIN favorites f ON f.collection_id=c.id "
+      "GROUP BY c.id,c.name,c.created_at "
       "ORDER BY c.created_at ASC,c.name COLLATE NOCASE ASC;");
-  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   std::vector<FavoriteCollectionRecord> collections;
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
     FavoriteCollectionRecord collection;
     collection.id = text_column(statement.get(), 0);
-    collection.profile_id = text_column(statement.get(), 1);
-    collection.name = text_column(statement.get(), 2);
-    collection.game_count = sqlite3_column_int(statement.get(), 3);
-    collection.created_at = sqlite3_column_int64(statement.get(), 4);
+    collection.profile_id.clear();
+    collection.name = text_column(statement.get(), 1);
+    collection.game_count = sqlite3_column_int(statement.get(), 2);
+    collection.created_at = sqlite3_column_int64(statement.get(), 3);
     collections.push_back(std::move(collection));
   }
   return collections;
 }
 
 FavoriteCollectionRecord Database::create_favorite_collection(
-    const std::string& profile_id, const std::string& name) {
+    const std::string& /*profile_id*/, const std::string& name) {
   auto duplicate = prepare(
-      db_,
-      "SELECT 1 FROM favorite_collections WHERE profile_id=? AND name=? COLLATE NOCASE;");
-  sqlite3_bind_text(duplicate.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(duplicate.get(), 2, name.c_str(), -1, SQLITE_TRANSIENT);
+      db_, "SELECT 1 FROM favorite_collections WHERE name=? COLLATE NOCASE;");
+  sqlite3_bind_text(duplicate.get(), 1, name.c_str(), -1, SQLITE_TRANSIENT);
   if (sqlite3_step(duplicate.get()) == SQLITE_ROW) {
     throw std::invalid_argument("A favorite collection with this name already exists");
   }
 
   FavoriteCollectionRecord collection;
   collection.id = make_uuid();
-  collection.profile_id = profile_id;
+  collection.profile_id.clear();
   collection.name = name;
   collection.created_at = unix_time_seconds();
   auto statement = prepare(
-      db_,
-      "INSERT INTO favorite_collections(id,profile_id,name,created_at) VALUES(?,?,?,?);");
+      db_, "INSERT INTO favorite_collections(id,name,created_at) VALUES(?,?,?);");
   sqlite3_bind_text(statement.get(), 1, collection.id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 3, collection.name.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_int64(statement.get(), 4, collection.created_at);
+  sqlite3_bind_text(statement.get(), 2, collection.name.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 3, collection.created_at);
   check(sqlite3_step(statement.get()), db_, "create favorite collection");
   return collection;
 }
 
 void Database::rename_favorite_collection(
-    const std::string& profile_id,
+    const std::string& /*profile_id*/,
     const std::string& collection_id,
     const std::string& name) {
   auto duplicate = prepare(
       db_,
-      "SELECT 1 FROM favorite_collections WHERE profile_id=? AND id<>? "
-      "AND name=? COLLATE NOCASE;");
-  sqlite3_bind_text(duplicate.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(duplicate.get(), 2, collection_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(duplicate.get(), 3, name.c_str(), -1, SQLITE_TRANSIENT);
+      "SELECT 1 FROM favorite_collections WHERE id<>? AND name=? COLLATE NOCASE;");
+  sqlite3_bind_text(duplicate.get(), 1, collection_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(duplicate.get(), 2, name.c_str(), -1, SQLITE_TRANSIENT);
   if (sqlite3_step(duplicate.get()) == SQLITE_ROW) {
     throw std::invalid_argument("A favorite collection with this name already exists");
   }
 
   auto statement = prepare(
-      db_, "UPDATE favorite_collections SET name=? WHERE id=? AND profile_id=?;");
+      db_, "UPDATE favorite_collections SET name=? WHERE id=?;");
   sqlite3_bind_text(statement.get(), 1, name.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 2, collection_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 3, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   check(sqlite3_step(statement.get()), db_, "rename favorite collection");
   if (sqlite3_changes(db_) == 0) throw std::runtime_error("Favorite collection not found");
 }
 
 void Database::delete_favorite_collection(
-    const std::string& profile_id, const std::string& collection_id) {
-  auto statement = prepare(
-      db_, "DELETE FROM favorite_collections WHERE id=? AND profile_id=?;");
+    const std::string& /*profile_id*/, const std::string& collection_id) {
+  auto statement = prepare(db_, "DELETE FROM favorite_collections WHERE id=?;");
   sqlite3_bind_text(statement.get(), 1, collection_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   check(sqlite3_step(statement.get()), db_, "delete favorite collection");
   if (sqlite3_changes(db_) == 0) throw std::runtime_error("Favorite collection not found");
 }
 
 void Database::set_favorite_collection(
-    const std::string& profile_id,
+    const std::string& /*profile_id*/,
     const std::string& game_id,
     const std::optional<std::string>& collection_id) {
-  auto owned = prepare(db_, "SELECT 1 FROM games WHERE id=? AND profile_id=?;");
-  sqlite3_bind_text(owned.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(owned.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  if (sqlite3_step(owned.get()) != SQLITE_ROW) throw std::runtime_error("Game not found");
+  auto game = prepare(db_, "SELECT profile_id FROM games WHERE id=?;");
+  sqlite3_bind_text(game.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(game.get()) != SQLITE_ROW) throw std::runtime_error("Game not found");
+  const auto owner_profile_id = text_column(game.get(), 0);
 
   if (collection_id.has_value()) {
-    auto collection = prepare(
-        db_, "SELECT 1 FROM favorite_collections WHERE id=? AND profile_id=?;");
+    auto collection = prepare(db_, "SELECT 1 FROM favorite_collections WHERE id=?;");
     sqlite3_bind_text(collection.get(), 1, collection_id->c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(collection.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
     if (sqlite3_step(collection.get()) != SQLITE_ROW) {
       throw std::runtime_error("Favorite collection not found");
     }
@@ -1444,43 +1878,93 @@ void Database::set_favorite_collection(
         db_,
         "INSERT OR IGNORE INTO favorites(profile_id,game_id,created_at,collection_id) "
         "VALUES(?,?,?,?);");
-    sqlite3_bind_text(insert.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert.get(), 1, owner_profile_id.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(insert.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int64(insert.get(), 3, unix_time_seconds());
     sqlite3_bind_text(insert.get(), 4, collection_id->c_str(), -1, SQLITE_TRANSIENT);
     check(sqlite3_step(insert.get()), db_, "favorite game for collection");
 
-    auto update = prepare(
-        db_, "UPDATE favorites SET collection_id=? WHERE profile_id=? AND game_id=?;");
+    auto update = prepare(db_, "UPDATE favorites SET collection_id=? WHERE game_id=?;");
     sqlite3_bind_text(update.get(), 1, collection_id->c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(update.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(update.get(), 3, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(update.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
     check(sqlite3_step(update.get()), db_, "assign favorite collection");
     return;
   }
 
-  auto update = prepare(
-      db_, "UPDATE favorites SET collection_id=NULL WHERE profile_id=? AND game_id=?;");
-  sqlite3_bind_text(update.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(update.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  auto update = prepare(db_, "UPDATE favorites SET collection_id=NULL WHERE game_id=?;");
+  sqlite3_bind_text(update.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
   check(sqlite3_step(update.get()), db_, "remove favorite from collection");
 }
 
 void Database::set_downloaded(
     const std::string& profile_id, const std::string& game_id, const bool value) {
-  auto owned = prepare(db_, "SELECT 1 FROM games WHERE id=? AND profile_id=?;");
+  auto owned = prepare(db_, "SELECT profile_id FROM games WHERE id=? AND profile_id=?;");
   sqlite3_bind_text(owned.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(owned.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   if (sqlite3_step(owned.get()) != SQLITE_ROW) throw std::runtime_error("Game not found");
-  auto statement = value
-      ? prepare(db_, "INSERT OR IGNORE INTO downloads(profile_id,game_id,downloaded_at) VALUES(?,?,?);")
-      : prepare(db_, "DELETE FROM downloads WHERE profile_id=? AND game_id=?;");
-  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
-  if (value) sqlite3_bind_int64(statement.get(), 3, unix_time_seconds());
-  check(sqlite3_step(statement.get()), db_, "update download");
-}
 
+  execute("BEGIN IMMEDIATE;");
+  try {
+    auto collection = prepare(
+        db_,
+        "SELECT id FROM favorite_collections WHERE name='Downloads' COLLATE NOCASE "
+        "ORDER BY created_at ASC LIMIT 1;");
+    std::optional<std::string> downloads_id;
+    if (sqlite3_step(collection.get()) == SQLITE_ROW) {
+      downloads_id = text_column(collection.get(), 0);
+    }
+
+    if (value) {
+      if (!downloads_id.has_value()) {
+        downloads_id = make_uuid();
+        auto create = prepare(
+            db_,
+            "INSERT INTO favorite_collections(id,name,created_at) VALUES(?,?,?);");
+        sqlite3_bind_text(create.get(), 1, downloads_id->c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(create.get(), 2, "Downloads", -1, SQLITE_STATIC);
+        sqlite3_bind_int64(create.get(), 3, unix_time_seconds());
+        check(sqlite3_step(create.get()), db_, "create Downloads collection");
+      }
+
+      auto favorite = prepare(
+          db_,
+          "INSERT OR IGNORE INTO favorites(profile_id,game_id,created_at,collection_id) "
+          "VALUES(?,?,?,?);");
+      sqlite3_bind_text(favorite.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(favorite.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_int64(favorite.get(), 3, unix_time_seconds());
+      sqlite3_bind_text(
+          favorite.get(), 4, downloads_id->c_str(), -1, SQLITE_TRANSIENT);
+      check(sqlite3_step(favorite.get()), db_, "favorite downloaded game");
+
+      auto move = prepare(
+          db_, "UPDATE favorites SET collection_id=? WHERE game_id=?;");
+      sqlite3_bind_text(move.get(), 1, downloads_id->c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(move.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
+      check(sqlite3_step(move.get()), db_, "move game to Downloads collection");
+    } else if (downloads_id.has_value()) {
+      // Compatibility for older callers: removing the old download flag simply
+      // moves the game out of Downloads into loose favorites. It never deletes
+      // the favorite itself.
+      auto move = prepare(
+          db_,
+          "UPDATE favorites SET collection_id=NULL WHERE game_id=? AND collection_id=?;");
+      sqlite3_bind_text(move.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(move.get(), 2, downloads_id->c_str(), -1, SQLITE_TRANSIENT);
+      check(sqlite3_step(move.get()), db_, "move download to loose favorites");
+    }
+
+    // Keep the obsolete table empty. New builds derive the compatibility
+    // `downloaded` field from membership in the Downloads collection.
+    auto legacy = prepare(db_, "DELETE FROM downloads WHERE game_id=?;");
+    sqlite3_bind_text(legacy.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(legacy.get()), db_, "clear legacy download flag");
+    execute("COMMIT;");
+  } catch (...) {
+    sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+    throw;
+  }
+}
 void Database::delete_local_game(
     const std::string& profile_id, const std::string& game_id) {
   auto statement = prepare(
@@ -1504,14 +1988,12 @@ int Database::clear_cached_month(
     sqlite3_bind_text(cache.get(), 2, month.c_str(), -1, SQLITE_TRANSIENT);
     check(sqlite3_step(cache.get()), db_, "clear provider month cache");
 
-    // Keep anything the user explicitly saved, favorited, or already analysed.
-    // Only disposable synced rows from this month are removed.
+    // Keep anything the user favorited (including the Downloads collection) or
+    // already analysed. Only disposable synced rows from this month are removed.
     auto games = prepare(
         db_,
         "DELETE FROM games WHERE profile_id=? AND provider_game_id IS NOT NULL "
         "AND strftime('%Y-%m',provider_ended_at,'unixepoch')=? "
-        "AND NOT EXISTS(SELECT 1 FROM downloads d WHERE d.profile_id=games.profile_id "
-        "AND d.game_id=games.id) "
         "AND NOT EXISTS(SELECT 1 FROM favorites f WHERE f.profile_id=games.profile_id "
         "AND f.game_id=games.id) "
         "AND NOT EXISTS(SELECT 1 FROM analysis_runs a WHERE a.game_id=games.id);");
@@ -1561,6 +2043,18 @@ std::vector<GameRecord> Database::games(const std::string& profile_id) const {
       + "WHERE g.profile_id=? ORDER BY COALESCE(NULLIF(g.provider_ended_at,0),g.created_at) DESC;";
   auto statement = prepare(db_, sql.c_str());
   sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GameRecord> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back(read_game_record(statement.get()));
+  }
+  return result;
+}
+
+std::vector<GameRecord> Database::favorite_games() const {
+  const std::string sql = std::string("SELECT ") + kGameColumns + kGameJoins +
+      "WHERE EXISTS(SELECT 1 FROM favorites fav WHERE fav.game_id=g.id) "
+      "ORDER BY CASE WHEN g.provider_ended_at>0 THEN g.provider_ended_at ELSE g.created_at END DESC;";
+  auto statement = prepare(db_, sql.c_str());
   std::vector<GameRecord> result;
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
     result.push_back(read_game_record(statement.get()));
@@ -2106,6 +2600,66 @@ std::optional<AnalysisResult> Database::compatible_position_analysis(
       "WHERE cache_id=? ORDER BY rank LIMIT ?;");
   sqlite3_bind_int64(lines.get(), 1, cache_id);
   sqlite3_bind_int(lines.get(), 2, requested.multi_pv);
+  while (sqlite3_step(lines.get()) == SQLITE_ROW) {
+    EngineLine line;
+    line.rank = sqlite3_column_int(lines.get(), 0);
+    line.depth = sqlite3_column_int(lines.get(), 1);
+    line.evaluation_cp = optional_int_column(lines.get(), 2);
+    line.mate_in = optional_int_column(lines.get(), 3);
+    if (sqlite3_column_type(lines.get(), 4) != SQLITE_NULL) {
+      line.wdl = WdlScore{
+          .wins = sqlite3_column_int(lines.get(), 4),
+          .draws = sqlite3_column_int(lines.get(), 5),
+          .losses = sqlite3_column_int(lines.get(), 6),
+      };
+    }
+    line.nodes = static_cast<std::uint64_t>(sqlite3_column_int64(lines.get(), 7));
+    std::istringstream pv(text_column(lines.get(), 8));
+    std::string move;
+    while (pv >> move) line.moves.push_back(move);
+    result.lines.push_back(std::move(line));
+  }
+  return result;
+}
+
+
+std::optional<AnalysisResult> Database::best_position_checkpoint(
+    const std::string& position_fen,
+    const std::string& engine_version,
+    const int maximum_depth,
+    const int multi_pv) const {
+  auto statement = prepare(
+      db_,
+      "SELECT id,reached_depth,nodes,best_move FROM engine_position_cache "
+      "WHERE position_fen=? AND stockfish_version=? AND depth<=? AND multi_pv>=? "
+      "ORDER BY reached_depth DESC,depth DESC,analyzed_at DESC LIMIT 1;");
+  sqlite3_bind_text(statement.get(), 1, position_fen.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, engine_version.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(statement.get(), 3, maximum_depth);
+  sqlite3_bind_int(statement.get(), 4, multi_pv);
+  if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
+
+  const auto cache_id = sqlite3_column_int64(statement.get(), 0);
+  {
+    auto touch = prepare(
+        db_,
+        "UPDATE engine_position_cache SET last_used_at=? WHERE id=?;");
+    sqlite3_bind_int64(touch.get(), 1, unix_time_seconds());
+    sqlite3_bind_int64(touch.get(), 2, cache_id);
+    check(sqlite3_step(touch.get()), db_, "touch position checkpoint");
+  }
+  AnalysisResult result;
+  result.reached_depth = sqlite3_column_int(statement.get(), 1);
+  result.nodes = static_cast<std::uint64_t>(sqlite3_column_int64(statement.get(), 2));
+  result.best_move = text_column(statement.get(), 3);
+
+  auto lines = prepare(
+      db_,
+      "SELECT rank,engine_depth,evaluation_cp,mate_in,wdl_wins,wdl_draws,"
+      "wdl_losses,nodes,principal_variation FROM engine_position_cache_lines "
+      "WHERE cache_id=? ORDER BY rank LIMIT ?;");
+  sqlite3_bind_int64(lines.get(), 1, cache_id);
+  sqlite3_bind_int(lines.get(), 2, multi_pv);
   while (sqlite3_step(lines.get()) == SQLITE_ROW) {
     EngineLine line;
     line.rank = sqlite3_column_int(lines.get(), 0);

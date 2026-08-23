@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -10,12 +12,19 @@ enum AppPhase { loading, firstRun, ready, error }
 class AppController extends ChangeNotifier {
   AppController(this.gateway);
 
+  static int get maximumEngineWorkerThreads =>
+      math.max(1, math.min(32, Platform.numberOfProcessors ~/ 2));
+
+  static int clampEngineWorkerThreads(int threads) =>
+      math.max(1, math.min(threads, maximumEngineWorkerThreads));
+
   final CoreGateway gateway;
   AppPhase phase = AppPhase.loading;
   List<AppProfile> profiles = const [];
   AppProfile? activeProfile;
   AppSettings settings = const AppSettings();
   List<GameSummary> games = const [];
+  List<GameSummary> favoriteGames = const [];
   List<FavoriteCollection> favoriteCollections = const [];
   ProviderOverview? providerOverview;
   bool providerSyncing = false;
@@ -30,22 +39,21 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       await gateway.initialize();
-      settings = await gateway.settings();
       profiles = await gateway.profiles();
       activeProfile = await gateway.activeProfile();
-      if (profiles.isEmpty || activeProfile == null) {
-        phase = AppPhase.firstRun;
-        games = const [];
-        favoriteCollections = const [];
+      await _ensureActiveProfile();
+      settings = await gateway.settings();
+      games = await gateway.games();
+      favoriteGames = await gateway.favoriteGames();
+      favoriteCollections = await gateway.favoriteCollections();
+      if (activeProfile!.type != ProfileType.localPgnFen) {
+        providerOverview = await gateway.providerOverview(activeProfile!.id);
+        selectedMonth = _currentMonth();
       } else {
-        games = await gateway.games();
-        favoriteCollections = await gateway.favoriteCollections();
-        if (activeProfile!.type != ProfileType.localPgnFen) {
-          providerOverview = await gateway.providerOverview(activeProfile!.id);
-          selectedMonth = _currentMonth();
-        }
-        phase = AppPhase.ready;
+        providerOverview = null;
+        selectedMonth = null;
       }
+      phase = AppPhase.ready;
     } catch (caught) {
       error = caught;
       phase = AppPhase.error;
@@ -72,6 +80,7 @@ class AppController extends ChangeNotifier {
     activeProfile = profile;
     settings = await gateway.settings();
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     if (type != ProfileType.localPgnFen) {
       providerOverview = await gateway.providerOverview(profile.id);
@@ -91,6 +100,7 @@ class AppController extends ChangeNotifier {
     activeProfile = profile;
     settings = await gateway.settings();
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     providerNotice = null;
     if (profile.type != ProfileType.localPgnFen) {
@@ -115,16 +125,44 @@ class AppController extends ChangeNotifier {
     providerNotice = null;
     providerOverview = null;
     selectedMonth = null;
-    if (profiles.isEmpty || activeProfile == null) {
-      games = const [];
-      favoriteCollections = const [];
-      settings = await gateway.settings();
-      phase = AppPhase.firstRun;
-      notifyListeners();
-      return;
-    }
+    await _ensureActiveProfile();
     settings = await gateway.settings();
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
+    favoriteCollections = await gateway.favoriteCollections();
+    if (activeProfile!.type != ProfileType.localPgnFen) {
+      providerOverview = await gateway.providerOverview(activeProfile!.id);
+      selectedMonth = _currentMonth();
+    }
+    phase = AppPhase.ready;
+    notifyListeners();
+    if (settings.autoSyncOnline &&
+        activeProfile!.type != ProfileType.localPgnFen) {
+      unawaited(syncProvider());
+    }
+  }
+
+  Future<void> mergeLocalProfile(
+    AppProfile source,
+    AppProfile target,
+  ) async {
+    if (source.type != ProfileType.localPgnFen ||
+        target.type == ProfileType.localPgnFen) {
+      throw const CoreGatewayException('Invalid profile merge');
+    }
+
+    _providerSyncGeneration++;
+    providerSyncing = false;
+    await gateway.mergeLocalProfile(source.id, target.id);
+    profiles = await gateway.profiles();
+    activeProfile = await gateway.activeProfile();
+    providerNotice = null;
+    providerOverview = null;
+    selectedMonth = null;
+    await _ensureActiveProfile();
+    settings = await gateway.settings();
+    games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     if (activeProfile!.type != ProfileType.localPgnFen) {
       providerOverview = await gateway.providerOverview(activeProfile!.id);
@@ -169,6 +207,7 @@ class AppController extends ChangeNotifier {
       activeProfile = providerOverview!.profile;
       profiles = await gateway.profiles();
       games = await gateway.games();
+      favoriteGames = await gateway.favoriteGames();
     } catch (caught) {
       if (generation != _providerSyncGeneration ||
           activeProfile?.id != profile.id) {
@@ -176,6 +215,7 @@ class AppController extends ChangeNotifier {
       }
       providerNotice = caught.toString();
       games = await gateway.games();
+      favoriteGames = await gateway.favoriteGames();
     } finally {
       if (generation == _providerSyncGeneration) {
         providerSyncing = false;
@@ -187,12 +227,14 @@ class AppController extends ChangeNotifier {
   Future<void> toggleFavorite(GameSummary game) async {
     await gateway.setGameFavorite(game.id, !game.favorite);
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
   }
 
   Future<void> createFavoriteCollection(String name) async {
     await gateway.createFavoriteCollection(name.trim());
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
   }
@@ -202,12 +244,14 @@ class AppController extends ChangeNotifier {
     String name,
   ) async {
     await gateway.renameFavoriteCollection(collection.id, name.trim());
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
   }
 
   Future<void> deleteFavoriteCollection(FavoriteCollection collection) async {
     await gateway.deleteFavoriteCollection(collection.id);
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     games = await gateway.games();
     notifyListeners();
@@ -219,24 +263,25 @@ class AppController extends ChangeNotifier {
   ) async {
     await gateway.setGameFavoriteCollection(game.id, collection?.id);
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
   }
 
-  Future<void> toggleDownload(GameSummary game) async {
-    await gateway.setGameDownloaded(game.id, !game.downloaded);
+  Future<void> saveToDownloads(GameSummary game) async {
+    // Downloads are no longer a separate state. Saving an online game makes it
+    // a global favorite and places it in the top-level Downloads collection.
+    await gateway.setGameDownloaded(game.id, true);
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
+    favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
   }
 
   Future<void> deleteLocalGame(GameSummary game) async {
-    if (activeProfile?.type != ProfileType.localPgnFen) {
-      throw const CoreGatewayException(
-        'Only local PGN/FEN entries can be deleted',
-      );
-    }
     await gateway.deleteLocalGame(game.id);
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
   }
@@ -246,8 +291,28 @@ class AppController extends ChangeNotifier {
     if (profile == null || profile.type == ProfileType.localPgnFen) return;
     await gateway.clearCachedMonth(profile.id, month);
     games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
+    favoriteCollections = await gateway.favoriteCollections();
     providerOverview = await gateway.providerOverview(profile.id);
     notifyListeners();
+  }
+
+  Future<void> _ensureActiveProfile() async {
+    if (profiles.isEmpty) {
+      final profile = await gateway.createProfile(
+        type: ProfileType.localPgnFen,
+        displayName: 'Kchess',
+        providerUsername: '',
+      );
+      profiles = await gateway.profiles();
+      activeProfile = profile;
+      return;
+    }
+    if (activeProfile == null) {
+      final profile = profiles.first;
+      await gateway.setActiveProfile(profile.id);
+      activeProfile = profile;
+    }
   }
 
   String _currentMonth() {
@@ -257,7 +322,13 @@ class AppController extends ChangeNotifier {
 
   Future<GameSummary> importPgn(String pgn) async {
     final game = await gateway.importPgn(pgn);
-    games = [game, ...games.where((value) => value.id != game.id)];
+    // PGN/FEN imports always belong to the local library. The native layer may
+    // create that profile on demand while preserving the currently active one.
+    profiles = await gateway.profiles();
+    activeProfile = await gateway.activeProfile();
+    games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
+    favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
     return game;
   }
@@ -267,9 +338,23 @@ class AppController extends ChangeNotifier {
     required String name,
   }) async {
     final game = await gateway.importFen(fen: fen, name: name);
-    games = [game, ...games.where((value) => value.id != game.id)];
+    profiles = await gateway.profiles();
+    activeProfile = await gateway.activeProfile();
+    games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
+    favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
     return game;
+  }
+
+  Future<void> refreshAfterAnalysis() async {
+    // Analysis is persisted asynchronously in native storage. Refresh summaries
+    // after the analysis workflow closes so local imports immediately show their
+    // analyzed state/accuracy without a profile switch or app restart.
+    games = await gateway.games();
+    favoriteGames = await gateway.favoriteGames();
+    favoriteCollections = await gateway.favoriteCollections();
+    notifyListeners();
   }
 
   Future<void> setShowBoardArrows(bool enabled) => setShowBestMoveArrow(enabled);
@@ -346,6 +431,11 @@ class AppController extends ChangeNotifier {
 
   Future<void> clearEngineCache() => gateway.clearEngineCache();
 
+  Future<void> reloadSettings() async {
+    settings = await gateway.settings();
+    notifyListeners();
+  }
+
   Future<void> _setBooleanSetting(String key, AppSettings updated) async {
     final enabled = switch (key) {
       'showBestMoveArrow' => updated.showBestMoveArrow,
@@ -369,8 +459,20 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setDepth(int depth) =>
-      _setEngineSettings(settings.copyWith(depth: depth));
+  Future<void> setMinAnalysisDepth(int depth) async {
+    final minimum = depth < 1 ? 1 : (depth > settings.depth ? settings.depth : depth);
+    await gateway.setAnalysisDepthRange(minimumDepth: minimum, maximumDepth: settings.depth);
+    settings = settings.copyWith(minAnalysisDepth: minimum);
+    notifyListeners();
+  }
+
+  Future<void> setDepth(int depth) async {
+    final maximum = depth < 1 ? 1 : (depth > 64 ? 64 : depth);
+    final minimum = settings.minAnalysisDepth > maximum ? maximum : settings.minAnalysisDepth;
+    await gateway.setAnalysisDepthRange(minimumDepth: minimum, maximumDepth: maximum);
+    settings = settings.copyWith(minAnalysisDepth: minimum, depth: maximum);
+    notifyListeners();
+  }
 
   Future<void> setMultiPv(int multiPv) =>
       _setEngineSettings(settings.copyWith(multiPv: multiPv));
@@ -378,8 +480,10 @@ class AppController extends ChangeNotifier {
   Future<void> setTimeLimitSeconds(int seconds) =>
       _setEngineSettings(settings.copyWith(timeLimitSeconds: seconds));
 
-  Future<void> setThreads(int threads) =>
-      _setEngineResources(settings.copyWith(threads: threads));
+  Future<void> setThreads(int threads) {
+    final bounded = clampEngineWorkerThreads(threads);
+    return _setEngineResources(settings.copyWith(threads: bounded));
+  }
 
   Future<void> setHashMb(int hashMb) =>
       _setEngineResources(settings.copyWith(hashMb: hashMb));
@@ -439,6 +543,9 @@ class AnalysisController extends ChangeNotifier {
   int? selectedPly;
   Object? error;
   Timer? _timer;
+  Timer? _refinementTimer;
+  int _refinementGeneration = 0;
+  bool _variationPaused = false;
   bool _disposed = false;
 
   Future<void> open() async {
@@ -449,6 +556,10 @@ class AnalysisController extends ChangeNotifier {
       if (!_disposed) notifyListeners();
       if (snapshot?.isRunning == true) {
         _schedulePoll();
+      } else if (detail?.moves.isNotEmpty == true) {
+        final last = detail!.moves.length - 1;
+        selectedPly = last;
+        await refinePly(last);
       }
     } catch (caught) {
       error = caught;
@@ -462,6 +573,17 @@ class AnalysisController extends ChangeNotifier {
       snapshot = prepared;
       displayedSnapshot = prepared;
       if (!_disposed) notifyListeners();
+
+      // A prepared snapshot normally means the minimum pass is already
+      // complete.  Still start/retarget the maximum live refinement
+      // immediately.  This is essential after engine settings changed: the
+      // minimum configuration may be unchanged while the maximum target has a
+      // new config hash and must not remain idle until the user clicks a move.
+      if (detail?.moves.isNotEmpty == true) {
+        final last = detail!.moves.length - 1;
+        selectedPly = last;
+        await refinePly(last);
+      }
     } catch (caught) {
       error = caught;
       if (!_disposed) notifyListeners();
@@ -469,22 +591,79 @@ class AnalysisController extends ChangeNotifier {
   }
 
   void _schedulePoll() {
+    if (_variationPaused) return;
     _timer?.cancel();
     _timer = Timer(pollInterval, _poll);
   }
 
   Future<void> _poll() async {
+    if (_variationPaused) return;
     try {
       snapshot = await gateway.analysisStatus(game.id);
       if (selectedPly == null) displayedSnapshot = snapshot;
       if (!_disposed) notifyListeners();
       if (snapshot?.isRunning == true) {
         _schedulePoll();
+      } else if (selectedPly == null && (snapshot?.completedPlies ?? 0) > 0) {
+        final lastIndex = (detail?.moves.length ?? 1) - 1;
+        final rawLatest = snapshot!.completedPlies - 1;
+        final latest = rawLatest < 0 ? 0 : (rawLatest > lastIndex ? lastIndex : rawLatest);
+        selectedPly = latest;
+        await refinePly(latest);
       }
     } catch (caught) {
       error = caught;
       if (!_disposed) notifyListeners();
     }
+  }
+
+  Future<void> refinePly(int ply) async {
+    if (_variationPaused) return;
+    final generation = ++_refinementGeneration;
+    _timer?.cancel();
+    try {
+      final started = await gateway.startMoveRefinement(game.id, ply);
+      if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+        return;
+      }
+      if (started.lines.isNotEmpty) displayedSnapshot = started;
+      notifyListeners();
+      _scheduleRefinementPoll(ply, generation);
+    } catch (caught) {
+      if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+        return;
+      }
+      error = caught;
+      notifyListeners();
+    }
+  }
+
+  void _scheduleRefinementPoll(int ply, int generation) {
+    if (_variationPaused ||
+        _disposed ||
+        generation != _refinementGeneration ||
+        selectedPly != ply) {
+      return;
+    }
+    _refinementTimer?.cancel();
+    _refinementTimer = Timer(pollInterval, () async {
+      if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+        return;
+      }
+      try {
+        final next = await gateway.moveAnalysisStatus(game.id, ply);
+        if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+          return;
+        }
+        displayedSnapshot = next;
+        notifyListeners();
+        if (next.isRunning) _scheduleRefinementPoll(ply, generation);
+      } catch (_) {
+        if (!_disposed && generation == _refinementGeneration && selectedPly == ply) {
+          _scheduleRefinementPoll(ply, generation);
+        }
+      }
+    });
   }
 
   Future<void> selectPly(int ply) async {
@@ -493,19 +672,32 @@ class AnalysisController extends ChangeNotifier {
         : (detail?.moves.length ?? 1) - 1;
     final selected = ply < 0 ? 0 : (ply > maximum ? maximum : ply);
     selectedPly = selected;
-    if (selected < (snapshot?.completedPlies ?? 0)) {
-      try {
-        displayedSnapshot = await gateway.moveAnalysisStatus(game.id, selected);
-      } catch (caught) {
-        error = caught;
-      }
-    } else {
-      displayedSnapshot = null;
-    }
+    // Do not issue a separate status request before retargeting. The native
+    // worker returns the best persisted checkpoint with the retarget call,
+    // which avoids stale async responses when the user skips several moves.
+    displayedSnapshot = null;
     if (!_disposed) notifyListeners();
+    if (!_disposed) await refinePly(selected);
+  }
+
+
+  void pauseForVariation() {
+    _variationPaused = true;
+    _refinementGeneration++;
+    _timer?.cancel();
+    _refinementTimer?.cancel();
+  }
+
+  Future<void> resumeAfterVariation(int ply) async {
+    if (_disposed) return;
+    _variationPaused = false;
+    selectedPly = ply;
+    await refinePly(ply);
   }
 
   void followLatest() {
+    _refinementGeneration++;
+    _refinementTimer?.cancel();
     selectedPly = null;
     displayedSnapshot = snapshot;
     if (!_disposed) notifyListeners();
@@ -526,7 +718,9 @@ class AnalysisController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _refinementGeneration++;
     _timer?.cancel();
+    _refinementTimer?.cancel();
     super.dispose();
   }
 }

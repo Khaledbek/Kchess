@@ -383,7 +383,6 @@ class _HomeShellState extends State<HomeShell> {
         Icons.sports_esports_outlined,
         Icons.sports_esports,
       ),
-      _Destination(strings.downloads, Icons.download_outlined, Icons.download),
       _Destination(strings.favorites, Icons.favorite_border, Icons.favorite),
       _Destination(
         _statisticsText(context).title,
@@ -394,13 +393,9 @@ class _HomeShellState extends State<HomeShell> {
     ];
     final content = switch (_selectedIndex) {
       0 => GamesScreen(controller: widget.controller),
-      1 => GamesScreen(
-        controller: widget.controller,
-        savedFilter: 'downloaded',
-      ),
-      2 => FavoritesScreen(controller: widget.controller),
-      3 => StatisticsScreen(controller: widget.controller),
-      4 => SettingsScreen(controller: widget.controller),
+      1 => FavoritesScreen(controller: widget.controller),
+      2 => StatisticsScreen(controller: widget.controller),
+      3 => SettingsScreen(controller: widget.controller),
       _ => _EmptySection(title: destinations[_selectedIndex].label),
     };
 
@@ -762,31 +757,154 @@ Future<bool> _confirmDeleteProfile(
   AppProfile profile,
 ) async {
   final strings = AppLocalizations.of(context);
+  if (controller.settings.confirmBeforeDelete) {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.deleteAccountQuestion),
+        content: Text(
+          profile.type == ProfileType.localPgnFen
+              ? strings.deleteLocalProfileBody
+              : strings.deleteOnlineProfileBody,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(strings.cancelAction),
+          ),
+          FilledButton(
+            key: const Key('confirm-delete-profile'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(strings.deleteAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+  }
+  try {
+    await controller.deleteProfile(profile);
+    return true;
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+    return false;
+  }
+}
+
+
+String _profileMergeText(
+  BuildContext context, {
+  required String de,
+  required String en,
+  required String ar,
+}) => switch (Localizations.localeOf(context).languageCode) {
+  'ar' => ar,
+  'en' => en,
+  _ => de,
+};
+
+Future<bool> _showMergeLocalProfileDialog(
+  BuildContext context,
+  AppController controller,
+  AppProfile source,
+) async {
+  final targets = controller.profiles
+      .where((profile) => profile.type != ProfileType.localPgnFen)
+      .toList(growable: false);
+  if (targets.isEmpty) return false;
+
+  final target = await showDialog<AppProfile>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text(
+        _profileMergeText(
+          context,
+          de: 'Mit Online-Profil zusammenführen',
+          en: 'Merge with online profile',
+          ar: 'دمج مع ملف شخصي عبر الإنترنت',
+        ),
+      ),
+      children: [
+        for (final profile in targets)
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, profile),
+            child: ListTile(
+              leading: const Icon(Icons.merge_type),
+              title: Text(profile.displayName),
+              subtitle: Text(
+                _profileTypeLabel(AppLocalizations.of(context), profile.type),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+  if (target == null || !context.mounted) return false;
+
+  final gameCount = controller.games.length;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(strings.deleteAccountQuestion),
+      title: Text(
+        _profileMergeText(
+          context,
+          de: 'Lokales Profil zusammenführen?',
+          en: 'Merge local profile?',
+          ar: 'دمج الملف الشخصي المحلي؟',
+        ),
+      ),
       content: Text(
-        profile.type == ProfileType.localPgnFen
-            ? strings.deleteLocalProfileBody
-            : strings.deleteOnlineProfileBody,
+        _profileMergeText(
+          context,
+          de:
+              '$gameCount lokale Partien/Positionen werden zu „${target.displayName}“ verschoben. Doppelte Partien werden erkannt; Favoriten, Sammlungen und die beste vorhandene Analyse bleiben erhalten. Das lokale Profil wird danach entfernt.',
+          en:
+              '$gameCount local games/positions will be moved to “${target.displayName}”. Duplicate games are detected; favorites, collections and the best available analysis are kept. The local profile is removed afterwards.',
+          ar:
+              'سيتم نقل $gameCount من المباريات/الوضعيات المحلية إلى «${target.displayName}». سيتم اكتشاف المباريات المكررة مع الاحتفاظ بالمفضلة والمجموعات وأفضل تحليل متاح. بعد ذلك سيتم حذف الملف الشخصي المحلي.',
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: Text(strings.cancelAction),
+          child: Text(AppLocalizations.of(context).cancelAction),
         ),
         FilledButton(
-          key: const Key('confirm-delete-profile'),
           onPressed: () => Navigator.pop(context, true),
-          child: Text(strings.deleteAction),
+          child: Text(
+            _profileMergeText(
+              context,
+              de: 'Zusammenführen',
+              en: 'Merge',
+              ar: 'دمج',
+            ),
+          ),
         ),
       ],
     ),
   );
   if (confirmed != true) return false;
+
   try {
-    await controller.deleteProfile(profile);
+    await controller.mergeLocalProfile(source, target);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _profileMergeText(
+              context,
+              de: 'Lokales Profil wurde mit „${target.displayName}“ zusammengeführt.',
+              en: 'Local profile was merged into “${target.displayName}”.',
+              ar: 'تم دمج الملف الشخصي المحلي مع «${target.displayName}».',
+            ),
+          ),
+        ),
+      );
+      Navigator.of(context).pop();
+    }
     return true;
   } catch (error) {
     if (context.mounted) {
@@ -816,6 +934,21 @@ Widget _profileAvatar(AppProfile profile, {double iconSize = 24}) {
     fit: BoxFit.cover,
     errorBuilder: (_, _, _) => fallback(),
   );
+}
+
+Future<void> _openAnalysisAndRefreshSettings({
+  required BuildContext context,
+  required AppController controller,
+  required GameSummary game,
+}) async {
+  await openAnalysisWorkflow(
+    context: context,
+    gateway: controller.gateway,
+    game: game,
+    settings: controller.settings,
+  );
+  await controller.reloadSettings();
+  await controller.refreshAfterAnalysis();
 }
 
 class GamesScreen extends StatefulWidget {
@@ -1075,11 +1208,10 @@ class _GamesScreenState extends State<GamesScreen> {
         game = await controller.importFen(fen: value.fen, name: value.name);
       }
       if (context.mounted) {
-        await openAnalysisWorkflow(
+        await _openAnalysisAndRefreshSettings(
           context: context,
-          gateway: controller.gateway,
+          controller: controller,
           game: game,
-          settings: controller.settings,
         );
       }
     } catch (error) {
@@ -1091,26 +1223,27 @@ class _GamesScreenState extends State<GamesScreen> {
   }
 
   Future<void> _deleteLocalEntry(BuildContext context, GameSummary game) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Lokalen Eintrag löschen?'),
-        content: const Text(
-          'Die gespeicherte PGN/FEN und ihre lokale Analyse werden dauerhaft entfernt.',
+    if (controller.settings.confirmBeforeDelete) {
+      final strings = AppLocalizations.of(context);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(strings.deleteLocalGameQuestion),
+          content: Text(strings.deleteLocalGameBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(strings.cancelAction),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(strings.deleteAction),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Löschen'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
+      );
+      if (confirmed != true) return;
+    }
     await controller.deleteLocalGame(game);
   }
 
@@ -1120,7 +1253,7 @@ class _GamesScreenState extends State<GamesScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Monatscache löschen?'),
         content: Text(
-          '$month wird aus dem normalen Cache entfernt. Downloads, Favoriten und bereits analysierte Partien bleiben erhalten.',
+          '$month wird aus dem normalen Cache entfernt. Favoriten und bereits analysierte Partien bleiben erhalten.',
         ),
         actions: [
           TextButton(
@@ -1149,7 +1282,6 @@ class _GamesScreenState extends State<GamesScreen> {
     final online = controller.activeProfile?.type != ProfileType.localPgnFen;
     final librarySection = widget.savedFilter != null;
     final screenTitle = switch (widget.savedFilter) {
-      'downloaded' => strings.downloads,
       'favorite' => strings.favorites,
       _ => strings.games,
     };
@@ -1161,7 +1293,6 @@ class _GamesScreenState extends State<GamesScreen> {
             .trim();
     final filtered = controller.games.where((game) {
       if (widget.savedFilter == 'favorite' && !game.favorite) return false;
-      if (widget.savedFilter == 'downloaded' && !game.downloaded) return false;
       final query = _search.text.trim().toLowerCase();
       if (query.isNotEmpty &&
           !game.whiteName.toLowerCase().contains(query) &&
@@ -1187,8 +1318,6 @@ class _GamesScreenState extends State<GamesScreen> {
       }
       if (_timeControls.contains('analyzed') && !game.analyzed) return false;
       if (_timeControls.contains('notAnalyzed') && game.analyzed) return false;
-      if (_timeControls.contains('downloaded') && !game.downloaded) return false;
-      if (_timeControls.contains('notDownloaded') && game.downloaded) return false;
       if (online &&
           !librarySection &&
           selectedMonth != null &&
@@ -1229,15 +1358,12 @@ class _GamesScreenState extends State<GamesScreen> {
               ],
             )
           : null,
-      floatingActionButton:
-          controller.activeProfile?.type == ProfileType.localPgnFen
-          ? FloatingActionButton.extended(
-              key: const Key('import-pgn-fen'),
-              onPressed: () => _import(context),
-              icon: const Icon(Icons.add),
-              label: Text(strings.importData),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        key: const Key('import-pgn-fen'),
+        onPressed: () => _import(context),
+        icon: const Icon(Icons.add),
+        label: Text(strings.importData),
+      ),
       body: Column(
         children: [
           if (controller.providerSyncing) const LinearProgressIndicator(),
@@ -1490,14 +1616,15 @@ class _GamesScreenState extends State<GamesScreen> {
                         game: game,
                         online: online,
                         playerIdentity: playerIdentity,
-                        onOpen: () => openAnalysisWorkflow(
+                        onOpen: () => _openAnalysisAndRefreshSettings(
                           context: context,
-                          gateway: controller.gateway,
+                          controller: controller,
                           game: game,
-                          settings: controller.settings,
                         ),
                         onToggleFavorite: () => controller.toggleFavorite(game),
-                        onToggleDownload: () => controller.toggleDownload(game),
+                        onSaveToDownloads: game.downloaded
+                            ? null
+                            : () => controller.saveToDownloads(game),
                         onDelete: () => _deleteLocalEntry(context, game),
                       );
                     },
@@ -1560,16 +1687,12 @@ const _timeControlFilterValues = <String>[
 const _statusFilterValues = <String>{
   'analyzed',
   'notAnalyzed',
-  'downloaded',
-  'notDownloaded',
 };
 
 const _timeAndStatusFilterOrder = <String>[
   ..._timeControlFilterValues,
   'analyzed',
   'notAnalyzed',
-  'downloaded',
-  'notDownloaded',
 ];
 
 Iterable<String> _orderedTimeAndStatusValues(Set<String> values) =>
@@ -1585,8 +1708,6 @@ String _timeAndStatusLabel(_GameFilterLabels labels, String value) =>
       'correspondence' => labels.correspondence,
       'analyzed' => labels.analyzed,
       'notAnalyzed' => labels.notAnalyzed,
-      'downloaded' => labels.downloaded,
-      'notDownloaded' => labels.notDownloaded,
       _ => value,
     };
 
@@ -1740,10 +1861,6 @@ class _GameFilterPanelState extends State<_GameFilterPanel> {
                             _timeControls.remove('notAnalyzed');
                           } else if (value == 'notAnalyzed') {
                             _timeControls.remove('analyzed');
-                          } else if (value == 'downloaded') {
-                            _timeControls.remove('notDownloaded');
-                          } else if (value == 'notDownloaded') {
-                            _timeControls.remove('downloaded');
                           }
                           _timeControls.add(value);
                         } else {
@@ -1828,8 +1945,6 @@ class _GameFilterLabels {
     required this.correspondence,
     required this.analyzed,
     required this.notAnalyzed,
-    required this.downloaded,
-    required this.notDownloaded,
     required this.sort,
     required this.newestFirst,
     required this.oldestFirst,
@@ -1864,8 +1979,6 @@ class _GameFilterLabels {
   final String correspondence;
   final String analyzed;
   final String notAnalyzed;
-  final String downloaded;
-  final String notDownloaded;
   final String sort;
   final String newestFirst;
   final String oldestFirst;
@@ -1903,8 +2016,6 @@ class _GameFilterLabels {
         correspondence: 'مراسلة',
         analyzed: 'تم تحليلها',
         notAnalyzed: 'غير محللة',
-        downloaded: 'تم تنزيلها',
-        notDownloaded: 'غير منزلة',
         sort: 'الترتيب',
         newestFirst: 'الأحدث أولاً',
         oldestFirst: 'الأقدم أولاً',
@@ -1941,8 +2052,6 @@ class _GameFilterLabels {
         correspondence: 'Correspondence',
         analyzed: 'Analyzed',
         notAnalyzed: 'Not analyzed',
-        downloaded: 'Downloaded',
-        notDownloaded: 'Not downloaded',
         sort: 'Sort',
         newestFirst: 'Newest first',
         oldestFirst: 'Oldest first',
@@ -1978,8 +2087,6 @@ class _GameFilterLabels {
       correspondence: 'Korrespondenz',
       analyzed: 'Analysiert',
       notAnalyzed: 'Nicht analysiert',
-      downloaded: 'Heruntergeladen',
-      notDownloaded: 'Nicht heruntergeladen',
       sort: 'Sortierung',
       newestFirst: 'Neueste zuerst',
       oldestFirst: 'Älteste zuerst',
@@ -2084,8 +2191,7 @@ class FavoritesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
-    final online = controller.activeProfile?.type != ProfileType.localPgnFen;
-    final looseFavorites = controller.games
+    final looseFavorites = controller.favoriteGames
         .where((game) => game.favorite && game.favoriteCollectionId == null)
         .toList(growable: false);
 
@@ -2245,15 +2351,14 @@ class FavoritesScreen extends StatelessWidget {
               for (final game in looseFavorites) ...[
                 _GameCard(
                   game: game,
-                  online: online,
-                  onOpen: () => openAnalysisWorkflow(
+                  online: game.providerGameId != null,
+                  onOpen: () => _openAnalysisAndRefreshSettings(
                     context: context,
-                    gateway: controller.gateway,
+                    controller: controller,
                     game: game,
-                    settings: controller.settings,
                   ),
                   onToggleFavorite: () => controller.toggleFavorite(game),
-                  onToggleDownload: () => controller.toggleDownload(game),
+                  onSaveToDownloads: null,
                   onMoveFavorite: () => _showFavoriteCollectionPicker(
                     context,
                     controller,
@@ -2283,8 +2388,7 @@ class FavoriteCollectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
-    final online = controller.activeProfile?.type != ProfileType.localPgnFen;
-    final games = controller.games
+    final games = controller.favoriteGames
         .where(
           (game) =>
               game.favorite && game.favoriteCollectionId == collection.id,
@@ -2310,15 +2414,14 @@ class FavoriteCollectionScreen extends StatelessWidget {
                 final game = games[index];
                 return _GameCard(
                   game: game,
-                  online: online,
-                  onOpen: () => openAnalysisWorkflow(
+                  online: game.providerGameId != null,
+                  onOpen: () => _openAnalysisAndRefreshSettings(
                     context: context,
-                    gateway: controller.gateway,
+                    controller: controller,
                     game: game,
-                    settings: controller.settings,
                   ),
                   onToggleFavorite: () => controller.toggleFavorite(game),
-                  onToggleDownload: () => controller.toggleDownload(game),
+                  onSaveToDownloads: null,
                   onMoveFavorite: () => _showFavoriteCollectionPicker(
                     context,
                     controller,
@@ -2672,6 +2775,9 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     final profile = controller.activeProfile!;
+    final mergeTargets = controller.profiles
+        .where((value) => value.type != ProfileType.localPgnFen)
+        .toList(growable: false);
     return Scaffold(
       appBar: MediaQuery.sizeOf(context).width >= 900
           ? AppBar(title: Text(strings.profile))
@@ -2762,6 +2868,28 @@ class ProfileScreen extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (profile.type == ProfileType.localPgnFen &&
+                      mergeTargets.isNotEmpty)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: FilledButton.tonalIcon(
+                        key: const Key('merge-local-profile'),
+                        onPressed: () => _showMergeLocalProfileDialog(
+                          context,
+                          controller,
+                          profile,
+                        ),
+                        icon: const Icon(Icons.merge_type, size: 18),
+                        label: Text(
+                          _profileMergeText(
+                            context,
+                            de: 'Mit Online-Profil zusammenführen',
+                            en: 'Merge with online profile',
+                            ar: 'دمج مع ملف شخصي عبر الإنترنت',
+                          ),
+                        ),
+                      ),
+                    ),
                   Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: TextButton.icon(
@@ -3257,7 +3385,8 @@ class SettingsScreen extends StatelessWidget {
             subtitle: strings.engineSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
-              _EngineSettingsPage(controller: controller),
+              controller,
+              () => _EngineSettingsPage(controller: controller),
             ),
           ),
           _SettingsCategoryTile(
@@ -3267,7 +3396,8 @@ class SettingsScreen extends StatelessWidget {
             subtitle: strings.analysisSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
-              _AnalysisSettingsPage(controller: controller),
+              controller,
+              () => _AnalysisSettingsPage(controller: controller),
             ),
           ),
           _SettingsCategoryTile(
@@ -3277,7 +3407,8 @@ class SettingsScreen extends StatelessWidget {
             subtitle: strings.designSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
-              _DesignSettingsPage(controller: controller),
+              controller,
+              () => _DesignSettingsPage(controller: controller),
             ),
           ),
           _SettingsCategoryTile(
@@ -3287,7 +3418,8 @@ class SettingsScreen extends StatelessWidget {
             subtitle: strings.generalSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
-              _GeneralSettingsPage(controller: controller),
+              controller,
+              () => _GeneralSettingsPage(controller: controller),
             ),
           ),
           _SettingsCategoryTile(
@@ -3297,7 +3429,8 @@ class SettingsScreen extends StatelessWidget {
             subtitle: strings.dataStorageSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
-              _DataStorageSettingsPage(controller: controller),
+              controller,
+              () => _DataStorageSettingsPage(controller: controller),
             ),
           ),
         ],
@@ -3305,8 +3438,19 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  static void _openSettingsPage(BuildContext context, Widget page) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  static void _openSettingsPage(
+    BuildContext context,
+    AppController controller,
+    Widget Function() pageBuilder,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) => pageBuilder(),
+        ),
+      ),
+    );
   }
 }
 
@@ -3369,15 +3513,13 @@ class _EngineSettingsPage extends StatelessWidget {
             title: strings.engineQualityTitle,
             child: Column(
               children: [
-                _IntegerSettingTile(
-                  key: const Key('engine-depth'),
-                  icon: Icons.account_tree_outlined,
+                _DepthRangeSettingTile(
+                  key: const Key('engine-depth-range'),
                   title: strings.depth,
-                  description: strings.depthHelp,
-                  value: controller.settings.depth,
-                  minimum: 1,
-                  maximum: 64,
-                  onChanged: controller.setDepth,
+                  minimumDepth: controller.settings.minAnalysisDepth,
+                  maximumDepth: controller.settings.depth,
+                  onMinimumChanged: controller.setMinAnalysisDepth,
+                  onMaximumChanged: controller.setDepth,
                 ),
                 const Divider(height: 1),
                 _IntegerSettingTile(
@@ -3399,9 +3541,9 @@ class _EngineSettingsPage extends StatelessWidget {
                   value: controller.settings.timeLimitSeconds,
                   minimum: 0,
                   maximum: 60,
-                  valueLabel: controller.settings.timeLimitSeconds == 0
+                  valueLabelBuilder: (value) => value == 0
                       ? strings.noTimeLimit
-                      : '${controller.settings.timeLimitSeconds} ${strings.secondsShort}',
+                      : '$value ${strings.secondsShort}',
                   onChanged: controller.setTimeLimitSeconds,
                 ),
               ],
@@ -3416,9 +3558,11 @@ class _EngineSettingsPage extends StatelessWidget {
                   icon: Icons.memory_outlined,
                   title: strings.threads,
                   description: strings.threadsHelp,
-                  value: controller.settings.threads,
+                  value: AppController.clampEngineWorkerThreads(
+                    controller.settings.threads,
+                  ),
                   minimum: 1,
-                  maximum: 32,
+                  maximum: AppController.maximumEngineWorkerThreads,
                   onChanged: controller.setThreads,
                 ),
                 const Divider(height: 1),
@@ -3431,7 +3575,7 @@ class _EngineSettingsPage extends StatelessWidget {
                   minimum: 16,
                   maximum: 2048,
                   allowedValues: const [16, 32, 64, 128, 256, 512, 1024, 2048],
-                  valueLabel: '${controller.settings.hashMb} MB',
+                  valueLabelBuilder: (value) => '$value MB',
                   onChanged: controller.setHashMb,
                 ),
               ],
@@ -3773,7 +3917,180 @@ class _DataStorageSettingsPage extends StatelessWidget {
   }
 }
 
-class _IntegerSettingTile extends StatelessWidget {
+class _DepthRangeSettingTile extends StatelessWidget {
+  const _DepthRangeSettingTile({
+    required this.title,
+    required this.minimumDepth,
+    required this.maximumDepth,
+    required this.onMinimumChanged,
+    required this.onMaximumChanged,
+    super.key,
+  });
+
+  final String title;
+  final int minimumDepth;
+  final int maximumDepth;
+  final Future<void> Function(int value) onMinimumChanged;
+  final Future<void> Function(int value) onMaximumChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.account_tree_outlined),
+          const SizedBox(width: 16),
+          Text(title, style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FittedBox(
+              alignment: Alignment.centerRight,
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CompactIntegerControl(
+                    key: const Key('engine-min-depth'),
+                    label: 'Min',
+                    value: minimumDepth,
+                    minimum: 1,
+                    maximum: maximumDepth,
+                    onChanged: onMinimumChanged,
+                  ),
+                  const SizedBox(width: 12),
+                  _CompactIntegerControl(
+                    key: const Key('engine-max-depth'),
+                    label: 'Max',
+                    value: maximumDepth,
+                    minimum: minimumDepth,
+                    maximum: 64,
+                    onChanged: onMaximumChanged,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactIntegerControl extends StatefulWidget {
+  const _CompactIntegerControl({
+    required this.label,
+    required this.value,
+    required this.minimum,
+    required this.maximum,
+    required this.onChanged,
+    super.key,
+  });
+
+  final String label;
+  final int value;
+  final int minimum;
+  final int maximum;
+  final Future<void> Function(int value) onChanged;
+
+  @override
+  State<_CompactIntegerControl> createState() => _CompactIntegerControlState();
+}
+
+class _CompactIntegerControlState extends State<_CompactIntegerControl> {
+  late int _value;
+  int _pendingWrites = 0;
+  Future<void> _writeQueue = Future<void>.value();
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.value;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompactIntegerControl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_pendingWrites == 0 && widget.value != _value) {
+      _value = widget.value;
+    }
+    if (_value < widget.minimum) _value = widget.minimum;
+    if (_value > widget.maximum) _value = widget.maximum;
+  }
+
+  void _changeValue(int next) {
+    final bounded = next.clamp(widget.minimum, widget.maximum).toInt();
+    if (bounded == _value) return;
+    setState(() {
+      _value = bounded;
+      _pendingWrites += 1;
+    });
+    final previousWrite = _writeQueue;
+    _writeQueue = () async {
+      try {
+        await previousWrite;
+      } catch (_) {}
+      await widget.onChanged(bounded);
+    }();
+    _writeQueue.then(
+      (_) => _finishWrite(),
+      onError: (Object _, StackTrace __) => _finishWrite(),
+    );
+  }
+
+  void _finishWrite() {
+    if (!mounted) return;
+    setState(() {
+      if (_pendingWrites > 0) _pendingWrites -= 1;
+      if (_pendingWrites == 0) _value = widget.value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(widget.label, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(width: 4),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+          padding: EdgeInsets.zero,
+          onPressed: _value > widget.minimum ? () => _changeValue(_value - 1) : null,
+          icon: const Icon(Icons.remove, size: 18),
+        ),
+        SizedBox(
+          width: 44,
+          child: TextFormField(
+            key: ValueKey('${widget.key}-$_value'),
+            initialValue: '$_value',
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            ),
+            onFieldSubmitted: (text) {
+              final parsed = int.tryParse(text);
+              if (parsed != null) _changeValue(parsed);
+            },
+          ),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+          padding: EdgeInsets.zero,
+          onPressed: _value < widget.maximum ? () => _changeValue(_value + 1) : null,
+          icon: const Icon(Icons.add, size: 18),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntegerSettingTile extends StatefulWidget {
   const _IntegerSettingTile({
     required this.icon,
     required this.title,
@@ -3783,7 +4100,9 @@ class _IntegerSettingTile extends StatelessWidget {
     required this.onChanged,
     this.description,
     this.valueLabel,
+    this.valueLabelBuilder,
     this.allowedValues,
+    this.editable = false,
     super.key,
   });
 
@@ -3794,60 +4113,141 @@ class _IntegerSettingTile extends StatelessWidget {
   final int minimum;
   final int maximum;
   final String? valueLabel;
+  final String Function(int value)? valueLabelBuilder;
   final List<int>? allowedValues;
+  final bool editable;
   final Future<void> Function(int value) onChanged;
 
+  @override
+  State<_IntegerSettingTile> createState() => _IntegerSettingTileState();
+}
+
+class _IntegerSettingTileState extends State<_IntegerSettingTile> {
+  late int _value;
+  int _pendingWrites = 0;
+  Future<void> _writeQueue = Future<void>.value();
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.value;
+  }
+
+  @override
+  void didUpdateWidget(covariant _IntegerSettingTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_pendingWrites == 0 && widget.value != _value) {
+      _value = widget.value;
+    }
+  }
+
   int? get _previousValue {
-    final values = allowedValues;
-    if (values == null) return value > minimum ? value - 1 : null;
-    final index = values.indexOf(value);
+    final values = widget.allowedValues;
+    if (values == null) {
+      return _value > widget.minimum ? _value - 1 : null;
+    }
+    final index = values.indexOf(_value);
     if (index > 0) return values[index - 1];
     if (index == -1) {
-      final lower = values.where((candidate) => candidate < value).toList();
+      final lower = values.where((candidate) => candidate < _value).toList();
       return lower.isEmpty ? null : lower.last;
     }
     return null;
   }
 
   int? get _nextValue {
-    final values = allowedValues;
-    if (values == null) return value < maximum ? value + 1 : null;
-    final index = values.indexOf(value);
+    final values = widget.allowedValues;
+    if (values == null) {
+      return _value < widget.maximum ? _value + 1 : null;
+    }
+    final index = values.indexOf(_value);
     if (index >= 0 && index < values.length - 1) return values[index + 1];
     if (index == -1) {
-      final higher = values.where((candidate) => candidate > value).toList();
+      final higher = values.where((candidate) => candidate > _value).toList();
       return higher.isEmpty ? null : higher.first;
     }
     return null;
+  }
+
+  void _changeValue(int next) {
+    if (next == _value) return;
+    setState(() {
+      _value = next;
+      _pendingWrites += 1;
+    });
+
+    final previousWrite = _writeQueue;
+    _writeQueue = () async {
+      try {
+        await previousWrite;
+      } catch (_) {
+        // A failed earlier write must not block later user input.
+      }
+      await widget.onChanged(next);
+    }();
+
+    _writeQueue.then(
+      (_) => _finishWrite(),
+      onError: (Object _, StackTrace __) => _finishWrite(),
+    );
+  }
+
+  void _finishWrite() {
+    if (!mounted) return;
+    setState(() {
+      if (_pendingWrites > 0) _pendingWrites -= 1;
+      if (_pendingWrites == 0) {
+        _value = widget.value;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final previous = _previousValue;
     final next = _nextValue;
-    final range = '$minimum–$maximum';
+    final range = '${widget.minimum}–${widget.maximum}';
+    final label = widget.valueLabelBuilder?.call(_value) ??
+        widget.valueLabel ??
+        '$_value';
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: description == null ? Text(range) : Text('$description\n$range'),
-      isThreeLine: description != null,
+      leading: Icon(widget.icon),
+      title: Text(widget.title),
+      subtitle: widget.description == null
+          ? Text(range)
+          : Text('${widget.description}\n$range'),
+      isThreeLine: widget.description != null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            onPressed: previous == null ? null : () => onChanged(previous),
+            onPressed: previous == null ? null : () => _changeValue(previous),
             icon: const Icon(Icons.remove),
           ),
           SizedBox(
             width: 72,
-            child: Text(
-              valueLabel ?? '$value',
-              textAlign: TextAlign.center,
-              textDirection: TextDirection.ltr,
-            ),
+            child: widget.editable
+                ? TextFormField(
+                    key: ValueKey('integer-${widget.key}-$_value'),
+                    initialValue: '$_value',
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(isDense: true),
+                    onFieldSubmitted: (text) {
+                      final parsed = int.tryParse(text);
+                      if (parsed != null) {
+                        final bounded = parsed < widget.minimum
+                            ? widget.minimum
+                            : (parsed > widget.maximum ? widget.maximum : parsed);
+                        _changeValue(bounded);
+                      }
+                    },
+                  )
+                : Text(label, textAlign: TextAlign.center, textDirection: TextDirection.ltr),
           ),
           IconButton(
-            onPressed: next == null ? null : () => onChanged(next),
+            onPressed: next == null ? null : () => _changeValue(next),
             icon: const Icon(Icons.add),
           ),
         ],
@@ -3878,7 +4278,7 @@ class _GameCard extends StatelessWidget {
     this.playerIdentity,
     required this.onOpen,
     required this.onToggleFavorite,
-    required this.onToggleDownload,
+    this.onSaveToDownloads,
     this.onMoveFavorite,
     this.onDelete,
   });
@@ -3888,7 +4288,7 @@ class _GameCard extends StatelessWidget {
   final String? playerIdentity;
   final VoidCallback onOpen;
   final VoidCallback onToggleFavorite;
-  final VoidCallback onToggleDownload;
+  final VoidCallback? onSaveToDownloads;
   final VoidCallback? onMoveFavorite;
   final VoidCallback? onDelete;
 
@@ -4027,22 +4427,20 @@ class _GameCard extends StatelessWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
-                    if (online)
+                    if (online &&
+                        game.providerGameId != null &&
+                        onSaveToDownloads != null)
                       IconButton(
                         key: Key('download-${game.id}'),
-                        tooltip: 'Offline speichern',
+                        tooltip: 'In Downloads speichern',
                         visualDensity: VisualDensity.compact,
-                        onPressed: onToggleDownload,
+                        onPressed: onSaveToDownloads,
                         icon: Icon(
-                          game.downloaded
-                              ? Icons.download_done
-                              : Icons.download,
-                          color: game.downloaded
-                              ? AppTheme.success
-                              : scheme.onSurfaceVariant,
+                          Icons.download,
+                          color: scheme.onSurfaceVariant,
                         ),
                       )
-                    else if (onDelete != null)
+                    else if (game.providerGameId == null && onDelete != null)
                       IconButton(
                         key: Key('delete-local-${game.id}'),
                         tooltip: 'Lokalen Eintrag löschen',

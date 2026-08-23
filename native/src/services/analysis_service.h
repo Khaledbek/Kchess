@@ -31,6 +31,7 @@ class AnalysisService {
   std::string start_analysis_json(const std::string& game_id);
   std::string analysis_status_json(const std::string& game_id);
   std::string move_analysis_status_json(const std::string& game_id, int ply);
+  std::string start_move_refinement_json(const std::string& game_id, int ply);
   void cancel_analysis(const std::string& game_id);
   void clear_engine_cache();
   void cancel_jobs_for_games(const std::vector<std::string>& game_ids);
@@ -45,6 +46,7 @@ class AnalysisService {
       int threads,
       int hash_mb);
   std::string variation_analysis_status_json(const std::string& job_id);
+  void cancel_variation_analysis(const std::string& job_id);
 
  private:
   enum class AnalysisJobState {
@@ -61,6 +63,8 @@ class AnalysisService {
     std::atomic_bool finished{false};
     std::atomic<AnalysisJobState> state{AnalysisJobState::queued};
     std::atomic_int current_position_slot{-1};
+    std::atomic_int requested_position_slot{-1};
+    std::atomic_uint64_t target_generation{0};
     std::atomic_int completed_moves{0};
     std::shared_ptr<StockfishEngine> engine;
     std::string config_hash;
@@ -73,6 +77,7 @@ class AnalysisService {
     std::string played_san;
     std::string fen;
     std::atomic_bool finished{false};
+    std::atomic_bool cancel_requested{false};
     mutable std::mutex state_mutex;
     std::string status{"running"};
     std::string error;
@@ -104,8 +109,18 @@ class AnalysisService {
       AppSettings settings,
       std::vector<std::string> positions,
       std::vector<int> completed_position_slots,
+      const std::shared_ptr<AnalysisJob>& job,
+      int preferred_slot = -1) noexcept;
+  void run_refinement_queue(
+      const std::string& game_id,
+      const std::string& config_hash,
+      AppSettings settings,
+      std::vector<std::string> positions,
+      std::vector<int> completed_position_slots,
       const std::shared_ptr<AnalysisJob>& job) noexcept;
   void reap_finished_variation_jobs();
+  void stop_all_variation_jobs() noexcept;
+  void stop_all_mainline_analysis_jobs() noexcept;
   std::string start_variation_job_json(
       const std::string& fen,
       const std::string& uci,
@@ -116,6 +131,9 @@ class AnalysisService {
 
   mutable std::mutex jobs_mutex_;
   std::unordered_map<std::string, std::shared_ptr<AnalysisJob>> jobs_;
+
+  mutable std::mutex refinement_jobs_mutex_;
+  std::unordered_map<std::string, std::shared_ptr<AnalysisJob>> refinement_jobs_;
 
   mutable std::mutex variation_jobs_mutex_;
   std::unordered_map<std::string, std::shared_ptr<VariationJob>> variation_jobs_;

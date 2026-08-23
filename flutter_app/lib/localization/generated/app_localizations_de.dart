@@ -358,7 +358,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get brilliant => 'Brillant';
 
   @override
-  String get critical => 'Kritischer Zug';
+  String get critical => 'Großartiger Zug';
 
   @override
   String get best => 'Bester';
@@ -464,6 +464,33 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get sidelineEngineTitle => 'Side-Line-Engine';
+
+  @override
+  String get sidelineEngineSubtitle =>
+      'Diese Werte gelten nur für die Live-Analyse eigener Varianten.';
+
+  @override
+  String get mainLineLabel => 'Hauptlinie';
+
+  @override
+  String get sidelineLabel => 'Eigene Variante';
+
+  @override
+  String get liveEngineTheorySkipped => 'Theorie: Live-Analyse übersprungen';
+
+  @override
+  String get liveEngineTargetReached => 'Stockfish: Analyseziel erreicht';
+
+  @override
+  String liveEngineProgress(int percent) {
+    return 'Stockfish analysiert live · $percent%';
+  }
+
+  @override
+  String get sidelineAnalysisPaused => 'Live-Analyse pausiert';
+
+  @override
   String get analyzingVariation => 'Die temporäre Variante wird analysiert…';
 
   @override
@@ -519,7 +546,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get threadsHelp =>
-      'CPU-Threads für Stockfish. Mehr kann schneller sein, benötigt aber mehr Rechenleistung und Akku.';
+      'CPU-Threads pro Stockfish-Worker. Kchess erkennt deinen PC automatisch und erlaubt höchstens die Hälfte der logischen CPU-Threads.';
 
   @override
   String get hashMemory => 'Hash-Speicher';

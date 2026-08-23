@@ -58,60 +58,73 @@ std::optional<double> expected_score_mover_after_move(const PositionEvaluation& 
 
 std::optional<double> expected_score_loss(
     const std::optional<double>& best, const std::optional<double>& played) {
-  if (!best.has_value() || !played.has_value()) return std::nullopt;
+  if (!best.has_value() || !played.has_value()
+      || !std::isfinite(*best) || !std::isfinite(*played)) {
+    return std::nullopt;
+  }
   return std::clamp(*best - *played, 0.0, 1.0);
 }
 
 MoveCategory classify_move(
     const MoveClassifierInput& input, const MoveClassifierConfig& config) {
   if (input.theory) return MoveCategory::theory;
+
   const auto loss = expected_score_loss(input.best_expected_score, input.played_expected_score);
   if (!loss.has_value()) return MoveCategory::unknown;
 
   const double best = *input.best_expected_score;
   const double played = *input.played_expected_score;
-  const double gap = input.second_best_expected_score.has_value()
-      ? std::max(0.0, best - *input.second_best_expected_score)
-      : 0.0;
-  const bool practical_best = input.played_is_best || *loss <= config.best_loss;
-  const bool has_real_alternative = input.legal_move_count > 1
-      && input.second_best_expected_score.has_value();
+  if (!std::isfinite(best) || !std::isfinite(played)
+      || best < 0.0 || best > 1.0 || played < 0.0 || played > 1.0) {
+    return MoveCategory::unknown;
+  }
 
-  // Brilliant is intentionally exceptional. A move made while in check is
-  // never Brilliant: even a difficult king reply is a defensive obligation,
-  // not a sacrifice award. It must be Stockfish's exact first choice, have a
-  // genuine alternative, preserve meaningful chances, separate clearly from
-  // the runner-up and contain a verified near-term material sacrifice.
-  const bool brilliant_eligible = input.played_is_best
+  const bool has_second = input.second_best_expected_score.has_value()
+      && std::isfinite(*input.second_best_expected_score)
+      && *input.second_best_expected_score >= 0.0
+      && *input.second_best_expected_score <= 1.0;
+  const double second = has_second ? *input.second_best_expected_score : best;
+  const double gap = has_second ? std::max(0.0, best - second) : 0.0;
+  const bool has_real_alternative = input.legal_move_count > 1 && has_second;
+
+  // Equivalent engine moves can legitimately have effectively identical WDL.
+  // Keep those as Best, but do not promote merely "very good" alternatives to
+  // Best: Excellent exists for that purpose.
+  const bool equivalent_best = input.played_is_best || *loss <= config.best_loss;
+
+  // Brilliant is exceptional, but it must not depend on a fragile exact-rank
+  // match from one particular search depth. A verified sacrifice that is
+  // objectively near-best can still be Brilliant when it preserves a strong
+  // result and has concrete tactical justification. This is especially
+  // important for sacrificial mating attacks whose root ranking can swap
+  // between equivalent moves while Stockfish deepens.
+  const bool near_best = input.played_is_best || *loss <= config.excellent_loss;
+  const bool uniquely_strong_best = has_real_alternative && gap >= config.brilliant_gap;
+  const bool brilliant_eligible = near_best
       && !input.was_in_check_before_move
-      && has_real_alternative
+      && input.legal_move_count > 1
       && best >= config.brilliant_min_best_score
       && played >= config.brilliant_min_best_score
-      && gap >= config.brilliant_gap
-      && input.material_sacrifice;
+      && input.material_sacrifice
+      && (input.forces_nontrivial_mate || uniquely_strong_best);
   if (brilliant_eligible) return MoveCategory::brilliant;
 
-  // Critical means the position genuinely hinges on the choice. A plain best
-  // move in a quiet position is still Best. We require a large MultiPV gap and
-  // either a result-band drop for the next-best move or an exceptionally large
-  // gap. Forced single replies are excluded. Multiple-reply check positions
-  // may still be Critical, but never Brilliant.
-  const bool second_drops_result_band = input.second_best_expected_score.has_value()
-      && ((best >= 0.70 && *input.second_best_expected_score < 0.50)
-          || (best >= 0.45 && *input.second_best_expected_score < 0.25));
-  const bool critical_eligible = practical_best
+  // "Critical" is the app's Great-move bucket. It is reserved for the exact
+  // engine move when the runner-up is materially worse in expected-score
+  // terms. The old classifier additionally required coarse result-band
+  // crossings, which caused clear only-move / great-move situations to be
+  // labelled plain Best.
+  const bool critical_eligible = input.played_is_best
       && has_real_alternative
       && best >= config.critical_min_best_score
-      && gap >= config.critical_gap
-      && (second_drops_result_band || gap >= 0.30);
+      && gap >= config.critical_gap;
   if (critical_eligible) return MoveCategory::critical;
 
-  if (practical_best) return MoveCategory::best;
+  if (equivalent_best) return MoveCategory::best;
 
-  // Miss is reserved for a concrete opportunity, not merely a generic bad
-  // move from a good position. Missing a forced mate always qualifies. The
-  // non-mate form requires a unique tactical best move (large MultiPV gap)
-  // and losing most of the winning/drawing opportunity.
+  // Miss is a concrete missed opportunity, not a synonym for every bad move.
+  // Missing a forced mate qualifies. Otherwise require evidence that there was
+  // a unique tactical move and that most of the opportunity was actually lost.
   const bool missed_tactical_opportunity = input.only_move_tactical
       && best >= config.miss_best_score
       && played <= config.miss_played_ceiling
@@ -120,26 +133,23 @@ MoveCategory classify_move(
     return MoveCategory::miss;
   }
 
-  // Blunder is also conservative. In an already bad position (best expected
-  // score below blunder_min_best_score), further deterioration is capped at
-  // Mistake. Otherwise a move must either lose an enormous amount of expected
-  // score or cross a major practical result band. This prevents games that are
-  // already lost from accumulating a wall of Blunders.
+  // Blunder requires either a very large expected-score loss or a practical
+  // outcome collapse. In positions that were already essentially lost, a
+  // further small deterioration is capped at Mistake so the move list does not
+  // become a wall of red labels caused by engine noise.
   const bool had_meaningful_chances = best >= config.blunder_min_best_score;
   const bool outcome_collapse = (best >= 0.70 && played <= 0.45)
       || (best >= 0.45 && played <= 0.20);
   const bool severe_blunder = *loss >= config.blunder_severe_loss;
   const bool outcome_blunder = *loss >= config.blunder_outcome_loss && outcome_collapse;
-  if (had_meaningful_chances
-      && (severe_blunder || outcome_blunder
-          || (input.allowed_forced_mate && *loss >= config.miss_loss))) {
+  const bool newly_allowed_mate = input.allowed_forced_mate && had_meaningful_chances;
+  if (had_meaningful_chances && (severe_blunder || outcome_blunder || newly_allowed_mate)) {
     return MoveCategory::blunder;
   }
 
-  if (*loss > config.okay_loss) return MoveCategory::mistake;
   if (*loss <= config.excellent_loss) return MoveCategory::excellent;
   if (*loss <= config.okay_loss) return MoveCategory::okay;
-  return MoveCategory::unknown;
+  return MoveCategory::mistake;
 }
 
 std::string move_category_name(const MoveCategory category) {

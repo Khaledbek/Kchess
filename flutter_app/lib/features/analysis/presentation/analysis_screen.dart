@@ -39,6 +39,17 @@ String? _analysisClassificationAsset(MoveClassification classification) =>
       MoveClassification.unknown => null,
     };
 
+String? _knownGameResult(String? raw) {
+  final result = raw?.trim();
+  return switch (result) {
+    '1-0' || '0-1' || '1/2-1/2' || '½-½' => result,
+    _ => null,
+  };
+}
+
+bool _isDrawResult(String result) =>
+    result == '1/2-1/2' || result == '½-½';
+
 Color _classificationColor(
   BuildContext context,
   MoveClassification classification,
@@ -362,6 +373,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   Object? _variationError;
   Timer? _playTimer;
   Timer? _variationTimer;
+  String? _activeVariationJobId;
+  bool _variationMovePending = false;
   late int _sidelineDepth;
   late int _sidelineMultiPv;
   late int _sidelineThreads;
@@ -373,7 +386,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     _settings = widget.settings;
     _sidelineDepth = _settings.depth;
     _sidelineMultiPv = _settings.multiPv;
-    _sidelineThreads = _settings.threads;
+    _sidelineThreads = AppController.clampEngineWorkerThreads(
+      _settings.threads,
+    );
     _sidelineHashMb = _settings.hashMb;
     _controller = AnalysisController(widget.gateway, widget.game)
       ..addListener(_refresh);
@@ -389,6 +404,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   void dispose() {
     _playTimer?.cancel();
     _variationTimer?.cancel();
+    final activeVariationJobId = _activeVariationJobId;
+    if (activeVariationJobId != null) {
+      unawaited(widget.gateway.cancelVariationAnalysis(activeVariationJobId));
+    }
     _controller
       ..removeListener(_refresh)
       ..dispose();
@@ -420,7 +439,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ? 0
         : (moveIndex >= moves.length ? moves.length - 1 : moveIndex);
     final slot = clampedMoveIndex + 1;
-    final analysisRunning = _controller.snapshot?.isRunning == true;
+    final analysisRunning = _controller.snapshot?.isRunning == true ||
+        _controller.displayedSnapshot?.isRunning == true;
     if (_afterMoveLoadingSlot == slot) return;
     if (_afterMoveSlot == slot &&
         _afterMoveSnapshot != null &&
@@ -490,7 +510,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         showDragHandle: true,
         isScrollControlled: true,
         builder: (context) =>
-            _SummarySheet(summary: summary, settings: _settings),
+            _SummarySheet(summary: summary),
       );
 
   AppSettings _withDisplaySetting(
@@ -704,13 +724,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                strings.engine,
+                                strings.sidelineEngineTitle,
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
                               Text(
-                                strings.engineSettingsSubtitle,
+                                strings.sidelineEngineSubtitle,
                                 style: theme.textTheme.bodySmall,
                               ),
                             ],
@@ -735,10 +755,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     ),
                     numberSlider(
                       title: strings.threads,
-                      value: quickThreads,
+                      value: AppController.clampEngineWorkerThreads(
+                        quickThreads,
+                      ),
                       min: 1,
-                      max: 32,
-                      onChanged: (value) => updateSideline(threads: value),
+                      max: AppController.maximumEngineWorkerThreads,
+                      onChanged: (value) => updateSideline(
+                        threads: AppController.clampEngineWorkerThreads(value),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
@@ -788,7 +812,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Future<void> _onBoardSquare(String square) async {
-    if (_variationSession?.moves.any((move) => move.isRunning) == true) return;
+    if (_variationMovePending) return;
     final source = _selectedSquare;
     if (source == null) {
       setState(() {
@@ -805,10 +829,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Future<void> _onBoardDrop(String source, String target) async {
-    if (source == target ||
-        _variationSession?.moves.any((move) => move.isRunning) == true) {
-      return;
-    }
+    if (source == target || _variationMovePending) return;
     await _playBoardMove(source, target);
   }
 
@@ -826,6 +847,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Future<void> _playBoardMove(String source, String target) async {
+    if (_variationMovePending) return;
     final session = _variationSession;
     final activeFen = session == null
         ? _displayFen
@@ -837,7 +859,27 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         _pieceAt(placement, source).toLowerCase() == 'p') {
       uci += 'q';
     }
+
+    // A move played on the board is only a sideline when it actually deviates
+    // from the recorded PGN. If this exact position + move occurs later in the
+    // main line (including a rejoin after a transposition), jump back onto the
+    // PGN instead of starting a variation engine job.
+    final mainLinePly = _matchingMainLinePly(activeFen, uci);
+    if (mainLinePly != null) {
+      if (session == null) {
+        await _selectPly(mainLinePly);
+      } else {
+        await _rejoinMainLineAt(mainLinePly);
+      }
+      return;
+    }
+
+    // Entering a sideline pauses every main-line poll immediately. Native code
+    // then transfers the single Stockfish slot to the sideline worker.
+    if (session == null) _controller.pauseForVariation();
+    _variationTimer?.cancel();
     setState(() {
+      _variationMovePending = true;
       _selectedSquare = null;
       _selectedLine = 0;
       _variationError = null;
@@ -851,7 +893,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         threads: _sidelineThreads,
         hashMb: _sidelineHashMb,
       );
-      if (!mounted) return;
+      if (!mounted) {
+        if (variation.isRunning) {
+          unawaited(widget.gateway.cancelVariationAnalysis(variation.jobId));
+        }
+        return;
+      }
       setState(() {
         final activeSession = _variationSession ??=
             _VariationSession(parentPly: _currentPly, startingFen: _displayFen);
@@ -861,12 +908,30 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             activeSession.moves.length,
           );
         }
+        // Previous sideline positions are snapshots only. They must never keep
+        // a hidden engine alive after the user has played the next move.
+        for (var index = 0; index < activeSession.moves.length; index++) {
+          final old = activeSession.moves[index];
+          if (old.isRunning) {
+            activeSession.moves[index] = old.copyWith(status: 'paused');
+          }
+        }
         activeSession.moves.add(variation);
         activeSession.currentIndex = activeSession.moves.length - 1;
+        _activeVariationJobId = variation.jobId;
+        _variationMovePending = false;
       });
       _pollVariation(variation.jobId, _variationSession!.currentIndex);
     } catch (error) {
-      if (mounted) setState(() => _variationError = error);
+      if (mounted) {
+        setState(() {
+          _variationMovePending = false;
+          _variationError = error;
+        });
+        if (_variationSession == null) {
+          unawaited(_controller.resumeAfterVariation(_currentPly));
+        }
+      }
     }
   }
 
@@ -881,6 +946,64 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               ? detail.moves.length - 1
               : _currentPly);
     return detail.moves[index].fenAfter;
+  }
+
+  int? _matchingMainLinePly(String fen, String uci) {
+    final moves = _controller.detail?.moves;
+    if (moves == null || moves.isEmpty) return null;
+
+    final session = _variationSession;
+    final firstCandidate = session == null
+        ? _currentPly + 1
+        : session.parentPly + 1;
+    final normalizedUci = uci.toLowerCase();
+    for (var index = firstCandidate < 0 ? 0 : firstCandidate;
+        index < moves.length;
+        index++) {
+      final recorded = moves[index];
+      if (recorded.uci.toLowerCase() == normalizedUci &&
+          _sameChessPosition(recorded.fenBefore, fen)) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  bool _sameChessPosition(String left, String right) {
+    final leftFields = left.trim().split(RegExp(r'\s+'));
+    final rightFields = right.trim().split(RegExp(r'\s+'));
+    if (leftFields.length < 4 || rightFields.length < 4) return left == right;
+    for (var index = 0; index < 4; index++) {
+      if (leftFields[index] != rightFields[index]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _rejoinMainLineAt(int ply) async {
+    _variationTimer?.cancel();
+    final activeJobId = _activeVariationJobId;
+    _activeVariationJobId = null;
+    if (mounted) {
+      setState(() {
+        _variationSession = null;
+        _variationError = null;
+        _variationMovePending = false;
+        _selectedSquare = null;
+        _selectedLine = 0;
+        _followLatest = false;
+        _currentPly = ply;
+      });
+    }
+    if (activeJobId != null) {
+      try {
+        await widget.gateway.cancelVariationAnalysis(activeJobId);
+      } catch (_) {
+        // The sideline worker may have completed just before the rejoin.
+      }
+    }
+    if (!mounted) return;
+    await _controller.resumeAfterVariation(ply);
+    await _loadAfterMoveSnapshot(ply);
   }
 
   String _pieceAt(String placement, String square) {
@@ -911,7 +1034,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             moveIndex < session.moves.length
         ? session.moves[moveIndex]
         : null;
-    if (current == null || current.jobId != jobId || !current.isRunning) return;
+    if (current == null ||
+        current.jobId != jobId ||
+        _activeVariationJobId != jobId ||
+        !current.isRunning) {
+      return;
+    }
     _variationTimer = Timer(const Duration(milliseconds: 300), () async {
       try {
         final updated = await widget.gateway.variationAnalysisStatus(jobId);
@@ -922,7 +1050,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             session.moves[moveIndex].jobId != jobId) {
           return;
         }
-        setState(() => session.moves[moveIndex] = updated);
+        setState(() {
+          session.moves[moveIndex] = updated;
+          if (!updated.isRunning && _activeVariationJobId == jobId) {
+            _activeVariationJobId = null;
+          }
+        });
         if (updated.isRunning) _pollVariation(jobId, moveIndex);
       } catch (error) {
         if (mounted) setState(() => _variationError = error);
@@ -932,11 +1065,26 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   void _returnToMainLine() {
     _variationTimer?.cancel();
+    final activeJobId = _activeVariationJobId;
+    _activeVariationJobId = null;
     setState(() {
       _variationSession = null;
       _variationError = null;
       _selectedSquare = null;
+      _variationMovePending = false;
     });
+    unawaited(_leaveVariationAndResume(activeJobId));
+  }
+
+  Future<void> _leaveVariationAndResume(String? activeJobId) async {
+    if (activeJobId != null) {
+      try {
+        await widget.gateway.cancelVariationAnalysis(activeJobId);
+      } catch (_) {
+        // A just-finished live job may already have been reaped natively.
+      }
+    }
+    if (mounted) await _controller.resumeAfterVariation(_currentPly);
   }
 
   void _navigateVariation(int index) {
@@ -952,8 +1100,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       _selectedSquare = null;
     });
     final current = session.current;
-    if (current?.isRunning == true) {
-      _pollVariation(current!.jobId, selected);
+    if (current?.isRunning == true &&
+        current!.jobId == _activeVariationJobId) {
+      _pollVariation(current.jobId, selected);
     }
   }
 
@@ -1041,6 +1190,18 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         sideToMove != profileSide;
     final bestArrowMove = opponentToMove ? '' : arrowMove;
     final threatArrowMove = opponentToMove ? arrowMove : '';
+    final atMainLineEnd =
+        _variationSession == null &&
+        detail != null &&
+        detail.moves.isNotEmpty &&
+        moveIndex == detail.moves.length - 1;
+    final terminalResult = atMainLineEnd
+        ? _knownGameResult(detail.summary.result)
+        : null;
+    final terminalByCheckmate =
+        terminalResult != null &&
+        !_isDrawResult(terminalResult) &&
+        detail!.moves.last.san.contains('#');
 
     return Scaffold(
       appBar: AppBar(
@@ -1053,13 +1214,98 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               tooltip: strings.cancelAnalysis,
               icon: const Icon(Icons.stop_circle_outlined),
             ),
-          if (snapshot?.summary case final summary?)
+          if (snapshot?.summary case final summary?) ...[
+            Builder(
+              builder: (context) {
+                var beforeDepth = displayed?.lines.isEmpty ?? true
+                    ? 0
+                    : displayed!.lines.first.depth;
+                var afterDepth = afterMoveSnapshot?.lines.isEmpty ?? true
+                    ? 0
+                    : afterMoveSnapshot!.lines.first.depth;
+                final liveSnapshot = displayed?.isRunning == true
+                    ? displayed
+                    : (afterMoveSnapshot?.isRunning == true
+                          ? afterMoveSnapshot
+                          : null);
+                if (liveSnapshot != null && liveSnapshot.liveDepth > 0) {
+                  if (liveSnapshot.currentPly == _currentPly) {
+                    beforeDepth = math.max(beforeDepth, liveSnapshot.liveDepth);
+                  } else if (liveSnapshot.currentPly == _currentPly + 1) {
+                    afterDepth = math.max(afterDepth, liveSnapshot.liveDepth);
+                  }
+                }
+                final minDepth = _settings.minAnalysisDepth;
+                final maxDepth = _settings.depth;
+                final theoryMove =
+                    displayed?.classification == MoveClassification.theory;
+                double depthProgress(int depth, bool qualityComplete) =>
+                    qualityComplete || maxDepth <= minDepth
+                    ? 1.0
+                    : ((depth - minDepth) / (maxDepth - minDepth))
+                          .clamp(0.0, 1.0);
+                final beforeProgress = depthProgress(
+                  beforeDepth,
+                  displayed?.qualityComplete ?? false,
+                );
+                final afterProgress = depthProgress(
+                  afterDepth,
+                  afterMoveSnapshot?.qualityComplete ?? false,
+                );
+                final progress = theoryMove
+                    ? 1.0
+                    : (move == null
+                          ? beforeProgress
+                          : (beforeProgress + afterProgress) / 2.0);
+                final finished = progress >= 1.0;
+                final scheme = Theme.of(context).colorScheme;
+                return Tooltip(
+                  message: theoryMove
+                      ? strings.liveEngineTheorySkipped
+                      : (finished
+                            ? strings.liveEngineTargetReached
+                            : strings.liveEngineProgress(
+                                (progress * 100).round(),
+                              )),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SizedBox(
+                      key: const Key('live-engine-status'),
+                      width: 28,
+                      height: 28,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              value: progress,
+                              strokeWidth: 2.6,
+                              strokeCap: StrokeCap.round,
+                              color: Colors.green,
+                              backgroundColor: scheme.outlineVariant,
+                            ),
+                          ),
+                          Icon(
+                            Icons.memory_rounded,
+                            size: 16,
+                            color: finished ? Colors.green : scheme.outline,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
             TextButton.icon(
               key: const Key('reopen-summary'),
               onPressed: () => _showSummary(summary),
               icon: const Icon(Icons.assessment_outlined),
               label: Text(strings.summary),
             ),
+          ],
         ],
       ),
       body: Column(
@@ -1092,6 +1338,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   playerRating: playerRating,
                   evaluationLine: lines.isEmpty ? null : lines.first,
                   showEvaluationBar: _settings.showEvaluationBar,
+                  terminalResult: terminalResult,
+                  terminalByCheckmate: terminalByCheckmate,
                   currentMoveClassification:
                       _variationSession == null && _settings.showClassifications
                           ? displayed?.classification
@@ -1129,8 +1377,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     (_variationSession?.moves.length ?? 1) - 1,
                   ),
                   variationError: _variationError,
-                  originalEvaluation:
-                      mainPositionLines.isEmpty ? null : mainPositionLines.first,
                   currentPositionLines: mainPositionLines,
                   onReturnToMainLine: _returnToMainLine,
                   settings: _settings,
@@ -1201,6 +1447,8 @@ class _Board extends StatelessWidget {
     required this.playerRating,
     required this.evaluationLine,
     required this.showEvaluationBar,
+    required this.terminalResult,
+    required this.terminalByCheckmate,
     required this.currentMoveClassification,
     required this.classificationMoveUci,
     required this.selectedSquare,
@@ -1225,6 +1473,8 @@ class _Board extends StatelessWidget {
   final int? playerRating;
   final EngineLine? evaluationLine;
   final bool showEvaluationBar;
+  final String? terminalResult;
+  final bool terminalByCheckmate;
   final MoveClassification? currentMoveClassification;
   final String classificationMoveUci;
   final String? selectedSquare;
@@ -1247,6 +1497,48 @@ class _Board extends StatelessWidget {
     'n': 'assets/analysis_img/piece_black_knight.svg',
     'p': 'assets/analysis_img/piece_black_pawn.svg',
   };
+
+  String? _kingEndMarker(String piece) {
+    final result = terminalResult;
+    if (result == null || (piece != 'K' && piece != 'k')) return null;
+    if (_isDrawResult(result)) return 'board_remis';
+
+    final whiteWon = result == '1-0';
+    final kingIsWhite = piece == 'K';
+    final isWinner = whiteWon == kingIsWhite;
+    if (isWinner) return 'board_mate_win';
+    return terminalByCheckmate ? 'board_lose' : 'board_giveup';
+  }
+
+  Widget _optionalEndMarker(String baseName) {
+    final aliases = <String>{baseName};
+    if (baseName == 'board_lose') aliases.add('board_mate_lost');
+
+    final candidates = <String>[
+      for (final name in aliases) ...[
+        'assets/analysis_img/$name.png',
+        'assets/$name.png',
+        'assets/analysis_img/$name.webp',
+        'assets/$name.webp',
+        'assets/analysis_img/$name.jpg',
+        'assets/$name.jpg',
+        'assets/analysis_img/$name.jpeg',
+        'assets/$name.jpeg',
+      ],
+    ];
+
+    Widget tryAsset(int index) {
+      if (index >= candidates.length) return const SizedBox.shrink();
+      return Image.asset(
+        candidates[index],
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        errorBuilder: (_, _, _) => tryAsset(index + 1),
+      );
+    }
+
+    return tryAsset(0);
+  }
 
   List<String> get _pieces {
     final fields = fen.split(' ');
@@ -1351,6 +1643,7 @@ class _Board extends StatelessWidget {
                         classificationTarget == square;
                     final piece = pieces[index];
                     final pieceAsset = _pieceAssets[piece];
+                    final kingEndMarker = _kingEndMarker(piece);
                     final canDrag = pieceAsset != null && _canDragPiece(piece);
                     final squareSide = boardSide / 8;
                     final pieceInset = squareSide * 0.055;
@@ -1405,6 +1698,30 @@ class _Board extends StatelessWidget {
                                           )
                                         : pieceImage(),
                                   ),
+                                if (kingEndMarker != null)
+                                  Positioned(
+                                    left: 2,
+                                    bottom: 2,
+                                    child: IgnorePointer(
+                                      child: Builder(
+                                        builder: (context) {
+                                          final badgeSize = math.max(
+                                            14.0,
+                                            math.min(
+                                              26.0,
+                                              boardSide / 8 * 0.30,
+                                            ),
+                                          );
+                                          return SizedBox.square(
+                                            dimension: badgeSize,
+                                            child: _optionalEndMarker(
+                                              kingEndMarker,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
                                 if (showClassificationBadge &&
                                     classification != null)
                                   Positioned(
@@ -1430,14 +1747,8 @@ class _Board extends StatelessWidget {
                                               width: badgeSize,
                                               height: badgeSize,
                                               fit: BoxFit.contain,
-                                              errorBuilder: (_, _, _) => Icon(
-                                                Icons.auto_awesome,
-                                                size: badgeSize * 0.82,
-                                                color: _classificationColor(
-                                                  context,
-                                                  classification,
-                                                ),
-                                              ),
+                                              errorBuilder: (_, _, _) =>
+                                                  const SizedBox.shrink(),
                                             );
                                           }
                                           return Icon(
@@ -1530,6 +1841,7 @@ class _Board extends StatelessWidget {
                   child: _EvaluationBar(
                     line: evaluationLine,
                     fen: fen,
+                    terminalResult: terminalResult,
                   ),
                 ),
                 const SizedBox(height: evaluationGap),
@@ -1656,12 +1968,24 @@ class _ArrowPainter extends CustomPainter {
 }
 
 class _EvaluationBar extends StatelessWidget {
-  const _EvaluationBar({required this.line, required this.fen});
+  const _EvaluationBar({
+    required this.line,
+    required this.fen,
+    required this.terminalResult,
+  });
 
   final EngineLine? line;
   final String fen;
+  final String? terminalResult;
 
   ({double whiteShare, String label}) _value() {
+    final result = terminalResult;
+    if (result == '1-0') return (whiteShare: 1.0, label: '1-0');
+    if (result == '0-1') return (whiteShare: 0.0, label: '0-1');
+    if (result != null && _isDrawResult(result)) {
+      return (whiteShare: 0.5, label: '½-½');
+    }
+
     final fields = fen.split(' ');
     final blackToMove = fields.length > 1 && fields[1] == 'b';
     final cp = line?.evaluationCp;
@@ -1718,13 +2042,14 @@ class _EvaluationBar extends StatelessWidget {
                       child: const ColoredBox(color: Color(0xFFF2EFE7)),
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 1,
-                      color: scheme.outline.withValues(alpha: 0.75),
+                  if (terminalResult != '1-0' && terminalResult != '0-1')
+                    Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 1,
+                        color: scheme.outline.withValues(alpha: 0.75),
+                      ),
                     ),
-                  ),
                   Center(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -1776,7 +2101,6 @@ class _AnalysisDetails extends StatelessWidget {
     required this.onVariationNext,
     required this.onVariationLast,
     required this.variationError,
-    required this.originalEvaluation,
     required this.currentPositionLines,
     required this.onReturnToMainLine,
     required this.settings,
@@ -1799,7 +2123,6 @@ class _AnalysisDetails extends StatelessWidget {
   final VoidCallback onVariationNext;
   final VoidCallback onVariationLast;
   final Object? variationError;
-  final EngineLine? originalEvaluation;
   final List<EngineLine> currentPositionLines;
   final VoidCallback onReturnToMainLine;
   final AppSettings settings;
@@ -1879,11 +2202,7 @@ class _AnalysisDetails extends StatelessWidget {
                       key: Key('move-icon-${classification.name}'),
                       width: 28,
                       height: 28,
-                      errorBuilder: (_, _, _) => Icon(
-                        Icons.auto_awesome,
-                        size: 22,
-                        color: _classificationColor(context, classification),
-                      ),
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     )
                   else
                     Icon(
@@ -1956,13 +2275,6 @@ class _AnalysisDetails extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
             ],
-            if (settings.showClassifications && classification == null) ...[
-              const SizedBox(height: 5),
-              Text(
-                strings.classificationPending,
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
             if (settings.showTheory && theory != null) ...[
               const SizedBox(height: 5),
               Text(
@@ -1978,21 +2290,8 @@ class _AnalysisDetails extends StatelessWidget {
     );
   }
 
-  String _analysisModeLabel(BuildContext context, bool variationMode) {
-    final language = Localizations.localeOf(context).languageCode;
-    if (variationMode) {
-      return switch (language) {
-        'de' => 'Eigene Variante',
-        'ar' => 'خطك البديل',
-        _ => 'Your sideline',
-      };
-    }
-    return switch (language) {
-      'de' => 'Hauptlinie',
-      'ar' => 'الخط الرئيسي',
-      _ => 'Main line',
-    };
-  }
+  String _analysisModeLabel(AppLocalizations strings, bool variationMode) =>
+      variationMode ? strings.sidelineLabel : strings.mainLineLabel;
 
   Widget _variationCard(BuildContext context, AppLocalizations strings) {
     final theme = Theme.of(context);
@@ -2014,7 +2313,7 @@ class _AnalysisDetails extends StatelessWidget {
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    _analysisModeLabel(context, true),
+                    _analysisModeLabel(strings, true),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -2047,73 +2346,29 @@ class _AnalysisDetails extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (value != null) ...[
+                if (value != null &&
+                    value.lines.isNotEmpty &&
+                    value.status != 'error') ...[
                   const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          strings.triedMove(value.playedSan),
-                          textDirection: TextDirection.ltr,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      if (!value.isRunning && value.status != 'error')
-                        Text(
-                          _variationScore(value),
-                          textDirection: TextDirection.ltr,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (value.isRunning) ...[
-                    const SizedBox(height: 6),
-                    const LinearProgressIndicator(
-                      key: Key('variation-progress'),
-                      minHeight: 3,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      strings.analyzingVariation,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ] else if (value.status == 'error')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 5),
-                      child: Text(
-                        value.error ?? strings.coreUnavailable,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.error,
-                        ),
-                      ),
-                    )
-                  else if (value.lines.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      strings.evaluationComparison(
-                        originalEvaluation == null
-                            ? '—'
-                            : _score(originalEvaluation!),
-                        _variationScore(value),
-                      ),
-                      key: const Key('variation-evaluation'),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ] else
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
                     child: Text(
-                      strings.variationStartingPosition,
-                      style: theme.textTheme.bodySmall,
+                      _variationScore(value),
+                      key: const Key('variation-live-score'),
+                      textDirection: TextDirection.ltr,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
+                ],
+                if (value?.isRunning == true) ...[
+                  const SizedBox(height: 6),
+                  const LinearProgressIndicator(
+                    key: Key('variation-progress'),
+                    minHeight: 3,
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -2267,7 +2522,7 @@ class _AnalysisDetails extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    _analysisModeLabel(context, variationMode),
+                    _analysisModeLabel(strings, variationMode),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: accent,
                       fontWeight: FontWeight.w800,
@@ -2494,7 +2749,10 @@ class _AnalysisDetails extends StatelessWidget {
         : '${move!.moveNumber}${move!.sideToMove == 'black' ? '…' : '.'}';
     final playedMove = move?.san ?? 'FEN';
     final shownLines = variation?.lines ?? currentPositionLines;
-    final classification = displayed?.classification;
+    final rawClassification = displayed?.classification;
+    final classification = rawClassification == MoveClassification.unknown
+        ? null
+        : rawClassification;
     final theory = displayed?.theory;
     final recommendedMove = displayed?.recommendedMove;
     final showRecommendedMove =
@@ -2675,95 +2933,47 @@ class _AnalysisControls extends StatelessWidget {
   }
 }
 
-class _SummarySheet extends StatefulWidget {
-  const _SummarySheet({required this.summary, required this.settings});
+class _SummarySheet extends StatelessWidget {
+  const _SummarySheet({required this.summary});
 
   final AnalysisSummary summary;
-  final AppSettings settings;
-
-  @override
-  State<_SummarySheet> createState() => _SummarySheetState();
-}
-
-class _SummarySheetState extends State<_SummarySheet> {
-  bool _showBoth = false;
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppLocalizations.of(context);
-    final summary = widget.summary;
-    final selected = summary.selected;
-    final selectedLabel = summary.profileSide == 'black'
-        ? strings.blackPlayer
-        : strings.whitePlayer;
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              strings.analysisComplete,
-              style: Theme.of(context).textTheme.titleLarge,
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: IconButton(
+                key: const Key('summary-close'),
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
             ),
-            const SizedBox(height: 12),
-            SegmentedButton<bool>(
-              key: const Key('summary-player-toggle'),
-              segments: [
-                ButtonSegment(value: false, label: Text(strings.player)),
-                ButtonSegment(value: true, label: Text(strings.bothPlayers)),
-              ],
-              selected: {_showBoth},
-              onSelectionChanged: (value) =>
-                  setState(() => _showBoth = value.single),
-            ),
-            const SizedBox(height: 16),
-            if (_showBoth) ...[
-              _PlayerSummaryBlock(
-                key: const Key('white-summary'),
-                title: strings.whitePlayer,
-                summary: summary.white,
-                settings: widget.settings,
-              ),
-              const SizedBox(height: 16),
-              _PlayerSummaryBlock(
-                key: const Key('black-summary'),
-                title: strings.blackPlayer,
-                summary: summary.black,
-                settings: widget.settings,
-              ),
-            ] else
-              _PlayerSummaryBlock(
-                key: const Key('selected-player-summary'),
-                title: selectedLabel,
-                summary: selected,
-                settings: widget.settings,
-              ),
-            const SizedBox(height: 12),
-            ExpansionTile(
-              key: const Key('summary-versions'),
-              tilePadding: EdgeInsets.zero,
-              title: Text(strings.versions),
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    'd${summary.engineDepth} · ${summary.engineVersion}\n'
-                    '${strings.classifierVersionLabel} ${summary.classifierVersion} · '
-                    '${strings.accuracyVersionLabel} ${summary.accuracyAlgorithmVersion}\n'
-                    '${summary.openingBookVersion}',
-                    textDirection: TextDirection.ltr,
+                Expanded(
+                  child: _PlayerSummaryBlock(
+                    key: const Key('white-summary'),
+                    isWhite: true,
+                    summary: summary.white,
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: _PlayerSummaryBlock(
+                    key: const Key('black-summary'),
+                    isWhite: false,
+                    summary: summary.black,
                   ),
                 ),
               ],
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(strings.close),
-              ),
             ),
           ],
         ),
@@ -2774,54 +2984,99 @@ class _SummarySheetState extends State<_SummarySheet> {
 
 class _PlayerSummaryBlock extends StatelessWidget {
   const _PlayerSummaryBlock({
-    required this.title,
+    required this.isWhite,
     required this.summary,
-    required this.settings,
     super.key,
   });
 
-  final String title;
+  final bool isWhite;
   final PlayerAnalysisSummary summary;
-  final AppSettings settings;
+  @override
+  Widget build(BuildContext context) {
+    final accuracy = summary.localAccuracy;
+    final counts = <(MoveClassification, int)>[
+      (MoveClassification.theory, summary.theory),
+      (MoveClassification.brilliant, summary.brilliant),
+      (MoveClassification.critical, summary.critical),
+      (MoveClassification.best, summary.best),
+      (MoveClassification.excellent, summary.excellent),
+      (MoveClassification.okay, summary.okay),
+      (MoveClassification.miss, summary.miss),
+      (MoveClassification.mistake, summary.mistake),
+      (MoveClassification.blunder, summary.blunder),
+    ];
+    final visibleCounts = counts.where((entry) => entry.$2 > 0).toList();
+    final kingAsset = isWhite
+        ? 'assets/analysis_img/piece_white_king.svg'
+        : 'assets/analysis_img/piece_black_king.svg';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SvgPicture.asset(
+          kingAsset,
+          width: 34,
+          height: 34,
+          semanticsLabel: isWhite ? 'White' : 'Black',
+        ),
+        if (accuracy != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            '${accuracy.toStringAsFixed(1)}%',
+            key: Key(isWhite ? 'white-summary-accuracy' : 'black-summary-accuracy'),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+        if (visibleCounts.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          for (final (classification, value) in visibleCounts)
+            _SummaryClassificationRow(
+              classification: classification,
+              value: value,
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SummaryClassificationRow extends StatelessWidget {
+  const _SummaryClassificationRow({
+    required this.classification,
+    required this.value,
+  });
+
+  final MoveClassification classification;
+  final int value;
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppLocalizations.of(context);
-    final accuracy = summary.localAccuracy;
-    final counts = <(String, int)>[
-      if (settings.showTheory) (strings.theory, summary.theory),
-      (strings.brilliant, summary.brilliant),
-      (strings.critical, summary.critical),
-      (strings.best, summary.best),
-      (strings.excellent, summary.excellent),
-      (strings.okay, summary.okay),
-      (strings.miss, summary.miss),
-      (strings.mistake, summary.mistake),
-      (strings.blunder, summary.blunder),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        if (settings.showAccuracy && accuracy != null)
-          Text(
-            '${strings.localAccuracy}: ${accuracy.toStringAsFixed(1)}%',
-            key: const Key('summary-accuracy'),
+    final asset = _analysisClassificationAsset(classification);
+    if (asset == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            asset,
+            width: 28,
+            height: 28,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
-        Text('${strings.totalMoves}: ${summary.totalMoves}'),
-        Text('${strings.analyzedMoves}: ${summary.analyzedMoves}'),
-        if (settings.showClassifications) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final (label, value) in counts)
-                Chip(label: Text('$label: $value')),
-            ],
+          const SizedBox(width: 8),
+          Text(
+            '$value',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
-      ],
+      ),
     );
   }
 }

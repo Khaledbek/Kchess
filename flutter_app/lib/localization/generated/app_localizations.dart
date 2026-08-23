@@ -757,7 +757,7 @@ abstract class AppLocalizations {
   /// No description provided for @critical.
   ///
   /// In en, this message translates to:
-  /// **'Critical Move'**
+  /// **'Great Move'**
   String get critical;
 
   /// No description provided for @best.
@@ -946,6 +946,54 @@ abstract class AppLocalizations {
   /// **'You tried {move}.'**
   String triedMove(String move);
 
+  /// No description provided for @sidelineEngineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sideline engine'**
+  String get sidelineEngineTitle;
+
+  /// No description provided for @sidelineEngineSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'These values apply only to live analysis of your sideline.'**
+  String get sidelineEngineSubtitle;
+
+  /// No description provided for @mainLineLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Main line'**
+  String get mainLineLabel;
+
+  /// No description provided for @sidelineLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your sideline'**
+  String get sidelineLabel;
+
+  /// No description provided for @liveEngineTheorySkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Theory: live analysis skipped'**
+  String get liveEngineTheorySkipped;
+
+  /// No description provided for @liveEngineTargetReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish: analysis target reached'**
+  String get liveEngineTargetReached;
+
+  /// No description provided for @liveEngineProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish analyzing live · {percent}%'**
+  String liveEngineProgress(int percent);
+
+  /// No description provided for @sidelineAnalysisPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Live analysis paused'**
+  String get sidelineAnalysisPaused;
+
   /// No description provided for @analyzingVariation.
   ///
   /// In en, this message translates to:
@@ -1039,7 +1087,7 @@ abstract class AppLocalizations {
   /// No description provided for @threadsHelp.
   ///
   /// In en, this message translates to:
-  /// **'CPU threads used by Stockfish. More can be faster, but uses more processor power and battery.'**
+  /// **'CPU threads per Stockfish worker. Kchess detects your PC automatically and allows at most half of the logical CPU threads.'**
   String get threadsHelp;
 
   /// No description provided for @hashMemory.

@@ -164,6 +164,19 @@ kc_status kc_delete_profile(
   return status_call(core, [=] { core->delete_profile(profile_id_utf8); });
 }
 
+kc_status kc_merge_local_profile(
+    const kc_core_handle handle,
+    const char* source_profile_id_utf8,
+    const char* target_profile_id_utf8) {
+  auto* core = core_from(handle);
+  if (source_profile_id_utf8 == nullptr || target_profile_id_utf8 == nullptr) {
+    return set_error(core, KC_STATUS_INVALID_ARGUMENT, "Source and target profile ids are required");
+  }
+  return status_call(core, [=] {
+    core->merge_local_profile(source_profile_id_utf8, target_profile_id_utf8);
+  });
+}
+
 char* kc_active_profile_json(const kc_core_handle handle) {
   return string_call(
       core_from(handle), [handle] { return core_from(handle)->active_profile_json(); });
@@ -180,6 +193,15 @@ kc_status kc_set_engine_settings(
     const int32_t time_limit_seconds) {
   return status_call(core_from(handle), [=] {
     core_from(handle)->set_engine_settings(depth, multi_pv, time_limit_seconds);
+  });
+}
+
+kc_status kc_set_analysis_depth_range(
+    const kc_core_handle handle,
+    const int32_t minimum_depth,
+    const int32_t maximum_depth) {
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->set_analysis_depth_range(minimum_depth, maximum_depth);
   });
 }
 
@@ -219,6 +241,12 @@ kc_status kc_set_locale(const kc_core_handle handle, const char* locale_utf8) {
 
 char* kc_games_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [handle] { return core_from(handle)->games_json(); });
+}
+
+char* kc_favorite_games_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [handle] {
+    return core_from(handle)->favorite_games_json();
+  });
 }
 
 char* kc_game_json(const kc_core_handle handle, const char* game_id_utf8) {
@@ -407,6 +435,15 @@ char* kc_analysis_status_json(const kc_core_handle handle, const char* game_id_u
       core_from(handle), [=] { return core_from(handle)->analysis_status_json(game_id_utf8); });
 }
 
+char* kc_start_move_refinement_json(
+    const kc_core_handle handle, const char* game_id_utf8, const int32_t ply) {
+  if (game_id_utf8 == nullptr)
+    return invalid_string_argument(core_from(handle), "Game id is required");
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_move_refinement_json(game_id_utf8, ply);
+  });
+}
+
 char* kc_move_analysis_status_json(
     const kc_core_handle handle, const char* game_id_utf8, const int32_t ply) {
   if (game_id_utf8 == nullptr)
@@ -459,6 +496,15 @@ char* kc_variation_analysis_status_json(
     return invalid_string_argument(core_from(handle), "Job id is required");
   return string_call(core_from(handle), [=] {
     return core_from(handle)->variation_analysis_status_json(job_id_utf8);
+  });
+}
+
+kc_status kc_cancel_variation_analysis(
+    const kc_core_handle handle, const char* job_id_utf8) {
+  if (job_id_utf8 == nullptr)
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Job id is required");
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->cancel_variation_analysis(job_id_utf8);
   });
 }
 

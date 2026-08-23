@@ -183,6 +183,18 @@ std::string GameLibraryService::games_json() const {
   return json.str();
 }
 
+std::string GameLibraryService::favorite_games_json() const {
+  const auto games = database_.favorite_games();
+  std::ostringstream json;
+  json << '[';
+  for (std::size_t index = 0; index < games.size(); ++index) {
+    if (index != 0) json << ',';
+    json << game_record_json(games[index], false);
+  }
+  json << ']';
+  return json.str();
+}
+
 std::string GameLibraryService::game_json(const std::string& game_id) const {
   validate_token(game_id, "game id");
   const auto game = database_.game(game_id);
@@ -191,7 +203,7 @@ std::string GameLibraryService::game_json(const std::string& game_id) const {
 }
 
 std::string GameLibraryService::import_pgn_json(const std::string& pgn) {
-  const auto profile = profile_service_.require_local_profile();
+  const auto profile = profile_service_.ensure_local_profile();
   const auto parsed = parse_pgn(pgn);
   if (!parsed.valid) throw std::invalid_argument("Invalid PGN: " + parsed.error);
   if (parsed.game.moves.empty()) throw std::invalid_argument("PGN contains no main-line moves");
@@ -201,7 +213,7 @@ std::string GameLibraryService::import_pgn_json(const std::string& pgn) {
 
 std::string GameLibraryService::import_fen_json(
     const std::string& fen, const std::string& display_name) {
-  const auto profile = profile_service_.require_local_profile();
+  const auto profile = profile_service_.ensure_local_profile();
   validate_token(display_name, "position name");
   const auto validation = validate_fen(fen);
   if (!validation.valid) throw std::invalid_argument("Invalid FEN: " + validation.error);
@@ -278,6 +290,8 @@ void GameLibraryService::set_downloaded(const std::string& game_id, const bool v
   validate_token(game_id, "game id");
   const auto profile = database_.active_profile();
   if (!profile.has_value()) throw std::runtime_error("no active profile");
+  // ABI-compatible entry point: a "download" is now just a global favorite
+  // placed in the Downloads collection, not a separate persistence state.
   database_.set_downloaded(profile->id, game_id, value);
 }
 
@@ -285,9 +299,9 @@ void GameLibraryService::delete_local_game(const std::string& game_id) {
   validate_token(game_id, "game id");
   const auto profile = database_.active_profile();
   if (!profile.has_value()) throw std::runtime_error("no active profile");
-  if (profile->type != ProfileType::local_pgn_fen) {
-    throw std::runtime_error("Only local PGN/FEN entries can be deleted here");
-  }
+  // Local/imported entries are identified by the game itself, not by the
+  // profile type. This allows PGN/FEN imports inside Chess.com/Lichess
+  // libraries while provider games remain protected by Database::delete_local_game.
   database_.delete_local_game(profile->id, game_id);
 }
 

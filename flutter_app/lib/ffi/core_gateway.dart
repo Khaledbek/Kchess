@@ -11,6 +11,7 @@ abstract interface class CoreGateway {
   });
   Future<void> setActiveProfile(String profileId);
   Future<void> deleteProfile(String profileId);
+  Future<void> mergeLocalProfile(String sourceProfileId, String targetProfileId);
   Future<ProviderOverview> providerOverview(String profileId);
   Future<ProviderOverview> syncProvider(
     String profileId, {
@@ -18,6 +19,10 @@ abstract interface class CoreGateway {
     int month = 0,
   });
   Future<AppSettings> settings();
+  Future<void> setAnalysisDepthRange({
+    required int minimumDepth,
+    required int maximumDepth,
+  });
   Future<void> setEngineSettings({
     required int depth,
     required int multiPv,
@@ -32,12 +37,14 @@ abstract interface class CoreGateway {
   Future<void> setThemeMode(AppThemeMode mode);
   Future<void> setLocale(String locale);
   Future<List<GameSummary>> games();
+  Future<List<GameSummary>> favoriteGames();
   Future<GameDetail> game(String gameId);
   Future<GameSummary> importPgn(String pgn);
   Future<GameSummary> importFen({required String fen, required String name});
   Future<AnalysisSnapshot> startAnalysis(String gameId);
   Future<AnalysisSnapshot> analysisStatus(String gameId);
   Future<AnalysisSnapshot> moveAnalysisStatus(String gameId, int ply);
+  Future<AnalysisSnapshot> startMoveRefinement(String gameId, int ply);
   Future<void> cancelAnalysis(String gameId);
   Future<void> clearEngineCache();
   Future<VariationAnalysisSnapshot> startVariationAnalysis({
@@ -49,6 +56,7 @@ abstract interface class CoreGateway {
     int? hashMb,
   });
   Future<VariationAnalysisSnapshot> variationAnalysisStatus(String jobId);
+  Future<void> cancelVariationAnalysis(String jobId);
   Future<void> setGameFavorite(String gameId, bool enabled);
   Future<List<FavoriteCollection>> favoriteCollections();
   Future<FavoriteCollection> createFavoriteCollection(String name);

@@ -178,6 +178,23 @@ class FakeCoreGateway implements CoreGateway {
   }
 
   @override
+  Future<void> mergeLocalProfile(
+    String sourceProfileId,
+    String targetProfileId,
+  ) async {
+    final source =
+        storedProfiles.firstWhere((profile) => profile.id == sourceProfileId);
+    final target =
+        storedProfiles.firstWhere((profile) => profile.id == targetProfileId);
+    if (source.type != ProfileType.localPgnFen ||
+        target.type == ProfileType.localPgnFen) {
+      throw const CoreGatewayException('Invalid profile merge');
+    }
+    storedProfiles.removeWhere((profile) => profile.id == sourceProfileId);
+    active = target;
+  }
+
+  @override
   Future<ProviderOverview> providerOverview(String profileId) async =>
       ProviderOverview(
         profile: storedProfiles.firstWhere((value) => value.id == profileId),
@@ -211,6 +228,19 @@ class FakeCoreGateway implements CoreGateway {
 
   @override
   Future<AppSettings> settings() async => currentSettings;
+
+  @override
+  Future<void> setAnalysisDepthRange({
+    required int minimumDepth,
+    required int maximumDepth,
+  }) async {
+    settingWrites++;
+    engineSettingWrites++;
+    currentSettings = currentSettings.copyWith(
+      minAnalysisDepth: minimumDepth,
+      depth: maximumDepth,
+    );
+  }
 
   @override
   Future<void> setEngineSettings({
@@ -338,6 +368,10 @@ class FakeCoreGateway implements CoreGateway {
   }
 
   @override
+  Future<AnalysisSnapshot> startMoveRefinement(String gameId, int ply) async =>
+      _snapshot(gameId, complete: true);
+
+  @override
   Future<AnalysisSnapshot> moveAnalysisStatus(String gameId, int ply) async =>
       _snapshot(gameId, complete: true);
 
@@ -424,6 +458,11 @@ class FakeCoreGateway implements CoreGateway {
   }
 
   @override
+  Future<void> cancelVariationAnalysis(String jobId) async {
+    _variationJobs.remove(jobId);
+  }
+
+  @override
   Future<void> setGameFavorite(String gameId, bool enabled) async {
     final index = storedGames.indexWhere((game) => game.id == gameId);
     if (index >= 0) {
@@ -434,6 +473,10 @@ class FakeCoreGateway implements CoreGateway {
       );
     }
   }
+
+  @override
+  Future<List<GameSummary>> favoriteGames() async =>
+      storedGames.where((game) => game.favorite).toList(growable: false);
 
   @override
   Future<List<FavoriteCollection>> favoriteCollections() async =>

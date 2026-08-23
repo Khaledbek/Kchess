@@ -22,6 +22,31 @@
 namespace kchess {
 namespace {
 
+constexpr int kLiveRefinementHashMb = 512;
+constexpr int kEngineThreadHardCap = 32;
+constexpr int kLiveStableIterations = 3;
+constexpr int kLiveStableEvalToleranceCp = 15;
+
+int maximum_worker_threads() {
+  const unsigned hardware = std::thread::hardware_concurrency();
+  if (hardware <= 1) return 1;
+  // A single Stockfish worker may use at most half of the machine's logical
+  // CPUs. The hard cap keeps the value inside Kchess' persisted setting range.
+  const int half = std::max(1, static_cast<int>(hardware / 2U));
+  return std::clamp(half, 1, kEngineThreadHardCap);
+}
+
+int live_refinement_threads(const AppSettings& settings) {
+  return std::clamp(settings.threads, 1, maximum_worker_threads());
+}
+
+int live_early_stop_min_depth(const AppSettings& settings) {
+  // Never stop immediately after the minimum pass. Give Stockfish several
+  // genuinely deeper iterations, then allow convergence to end quiet nodes.
+  return std::min(
+      settings.depth, std::max(16, settings.min_analysis_depth + 4));
+}
+
 std::int64_t unix_time_seconds() {
   return std::chrono::duration_cast<std::chrono::seconds>(
              std::chrono::system_clock::now().time_since_epoch())
@@ -144,6 +169,20 @@ AnalysisService::~AnalysisService() {
     if (job->worker.joinable()) job->worker.join();
   }
 
+  std::vector<std::shared_ptr<AnalysisJob>> refinement_jobs;
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    for (const auto& [game_id, job] : refinement_jobs_) {
+      (void)game_id;
+      job->cancel_requested = true;
+      job->engine->cancel();
+      refinement_jobs.push_back(job);
+    }
+  }
+  for (const auto& job : refinement_jobs) {
+    if (job->worker.joinable()) job->worker.join();
+  }
+
   std::vector<std::shared_ptr<VariationJob>> variation_jobs;
   {
     std::lock_guard lock(variation_jobs_mutex_);
@@ -183,6 +222,22 @@ void AnalysisService::cancel_jobs_for_games(
     }
   }
   for (const auto& job : cancelled) {
+    if (job->worker.joinable()) job->worker.join();
+  }
+
+  std::vector<std::shared_ptr<AnalysisJob>> refinements;
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    for (const auto& game_id : game_ids) {
+      const auto found = refinement_jobs_.find(game_id);
+      if (found == refinement_jobs_.end()) continue;
+      found->second->cancel_requested = true;
+      found->second->engine->cancel();
+      refinements.push_back(found->second);
+      refinement_jobs_.erase(found);
+    }
+  }
+  for (const auto& job : refinements) {
     if (job->worker.joinable()) job->worker.join();
   }
 }
@@ -233,12 +288,13 @@ std::optional<PersistedAnalysis> AnalysisService::reusable_analysis(
     const std::string& game_id,
     const AppSettings& settings,
     const int requested_ply) const {
+  // A completed game-analysis run is reusable only for the exact engine
+  // configuration that produced it.  Position-level cache entries remain
+  // quality-compatible and can still accelerate a new run, but changing any
+  // cache-relevant engine setting must create/continue the corresponding new
+  // run instead of making the UI believe the game is already complete.
   const auto exact_hash = analysis_config_hash(settings);
-  if (auto exact = database_.analysis(game_id, exact_hash, requested_ply); exact.has_value()) {
-    return exact;
-  }
-  StockfishEngine engine;
-  return database_.compatible_analysis(game_id, engine.version(), settings, requested_ply);
+  return database_.analysis(game_id, exact_hash, requested_ply);
 }
 
 const char* AnalysisService::job_state_name(const AnalysisJobState state) noexcept {
@@ -283,7 +339,22 @@ std::string AnalysisService::analysis_json(
   if (analysis.total_plies <= 0) json << '0';
   else json << std::fixed << std::setprecision(3)
             << static_cast<double>(live_completed_moves) / analysis.total_plies;
+  const int live_depth = live_job != nullptr && live_job->engine != nullptr
+      ? live_job->engine->current_depth()
+      : 0;
+  bool quality_complete = false;
+  try {
+    const auto current_settings = database_.settings();
+    quality_complete = analysis.latest_ply >= 0
+        && analysis.config_hash == analysis_config_hash(current_settings)
+        && (!analysis.lines.empty()
+            || (analysis.classification.has_value()
+                && *analysis.classification == MoveCategory::theory));
+  } catch (...) {
+  }
   json << ",\"currentPly\":" << live_current_slot
+       << ",\"liveDepth\":" << live_depth
+       << ",\"qualityComplete\":" << (quality_complete ? "true" : "false")
        << ",\"bestMove\":\"" << escape_json(analysis.best_move)
        << "\",\"engineVersion\":\"" << escape_json(analysis.engine_version)
        << "\",\"configHash\":\"" << escape_json(analysis.config_hash)
@@ -440,26 +511,57 @@ void AnalysisService::rebuild_classification(
       if (before->lines.size() > 1) {
         second_expected = expected_score_side_to_move(evaluation_of(before->lines[1]));
       }
-      if (played_is_best) {
+
+      // Prefer the played move's score from the SAME root MultiPV search when
+      // Stockfish returned it. Comparing two root alternatives from one search
+      // is much more stable than comparing a before-position result with an
+      // independently deepened after-position result.
+      for (const auto& line : before->lines) {
+        if (line.best_move() != move.uci) continue;
+        played_expected = expected_score_side_to_move(evaluation_of(line));
         material_sacrifice = material_sacrifice_in_pv(
-            move.fen_before, before->lines.front().moves);
+            move.fen_before, line.moves, 8);
+        forces_nontrivial_mate = line.mate_in.has_value() && *line.mate_in > 1;
+        break;
       }
+
       if (best_expected.has_value() && second_expected.has_value()) {
         only_move_tactical = *best_expected >= 0.55
             && *best_expected - *second_expected >= 0.20;
       }
-      const bool best_has_mate = before->lines.front().mate_in.value_or(0) > 0;
-      forces_nontrivial_mate = played_is_best
-          && before->lines.front().mate_in.value_or(0) > 1;
+      const auto best_mate = before->lines.front().mate_in;
+      const bool best_has_mate = best_mate.has_value() && *best_mate > 0;
       if (after.has_value() && !after->lines.empty()) {
-        const int after_mate = after->lines.front().mate_in.value_or(0);
-        missed_forced_mate = best_has_mate && after_mate >= 0;
-        allowed_forced_mate = after_mate > 0
-            && before->lines.front().mate_in.value_or(1) >= 0;
+        const auto after_mate = after->lines.front().mate_in;
+        // After the move the perspective flips to the opponent. Negative mate
+        // means the mover has a forced mate. This also verifies sacrificial
+        // attacks even when the played move was not rank 1 in a shallower root
+        // search.
+        forces_nontrivial_mate = forces_nontrivial_mate
+            || (after_mate.has_value() && *after_mate < -1);
+        if (!material_sacrifice) {
+          std::vector<std::string> played_pv;
+          played_pv.reserve(after->lines.front().moves.size() + 1);
+          played_pv.push_back(move.uci);
+          played_pv.insert(
+              played_pv.end(),
+              after->lines.front().moves.begin(),
+              after->lines.front().moves.end());
+          material_sacrifice = material_sacrifice_in_pv(
+              move.fen_before, played_pv, 8);
+        }
+        // A missing mate score means a previously forced mate was lost;
+        // positive mate means the move allowed the opponent to force mate.
+        missed_forced_mate = best_has_mate
+            && (!after_mate.has_value() || *after_mate > 0);
+        allowed_forced_mate = after_mate.has_value() && *after_mate > 0
+            && (!best_mate.has_value() || *best_mate >= 0);
       }
     }
     if (after.has_value() && !after->lines.empty()) {
-      played_expected = expected_score_mover_after_move(evaluation_of(after->lines.front()));
+      if (!played_expected.has_value()) {
+        played_expected = expected_score_mover_after_move(evaluation_of(after->lines.front()));
+      }
     } else if (after.has_value()) {
       // A terminal position legitimately has no PV.  Score it directly from
       // the board state so the final mating/stalemating move can still be
@@ -517,7 +619,8 @@ void AnalysisService::run_analysis(
     AppSettings settings,
     std::vector<std::string> positions,
     std::vector<int> completed_position_slots,
-    const std::shared_ptr<AnalysisJob>& job) noexcept {
+    const std::shared_ptr<AnalysisJob>& job,
+    const int preferred_slot) noexcept {
   try {
     if (job->cancel_requested) {
       job->state = AnalysisJobState::cancelled;
@@ -558,7 +661,21 @@ void AnalysisService::run_analysis(
     };
 
     job->completed_moves = contiguous_completed_moves();
-    for (int ply = 0; ply < static_cast<int>(positions.size()); ++ply) {
+    std::vector<int> analysis_order;
+    analysis_order.reserve(positions.size());
+    const auto push_slot = [&](const int slot) {
+      if (slot < 0 || slot >= static_cast<int>(positions.size())) return;
+      if (std::find(analysis_order.begin(), analysis_order.end(), slot) == analysis_order.end()) {
+        analysis_order.push_back(slot);
+      }
+    };
+    if (preferred_slot >= 0) {
+      push_slot(preferred_slot);
+      push_slot(preferred_slot + 1);
+    }
+    for (int slot = 0; slot < static_cast<int>(positions.size()); ++slot) push_slot(slot);
+
+    for (const int ply : analysis_order) {
       if (completed_slots.contains(ply)) continue;
       job->current_position_slot = ply;
 
@@ -589,6 +706,16 @@ void AnalysisService::run_analysis(
           engine_started = true;
         }
         result = job->engine->analyze(analysis_request(positions[ply], settings));
+        if (result->interrupted) {
+          if (job->cancel_requested) {
+            job->state = AnalysisJobState::cancelled;
+            database_.set_analysis_status(game_id, config_hash, "cancelled");
+            job->engine->stop();
+            job->finished = true;
+            return;
+          }
+          continue;
+        }
         if (settings.use_global_analysis_cache) {
           database_.persist_position_analysis(
               cache_fen, cache_engine_identity, settings, *result, unix_time_seconds());
@@ -605,7 +732,11 @@ void AnalysisService::run_analysis(
           "analysis", "game=" + game_id + " slot=" + std::to_string(ply)
               + " completedMoves=" + std::to_string(completed_moves));
 
-      if (!is_fen_position_only && completed_moves > 0) {
+      if (!is_fen_position_only && preferred_slot >= 0
+          && completed_slots.contains(preferred_slot)
+          && completed_slots.contains(preferred_slot + 1)) {
+        rebuild_classification(game_id, config_hash, true, preferred_slot);
+      } else if (!is_fen_position_only && completed_moves > 0) {
         rebuild_classification(
             game_id, config_hash, true, completed_moves - 1);
       }
@@ -647,6 +778,230 @@ void AnalysisService::run_analysis(
   }
 }
 
+
+void AnalysisService::run_refinement_queue(
+    const std::string& game_id,
+    const std::string& config_hash,
+    AppSettings settings,
+    std::vector<std::string> positions,
+    std::vector<int> completed_position_slots,
+    const std::shared_ptr<AnalysisJob>& job) noexcept {
+  try {
+    job->state = AnalysisJobState::running;
+    // There is exactly one live Stockfish instance. Give that one worker a
+    // useful fixed transposition table and enough CPU to finish positions fast,
+    // while keeping roughly one quarter of logical CPUs free for the UI/OS.
+    settings.hash_mb = kLiveRefinementHashMb;
+    settings.threads = live_refinement_threads(settings);
+
+    const std::string engine_version = job->engine->version();
+    const std::string cache_engine_identity = position_cache_engine_identity(engine_version);
+    job->engine->start();
+    job->engine->new_game();
+
+    std::unordered_set<int> completed_slots(
+        completed_position_slots.begin(), completed_position_slots.end());
+    const bool is_fen_position_only = positions.size() == 1;
+
+    auto contiguous_completed_moves = [&]() {
+      if (is_fen_position_only) return completed_slots.contains(0) ? 1 : 0;
+      int next_slot = 0;
+      while (next_slot < static_cast<int>(positions.size())
+             && completed_slots.contains(next_slot)) {
+        ++next_slot;
+      }
+      return std::max(0, next_slot - 1);
+    };
+    job->completed_moves = contiguous_completed_moves();
+
+    // Theory moves do not need maximum-depth engine work: the classifier
+    // returns Theory directly. A position slot can be skipped only when every
+    // adjacent move that depends on it is theory; this preserves the boundary
+    // evaluation needed for the first non-theory move after the opening.
+    std::vector<int> theory_skipped_slots;
+    if (!is_fen_position_only) {
+      if (const auto game = database_.game(game_id); game.has_value()) {
+        std::vector<bool> theory_moves(game->moves.size(), false);
+        const auto metadata = opening_theory_->metadata();
+        for (std::size_t index = 0; index < game->moves.size(); ++index) {
+          const auto& move = game->moves[index];
+          if (metadata.max_ply > 0
+              && static_cast<std::uint32_t>(move.ply_index) < metadata.max_ply) {
+            theory_moves[index] =
+                opening_theory_->lookup(move.fen_before, move.uci).is_theory;
+          }
+        }
+        for (int slot = 0; slot < static_cast<int>(positions.size()); ++slot) {
+          const bool previous_requires_engine = slot > 0
+              && !theory_moves[static_cast<std::size_t>(slot - 1)];
+          const bool next_requires_engine = slot < static_cast<int>(theory_moves.size())
+              && !theory_moves[static_cast<std::size_t>(slot)];
+          if (!previous_requires_engine && !next_requires_engine) {
+            theory_skipped_slots.push_back(slot);
+          }
+        }
+      }
+    }
+
+    for (const int slot : theory_skipped_slots) {
+      if (!completed_slots.insert(slot).second) continue;
+      // Copy the best already-calculated minimum/checkpoint result into this
+      // maximum run when available. This costs no Stockfish time but keeps the
+      // eval bar populated while the move itself remains Theory.
+      const std::string cache_fen = canonical_position_cache_fen(positions[slot]);
+      if (auto checkpoint = database_.best_position_checkpoint(
+              cache_fen, cache_engine_identity, settings.depth, settings.multi_pv);
+          checkpoint.has_value()) {
+        const int completed_moves = contiguous_completed_moves();
+        database_.persist_engine_result(
+            game_id, config_hash, slot, completed_moves, *checkpoint, unix_time_seconds());
+      }
+    }
+    job->completed_moves = contiguous_completed_moves();
+    if (!theory_skipped_slots.empty()) {
+      // Populate Theory classifications immediately; unlike other categories
+      // they do not depend on engine evaluations.
+      rebuild_classification(game_id, config_hash, true);
+    }
+
+    auto next_slot = [&]() -> int {
+      if (positions.empty()) return -1;
+      int focus = job->requested_position_slot.load();
+      focus = std::clamp(focus, 0, static_cast<int>(positions.size()) - 1);
+
+      // Priority: selected position, position after the selected move, all
+      // following positions, then walk backwards. Recomputed after every
+      // completed/interrupted search, so a new selection takes effect at once.
+      if (!completed_slots.contains(focus)) return focus;
+      if (focus + 1 < static_cast<int>(positions.size())
+          && !completed_slots.contains(focus + 1)) {
+        return focus + 1;
+      }
+      for (int slot = focus + 2; slot < static_cast<int>(positions.size()); ++slot) {
+        if (!completed_slots.contains(slot)) return slot;
+      }
+      for (int slot = focus - 1; slot >= 0; --slot) {
+        if (!completed_slots.contains(slot)) return slot;
+      }
+      return -1;
+    };
+
+    while (!job->cancel_requested) {
+      const int slot = next_slot();
+      if (slot < 0) break;
+
+      job->current_position_slot = slot;
+      const auto generation = job->target_generation.load();
+      const std::string cache_fen = canonical_position_cache_fen(positions[slot]);
+      std::optional<AnalysisResult> result;
+
+      if (settings.use_global_analysis_cache) {
+        result = database_.compatible_position_analysis(
+            cache_fen, cache_engine_identity, settings);
+      }
+
+      if (!result.has_value()) {
+        try {
+          auto request = analysis_request(positions[slot], settings);
+          request.dynamic_early_stop = true;
+          request.early_stop_min_depth = live_early_stop_min_depth(settings);
+          request.early_stop_stable_iterations = kLiveStableIterations;
+          request.early_stop_eval_tolerance_cp = kLiveStableEvalToleranceCp;
+          result = job->engine->analyze(request);
+        } catch (const std::exception&) {
+          // A retarget can arrive before Stockfish emitted its first PV. That
+          // is a normal preemption, not a failed analysis job.
+          if (!job->cancel_requested && job->target_generation.load() != generation) {
+            continue;
+          }
+          throw;
+        }
+      }
+
+      if (!result.has_value()) continue;
+
+      if (result->interrupted) {
+        if (!result->lines.empty() && result->reached_depth > 0) {
+          // Keep an interrupted search as a lightweight position checkpoint,
+          // not as a completed maximum-analysis row. This preserves correct
+          // completion semantics (including time-limited searches) while a
+          // later visit can immediately show the best depth already reached.
+          auto checkpoint_settings = settings;
+          checkpoint_settings.depth = std::max(1, result->reached_depth);
+          database_.persist_position_analysis(
+              cache_fen, cache_engine_identity, checkpoint_settings,
+              *result, unix_time_seconds());
+        }
+        if (job->cancel_requested) break;
+        continue;
+      }
+
+      if (result->converged_early) {
+        diagnostics::debug(
+            "analysis", "game=" + game_id + " slot=" + std::to_string(slot)
+                + " converged early at depth=" + std::to_string(result->reached_depth));
+      }
+
+      if (settings.use_global_analysis_cache) {
+        database_.persist_position_analysis(
+            cache_fen, cache_engine_identity, settings, *result, unix_time_seconds());
+      }
+      completed_slots.insert(slot);
+      const int completed_moves = contiguous_completed_moves();
+      job->completed_moves = completed_moves;
+      database_.persist_engine_result(
+          game_id, config_hash, slot, completed_moves, *result, unix_time_seconds());
+
+      const int focus = std::clamp(
+          job->requested_position_slot.load(), 0,
+          static_cast<int>(positions.size()) - 1);
+      if (!is_fen_position_only && focus + 1 < static_cast<int>(positions.size())
+          && completed_slots.contains(focus)
+          && completed_slots.contains(focus + 1)) {
+        rebuild_classification(game_id, config_hash, true, focus);
+      }
+    }
+
+    if (job->cancel_requested) {
+      job->state = AnalysisJobState::cancelled;
+      database_.set_analysis_status(game_id, config_hash, "cancelled");
+      diagnostics::info("analysis", "game=" + game_id + " refinement worker cancelled");
+    } else {
+      rebuild_classification(game_id, config_hash, true);
+      database_.set_analysis_status(game_id, config_hash, "complete");
+      job->state = AnalysisJobState::completed;
+      diagnostics::info("analysis", "game=" + game_id + " refinement queue completed");
+    }
+  } catch (const std::exception& error) {
+    const bool cancelled = job->cancel_requested;
+    job->state = cancelled ? AnalysisJobState::cancelled : AnalysisJobState::failed;
+    try {
+      database_.set_analysis_status(
+          game_id, config_hash, cancelled ? "cancelled" : "error",
+          cancelled ? std::string{} : error.what());
+    } catch (...) {
+    }
+    if (!cancelled) {
+      diagnostics::error(
+          "analysis", "game=" + game_id + " refinement worker failed: " + error.what());
+    }
+  } catch (...) {
+    job->state = job->cancel_requested
+        ? AnalysisJobState::cancelled
+        : AnalysisJobState::failed;
+    try {
+      database_.set_analysis_status(
+          game_id, config_hash, job->cancel_requested ? "cancelled" : "error",
+          job->cancel_requested ? std::string{} : "Unknown refinement worker error");
+    } catch (...) {
+    }
+  }
+
+  job->current_position_slot = -1;
+  job->engine->stop();
+  job->finished = true;
+}
+
 std::string AnalysisService::start_analysis_json(const std::string& game_id) {
   validate_token(game_id, "game id");
   const auto game = database_.game(game_id);
@@ -664,7 +1019,9 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
   }
   if (positions.empty()) throw std::invalid_argument("Game has no analyzable positions");
 
-  const auto settings = database_.settings();
+  const auto maximum_settings = database_.settings();
+  auto settings = maximum_settings;
+  settings.depth = maximum_settings.min_analysis_depth;
   StockfishEngine version_probe;
   const auto config_hash = analysis_config_hash(settings);
   if (auto reusable = reusable_analysis(game_id, settings);
@@ -738,7 +1095,11 @@ std::string AnalysisService::analysis_status_json(const std::string& game_id) {
       result = database_.analysis(game_id, job->second->config_hash);
     }
   }
-  if (!result.has_value()) result = reusable_analysis(game_id, database_.settings());
+  if (!result.has_value()) {
+    auto minimum_settings = database_.settings();
+    minimum_settings.depth = minimum_settings.min_analysis_depth;
+    result = reusable_analysis(game_id, minimum_settings);
+  }
   if (!result.has_value()) throw std::runtime_error("Analysis job not found");
   return analysis_json(game_id, *result, live_job.get());
 }
@@ -746,6 +1107,29 @@ std::string AnalysisService::analysis_status_json(const std::string& game_id) {
 std::string AnalysisService::move_analysis_status_json(const std::string& game_id, const int ply) {
   validate_token(game_id, "game id");
   if (ply < 0) throw std::invalid_argument("ply must be non-negative");
+
+  // Prefer a maximum-quality live refinement when that position already has
+  // a result. Keep the refinement job attached even before the first maximum
+  // result is persisted, so callers continue polling and can see live depth.
+  std::shared_ptr<AnalysisJob> refinement_job;
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    const auto job = refinement_jobs_.find(game_id);
+    if (job != refinement_jobs_.end()) {
+      refinement_job = job->second;
+      if (auto refined = database_.analysis(game_id, refinement_job->config_hash, ply);
+          refined.has_value() && (!refined->lines.empty() || refined->latest_ply == ply)) {
+        return analysis_json(game_id, *refined, refinement_job.get());
+      }
+    }
+  }
+
+  auto maximum_settings = database_.settings();
+  if (auto refined = reusable_analysis(game_id, maximum_settings, ply);
+      refined.has_value() && (!refined->lines.empty() || refined->latest_ply == ply)) {
+    return analysis_json(game_id, *refined, refinement_job.get());
+  }
+
   std::optional<PersistedAnalysis> result;
   std::shared_ptr<AnalysisJob> live_job;
   {
@@ -757,26 +1141,244 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
     }
   }
   if (!result.has_value()) {
-    result = reusable_analysis(game_id, database_.settings(), ply);
+    auto minimum_settings = database_.settings();
+    minimum_settings.depth = minimum_settings.min_analysis_depth;
+    result = reusable_analysis(game_id, minimum_settings, ply);
+  }
+  if (!result.has_value() && refinement_job != nullptr) {
+    result = database_.analysis(game_id, refinement_job->config_hash, ply);
   }
   if (!result.has_value()) throw std::runtime_error("Analysis job not found");
+
+  if (refinement_job != nullptr) {
+    live_job = refinement_job;
+    const auto game = database_.game(game_id);
+    if (game.has_value()) {
+      std::string fen;
+      if (game->kind == "fen") {
+        if (ply == 0) fen = game->starting_fen;
+      } else if (ply == 0) {
+        fen = game->starting_fen;
+      } else if (ply <= static_cast<int>(game->moves.size())) {
+        fen = game->moves[static_cast<std::size_t>(ply - 1)].fen_after;
+      }
+      if (!fen.empty()) {
+        const auto requested = database_.settings();
+        const auto checkpoint = database_.best_position_checkpoint(
+            canonical_position_cache_fen(fen),
+            position_cache_engine_identity(refinement_job->engine->version()),
+            requested.depth, requested.multi_pv);
+        const int persisted_depth = result->lines.empty()
+            ? 0 : result->lines.front().depth;
+        if (checkpoint.has_value() && !checkpoint->lines.empty()
+            && checkpoint->lines.front().depth > persisted_depth) {
+          result->best_move = checkpoint->best_move;
+          result->lines = checkpoint->lines;
+          result->latest_ply = ply;
+        }
+      }
+    }
+  }
   return analysis_json(game_id, *result, live_job.get());
+}
+
+std::string AnalysisService::start_move_refinement_json(
+    const std::string& game_id, const int ply) {
+  validate_token(game_id, "game id");
+  if (ply < 0) throw std::invalid_argument("ply must be non-negative");
+  const auto game = database_.game(game_id);
+  if (!game.has_value()) throw std::runtime_error("Game not found");
+
+  // Main-line refinement and sideline analysis share the same live-analysis
+  // budget. Returning to the main line first stops the temporary sideline
+  // search so Stockfish never competes with itself for CPU or RAM.
+  stop_all_variation_jobs();
+
+  auto settings = database_.settings();
+  if (settings.depth <= settings.min_analysis_depth) {
+    return move_analysis_status_json(game_id, ply);
+  }
+
+  std::vector<std::string> positions;
+  if (game->kind == "fen") {
+    positions.push_back(game->starting_fen);
+  } else {
+    positions.reserve(game->moves.size() + 1);
+    positions.push_back(game->starting_fen);
+    for (const auto& move : game->moves) positions.push_back(move.fen_after);
+  }
+  if (ply >= static_cast<int>(positions.size())) {
+    throw std::invalid_argument("ply exceeds game position count");
+  }
+
+  StockfishEngine version_probe;
+  version_probe.validate_available();
+  const auto config_hash = analysis_config_hash(settings);
+  const int public_total_plies = game->kind == "fen"
+      ? 1 : static_cast<int>(game->moves.size());
+  auto persisted = database_.prepare_analysis(
+      game_id, config_hash, version_probe.version(), public_total_plies,
+      settings.depth, settings.multi_pv, settings.time_limit_seconds);
+
+  // The minimum/background pass must never compete with live refinement for
+  // CPU/RAM. The first user-driven refinement takes ownership of Stockfish.
+  std::shared_ptr<AnalysisJob> minimum_job;
+  {
+    std::lock_guard lock(jobs_mutex_);
+    const auto existing = jobs_.find(game_id);
+    if (existing != jobs_.end()) {
+      minimum_job = existing->second;
+      if (!minimum_job->finished) {
+        minimum_job->cancel_requested = true;
+        minimum_job->engine->cancel();
+      }
+      jobs_.erase(existing);
+    }
+  }
+  if (minimum_job && minimum_job->worker.joinable()) minimum_job->worker.join();
+
+  // Only one live-refinement worker is allowed globally. Close a worker from
+  // another game before activating this game. For the same game/config, keep
+  // the existing worker and merely retarget it -- no thread/engine churn.
+  std::vector<std::shared_ptr<AnalysisJob>> stale_jobs;
+  std::shared_ptr<AnalysisJob> active;
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    for (auto it = refinement_jobs_.begin(); it != refinement_jobs_.end();) {
+      const bool same_job = it->first == game_id
+          && it->second->config_hash == config_hash
+          && !it->second->finished;
+      if (same_job) {
+        active = it->second;
+        ++it;
+        continue;
+      }
+      auto stale = it->second;
+      if (!stale->finished) {
+        stale->cancel_requested = true;
+        stale->engine->cancel();
+      }
+      stale_jobs.push_back(stale);
+      it = refinement_jobs_.erase(it);
+    }
+  }
+  for (const auto& stale : stale_jobs) {
+    if (stale->worker.joinable()) stale->worker.join();
+  }
+
+  if (active != nullptr) {
+    active->requested_position_slot = ply;
+    active->target_generation.fetch_add(1);
+    // Preempt the old position immediately. The worker persists any partial
+    // PV it already has and recomputes its queue around the newly selected ply.
+    const int current = active->current_position_slot.load();
+    if (current >= 0 && current != ply) active->engine->cancel();
+
+    return move_analysis_status_json(game_id, ply);
+  }
+
+  // If the whole maximum run is already complete, there is no worker to start.
+  if (persisted.status == "complete") {
+    if (auto ready = database_.analysis(game_id, config_hash, ply); ready.has_value()) {
+      return analysis_json(game_id, *ready);
+    }
+    return analysis_json(game_id, persisted);
+  }
+
+  auto job = std::make_shared<AnalysisJob>();
+  job->engine = std::make_shared<StockfishEngine>();
+  job->config_hash = config_hash;
+  job->requested_position_slot = ply;
+  job->target_generation = 1;
+  auto completed_position_slots = database_.analyzed_position_slots(game_id, config_hash);
+  job->worker = std::thread(
+      [this, game_id, config_hash, settings, positions = std::move(positions),
+       completed_position_slots = std::move(completed_position_slots), job]() mutable {
+        run_refinement_queue(
+            game_id, config_hash, settings, std::move(positions),
+            std::move(completed_position_slots), job);
+      });
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    refinement_jobs_[game_id] = job;
+  }
+
+  return move_analysis_status_json(game_id, ply);
 }
 
 void AnalysisService::cancel_analysis(const std::string& game_id) {
   validate_token(game_id, "game id");
-  std::shared_ptr<AnalysisJob> job;
+  std::vector<std::shared_ptr<AnalysisJob>> jobs;
   {
     std::lock_guard lock(jobs_mutex_);
     const auto found = jobs_.find(game_id);
-    if (found == jobs_.end()) throw std::runtime_error("Analysis job not found");
-    job = found->second;
+    if (found != jobs_.end()) jobs.push_back(found->second);
   }
-  job->state = AnalysisJobState::cancelling;
-  job->cancel_requested = true;
-  job->engine->cancel();
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    const auto found = refinement_jobs_.find(game_id);
+    if (found != refinement_jobs_.end()) jobs.push_back(found->second);
+  }
+  if (jobs.empty()) throw std::runtime_error("Analysis job not found");
+  for (const auto& job : jobs) {
+    job->state = AnalysisJobState::cancelling;
+    job->cancel_requested = true;
+    job->engine->cancel();
+  }
 }
 
+
+void AnalysisService::stop_all_mainline_analysis_jobs() noexcept {
+  std::vector<std::shared_ptr<AnalysisJob>> stale_jobs;
+  {
+    std::lock_guard lock(jobs_mutex_);
+    for (auto& [game_id, job] : jobs_) {
+      (void)game_id;
+      if (!job->finished) {
+        job->state = AnalysisJobState::cancelling;
+        job->cancel_requested = true;
+        job->engine->cancel();
+      }
+      stale_jobs.push_back(job);
+    }
+    jobs_.clear();
+  }
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    for (auto& [game_id, job] : refinement_jobs_) {
+      (void)game_id;
+      if (!job->finished) {
+        job->state = AnalysisJobState::cancelling;
+        job->cancel_requested = true;
+        job->engine->cancel();
+      }
+      stale_jobs.push_back(job);
+    }
+    refinement_jobs_.clear();
+  }
+  for (const auto& stale : stale_jobs) {
+    if (stale->worker.joinable()) stale->worker.join();
+  }
+}
+
+void AnalysisService::stop_all_variation_jobs() noexcept {
+  std::vector<std::shared_ptr<VariationJob>> stale_jobs;
+  {
+    std::lock_guard lock(variation_jobs_mutex_);
+    for (auto& [job_id, job] : variation_jobs_) {
+      (void)job_id;
+      if (!job->finished) {
+        job->cancel_requested = true;
+        job->engine->cancel();
+      }
+      stale_jobs.push_back(job);
+    }
+    variation_jobs_.clear();
+  }
+  for (const auto& stale : stale_jobs) {
+    if (stale->worker.joinable()) stale->worker.join();
+  }
+}
 
 void AnalysisService::reap_finished_variation_jobs() {
   std::vector<std::shared_ptr<VariationJob>> stale_jobs;
@@ -835,8 +1437,16 @@ std::string AnalysisService::start_variation_job_json(
     const std::string& uci,
     AppSettings settings) {
   reap_finished_variation_jobs();
-
+  // Validate/apply the move before touching the current worker. An illegal
+  // sideline attempt must not kill the analysis that is already visible.
   const auto applied = apply_legal_uci_move(fen, uci);
+
+  // A sideline is live-only and owns the single Stockfish work slot. Stop
+  // both the main-line worker and any previous sideline search before the new
+  // legal board position is accepted. This prevents hidden background engines.
+  stop_all_mainline_analysis_jobs();
+  stop_all_variation_jobs();
+  settings.threads = std::clamp(settings.threads, 1, maximum_worker_threads());
   auto job = std::make_shared<VariationJob>();
   job->id = "variation-" + std::to_string(next_variation_job_id_++);
   job->played_move = applied.uci;
@@ -846,22 +1456,36 @@ std::string AnalysisService::start_variation_job_json(
   job->engine->validate_available();
   job->worker = std::thread([this, job, settings = std::move(settings)] {
     try {
+      if (job->cancel_requested) throw std::runtime_error("Variation analysis cancelled");
       job->engine->start();
       job->engine->new_game();
-      auto result = job->engine->analyze(analysis_request(job->fen, settings));
+      auto request = analysis_request(job->fen, settings);
+      request.cancel_requested = &job->cancel_requested;
+      auto result = job->engine->analyze(request);
       {
         std::lock_guard lock(job->state_mutex);
         job->result = std::move(result);
-        job->status = "complete";
+        job->status = (job->cancel_requested || job->result.interrupted)
+            ? "paused" : "complete";
       }
     } catch (const std::exception& error) {
       std::lock_guard lock(job->state_mutex);
-      job->status = "error";
-      job->error = error.what();
+      if (job->cancel_requested) {
+        job->status = "paused";
+        job->error.clear();
+      } else {
+        job->status = "error";
+        job->error = error.what();
+      }
     } catch (...) {
       std::lock_guard lock(job->state_mutex);
-      job->status = "error";
-      job->error = "Unknown variation analysis error";
+      if (job->cancel_requested) {
+        job->status = "paused";
+        job->error.clear();
+      } else {
+        job->status = "error";
+        job->error = "Unknown variation analysis error";
+      }
     }
     job->engine->stop();
     job->finished = true;
@@ -882,27 +1506,44 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
     if (found == variation_jobs_.end()) throw std::runtime_error("Variation job not found");
     job = found->second;
   }
-  std::lock_guard lock(job->state_mutex);
+
+  std::string status;
+  std::string error;
+  AnalysisResult result;
+  {
+    std::lock_guard lock(job->state_mutex);
+    status = job->status;
+    error = job->error;
+    result = job->result;
+  }
+  // Side-line analysis is genuinely live: while Stockfish is thinking, expose
+  // its latest complete PV iteration instead of waiting for the hard depth.
+  if (status == "running") {
+    auto live = job->engine->current_result();
+    if (!live.lines.empty()) result = std::move(live);
+  }
+
   nlohmann::json json{
       {"jobId", job->id},
-      {"status", job->status},
+      {"status", status},
       {"playedMove", job->played_move},
       {"playedSan", job->played_san},
       {"fen", job->fen},
-      {"error", job->error.empty() ? nlohmann::json(nullptr) : nlohmann::json(job->error)},
-      {"bestMove", job->result.best_move},
+      {"error", error.empty() ? nlohmann::json(nullptr) : nlohmann::json(error)},
+      {"bestMove", result.best_move},
+      {"liveDepth", result.reached_depth},
       {"moverEvaluationCp", nullptr},
       {"moverMateIn", nullptr},
       {"lines", nlohmann::json::array()},
   };
-  if (!job->result.lines.empty()) {
-    const auto& principal = job->result.lines.front();
+  if (!result.lines.empty()) {
+    const auto& principal = result.lines.front();
     if (principal.evaluation_cp.has_value()) {
       json["moverEvaluationCp"] = -*principal.evaluation_cp;
     }
     if (principal.mate_in.has_value()) json["moverMateIn"] = -*principal.mate_in;
   }
-  for (const auto& line : job->result.lines) {
+  for (const auto& line : result.lines) {
     nlohmann::json line_json{
         {"rank", line.rank},
         {"depth", line.depth},
@@ -924,6 +1565,27 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
     json["lines"].push_back(std::move(line_json));
   }
   return json.dump();
+}
+
+void AnalysisService::cancel_variation_analysis(const std::string& job_id) {
+  validate_token(job_id, "variation job id");
+  std::shared_ptr<VariationJob> job;
+  {
+    std::lock_guard lock(variation_jobs_mutex_);
+    const auto found = variation_jobs_.find(job_id);
+    if (found == variation_jobs_.end()) return;
+    job = found->second;
+    job->cancel_requested = true;
+    job->engine->cancel();
+  }
+  if (job->worker.joinable()) job->worker.join();
+  {
+    std::lock_guard lock(variation_jobs_mutex_);
+    const auto found = variation_jobs_.find(job_id);
+    if (found != variation_jobs_.end() && found->second == job) {
+      variation_jobs_.erase(found);
+    }
+  }
 }
 
 }  // namespace kchess

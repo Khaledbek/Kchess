@@ -13,7 +13,9 @@ namespace kchess {
 std::string SettingsService::settings_json() const {
   const auto settings = database_.settings();
   return nlohmann::json{
+      {"minAnalysisDepth", settings.min_analysis_depth},
       {"depth", settings.depth},
+      {"maxAnalysisDepth", settings.depth},
       {"multiPv", settings.multi_pv},
       {"timeLimitSeconds", settings.time_limit_seconds},
       {"threads", settings.threads},
@@ -50,6 +52,20 @@ void SettingsService::set_engine_settings(
     throw std::invalid_argument("time limit must be between 0 and 60 seconds");
   }
   database_.set_engine_settings(depth, multi_pv, time_limit_seconds);
+}
+
+void SettingsService::set_analysis_depth_range(
+    const int minimum_depth, const int maximum_depth) {
+  if (!valid_integer_setting(kDepthSetting, minimum_depth)
+      || !valid_integer_setting(kDepthSetting, maximum_depth)) {
+    throw std::invalid_argument("analysis depth must be between 1 and 64");
+  }
+  if (minimum_depth > maximum_depth) {
+    throw std::invalid_argument("minimum analysis depth cannot exceed maximum depth");
+  }
+  const auto current = database_.settings();
+  database_.set_setting("minAnalysisDepth", std::to_string(minimum_depth));
+  database_.set_engine_settings(maximum_depth, current.multi_pv, current.time_limit_seconds);
 }
 
 void SettingsService::set_engine_resources(const int threads, const int hash_mb) {

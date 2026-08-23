@@ -175,6 +175,31 @@ Profile ProfileService::require_local_profile() const {
   return *profile;
 }
 
+Profile ProfileService::ensure_local_profile() {
+  const auto active = database_.active_profile();
+  if (active.has_value() && active->type == ProfileType::local_pgn_fen) {
+    return *active;
+  }
+
+  for (const auto& profile : database_.profiles()) {
+    if (profile.type == ProfileType::local_pgn_fen) return profile;
+  }
+
+  // A user may have merged the original local profile into an online profile.
+  // A later PGN/FEN import must still have a durable local library, but creating
+  // that profile must not unexpectedly switch the currently open online profile.
+  const auto created = database_.create_profile(
+      ProfileType::local_pgn_fen, "Kchess", std::nullopt, "profile_unknown.png");
+  if (active.has_value()) database_.set_active_profile(active->id);
+  return created;
+}
+
+Profile ProfileService::require_active_profile() const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) throw std::runtime_error("No active profile");
+  return *profile;
+}
+
 void ProfileService::delete_profile_storage(const Profile& profile) {
   database_.delete_profile(profile.id);
   if (!profile.avatar_file.has_value()) return;
@@ -186,6 +211,29 @@ void ProfileService::delete_profile_storage(const Profile& profile) {
       std::filesystem::weakly_canonical(data_directory_ / "avatars", error);
   if (!error && avatar.parent_path() == avatar_directory
       && avatar.filename() == profile.id + ".img") {
+    std::filesystem::remove(avatar, error);
+  }
+}
+
+
+void ProfileService::merge_local_profile(
+    const std::string& source_profile_id,
+    const std::string& target_profile_id) {
+  validate_token(source_profile_id, "source profile id");
+  validate_token(target_profile_id, "target profile id");
+  const auto source = database_.profile(source_profile_id);
+  if (!source.has_value()) throw std::runtime_error("Profile not found");
+
+  database_.merge_local_profile(source_profile_id, target_profile_id);
+
+  if (!source->avatar_file.has_value()) return;
+  std::error_code error;
+  const auto avatar = std::filesystem::weakly_canonical(*source->avatar_file, error);
+  if (error) return;
+  const auto avatar_directory =
+      std::filesystem::weakly_canonical(data_directory_ / "avatars", error);
+  if (!error && avatar.parent_path() == avatar_directory
+      && avatar.filename() == source->id + ".img") {
     std::filesystem::remove(avatar, error);
   }
 }

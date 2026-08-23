@@ -54,6 +54,10 @@ KCHESS_API kc_status kc_set_active_profile(
 KCHESS_API kc_status kc_delete_profile(
     kc_core_handle handle,
     const char* profile_id_utf8);
+KCHESS_API kc_status kc_merge_local_profile(
+    kc_core_handle handle,
+    const char* source_profile_id_utf8,
+    const char* target_profile_id_utf8);
 KCHESS_API char* kc_active_profile_json(kc_core_handle handle);
 
 KCHESS_API char* kc_app_settings_json(kc_core_handle handle);
@@ -62,6 +66,8 @@ KCHESS_API kc_status kc_set_engine_settings(
     int32_t depth,
     int32_t multi_pv,
     int32_t time_limit_seconds);
+KCHESS_API kc_status kc_set_analysis_depth_range(
+    kc_core_handle handle, int32_t minimum_depth, int32_t maximum_depth);
 KCHESS_API kc_status kc_set_engine_resources(
     kc_core_handle handle, int32_t threads, int32_t hash_mb);
 KCHESS_API kc_status kc_set_show_board_arrows(
@@ -79,6 +85,7 @@ KCHESS_API kc_status kc_set_locale(
     const char* locale_utf8);
 
 KCHESS_API char* kc_games_json(kc_core_handle handle);
+KCHESS_API char* kc_favorite_games_json(kc_core_handle handle);
 KCHESS_API char* kc_game_json(
     kc_core_handle handle,
     const char* game_id_utf8);
@@ -143,6 +150,8 @@ KCHESS_API char* kc_start_analysis_json(
 KCHESS_API char* kc_analysis_status_json(
     kc_core_handle handle,
     const char* game_id_utf8);
+KCHESS_API char* kc_start_move_refinement_json(
+    kc_core_handle handle, const char* game_id_utf8, int32_t ply);
 KCHESS_API char* kc_move_analysis_status_json(
     kc_core_handle handle,
     const char* game_id_utf8,
@@ -164,6 +173,9 @@ KCHESS_API char* kc_start_variation_analysis_with_settings_json(
     int32_t threads,
     int32_t hash_mb);
 KCHESS_API char* kc_variation_analysis_status_json(
+    kc_core_handle handle,
+    const char* job_id_utf8);
+KCHESS_API kc_status kc_cancel_variation_analysis(
     kc_core_handle handle,
     const char* job_id_utf8);
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <deque>
+#include <cmath>
 #include <filesystem>
 #include <map>
 #include <mutex>
@@ -97,6 +98,35 @@ void apply_score(EngineLine& line, const Stockfish::Score& score) {
   }
 }
 
+bool stable_engine_score(
+    const EngineLine& current, const EngineLine& previous, const int tolerance_cp) {
+  if (current.mate_in.has_value() && previous.mate_in.has_value()) {
+    // Once both iterations see mate for the same side, the exact distance can
+    // still wobble by a ply or two without changing the practical verdict.
+    return (*current.mate_in >= 0) == (*previous.mate_in >= 0);
+  }
+  if (current.evaluation_cp.has_value() && previous.evaluation_cp.has_value()) {
+    return std::abs(*current.evaluation_cp - *previous.evaluation_cp) <= tolerance_cp;
+  }
+  return false;
+}
+
+bool stable_engine_lines(
+    const std::vector<EngineLine>& current,
+    const std::vector<EngineLine>& previous,
+    const int tolerance_cp) {
+  const std::size_t compared = std::min<std::size_t>(2, current.size());
+  if (compared == 0 || previous.size() < compared) return false;
+  for (std::size_t index = 0; index < compared; ++index) {
+    if (current[index].best_move().empty()
+        || current[index].best_move() != previous[index].best_move()
+        || !stable_engine_score(current[index], previous[index], tolerance_cp)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::optional<AnalysisResult> terminal_position_result(const std::string& fen) {
   // A terminal chess position legitimately has no best move / principal
   // variation.  Treat it as a valid analysis result instead of an engine
@@ -137,6 +167,10 @@ class StockfishEngine::Impl {
   mutable std::mutex operation_mutex;
   mutable std::mutex engine_pointer_mutex;
   std::atomic_bool cancelled{false};
+  std::atomic_int current_depth{0};
+  mutable std::mutex live_result_mutex;
+  std::map<int, EngineLine> live_lines;
+  std::string live_best_move;
   bool ready{false};
   std::filesystem::path asset_directory;
 };
@@ -190,11 +224,26 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   if (request.depth < 1 || request.depth > 128 || request.multi_pv < 1
       || request.multi_pv > 16 || request.threads < 1 || request.threads > 64
       || request.hash_mb < 16 || request.hash_mb > 4096
-      || request.time_limit_seconds < 0 || request.time_limit_seconds > 3600) {
+      || request.time_limit_seconds < 0 || request.time_limit_seconds > 3600
+      || request.early_stop_min_depth < 0 || request.early_stop_min_depth > 128
+      || request.early_stop_stable_iterations < 1
+      || request.early_stop_stable_iterations > 16
+      || request.early_stop_eval_tolerance_cp < 0
+      || request.early_stop_eval_tolerance_cp > 500) {
     throw std::invalid_argument("Invalid Stockfish analysis settings");
   }
 
   impl_->cancelled = false;
+  impl_->current_depth = 0;
+  if (request.cancel_requested != nullptr && request.cancel_requested->load()) {
+    impl_->cancelled = true;
+    throw std::runtime_error("Stockfish analysis cancelled");
+  }
+  {
+    std::lock_guard live_lock(impl_->live_result_mutex);
+    impl_->live_lines.clear();
+    impl_->live_best_move.clear();
+  }
 
   // Do this before starting a Stockfish search. For checkmate/stalemate,
   // Stockfish correctly has no PV and no normal best move. Those positions
@@ -209,57 +258,129 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   set_option(*impl_->engine, "Ponder", "false");
   set_option(*impl_->engine, "UCI_ShowWDL", "true");
 
-  std::mutex result_mutex;
-  std::map<int, EngineLine> lines;
-  std::string best_move;
+  int last_stability_depth = 0;
+  int stable_iterations = 0;
+  std::vector<EngineLine> previous_stability_lines;
+  bool converged_early = false;
   impl_->engine->set_on_update_no_moves([](const Stockfish::Engine::InfoShort&) {});
   impl_->engine->set_on_iter([](const Stockfish::Engine::InfoIter&) {});
   impl_->engine->set_on_update_full([&](const Stockfish::Engine::InfoFull& info) {
-    std::lock_guard result_lock(result_mutex);
-    auto& line = lines[static_cast<int>(info.multiPV)];
-    line.rank = static_cast<int>(info.multiPV);
-    line.depth = info.depth;
-    line.nodes = static_cast<std::uint64_t>(info.nodes);
-    line.wdl = parse_wdl(info.wdl);
-    line.moves = split_moves(info.pv);
-    apply_score(line, info.score);
+    impl_->current_depth.store(
+        std::max(impl_->current_depth.load(), static_cast<int>(info.depth)));
+    bool should_stop = false;
+    {
+      std::lock_guard result_lock(impl_->live_result_mutex);
+      auto& line = impl_->live_lines[static_cast<int>(info.multiPV)];
+      line.rank = static_cast<int>(info.multiPV);
+      line.depth = info.depth;
+      line.nodes = static_cast<std::uint64_t>(info.nodes);
+      line.wdl = parse_wdl(info.wdl);
+      line.moves = split_moves(info.pv);
+      apply_score(line, info.score);
+
+      // MultiPV callbacks arrive once per line. Evaluate convergence only when
+      // every requested line has reached this depth, then compare the two most
+      // important lines (best + runner-up). This keeps classification quality
+      // stable while allowing quiet positions to finish well before max depth.
+      const int depth = static_cast<int>(info.depth);
+      if (request.dynamic_early_stop
+          && depth >= request.early_stop_min_depth
+          && depth > last_stability_depth) {
+        std::vector<EngineLine> iteration;
+        iteration.reserve(static_cast<std::size_t>(request.multi_pv));
+        bool complete_iteration = true;
+        for (int rank = 1; rank <= request.multi_pv; ++rank) {
+          const auto found = impl_->live_lines.find(rank);
+          if (found == impl_->live_lines.end() || found->second.depth != depth) {
+            complete_iteration = false;
+            break;
+          }
+          iteration.push_back(found->second);
+        }
+        if (complete_iteration) {
+          if (stable_engine_lines(
+                  iteration, previous_stability_lines,
+                  request.early_stop_eval_tolerance_cp)) {
+            ++stable_iterations;
+          } else {
+            stable_iterations = 0;
+          }
+          previous_stability_lines = std::move(iteration);
+          last_stability_depth = depth;
+          if (stable_iterations >= request.early_stop_stable_iterations) {
+            converged_early = true;
+            should_stop = true;
+          }
+        }
+      }
+    }
+    if (should_stop) impl_->engine->stop();
   });
   impl_->engine->set_on_bestmove([&](const std::string_view move, const std::string_view) {
-    std::lock_guard result_lock(result_mutex);
-    best_move = move;
+    std::lock_guard result_lock(impl_->live_result_mutex);
+    impl_->live_best_move = move;
   });
 
   impl_->engine->set_position(request.fen, {});
+  if (request.cancel_requested != nullptr && request.cancel_requested->load()) {
+    impl_->cancelled = true;
+    throw std::runtime_error("Stockfish analysis cancelled");
+  }
   Stockfish::Search::LimitsType limits;
   limits.depth = request.depth;
   if (request.time_limit_seconds > 0) {
     limits.movetime = static_cast<Stockfish::TimePoint>(request.time_limit_seconds) * 1000;
   }
   impl_->engine->go(limits);
+  if (request.cancel_requested != nullptr && request.cancel_requested->load()) {
+    impl_->cancelled = true;
+    impl_->engine->stop();
+  }
   impl_->engine->wait_for_search_finished();
 
   impl_->engine->set_on_update_full([](const Stockfish::Engine::InfoFull&) {});
   impl_->engine->set_on_bestmove([](const std::string_view, const std::string_view) {});
-  if (impl_->cancelled) throw std::runtime_error("Stockfish analysis cancelled");
 
+  AnalysisResult result = current_result();
+  result.interrupted = impl_->cancelled.load();
+  result.converged_early = converged_early;
+  if (result.lines.empty()) {
+    if (result.interrupted) throw std::runtime_error("Stockfish analysis cancelled");
+    throw std::runtime_error("Stockfish returned no principal variation for a non-terminal position");
+  }
+  // An interrupted live search may be stopped between PV and bestmove
+  // callbacks. The principal variation still gives us a valid checkpoint.
+  if (result.best_move.empty() || result.best_move == "(none)" || result.best_move == "0000") {
+    if (result.interrupted && !result.lines.front().moves.empty()) {
+      result.best_move = result.lines.front().moves.front();
+    } else {
+      throw std::runtime_error("Stockfish returned no best move for a non-terminal position");
+    }
+  }
+  return result;
+}
+
+
+AnalysisResult StockfishEngine::current_result() const {
   AnalysisResult result;
-  result.best_move = best_move;
-  for (auto& [rank, line] : lines) {
+  std::lock_guard result_lock(impl_->live_result_mutex);
+  result.best_move = impl_->live_best_move;
+  for (const auto& [rank, line] : impl_->live_lines) {
     (void)rank;
     result.reached_depth = std::max(result.reached_depth, line.depth);
     result.nodes = std::max(result.nodes, line.nodes);
-    result.lines.push_back(std::move(line));
+    result.lines.push_back(line);
   }
-  if (result.lines.empty()) {
-    throw std::runtime_error("Stockfish returned no principal variation for a non-terminal position");
-  }
-  // A normal non-terminal search should provide bestmove. Keep this as a
-  // controlled error rather than accepting a half-populated result. Terminal
-  // positions returned above intentionally have no best move.
-  if (result.best_move.empty() || result.best_move == "(none)" || result.best_move == "0000") {
-    throw std::runtime_error("Stockfish returned no best move for a non-terminal position");
+  if ((result.best_move.empty() || result.best_move == "(none)"
+       || result.best_move == "0000")
+      && !result.lines.empty() && !result.lines.front().moves.empty()) {
+    result.best_move = result.lines.front().moves.front();
   }
   return result;
+}
+
+int StockfishEngine::current_depth() const noexcept {
+  return impl_->current_depth.load();
 }
 
 void StockfishEngine::cancel() noexcept {

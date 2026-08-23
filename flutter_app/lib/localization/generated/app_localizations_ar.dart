@@ -354,7 +354,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get brilliant => 'بارعة';
 
   @override
-  String get critical => 'نقلة حاسمة';
+  String get critical => 'نقلة رائعة';
 
   @override
   String get best => 'الأفضل';
@@ -460,6 +460,33 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get sidelineEngineTitle => 'محرك الخط الجانبي';
+
+  @override
+  String get sidelineEngineSubtitle =>
+      'تُطبَّق هذه القيم فقط على التحليل المباشر لخطك الجانبي.';
+
+  @override
+  String get mainLineLabel => 'الخط الرئيسي';
+
+  @override
+  String get sidelineLabel => 'خطك البديل';
+
+  @override
+  String get liveEngineTheorySkipped => 'نظرية: تم تجاوز التحليل المباشر';
+
+  @override
+  String get liveEngineTargetReached => 'Stockfish: تم بلوغ هدف التحليل';
+
+  @override
+  String liveEngineProgress(int percent) {
+    return 'Stockfish يحلل مباشرة · $percent%';
+  }
+
+  @override
+  String get sidelineAnalysisPaused => 'تم إيقاف التحليل المباشر مؤقتًا';
+
+  @override
   String get analyzingVariation => 'جارٍ تحليل الخط المؤقت…';
 
   @override
@@ -515,7 +542,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get threadsHelp =>
-      'عدد خيوط المعالج التي يستخدمها Stockfish. الزيادة قد تسرّع التحليل لكنها تستهلك معالجًا وبطارية أكثر.';
+      'عدد خيوط المعالج لكل عامل Stockfish. يكتشف Kchess جهازك تلقائيًا ويسمح بحد أقصى بنصف خيوط المعالج المنطقية.';
 
   @override
   String get hashMemory => 'ذاكرة Hash';

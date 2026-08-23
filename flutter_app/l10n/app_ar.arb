@@ -109,7 +109,7 @@
   "localProfile": "ملف محلي",
   "theory": "النظرية",
   "brilliant": "بارعة",
-  "critical": "نقلة حاسمة",
+  "critical": "نقلة رائعة",
   "best": "الأفضل",
   "excellent": "ممتازة",
   "okay": "جيدة",
@@ -185,6 +185,21 @@
       }
     }
   },
+  "sidelineEngineTitle": "محرك الخط الجانبي",
+  "sidelineEngineSubtitle": "تُطبَّق هذه القيم فقط على التحليل المباشر لخطك الجانبي.",
+  "mainLineLabel": "الخط الرئيسي",
+  "sidelineLabel": "خطك البديل",
+  "liveEngineTheorySkipped": "نظرية: تم تجاوز التحليل المباشر",
+  "liveEngineTargetReached": "Stockfish: تم بلوغ هدف التحليل",
+  "liveEngineProgress": "Stockfish يحلل مباشرة · {percent}%",
+  "@liveEngineProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "sidelineAnalysisPaused": "تم إيقاف التحليل المباشر مؤقتًا",
   "analyzingVariation": "جارٍ تحليل الخط المؤقت…",
   "evaluationComparison": "التقييم: {before} ← {after}",
   "@evaluationComparison": {
@@ -224,7 +239,7 @@
   "numberOfLinesHelp": "عدد أفضل الخطوط التي يحسبها Stockfish في الوقت نفسه.",
   "timeLimitHelp": "حد اختياري لكل وضعية. عند إيقافه يُستخدم العمق فقط، وإلا يتوقف البحث عند بلوغ العمق أو الوقت أولًا.",
   "threads": "خيوط المعالجة",
-  "threadsHelp": "عدد خيوط المعالج التي يستخدمها Stockfish. الزيادة قد تسرّع التحليل لكنها تستهلك معالجًا وبطارية أكثر.",
+  "threadsHelp": "عدد خيوط المعالج لكل عامل Stockfish. يكتشف Kchess جهازك تلقائيًا ويسمح بحد أقصى بنصف خيوط المعالج المنطقية.",
   "hashMemory": "ذاكرة Hash",
   "hashMemoryHelp": "ذاكرة RAM لجدول النقل في Stockfish. زيادة الذاكرة قد تحسن البحث في الوضعيات المتكررة.",
   "boardDisplayTitle": "عرض الرقعة",

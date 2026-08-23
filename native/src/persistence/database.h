@@ -132,6 +132,7 @@ class Database {
   std::optional<Profile> active_profile() const;
   std::optional<Profile> profile(const std::string& profile_id) const;
   std::vector<std::string> profile_game_ids(const std::string& profile_id) const;
+  void merge_local_profile(const std::string& source_profile_id, const std::string& target_profile_id);
 
   std::optional<ProviderCacheRecord> provider_cache(
       const std::string& profile_id, const std::string& cache_key) const;
@@ -184,6 +185,7 @@ class Database {
       const std::string& fen,
       const std::string& display_name);
   std::vector<GameRecord> games(const std::string& profile_id) const;
+  std::vector<GameRecord> favorite_games() const;
   std::optional<GameRecord> game(const std::string& game_id) const;
 
   PersistedAnalysis prepare_analysis(
@@ -239,6 +241,11 @@ class Database {
       const std::string& position_fen,
       const std::string& engine_version,
       const AppSettings& requested) const;
+  std::optional<AnalysisResult> best_position_checkpoint(
+      const std::string& position_fen,
+      const std::string& engine_version,
+      int maximum_depth,
+      int multi_pv) const;
   void persist_position_analysis(
       const std::string& position_fen,
       const std::string& engine_version,
@@ -248,8 +255,8 @@ class Database {
   void clear_global_position_cache();
 
   // Lightweight bounded housekeeping for generated/cache-only data.
-  // User games, favorites, downloads, and completed current analyses are never
-  // removed here.
+  // User games, favorites, and completed current analyses are never
+  // removed here. The legacy downloads table is migration-only.
   void run_maintenance();
 
  private:

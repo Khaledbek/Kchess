@@ -176,6 +176,10 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StatusStringNative, _StatusStringDart>(
           'kc_delete_profile',
         );
+    _mergeLocalProfile = _library
+        .lookupFunction<_StatusTwoStringsNative, _StatusTwoStringsDart>(
+          'kc_merge_local_profile',
+        );
     _settings = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_app_settings_json',
     );
@@ -185,6 +189,10 @@ class FfiCoreGateway implements CoreGateway {
     _setBooleanSetting =
         _library.lookupFunction<_StatusStringIntNative, _StatusStringIntDart>(
           'kc_set_boolean_setting',
+        );
+    _setAnalysisDepthRange = _library
+        .lookupFunction<_StatusTwoIntsNative, _StatusTwoIntsDart>(
+          'kc_set_analysis_depth_range',
         );
     _setEngineSettings = _library
         .lookupFunction<_StatusThreeIntsNative, _StatusThreeIntsDart>(
@@ -204,6 +212,10 @@ class FfiCoreGateway implements CoreGateway {
     _games = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_games_json',
     );
+    _favoriteGames =
+        _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_favorite_games_json',
+        );
     _game = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_game_json',
     );
@@ -220,6 +232,10 @@ class FfiCoreGateway implements CoreGateway {
     _analysisStatus = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_analysis_status_json',
     );
+    _startMoveRefinement = _library
+        .lookupFunction<_StringIntArgNative, _StringIntArgDart>(
+          'kc_start_move_refinement_json',
+        );
     _moveAnalysisStatus = _library
         .lookupFunction<_StringIntArgNative, _StringIntArgDart>(
           'kc_move_analysis_status_json',
@@ -243,6 +259,10 @@ class FfiCoreGateway implements CoreGateway {
     _variationAnalysisStatus = _library
         .lookupFunction<_StringArgNative, _StringArgDart>(
           'kc_variation_analysis_status_json',
+        );
+    _cancelVariationAnalysis = _library
+        .lookupFunction<_StatusStringNative, _StatusStringDart>(
+          'kc_cancel_variation_analysis',
         );
     _startProviderProfile = _library
         .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
@@ -358,25 +378,30 @@ class FfiCoreGateway implements CoreGateway {
   late final _CreateProfileDart _createProfile;
   late final _StatusStringDart _setActiveProfile;
   late final _StatusStringDart _deleteProfile;
+  late final _StatusTwoStringsDart _mergeLocalProfile;
   late final _StringNoArgsDart _settings;
   late final _StatusIntDart _setArrows;
   late final _StatusStringIntDart _setBooleanSetting;
+  late final _StatusTwoIntsDart _setAnalysisDepthRange;
   late final _StatusThreeIntsDart _setEngineSettings;
   late final _StatusTwoIntsDart _setEngineResources;
   late final _StatusStringDart _setTheme;
   late final _StatusStringDart _setLocale;
   late final _StringNoArgsDart _games;
+  late final _StringNoArgsDart _favoriteGames;
   late final _StringArgDart _game;
   late final _StringArgDart _importPgn;
   late final _StringTwoArgsDart _importFen;
   late final _StringArgDart _startAnalysis;
   late final _StringArgDart _analysisStatus;
+  late final _StringIntArgDart _startMoveRefinement;
   late final _StringIntArgDart _moveAnalysisStatus;
   late final _StatusStringDart _cancelAnalysis;
   late final _StatusNoArgsDart _clearEngineCache;
   late final _StringTwoArgsDart _startVariationAnalysis;
   late final _StartVariationWithSettingsDart _startVariationAnalysisWithSettings;
   late final _StringArgDart _variationAnalysisStatus;
+  late final _StatusStringDart _cancelVariationAnalysis;
   late final _StartProviderProfileDart _startProviderProfile;
   late final _StartProviderSyncDart _startProviderSync;
   late final _StringArgDart _providerJobStatus;
@@ -475,6 +500,21 @@ class FfiCoreGateway implements CoreGateway {
   );
 
   @override
+  Future<void> mergeLocalProfile(
+    String sourceProfileId,
+    String targetProfileId,
+  ) async {
+    final source = sourceProfileId.toNativeUtf8();
+    final target = targetProfileId.toNativeUtf8();
+    try {
+      _checkStatus(_mergeLocalProfile(_handle, source, target));
+    } finally {
+      malloc.free(source);
+      malloc.free(target);
+    }
+  }
+
+  @override
   Future<ProviderOverview> providerOverview(String profileId) =>
       _withNativeString(profileId, (value) {
         final json =
@@ -505,6 +545,14 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<AppSettings> settings() async => AppSettings.fromJson(
     _readJson(_settings(_handle))! as Map<String, Object?>,
+  );
+
+  @override
+  Future<void> setAnalysisDepthRange({
+    required int minimumDepth,
+    required int maximumDepth,
+  }) async => _checkStatus(
+    _setAnalysisDepthRange(_handle, minimumDepth, maximumDepth),
   );
 
   @override
@@ -549,6 +597,10 @@ class FfiCoreGateway implements CoreGateway {
       _readList(_games(_handle), (json) => GameSummary.fromJson(json));
 
   @override
+  Future<List<GameSummary>> favoriteGames() async =>
+      _readList(_favoriteGames(_handle), (json) => GameSummary.fromJson(json));
+
+  @override
   Future<GameDetail> game(String gameId) => _withNativeString(gameId, (value) {
     final json = _readJson(_game(_handle, value))! as Map<String, Object?>;
     return GameDetail.fromJson(json);
@@ -585,6 +637,14 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<AnalysisSnapshot> analysisStatus(String gameId) =>
       _analysisCall(gameId, _analysisStatus);
+
+  @override
+  Future<AnalysisSnapshot> startMoveRefinement(String gameId, int ply) =>
+      _withNativeString(gameId, (value) {
+        final json = _readJson(_startMoveRefinement(_handle, value, ply))!
+            as Map<String, Object?>;
+        return AnalysisSnapshot.fromJson(json);
+      });
 
   @override
   Future<AnalysisSnapshot> moveAnalysisStatus(String gameId, int ply) =>
@@ -652,6 +712,12 @@ class FfiCoreGateway implements CoreGateway {
                 as Map<String, Object?>;
         return VariationAnalysisSnapshot.fromJson(json);
       });
+
+  @override
+  Future<void> cancelVariationAnalysis(String jobId) => _withNativeString(
+    jobId,
+    (value) => _checkStatus(_cancelVariationAnalysis(_handle, value)),
+  );
 
   @override
   Future<void> setGameFavorite(String gameId, bool enabled) =>

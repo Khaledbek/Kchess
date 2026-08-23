@@ -109,7 +109,7 @@
   "localProfile": "Local profile",
   "theory": "Theory",
   "brilliant": "Brilliant",
-  "critical": "Critical Move",
+  "critical": "Great Move",
   "best": "Best",
   "excellent": "Excellent",
   "okay": "Okay",
@@ -185,6 +185,21 @@
       }
     }
   },
+  "sidelineEngineTitle": "Sideline engine",
+  "sidelineEngineSubtitle": "These values apply only to live analysis of your sideline.",
+  "mainLineLabel": "Main line",
+  "sidelineLabel": "Your sideline",
+  "liveEngineTheorySkipped": "Theory: live analysis skipped",
+  "liveEngineTargetReached": "Stockfish: analysis target reached",
+  "liveEngineProgress": "Stockfish analyzing live · {percent}%",
+  "@liveEngineProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "sidelineAnalysisPaused": "Live analysis paused",
   "analyzingVariation": "Analyzing the temporary variation…",
   "evaluationComparison": "Evaluation: {before} → {after}",
   "@evaluationComparison": {
@@ -224,7 +239,7 @@
   "numberOfLinesHelp": "How many top engine variations Stockfish calculates at the same time.",
   "timeLimitHelp": "Optional limit per position. Off uses depth only; otherwise the search stops when depth or time is reached first.",
   "threads": "Threads",
-  "threadsHelp": "CPU threads used by Stockfish. More can be faster, but uses more processor power and battery.",
+  "threadsHelp": "CPU threads per Stockfish worker. Kchess detects your PC automatically and allows at most half of the logical CPU threads.",
   "hashMemory": "Hash memory",
   "hashMemoryHelp": "RAM for Stockfish’s transposition table. More memory can improve repeated-position search.",
   "boardDisplayTitle": "Board display",

@@ -31,7 +31,9 @@ if(KCHESS_WITH_STOCKFISH)
   )
 
   if(MSVC)
-    target_compile_options(stockfish_official PRIVATE /W3 /EHsc /bigobj)
+    # Stockfish has many translation units that MSBuild compiles in parallel.
+    # /FS serializes writes to the shared compiler PDB and prevents MSVC C1041.
+    target_compile_options(stockfish_official PRIVATE /W3 /EHsc /bigobj /FS)
   else()
     target_compile_options(stockfish_official PRIVATE
       -O3
