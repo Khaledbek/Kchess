@@ -1,0 +1,2 @@
+third_party/stockfish/source/src/nn-c288c895ea92.nnue filter=lfs diff=lfs merge=lfs -text
+third_party/stockfish/source/src/nn-37f18f62d772.nnue filter=lfs diff=lfs merge=lfs -text
