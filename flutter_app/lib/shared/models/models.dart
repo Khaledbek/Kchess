@@ -494,6 +494,10 @@ class GameSummary {
     this.isFixture = false,
     this.providerGameId,
     this.providerUrl,
+    this.profileColor = 'unknown',
+    this.openingEco,
+    this.openingName,
+    this.openingPly,
     this.providerOutcome = 'unknown',
     this.timeControlType = 'unknown',
     this.providerAccuracy,
@@ -522,6 +526,10 @@ class GameSummary {
     isFixture: json['isFixture'] as bool? ?? false,
     providerGameId: json['providerGameId'] as String?,
     providerUrl: json['providerUrl'] as String?,
+    profileColor: json['profileColor'] as String? ?? 'unknown',
+    openingEco: json['openingEco'] as String?,
+    openingName: json['openingName'] as String?,
+    openingPly: json['openingPly'] as int?,
     providerOutcome: json['providerOutcome'] as String? ?? 'unknown',
     timeControlType: json['timeControlType'] as String? ?? 'unknown',
     providerAccuracy: (json['providerAccuracy'] as num?)?.toDouble(),
@@ -549,6 +557,10 @@ class GameSummary {
   final bool isFixture;
   final String? providerGameId;
   final String? providerUrl;
+  final String profileColor;
+  final String? openingEco;
+  final String? openingName;
+  final int? openingPly;
   final String providerOutcome;
   final String timeControlType;
   final double? providerAccuracy;

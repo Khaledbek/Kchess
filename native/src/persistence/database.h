@@ -73,6 +73,9 @@ struct GameRecord {
   std::optional<double> local_accuracy_black;
   std::string provider_outcome{"unknown"};
   std::string time_control_type{"unknown"};
+  std::optional<std::string> opening_eco;
+  std::optional<std::string> opening_name;
+  std::optional<int> opening_ply;
   std::int64_t ended_at{0};
   bool favorite{false};
   std::optional<std::string> favorite_collection_id;

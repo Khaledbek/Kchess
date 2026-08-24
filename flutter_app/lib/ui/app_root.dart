@@ -3166,11 +3166,32 @@ class StatisticsScreen extends StatefulWidget {
 class _StatisticsScreenState extends State<StatisticsScreen> {
   late Future<StatisticsOverview> _overview;
   late Future<OpeningsStats> _openings;
+  late bool _providerSyncing;
+  String? _profileId;
 
   @override
   void initState() {
     super.initState();
+    _providerSyncing = widget.controller.providerSyncing;
+    _profileId = widget.controller.activeProfile?.id;
+    widget.controller.addListener(_onControllerChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    final providerSyncing = widget.controller.providerSyncing;
+    final profileId = widget.controller.activeProfile?.id;
+    final shouldReload = _profileId != profileId ||
+        (_providerSyncing && !providerSyncing);
+    _providerSyncing = providerSyncing;
+    _profileId = profileId;
+    if (shouldReload && mounted) _reload();
   }
 
   void _load() {
@@ -3186,28 +3207,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Widget build(BuildContext context) {
     final text = _statisticsText(context);
     final theme = Theme.of(context);
-    final sections = <({IconData icon, String title, String body})>[
-      (
-        icon: Icons.show_chart_rounded,
-        title: text.rating,
-        body: text.ratingBody,
-      ),
-      (
-        icon: Icons.analytics_outlined,
-        title: text.gameQuality,
-        body: text.gameQualityBody,
-      ),
-      (
-        icon: Icons.contrast_rounded,
-        title: text.whiteBlack,
-        body: text.whiteBlackBody,
-      ),
-      (
-        icon: Icons.groups_outlined,
-        title: text.opponents,
-        body: text.opponentsBody,
-      ),
-    ];
 
     return Scaffold(
       appBar: MediaQuery.sizeOf(context).width >= 900
@@ -3243,62 +3242,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 _OpeningsCard(
                   future: _openings,
                   onRetry: _reload,
-                ),
-                const SizedBox(height: 20),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth >= 760
-                        ? (constraints.maxWidth - 12) / 2
-                        : constraints.maxWidth;
-                    return Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        for (final section in sections)
-                          SizedBox(
-                            width: width,
-                            child: Card(
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 10,
-                                ),
-                                leading: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primaryContainer,
-                                    borderRadius: BorderRadius.circular(13),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    section.icon,
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
-                                title: Text(
-                                  section.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(section.body),
-                                ),
-                                trailing: Tooltip(
-                                  message: text.comingSoon,
-                                  child: Icon(
-                                    Icons.lock_clock_outlined,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
                 ),
               ],
             ),
@@ -3777,20 +3720,18 @@ class _OpeningsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final mostPlayed = stats.openings.take(8).toList();
-    final qualified = stats.openings
-        .where((opening) => opening.tally.decided >= 5)
-        .toList();
-    OpeningStat? best;
-    OpeningStat? worst;
-    if (qualified.length >= 2) {
-      final byScore = [...qualified]..sort(
-        (a, b) =>
-            (b.tally.scorePercent ?? 0).compareTo(a.tally.scorePercent ?? 0),
-      );
-      best = byScore.first;
-      worst = byScore.last;
-    }
+    final whiteOpenings = stats.openings
+        .where((opening) => opening.color == 'white')
+        .take(8)
+        .toList(growable: false);
+    final blackOpenings = stats.openings
+        .where((opening) => opening.color == 'black')
+        .take(8)
+        .toList(growable: false);
+    final unknownOpenings = stats.openings
+        .where((opening) => opening.color != 'white' && opening.color != 'black')
+        .take(8)
+        .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3813,84 +3754,104 @@ class _OpeningsContent extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        if (best != null && worst != null) ...[
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _OpeningHighlight(label: labels.strongest, opening: best),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _OpeningHighlight(label: labels.weakest, opening: worst),
-              ),
-            ],
-          ),
-        ],
         const SizedBox(height: 16),
         Text(labels.mostPlayed, style: _overviewSectionLabel(theme)),
-        const SizedBox(height: 4),
-        for (final opening in mostPlayed)
-          _OpeningLine(opening: opening, labels: labels),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final sections = <Widget>[
+              if (whiteOpenings.isNotEmpty)
+                _OpeningColorSection(
+                  color: 'white',
+                  title: labels.white,
+                  openings: whiteOpenings,
+                  labels: labels,
+                ),
+              if (blackOpenings.isNotEmpty)
+                _OpeningColorSection(
+                  color: 'black',
+                  title: labels.black,
+                  openings: blackOpenings,
+                  labels: labels,
+                ),
+              if (unknownOpenings.isNotEmpty)
+                _OpeningColorSection(
+                  color: 'unknown',
+                  title: labels.unknownColor,
+                  openings: unknownOpenings,
+                  labels: labels,
+                ),
+            ];
+            if (constraints.maxWidth >= 720 && sections.length == 2) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: sections[0]),
+                  const SizedBox(width: 20),
+                  Expanded(child: sections[1]),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < sections.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 16),
+                  sections[index],
+                ],
+              ],
+            );
+          },
+        ),
       ],
     );
   }
 }
 
-class _OpeningHighlight extends StatelessWidget {
-  const _OpeningHighlight({required this.label, required this.opening});
+class _OpeningColorSection extends StatelessWidget {
+  const _OpeningColorSection({
+    required this.color,
+    required this.title,
+    required this.openings,
+    required this.labels,
+  });
 
-  final String label;
-  final OpeningStat opening;
+  final String color;
+  final String title;
+  final List<OpeningStat> openings;
+  final _OpeningsText labels;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
+        color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              letterSpacing: 0.5,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _ColorDot(color: color),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            opening.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _ColorDot(color: opening.color),
-              const SizedBox(width: 6),
-              Text(
-                _formatPercent(opening.tally.scorePercent),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '(${opening.tally.games})',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ],
+            const SizedBox(height: 4),
+            for (final opening in openings)
+              _OpeningLine(opening: opening, labels: labels),
+          ],
+        ),
       ),
     );
   }
@@ -3940,10 +3901,11 @@ class _OpeningLine extends StatelessWidget {
           SizedBox(width: 84, child: _WdlBar(tally: tally)),
           const SizedBox(width: 10),
           SizedBox(
-            width: 42,
+            width: 92,
             child: Text(
-              _formatPercent(tally.scorePercent),
+              '${labels.score}: ${_formatPercent(tally.scorePercent)}',
               textAlign: TextAlign.end,
+              maxLines: 1,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
@@ -3982,10 +3944,12 @@ class _OpeningsText {
   const _OpeningsText({
     required this.title,
     required this.mostPlayed,
-    required this.strongest,
-    required this.weakest,
     required this.classifiedGames,
     required this.games,
+    required this.white,
+    required this.black,
+    required this.unknownColor,
+    required this.score,
     required this.empty,
     required this.noProfile,
     required this.error,
@@ -3994,10 +3958,12 @@ class _OpeningsText {
 
   final String title;
   final String mostPlayed;
-  final String strongest;
-  final String weakest;
   final String classifiedGames;
   final String games;
+  final String white;
+  final String black;
+  final String unknownColor;
+  final String score;
   final String empty;
   final String noProfile;
   final String error;
@@ -4010,10 +3976,12 @@ _OpeningsText _openingsText(BuildContext context) {
       return const _OpeningsText(
         title: 'الافتتاحيات',
         mostPlayed: 'الأكثر لعبًا',
-        strongest: 'الأفضل',
-        weakest: 'الأسوأ',
         classifiedGames: 'مباراة بافتتاحية معروفة',
         games: 'مباراة',
+        white: 'الأبيض',
+        black: 'الأسود',
+        unknownColor: 'لون غير معروف',
+        score: 'النقاط',
         empty:
             'لا توجد افتتاحيات مُصنّفة بعد. تُصنَّف المباريات المستوردة والمتزامنة تلقائيًا.',
         noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الافتتاحيات.',
@@ -4024,10 +3992,12 @@ _OpeningsText _openingsText(BuildContext context) {
       return const _OpeningsText(
         title: 'Openings',
         mostPlayed: 'Most played',
-        strongest: 'Best',
-        weakest: 'Worst',
         classifiedGames: 'games with a named opening',
         games: 'games',
+        white: 'White',
+        black: 'Black',
+        unknownColor: 'Unassigned color',
+        score: 'Score',
         empty:
             'No named openings yet. Synced and imported games are classified automatically.',
         noProfile: 'Create or select a profile to see openings.',
@@ -4038,10 +4008,12 @@ _OpeningsText _openingsText(BuildContext context) {
       return const _OpeningsText(
         title: 'Eröffnungen',
         mostPlayed: 'Meistgespielt',
-        strongest: 'Beste',
-        weakest: 'Schwächste',
         classifiedGames: 'Partien mit benannter Eröffnung',
         games: 'Partien',
+        white: 'Weiß',
+        black: 'Schwarz',
+        unknownColor: 'Farbe nicht zugeordnet',
+        score: 'Punkte',
         empty:
             'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.',
         noProfile: 'Erstelle oder wähle ein Profil, um Eröffnungen zu sehen.',
@@ -4055,77 +4027,25 @@ _OpeningsText _openingsText(BuildContext context) {
   String title,
   String introTitle,
   String introBody,
-  String overview,
-  String overviewBody,
-  String rating,
-  String ratingBody,
-  String gameQuality,
-  String gameQualityBody,
-  String whiteBlack,
-  String whiteBlackBody,
-  String openings,
-  String openingsBody,
-  String opponents,
-  String opponentsBody,
-  String comingSoon,
 }) _statisticsText(BuildContext context) {
   return switch (Localizations.localeOf(context).languageCode) {
     'ar' => (
       title: 'الإحصائيات',
       introTitle: 'أداؤك في الشطرنج',
       introBody:
-          'سيجمع هذا القسم لاحقًا إحصائيات المباريات والتقييم وتحليل KChess في مكان واحد. تتم إضافة الوحدات خطوة بخطوة.',
-      overview: 'نظرة عامة',
-      overviewBody: 'المباريات، النتائج، الدقة، الأداء الحالي والاتجاه العام.',
-      rating: 'التقييم',
-      ratingBody: 'تطور التقييم، أعلى تقييم، والتغير حسب نوع الوقت.',
-      gameQuality: 'جودة اللعب',
-      gameQualityBody: 'Brilliant وCritical وBest والأخطاء وفق تحليل KChess المحلي.',
-      whiteBlack: 'الأبيض / الأسود',
-      whiteBlackBody: 'مقارنة النتائج وجودة اللعب عند اللعب بكل لون.',
-      openings: 'الافتتاحيات',
-      openingsBody: 'الافتتاحيات الأكثر استخدامًا والأقوى والأضعف.',
-      opponents: 'الخصوم',
-      opponentsBody: 'الأداء أمام خصوم أقوى أو أضعف ومقارنة فروق التقييم.',
-      comingSoon: 'سيتم إضافته في الخطوات التالية',
+          'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.',
     ),
     'en' => (
       title: 'Statistics',
       introTitle: 'Your chess performance',
       introBody:
-          'This area will bring game statistics, rating data and local KChess analysis together. Each module will be added step by step.',
-      overview: 'Overview',
-      overviewBody: 'Games, results, accuracy, recent form and overall trend.',
-      rating: 'Rating',
-      ratingBody: 'Rating history, peaks and changes by time control.',
-      gameQuality: 'Game quality',
-      gameQualityBody: 'Brilliant, Critical, Best and mistakes from local KChess analysis.',
-      whiteBlack: 'White / Black',
-      whiteBlackBody: 'Compare results and playing quality by color.',
-      openings: 'Openings',
-      openingsBody: 'Most played, strongest and weakest personal openings.',
-      opponents: 'Opponents',
-      opponentsBody: 'Performance against stronger and weaker opponents and rating gaps.',
-      comingSoon: 'Will be added in the next steps',
+          'See your results, recent form and opening record separated by color.',
     ),
     _ => (
       title: 'Statistiken',
       introTitle: 'Deine Schachleistung',
       introBody:
-          'Hier werden später Partiestatistiken, Ratingdaten und lokale KChess-Analysen zusammengeführt. Die Module kommen Schritt für Schritt hinzu.',
-      overview: 'Übersicht',
-      overviewBody: 'Partien, Ergebnisse, Accuracy, aktuelle Form und Gesamttrend.',
-      rating: 'Rating',
-      ratingBody: 'Ratingverlauf, Höchstwerte und Veränderungen nach Zeitkontrolle.',
-      gameQuality: 'Spielqualität',
-      gameQualityBody: 'Brilliant, Critical, Best und Fehler aus der lokalen KChess-Analyse.',
-      whiteBlack: 'Weiß / Schwarz',
-      whiteBlackBody: 'Ergebnisse und Spielqualität getrennt nach Farbe vergleichen.',
-      openings: 'Eröffnungen',
-      openingsBody: 'Häufigste, stärkste und schwächste persönliche Eröffnungen.',
-      opponents: 'Gegner',
-      opponentsBody: 'Leistung gegen stärkere und schwächere Gegner sowie Ratingabstände.',
-      comingSoon: 'Wird in den nächsten Schritten ergänzt',
+          'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.',
     ),
   };
 }

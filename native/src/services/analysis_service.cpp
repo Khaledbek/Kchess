@@ -580,8 +580,14 @@ void AnalysisService::rebuild_classification(
   std::vector<AccuracyMove> white_moves;
   std::vector<AccuracyMove> black_moves;
   const auto book_metadata = opening_theory_->metadata();
+  const bool omit_terminal_last_move = game->moves.size() > 1
+      && (game->result == "1-0" || game->result == "0-1"
+          || game->result == "1/2-1/2");
+  const int omitted_ply = omit_terminal_last_move
+      ? game->moves.back().ply_index : -1;
   for (const auto& move : game->moves) {
     if (through_ply >= 0 && move.ply_index > through_ply) break;
+    if (move.ply_index == omitted_ply) break;
     // Position slot i is the position before move i; slot i+1 is the
     // resulting position after that move.  This makes move 0 identical to
     // every other move and gives it a real Stockfish "before" evaluation.
@@ -819,18 +825,23 @@ void AnalysisService::run_analysis(
     for (const int slot : theory_skipped_slots) {
       if (completed_slots.contains(slot)) continue;
       const std::string cache_fen = canonical_position_cache_fen(positions[slot]);
+      AnalysisResult skipped_result;
       // Reuse a previous checkpoint when one exists, but do not run Stockfish
       // merely to populate an eval for a move that is classified as Theory.
       if (settings.use_global_analysis_cache) {
         if (auto checkpoint = database_.best_position_checkpoint(
                 cache_fen, cache_engine_identity, settings.depth, settings.multi_pv);
             checkpoint.has_value()) {
-          database_.persist_engine_result(
-              game_id, config_hash, slot, contiguous_completed_moves(),
-              *checkpoint, unix_time_seconds());
+          skipped_result = std::move(*checkpoint);
         }
       }
       completed_slots.insert(slot);
+      // A Theory classification still needs an authoritative move_analysis row.
+      // Without this empty placeholder persist_classifications() has nothing to
+      // update, so the move disappears from both the UI badge and Theory totals.
+      database_.persist_engine_result(
+          game_id, config_hash, slot, contiguous_completed_moves(),
+          skipped_result, unix_time_seconds());
     }
     job->completed_moves = contiguous_completed_moves();
     if (!theory_skipped_slots.empty()) {
@@ -1127,13 +1138,15 @@ void AnalysisService::run_refinement_queue(
       // maximum run when available. This costs no Stockfish time but keeps the
       // eval bar populated while the move itself remains Theory.
       const std::string cache_fen = canonical_position_cache_fen(positions[slot]);
+      AnalysisResult skipped_result;
       if (auto checkpoint = database_.best_position_checkpoint(
               cache_fen, cache_engine_identity, settings.depth, settings.multi_pv);
           checkpoint.has_value()) {
-        const int completed_moves = contiguous_completed_moves();
-        database_.persist_engine_result(
-            game_id, config_hash, slot, completed_moves, *checkpoint, unix_time_seconds());
+        skipped_result = std::move(*checkpoint);
       }
+      database_.persist_engine_result(
+          game_id, config_hash, slot, contiguous_completed_moves(),
+          skipped_result, unix_time_seconds());
     }
     job->completed_moves = contiguous_completed_moves();
     if (!theory_skipped_slots.empty()) {
@@ -1291,9 +1304,16 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
     // Slot 0 is the true position before the first move.  Each following
     // slot is the result after one played half-move, so move i is always
     // evaluated from slots i -> i+1.
-    positions.reserve(game->moves.size() + 1);
+    const bool omit_terminal_last_move = game->moves.size() > 1
+        && (game->result == "1-0" || game->result == "0-1"
+            || game->result == "1/2-1/2");
+    const std::size_t analyzed_move_count = game->moves.size()
+        - static_cast<std::size_t>(omit_terminal_last_move);
+    positions.reserve(analyzed_move_count + 1);
     positions.push_back(game->starting_fen);
-    for (const auto& move : game->moves) positions.push_back(move.fen_after);
+    for (std::size_t index = 0; index < analyzed_move_count; ++index) {
+      positions.push_back(game->moves[index].fen_after);
+    }
   }
   if (positions.empty()) throw std::invalid_argument("Game has no analyzable positions");
 
@@ -1308,9 +1328,14 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
         game_id, reusable->config_hash).value());
   }
   version_probe.validate_available();
+  const bool omit_terminal_last_move = game->kind != "fen"
+      && game->moves.size() > 1
+      && (game->result == "1-0" || game->result == "0-1"
+          || game->result == "1/2-1/2");
   const int public_total_plies = game->kind == "fen"
       ? 1
-      : static_cast<int>(game->moves.size());
+      : static_cast<int>(game->moves.size())
+          - static_cast<int>(omit_terminal_last_move);
   auto persisted = database_.prepare_analysis(
       game_id, config_hash, version_probe.version(), public_total_plies,
       settings.depth, settings.multi_pv, settings.time_limit_seconds);
@@ -1477,9 +1502,16 @@ std::string AnalysisService::start_move_refinement_json(
   if (game->kind == "fen") {
     positions.push_back(game->starting_fen);
   } else {
-    positions.reserve(game->moves.size() + 1);
+    const bool omit_terminal_last_move = game->moves.size() > 1
+        && (game->result == "1-0" || game->result == "0-1"
+            || game->result == "1/2-1/2");
+    const std::size_t analyzed_move_count = game->moves.size()
+        - static_cast<std::size_t>(omit_terminal_last_move);
+    positions.reserve(analyzed_move_count + 1);
     positions.push_back(game->starting_fen);
-    for (const auto& move : game->moves) positions.push_back(move.fen_after);
+    for (std::size_t index = 0; index < analyzed_move_count; ++index) {
+      positions.push_back(game->moves[index].fen_after);
+    }
   }
   if (ply >= static_cast<int>(positions.size())) {
     throw std::invalid_argument("ply exceeds game position count");
@@ -1488,8 +1520,14 @@ std::string AnalysisService::start_move_refinement_json(
   StockfishEngine version_probe;
   version_probe.validate_available();
   const auto config_hash = analysis_config_hash(settings);
+  const bool omit_terminal_last_move = game->kind != "fen"
+      && game->moves.size() > 1
+      && (game->result == "1-0" || game->result == "0-1"
+          || game->result == "1/2-1/2");
   const int public_total_plies = game->kind == "fen"
-      ? 1 : static_cast<int>(game->moves.size());
+      ? 1
+      : static_cast<int>(game->moves.size())
+          - static_cast<int>(omit_terminal_last_move);
   auto persisted = database_.prepare_analysis(
       game_id, config_hash, version_probe.version(), public_total_plies,
       settings.depth, settings.multi_pv, settings.time_limit_seconds);

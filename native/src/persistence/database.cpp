@@ -259,7 +259,8 @@ constexpr const char* kGameColumns =
     "AND f.game_id=g.id),(SELECT f.collection_id FROM favorites f WHERE "
     "f.profile_id=g.profile_id AND f.game_id=g.id),"
     "EXISTS(SELECT 1 FROM favorites f JOIN favorite_collections c ON c.id=f.collection_id "
-    "WHERE f.game_id=g.id AND c.name='Downloads' COLLATE NOCASE),(ar.id IS NOT NULL)";
+    "WHERE f.game_id=g.id AND c.name='Downloads' COLLATE NOCASE),(ar.id IS NOT NULL),"
+    "g.opening_eco,g.opening_name,g.opening_ply";
 
 constexpr const char* kGameJoins =
     " FROM games g LEFT JOIN game_sources gs ON gs.game_id=g.id "
@@ -296,6 +297,9 @@ GameRecord read_game_record(sqlite3_stmt* statement) {
   game.favorite_collection_id = optional_text_column(statement, 25);
   game.downloaded = sqlite3_column_int(statement, 26) != 0;
   game.analyzed = sqlite3_column_int(statement, 27) != 0;
+  game.opening_eco = optional_text_column(statement, 28);
+  game.opening_name = optional_text_column(statement, 29);
+  game.opening_ply = optional_int_column(statement, 30);
   return game;
 }
 

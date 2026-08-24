@@ -105,9 +105,16 @@ GameLibraryService::GameLibraryService(Database& database, ProfileService& profi
 std::string GameLibraryService::game_record_json(
     const GameRecord& game, const bool include_moves) const {
   bool profile_is_black = false;
+  std::string profile_color = "unknown";
   if (const auto profile = database_.profile(game.profile_id); profile.has_value()) {
     const auto identity = profile->provider_username.value_or(profile->display_name);
-    profile_is_black = lowercase(identity) == lowercase(game.black_name);
+    const auto normalized_identity = lowercase(identity);
+    if (normalized_identity == lowercase(game.black_name)) {
+      profile_is_black = true;
+      profile_color = "black";
+    } else if (normalized_identity == lowercase(game.white_name)) {
+      profile_color = "white";
+    }
   }
   const auto provider_accuracy = profile_is_black
       ? game.provider_accuracy_black : game.provider_accuracy_white;
@@ -134,6 +141,13 @@ std::string GameLibraryService::game_record_json(
   append_optional_string(json, game.provider_game_id);
   json << ",\"providerUrl\":";
   append_optional_string(json, game.provider_url);
+  json << ",\"profileColor\":\"" << profile_color
+       << "\",\"openingEco\":";
+  append_optional_string(json, game.opening_eco);
+  json << ",\"openingName\":";
+  append_optional_string(json, game.opening_name);
+  json << ",\"openingPly\":";
+  append_optional_int(json, game.opening_ply);
   json << ",\"providerOutcome\":\"" << escape_json(game.provider_outcome)
        << "\",\"timeControlType\":\"" << escape_json(game.time_control_type)
        << "\",\"providerAccuracy\":";

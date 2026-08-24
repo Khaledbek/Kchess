@@ -438,6 +438,24 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final clampedMoveIndex = moveIndex < 0
         ? 0
         : (moveIndex >= moves.length ? moves.length - 1 : moveIndex);
+    final result = _controller.detail?.summary.result.trim();
+    final unratedTerminalMove = moves.length > 1
+        && clampedMoveIndex == moves.length - 1
+        && (result == '1-0' ||
+            result == '0-1' ||
+            result == '1/2-1/2' ||
+            result == '½-½');
+    if (unratedTerminalMove) {
+      ++_afterMoveLoadGeneration;
+      if (mounted) {
+        setState(() {
+          _afterMoveSlot = null;
+          _afterMoveSnapshot = null;
+          _afterMoveLoadingSlot = null;
+        });
+      }
+      return;
+    }
     final slot = clampedMoveIndex + 1;
     final analysisRunning = _controller.snapshot?.isRunning == true ||
         _controller.displayedSnapshot?.isRunning == true;
@@ -1135,6 +1153,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final snapshot = _controller.snapshot;
     final displayed = _controller.displayedSnapshot;
     final detail = _controller.detail;
+    final gameSummary = detail?.summary ?? widget.game;
     final moveIndex = detail == null || detail.moves.isEmpty
         ? 0
         : (_currentPly < 0
@@ -1167,20 +1186,28 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         variation?.bestMove ??
         (move == null ? displayed?.bestMove : afterMoveSnapshot?.bestMove) ??
         '';
-    final profileSide = snapshot?.summary?.profileSide ?? 'unknown';
+    final profileSide = snapshot?.summary?.profileSide ?? gameSummary.profileColor;
     final playerIsBlack = profileSide == 'black';
     final opponentName = playerIsBlack
-        ? widget.game.whiteName
-        : widget.game.blackName;
+        ? gameSummary.whiteName
+        : gameSummary.blackName;
     final opponentRating = playerIsBlack
-        ? widget.game.whiteRating
-        : widget.game.blackRating;
+        ? gameSummary.whiteRating
+        : gameSummary.blackRating;
     final playerName = playerIsBlack
-        ? widget.game.blackName
-        : widget.game.whiteName;
+        ? gameSummary.blackName
+        : gameSummary.whiteName;
     final playerRating = playerIsBlack
-        ? widget.game.blackRating
-        : widget.game.whiteRating;
+        ? gameSummary.blackRating
+        : gameSummary.whiteRating;
+    final openingName = gameSummary.openingName?.trim() ?? '';
+    final openingEco = gameSummary.openingEco?.trim() ?? '';
+    final openingLabel = openingName.isEmpty
+        ? null
+        : (openingEco.isEmpty ? openingName : '$openingEco · $openingName');
+    final hasKnownProfileColor = profileSide == 'white' || profileSide == 'black';
+    final playerColor = playerIsBlack ? 'black' : 'white';
+    final opponentColor = playerIsBlack ? 'white' : 'black';
     final fenFields = fen.split(' ');
     final sideToMove = fenFields.length > 1
         ? (fenFields[1] == 'b' ? 'black' : 'white')
@@ -1198,10 +1225,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final terminalResult = atMainLineEnd
         ? _knownGameResult(detail.summary.result)
         : null;
-    final terminalByCheckmate =
-        terminalResult != null &&
-        !_isDrawResult(terminalResult) &&
-        detail!.moves.last.san.contains('#');
 
     return Scaffold(
       appBar: AppBar(
@@ -1334,12 +1357,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       _settings.highlightSelectedSquare,
                   opponentName: opponentName,
                   opponentRating: opponentRating,
+                  opponentColor: opponentColor,
                   playerName: playerName,
                   playerRating: playerRating,
+                  playerColor: playerColor,
+                  playerOpening: hasKnownProfileColor ? openingLabel : null,
                   evaluationLine: lines.isEmpty ? null : lines.first,
                   showEvaluationBar: _settings.showEvaluationBar,
                   terminalResult: terminalResult,
-                  terminalByCheckmate: terminalByCheckmate,
                   currentMoveClassification:
                       _variationSession == null && _settings.showClassifications
                           ? displayed?.classification
@@ -1443,12 +1468,14 @@ class _Board extends StatelessWidget {
     required this.highlightSelectedSquare,
     required this.opponentName,
     required this.opponentRating,
+    required this.opponentColor,
     required this.playerName,
     required this.playerRating,
+    required this.playerColor,
+    required this.playerOpening,
     required this.evaluationLine,
     required this.showEvaluationBar,
     required this.terminalResult,
-    required this.terminalByCheckmate,
     required this.currentMoveClassification,
     required this.classificationMoveUci,
     required this.selectedSquare,
@@ -1469,12 +1496,14 @@ class _Board extends StatelessWidget {
   final bool highlightSelectedSquare;
   final String opponentName;
   final int? opponentRating;
+  final String opponentColor;
   final String playerName;
   final int? playerRating;
+  final String playerColor;
+  final String? playerOpening;
   final EngineLine? evaluationLine;
   final bool showEvaluationBar;
   final String? terminalResult;
-  final bool terminalByCheckmate;
   final MoveClassification? currentMoveClassification;
   final String classificationMoveUci;
   final String? selectedSquare;
@@ -1498,46 +1527,13 @@ class _Board extends StatelessWidget {
     'p': 'assets/analysis_img/piece_black_pawn.svg',
   };
 
-  String? _kingEndMarker(String piece) {
+  String? _kingResult(String piece) {
     final result = terminalResult;
     if (result == null || (piece != 'K' && piece != 'k')) return null;
-    if (_isDrawResult(result)) return 'board_remis';
-
+    if (_isDrawResult(result)) return 'draw';
     final whiteWon = result == '1-0';
     final kingIsWhite = piece == 'K';
-    final isWinner = whiteWon == kingIsWhite;
-    if (isWinner) return 'board_mate_win';
-    return terminalByCheckmate ? 'board_lose' : 'board_giveup';
-  }
-
-  Widget _optionalEndMarker(String baseName) {
-    final aliases = <String>{baseName};
-    if (baseName == 'board_lose') aliases.add('board_mate_lost');
-
-    final candidates = <String>[
-      for (final name in aliases) ...[
-        'assets/analysis_img/$name.png',
-        'assets/$name.png',
-        'assets/analysis_img/$name.webp',
-        'assets/$name.webp',
-        'assets/analysis_img/$name.jpg',
-        'assets/$name.jpg',
-        'assets/analysis_img/$name.jpeg',
-        'assets/$name.jpeg',
-      ],
-    ];
-
-    Widget tryAsset(int index) {
-      if (index >= candidates.length) return const SizedBox.shrink();
-      return Image.asset(
-        candidates[index],
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        errorBuilder: (_, _, _) => tryAsset(index + 1),
-      );
-    }
-
-    return tryAsset(0);
+    return whiteWon == kingIsWhite ? 'win' : 'loss';
   }
 
   List<String> get _pieces {
@@ -1572,7 +1568,7 @@ class _Board extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          const stripHeight = 34.0;
+          const stripHeight = 58.0;
           const stripGap = 4.0;
           const evaluationHeight = 22.0;
           const evaluationGap = 4.0;
@@ -1638,12 +1634,13 @@ class _Board extends StatelessWidget {
                             ? classificationMoveUci.substring(2, 4)
                             : '';
                     final showClassificationBadge =
+                        terminalResult == null &&
                         classification != null &&
                         classification != MoveClassification.unknown &&
                         classificationTarget == square;
                     final piece = pieces[index];
                     final pieceAsset = _pieceAssets[piece];
-                    final kingEndMarker = _kingEndMarker(piece);
+                    final kingResult = _kingResult(piece);
                     final canDrag = pieceAsset != null && _canDragPiece(piece);
                     final squareSide = boardSide / 8;
                     final pieceInset = squareSide * 0.055;
@@ -1698,24 +1695,28 @@ class _Board extends StatelessWidget {
                                           )
                                         : pieceImage(),
                                   ),
-                                if (kingEndMarker != null)
+                                if (kingResult != null)
                                   Positioned(
-                                    left: 2,
-                                    bottom: 2,
+                                    top: 1,
+                                    right: 1,
                                     child: IgnorePointer(
                                       child: Builder(
                                         builder: (context) {
                                           final badgeSize = math.max(
-                                            14.0,
+                                            22.0,
                                             math.min(
-                                              26.0,
-                                              boardSide / 8 * 0.30,
+                                              46.0,
+                                              boardSide / 8 * 0.62,
                                             ),
                                           );
                                           return SizedBox.square(
                                             dimension: badgeSize,
-                                            child: _optionalEndMarker(
-                                              kingEndMarker,
+                                            child: SvgPicture.asset(
+                                              'assets/analysis_img/result_$kingResult.svg',
+                                              key: Key(
+                                                'board-${piece == 'K' ? 'white' : 'black'}-result-$kingResult',
+                                              ),
+                                              fit: BoxFit.contain,
                                             ),
                                           );
                                         },
@@ -1731,10 +1732,10 @@ class _Board extends StatelessWidget {
                                       child: Builder(
                                         builder: (context) {
                                           final badgeSize = math.max(
-                                            12.0,
+                                            18.0,
                                             math.min(
-                                              28.0,
-                                              boardSide / 8 * 0.32,
+                                              36.0,
+                                              boardSide / 8 * 0.46,
                                             ),
                                           );
                                           final asset = _analysisClassificationAsset(classification);
@@ -1852,6 +1853,8 @@ class _Board extends StatelessWidget {
                 child: _BoardPlayerStrip(
                   name: opponentName,
                   rating: opponentRating,
+                  color: opponentColor,
+                  opening: null,
                 ),
               ),
               const SizedBox(height: stripGap),
@@ -1863,6 +1866,8 @@ class _Board extends StatelessWidget {
                 child: _BoardPlayerStrip(
                   name: playerName,
                   rating: playerRating,
+                  color: playerColor,
+                  opening: playerOpening,
                   emphasize: true,
                 ),
               ),
@@ -1878,11 +1883,15 @@ class _BoardPlayerStrip extends StatelessWidget {
   const _BoardPlayerStrip({
     required this.name,
     required this.rating,
+    required this.color,
+    required this.opening,
     this.emphasize = false,
   });
 
   final String name;
   final int? rating;
+  final String color;
+  final String? opening;
   final bool emphasize;
 
   @override
@@ -1898,19 +1907,152 @@ class _BoardPlayerStrip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color == 'white' ? Colors.white : Colors.black,
+                    border: Border.all(color: scheme.outline),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
+            if (opening != null) ...[
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Icon(
+                    Icons.account_tree_outlined,
+                    size: 15,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: _OpeningMarquee(
+                      text: opening!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _OpeningMarquee extends StatefulWidget {
+  const _OpeningMarquee({required this.text, required this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_OpeningMarquee> createState() => _OpeningMarqueeState();
+}
+
+class _OpeningMarqueeState extends State<_OpeningMarquee>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double _configuredOverflow = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OpeningMarquee oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _configuredOverflow = -1;
+    }
+  }
+
+  void _configureAnimation(double overflow) {
+    if ((_configuredOverflow - overflow).abs() < 0.5) return;
+    _configuredOverflow = overflow;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller
+        ..stop()
+        ..value = 0;
+      if (overflow <= 0) return;
+      final milliseconds = math.max(8000, (overflow / 14 * 1000).round());
+      _controller
+        ..duration = Duration(milliseconds: milliseconds)
+        ..repeat();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: widget.style),
+          maxLines: 1,
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final overflow = math.max(0.0, painter.width - constraints.maxWidth);
+        _configureAnimation(overflow);
+        if (overflow <= 0) {
+          return Text(
+            widget.text,
+            maxLines: 1,
+            textDirection: TextDirection.ltr,
+            style: widget.style,
+          );
+        }
+        return ClipRect(
+          child: AnimatedBuilder(
+            animation: _controller,
+            child: Text(
+              widget.text,
+              maxLines: 1,
+              softWrap: false,
+              textDirection: TextDirection.ltr,
+              style: widget.style,
+            ),
+            builder: (context, child) => Transform.translate(
+              offset: Offset(-overflow * _controller.value, 0),
+              child: child,
+            ),
+          ),
+        );
+      },
     );
   }
 }

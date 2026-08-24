@@ -103,7 +103,8 @@ std::string StatisticsService::overview_json() const {
     return nlohmann::json{{"hasProfile", false}, {"totalGames", 0}}.dump();
   }
 
-  const std::string username = profile->provider_username.value_or("");
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
   const auto rows = database_.games_for_statistics(profile->id);
 
   Tally overall;
@@ -171,7 +172,8 @@ std::string StatisticsService::openings_json() const {
     return nlohmann::json{{"hasProfile", false}, {"gamesWithOpening", 0}}.dump();
   }
 
-  const std::string username = profile->provider_username.value_or("");
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
   const auto rows = database_.games_for_statistics(profile->id);
 
   struct OpeningEntry {

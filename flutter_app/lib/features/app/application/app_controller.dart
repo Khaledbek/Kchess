@@ -548,6 +548,17 @@ class AnalysisController extends ChangeNotifier {
   bool _variationPaused = false;
   bool _disposed = false;
 
+  bool _isUnratedTerminalPly(int ply) {
+    final loaded = detail;
+    if (loaded == null || loaded.moves.length <= 1) return false;
+    final result = loaded.summary.result.trim();
+    return (result == '1-0' ||
+            result == '0-1' ||
+            result == '1/2-1/2' ||
+            result == '½-½')
+        && ply == loaded.moves.length - 1;
+  }
+
   Future<void> open() async {
     try {
       detail = await gateway.game(game.id);
@@ -621,6 +632,13 @@ class AnalysisController extends ChangeNotifier {
     if (_variationPaused) return;
     final generation = ++_refinementGeneration;
     _timer?.cancel();
+    if (_isUnratedTerminalPly(ply)) {
+      _refinementTimer?.cancel();
+      displayedSnapshot = null;
+      error = null;
+      if (!_disposed) notifyListeners();
+      return;
+    }
     try {
       final started = await gateway.startMoveRefinement(game.id, ply);
       if (_disposed || generation != _refinementGeneration || selectedPly != ply) {

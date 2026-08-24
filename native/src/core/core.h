@@ -105,6 +105,7 @@ class Core {
   // opening-name index and persist each result. Idempotent and cheap; a single
   // unparseable game is marked processed rather than aborting the sweep.
   void classify_pending_openings(int limit);
+  void classify_game_opening(const std::string& game_id);
 
   std::filesystem::path data_directory_;
   Database database_;
