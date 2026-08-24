@@ -734,6 +734,16 @@ DELETE FROM downloads;
 PRAGMA user_version = 12;
 )sql";
 
+// Opening classification: per-game ECO code and named opening/variation from the
+// offline KCO1 name index. opening_ply is NULL until a game has been classified,
+// 0 once classified with no named opening, and the named line's ply otherwise.
+constexpr const char* kMigration13 = R"sql(
+ALTER TABLE games ADD COLUMN opening_eco TEXT;
+ALTER TABLE games ADD COLUMN opening_name TEXT;
+ALTER TABLE games ADD COLUMN opening_ply INTEGER;
+PRAGMA user_version = 13;
+)sql";
+
 }  // namespace
 
 Database::Database(std::filesystem::path data_directory)
@@ -778,6 +788,7 @@ void Database::open_and_migrate() {
     if (version < 10) execute(kMigration10);
     if (version < 11) execute(kMigration11);
     if (version < 12) execute(kMigration12);
+    if (version < 13) execute(kMigration13);
 
     // Privacy hardening for online profiles. Earlier builds could persist public
     // real-world/account metadata returned by provider profile endpoints. Kchess
@@ -1965,6 +1976,66 @@ void Database::set_downloaded(
     throw;
   }
 }
+
+std::vector<std::pair<std::string, std::string>> Database::games_needing_opening(
+    const int limit) const {
+  auto statement = limit > 0
+      ? prepare(db_, "SELECT id,pgn FROM games WHERE opening_ply IS NULL LIMIT ?;")
+      : prepare(db_, "SELECT id,pgn FROM games WHERE opening_ply IS NULL;");
+  if (limit > 0) sqlite3_bind_int(statement.get(), 1, limit);
+  std::vector<std::pair<std::string, std::string>> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.emplace_back(text_column(statement.get(), 0), text_column(statement.get(), 1));
+  }
+  return result;
+}
+
+void Database::set_game_opening(
+    const std::string& game_id,
+    const std::optional<std::string>& eco,
+    const std::optional<std::string>& name,
+    const int ply) {
+  auto statement = prepare(
+      db_, "UPDATE games SET opening_eco=?,opening_name=?,opening_ply=? WHERE id=?;");
+  if (eco.has_value()) {
+    sqlite3_bind_text(statement.get(), 1, eco->c_str(), -1, SQLITE_TRANSIENT);
+  } else {
+    sqlite3_bind_null(statement.get(), 1);
+  }
+  if (name.has_value()) {
+    sqlite3_bind_text(statement.get(), 2, name->c_str(), -1, SQLITE_TRANSIENT);
+  } else {
+    sqlite3_bind_null(statement.get(), 2);
+  }
+  sqlite3_bind_int(statement.get(), 3, ply);
+  sqlite3_bind_text(statement.get(), 4, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "update game opening");
+}
+
+std::vector<GameStatRow> Database::games_for_statistics(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT provider_outcome,result,white_name,black_name,time_control_type,"
+      "opening_eco,opening_name "
+      "FROM games WHERE profile_id=? "
+      "ORDER BY provider_ended_at DESC, created_at DESC;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GameStatRow> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back(GameStatRow{
+        .provider_outcome = text_column(statement.get(), 0),
+        .result = text_column(statement.get(), 1),
+        .white_name = text_column(statement.get(), 2),
+        .black_name = text_column(statement.get(), 3),
+        .time_control_type = text_column(statement.get(), 4),
+        .opening_eco = text_column(statement.get(), 5),
+        .opening_name = text_column(statement.get(), 6),
+    });
+  }
+  return result;
+}
+
 void Database::delete_local_game(
     const std::string& profile_id, const std::string& game_id) {
   auto statement = prepare(

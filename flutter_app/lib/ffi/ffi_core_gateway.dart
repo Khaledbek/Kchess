@@ -209,6 +209,14 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StatusStringNative, _StatusStringDart>(
           'kc_set_locale',
         );
+    _statisticsOverview = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_overview_json',
+        );
+    _statisticsOpenings = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_openings_json',
+        );
     _games = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_games_json',
     );
@@ -333,18 +341,22 @@ class FfiCoreGateway implements CoreGateway {
             Platform.isWindows ? 'kchess_core.dll' : 'libkchess_core.so',
           );
     final directory = await getApplicationSupportDirectory();
-    await _installOpeningBook(directory.path);
+    await _installBundledAsset(directory.path, 'opening_book.kcb');
+    await _installBundledAsset(directory.path, 'opening_names.kco');
     return FfiCoreGateway._(library, directory.path);
   }
 
-  static Future<void> _installOpeningBook(String directoryPath) async {
-    final data = await rootBundle.load('assets/opening_book.kcb');
+  static Future<void> _installBundledAsset(
+    String directoryPath,
+    String assetName,
+  ) async {
+    final data = await rootBundle.load('assets/$assetName');
     final bytes = data.buffer.asUint8List(
       data.offsetInBytes,
       data.lengthInBytes,
     );
     final destination = File(
-      '$directoryPath${Platform.pathSeparator}opening_book.kcb',
+      '$directoryPath${Platform.pathSeparator}$assetName',
     );
     if (await destination.exists()) {
       final current = await destination.readAsBytes();
@@ -407,6 +419,8 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _providerJobStatus;
   late final _StatusStringDart _cancelProviderJob;
   late final _StringArgDart _providerOverview;
+  late final _StringNoArgsDart _statisticsOverview;
+  late final _StringNoArgsDart _statisticsOpenings;
   late final _StatusStringIntDart _setGameFavorite;
   late final _StringNoArgsDart _favoriteCollections;
   late final _StringArgDart _createFavoriteCollection;
@@ -590,6 +604,17 @@ class FfiCoreGateway implements CoreGateway {
   Future<void> setLocale(String locale) => _withNativeString(
     locale,
     (value) => _checkStatus(_setLocale(_handle, value)),
+  );
+
+  @override
+  Future<StatisticsOverview> statisticsOverview() async =>
+      StatisticsOverview.fromJson(
+        _readJson(_statisticsOverview(_handle))! as Map<String, Object?>,
+      );
+
+  @override
+  Future<OpeningsStats> openingsStats() async => OpeningsStats.fromJson(
+    _readJson(_statisticsOpenings(_handle))! as Map<String, Object?>,
   );
 
   @override

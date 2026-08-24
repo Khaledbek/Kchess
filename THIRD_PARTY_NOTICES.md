@@ -49,6 +49,15 @@ das Betriebssystem-API WinHTTP, Android die Plattformklasse
 - Lizenz: CC0 1.0
 - Verarbeitung und Prüfsummen: `tools/opening_book/BUILD_METADATA.md`
 
+## Lichess chess-openings
+
+- Zweck: Quelldaten des offline ausgelieferten KCO1-Eröffnungsnamen-Index
+- Quelle: `https://github.com/lichess-org/chess-openings`
+- Upstream-Commit: `4b8622759e7ae6f93f011cc6c83a3823401ab45e` (2026-08-04)
+- Dateien: `a.tsv`, `b.tsv`, `c.tsv`, `d.tsv`, `e.tsv`
+- Lizenz: CC0 1.0
+- Verarbeitung und Prüfsummen: `tools/opening_names/BUILD_METADATA.md`
+
 ## Nur zur Entwicklung: Opening-Book-Builder
 
 Diese Komponenten erzeugen das Book und werden nicht mit der App ausgeliefert:

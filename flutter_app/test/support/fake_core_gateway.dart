@@ -195,6 +195,68 @@ class FakeCoreGateway implements CoreGateway {
   }
 
   @override
+  Future<StatisticsOverview> statisticsOverview() async => StatisticsOverview(
+    hasProfile: true,
+    totalGames: 3,
+    overall: const StatTally(
+      games: 3,
+      wins: 2,
+      losses: 1,
+      winRate: 0.6667,
+      scorePercent: 0.6667,
+    ),
+    white: const StatTally(
+      games: 2,
+      wins: 1,
+      losses: 1,
+      winRate: 0.5,
+      scorePercent: 0.5,
+    ),
+    black: const StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+    byTimeControl: const [
+      StatTimeControl(
+        type: 'blitz',
+        tally: StatTally(
+          games: 3,
+          wins: 2,
+          losses: 1,
+          winRate: 0.6667,
+          scorePercent: 0.6667,
+        ),
+      ),
+    ],
+    recentForm: const ['win', 'loss', 'win'],
+  );
+
+  @override
+  Future<OpeningsStats> openingsStats() async => const OpeningsStats(
+    hasProfile: true,
+    gamesWithOpening: 3,
+    gamesWithoutOpening: 0,
+    distinctOpenings: 2,
+    openings: [
+      OpeningStat(
+        eco: 'C65',
+        name: 'Ruy Lopez: Berlin Defense',
+        color: 'white',
+        tally: StatTally(
+          games: 2,
+          wins: 1,
+          losses: 1,
+          winRate: 0.5,
+          scorePercent: 0.5,
+        ),
+      ),
+      OpeningStat(
+        eco: 'B10',
+        name: 'Caro-Kann Defense',
+        color: 'black',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+      ),
+    ],
+  );
+
+  @override
   Future<ProviderOverview> providerOverview(String profileId) async =>
       ProviderOverview(
         profile: storedProfiles.firstWhere((value) => value.id == profileId),

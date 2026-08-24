@@ -2,10 +2,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 
+#include "chess/pgn.h"
 #include "diagnostics/logger.h"
+#include "theory/opening_name_index.h"
 
 namespace kchess {
 namespace {
@@ -31,7 +34,9 @@ Core::Core(std::filesystem::path data_directory)
       settings_service_(database_),
       provider_service_(database_, profile_service_, data_directory_),
       opening_theory_(std::make_unique<UnavailableOpeningTheoryProvider>()),
-      analysis_service_(database_, *opening_theory_) {
+      opening_names_(std::make_unique<UnavailableOpeningNameIndex>()),
+      analysis_service_(database_, *opening_theory_),
+      statistics_service_(database_) {
   diagnostics::configure_logging(data_directory_);
   diagnostics::info("core", "Core created");
 }
@@ -52,8 +57,38 @@ void Core::initialize() {
     }
   }
   analysis_service_.set_opening_theory_provider(*opening_theory_);
+  const auto names_path = data_directory_ / "opening_names.kco";
+  if (std::filesystem::exists(names_path)) {
+    try {
+      opening_names_ = std::make_unique<KcoOpeningNameIndex>(names_path);
+    } catch (const std::exception& error) {
+      opening_names_ = std::make_unique<UnavailableOpeningNameIndex>();
+      last_error_ = std::string("Opening names disabled: ") + error.what();
+    }
+  }
+  // Drain a bounded batch of unclassified games each launch so previously stored
+  // and provider-synced games gain openings over time without stalling startup.
+  classify_pending_openings(256);
   initialized_ = true;
   diagnostics::info("core", "Initialization complete");
+}
+
+void Core::classify_pending_openings(const int limit) {
+  if (opening_names_->max_ply() == 0) return;  // Index unavailable.
+  for (const auto& [game_id, pgn] : database_.games_needing_opening(limit)) {
+    std::optional<OpeningName> opening;
+    try {
+      const auto parsed = parse_pgn(pgn);
+      if (parsed.valid) opening = classify_opening(*opening_names_, parsed.game.moves);
+    } catch (const std::exception&) {
+      opening.reset();  // Fall through and mark the game processed.
+    }
+    if (opening.has_value()) {
+      database_.set_game_opening(game_id, opening->eco, opening->name, opening->ply);
+    } else {
+      database_.set_game_opening(game_id, std::nullopt, std::nullopt, 0);
+    }
+  }
 }
 
 std::string Core::profiles_json() {
@@ -150,12 +185,16 @@ std::string Core::game_json(const std::string& game_id) {
 }
 
 std::string Core::import_pgn_json(const std::string& pgn) {
-  return game_library_service_.import_pgn_json(pgn);
+  auto result = game_library_service_.import_pgn_json(pgn);
+  classify_pending_openings(64);
+  return result;
 }
 
 std::string Core::import_fen_json(
     const std::string& fen, const std::string& display_name) {
-  return game_library_service_.import_fen_json(fen, display_name);
+  auto result = game_library_service_.import_fen_json(fen, display_name);
+  classify_pending_openings(64);
+  return result;
 }
 
 std::string Core::start_provider_profile_json(
@@ -178,6 +217,14 @@ void Core::cancel_provider_job(const std::string& job_id) {
 
 std::string Core::provider_overview_json(const std::string& profile_id) {
   return provider_service_.provider_overview_json(profile_id);
+}
+
+std::string Core::statistics_overview_json() {
+  return statistics_service_.overview_json();
+}
+
+std::string Core::statistics_openings_json() {
+  return statistics_service_.openings_json();
 }
 
 void Core::set_favorite(const std::string& game_id, const bool value) {

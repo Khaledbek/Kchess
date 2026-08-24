@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "chess/pgn.h"
@@ -78,6 +79,18 @@ struct GameRecord {
   bool downloaded{false};
   bool analyzed{false};
   std::vector<ParsedMove> moves;
+};
+
+// Minimal per-game fields for statistics aggregation. Deliberately excludes the
+// PGN and analysis joins so a full-library overview stays cheap.
+struct GameStatRow {
+  std::string provider_outcome;   // win | loss | draw | unknown (profile perspective)
+  std::string result;             // 1-0 | 0-1 | 1/2-1/2 | *
+  std::string white_name;
+  std::string black_name;
+  std::string time_control_type;  // bullet | blitz | rapid | classical | daily | ...
+  std::string opening_eco;        // empty when the game has no named opening
+  std::string opening_name;       // empty when unclassified or no named opening
 };
 
 struct FavoriteCollectionRecord {
@@ -187,6 +200,20 @@ class Database {
   std::vector<GameRecord> games(const std::string& profile_id) const;
   std::vector<GameRecord> favorite_games() const;
   std::optional<GameRecord> game(const std::string& game_id) const;
+
+  // Lightweight rows for statistics, newest game first (by end/creation time).
+  std::vector<GameStatRow> games_for_statistics(const std::string& profile_id) const;
+
+  // Opening classification. games_needing_opening returns (game_id, pgn) for
+  // games not yet classified (opening_ply IS NULL); limit <= 0 returns all.
+  // set_game_opening records the result: pass eco/name empty and ply 0 when no
+  // named opening was found, so the game is not rescanned.
+  std::vector<std::pair<std::string, std::string>> games_needing_opening(int limit) const;
+  void set_game_opening(
+      const std::string& game_id,
+      const std::optional<std::string>& eco,
+      const std::optional<std::string>& name,
+      int ply);
 
   PersistedAnalysis prepare_analysis(
       const std::string& game_id,

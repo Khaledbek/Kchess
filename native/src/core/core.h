@@ -13,6 +13,8 @@
 #include "services/profile_service.h"
 #include "services/provider_service.h"
 #include "services/settings_service.h"
+#include "services/statistics_service.h"
+#include "theory/opening_name_index.h"
 #include "theory/opening_theory_provider.h"
 
 namespace kchess {
@@ -70,6 +72,9 @@ class Core {
   void cancel_provider_job(const std::string& job_id);
   std::string provider_overview_json(const std::string& profile_id);
 
+  std::string statistics_overview_json();
+  std::string statistics_openings_json();
+
   std::string start_analysis_json(const std::string& game_id);
   std::string analysis_status_json(const std::string& game_id);
   std::string move_analysis_status_json(const std::string& game_id, int ply);
@@ -96,6 +101,11 @@ class Core {
   }
 
  private:
+  // Classify up to `limit` unclassified stored games (<= 0 means all) with the
+  // opening-name index and persist each result. Idempotent and cheap; a single
+  // unparseable game is marked processed rather than aborting the sweep.
+  void classify_pending_openings(int limit);
+
   std::filesystem::path data_directory_;
   Database database_;
   ProfileService profile_service_;
@@ -103,7 +113,9 @@ class Core {
   SettingsService settings_service_;
   ProviderService provider_service_;
   std::unique_ptr<OpeningTheoryProvider> opening_theory_;
+  std::unique_ptr<OpeningNameIndex> opening_names_;
   AnalysisService analysis_service_;
+  StatisticsService statistics_service_;
   bool initialized_{false};
   int32_t last_status_{0};
   std::string last_error_;

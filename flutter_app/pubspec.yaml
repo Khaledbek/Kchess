@@ -29,3 +29,5 @@ flutter:
     - assets/
     - assets/analysis_img/
     - ../img/
+    - assets/opening_book.kcb
+    - assets/opening_names.kco

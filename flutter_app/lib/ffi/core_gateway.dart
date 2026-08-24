@@ -13,6 +13,8 @@ abstract interface class CoreGateway {
   Future<void> deleteProfile(String profileId);
   Future<void> mergeLocalProfile(String sourceProfileId, String targetProfileId);
   Future<ProviderOverview> providerOverview(String profileId);
+  Future<StatisticsOverview> statisticsOverview();
+  Future<OpeningsStats> openingsStats();
   Future<ProviderOverview> syncProvider(
     String profileId, {
     int year = 0,
