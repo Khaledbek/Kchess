@@ -178,8 +178,26 @@ class StockfishEngine::Impl {
 StockfishEngine::StockfishEngine(std::filesystem::path asset_directory)
     : impl_(std::make_unique<Impl>()) {
 #if defined(_WIN32)
-  impl_->asset_directory = asset_directory.empty()
-      ? module_directory() : std::move(asset_directory);
+  if (!asset_directory.empty()) {
+    impl_->asset_directory = std::move(asset_directory);
+  } else {
+    const auto module_dir = module_directory();
+    const bool module_has_networks =
+        std::filesystem::exists(module_dir / kBigNetwork)
+        && std::filesystem::exists(module_dir / kSmallNetwork);
+    if (module_has_networks) {
+      impl_->asset_directory = module_dir;
+    }
+#if defined(KCHESS_STOCKFISH_ASSET_DIR)
+    else {
+      impl_->asset_directory = std::filesystem::path(KCHESS_STOCKFISH_ASSET_DIR);
+    }
+#else
+    else {
+      impl_->asset_directory = module_dir;
+    }
+#endif
+  }
 #else
   impl_->asset_directory = std::move(asset_directory);
 #endif
@@ -298,7 +316,20 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
           iteration.push_back(found->second);
         }
         if (complete_iteration) {
-          if (stable_engine_lines(
+          const bool ordinary_cp_iteration = std::all_of(
+              iteration.begin(), iteration.end(), [](const EngineLine& line) {
+                return line.evaluation_cp.has_value() && !line.mate_in.has_value();
+              });
+          const bool ordinary_cp_previous = std::all_of(
+              previous_stability_lines.begin(), previous_stability_lines.end(),
+              [](const EngineLine& line) {
+                return line.evaluation_cp.has_value() && !line.mate_in.has_value();
+              });
+          const bool eligible_for_early_stop =
+              !request.early_stop_require_cp_scores
+              || (ordinary_cp_iteration && ordinary_cp_previous);
+          if (eligible_for_early_stop
+              && stable_engine_lines(
                   iteration, previous_stability_lines,
                   request.early_stop_eval_tolerance_cp)) {
             ++stable_iterations;

@@ -120,12 +120,11 @@ else()
 endif()
 
 if(KCHESS_WITH_STOCKFISH AND WIN32)
-  add_custom_command(TARGET kchess_core POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${STOCKFISH_BIG_NET}" "$<TARGET_FILE_DIR:kchess_core>"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${STOCKFISH_SMALL_NET}" "$<TARGET_FILE_DIR:kchess_core>"
-    VERBATIM
+  # Development builds can load the external NNUE networks directly from the
+  # checked-in Stockfish source tree. Runtime still prefers networks placed
+  # next to kchess_core.dll, so packaged builds can remain self-contained.
+  target_compile_definitions(kchess_core PRIVATE
+    KCHESS_STOCKFISH_ASSET_DIR="${STOCKFISH_SOURCE_DIR}"
   )
 endif()
 

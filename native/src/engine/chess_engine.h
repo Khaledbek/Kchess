@@ -23,6 +23,9 @@ struct AnalysisRequest {
   int early_stop_min_depth{0};
   int early_stop_stable_iterations{3};
   int early_stop_eval_tolerance_cp{15};
+  // Preparation analysis can require ordinary centipawn scores so mate/tactical
+  // positions always continue to the configured hard depth.
+  bool early_stop_require_cp_scores{false};
   const std::atomic_bool* cancel_requested{nullptr};
 };
 

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cctype>
 #include <cstdint>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -26,6 +27,89 @@ constexpr int kLiveRefinementHashMb = 512;
 constexpr int kEngineThreadHardCap = 32;
 constexpr int kLiveStableIterations = 3;
 constexpr int kLiveStableEvalToleranceCp = 15;
+constexpr int kPreanalysisStableIterations = 3;
+constexpr int kPreanalysisStableEvalToleranceCp = 10;
+
+constexpr double kPreanalysisBoundaryMargin = 0.02;
+constexpr double kPreanalysisGapMargin = 0.04;
+
+PositionEvaluation evaluation_of(const EngineLine& line);
+
+bool near_threshold(const double value, const double threshold, const double margin) {
+  return std::abs(value - threshold) <= margin;
+}
+
+bool difficult_preanalysis_position(
+    const std::string& fen,
+    const std::string& played_move,
+    const AnalysisResult& result) {
+  if (result.lines.empty()) return false;
+
+  const MoveClassifierConfig classifier;
+  const auto best_expected = expected_score_side_to_move(evaluation_of(result.lines.front()));
+  std::optional<double> second_expected;
+  if (result.lines.size() > 1) {
+    second_expected = expected_score_side_to_move(evaluation_of(result.lines[1]));
+  }
+
+  const EngineLine* played_line = nullptr;
+  for (const auto& line : result.lines) {
+    if (line.best_move() == played_move) {
+      played_line = &line;
+      break;
+    }
+  }
+
+  // Mate and verified sacrifices are exactly the positions where a shallow
+  // convergence decision can damage Great/Brilliant/Miss classification.
+  if (std::any_of(result.lines.begin(), result.lines.end(), [](const EngineLine& line) {
+        return line.mate_in.has_value();
+      })) {
+    return true;
+  }
+  if (played_line != nullptr
+      && material_sacrifice_in_pv(fen, played_line->moves, 8)) {
+    return true;
+  }
+
+  if (!best_expected.has_value()) return false;
+
+  if (second_expected.has_value()) {
+    const double gap = std::max(0.0, *best_expected - *second_expected);
+    if (gap >= classifier.brilliant_gap - kPreanalysisGapMargin
+        || near_threshold(gap, classifier.critical_gap, kPreanalysisGapMargin)) {
+      return true;
+    }
+  }
+
+  if (played_line == nullptr) {
+    // The played move falling outside the scout candidates is already an
+    // uncertainty signal: full configured MultiPV should verify it.
+    return !played_move.empty();
+  }
+
+  const auto played_expected = expected_score_side_to_move(evaluation_of(*played_line));
+  const auto loss = expected_score_loss(best_expected, played_expected);
+  if (!loss.has_value()) return false;
+
+  // Spend the full minimum budget near category boundaries, where a few
+  // centipawns can change the user-visible label.
+  return near_threshold(*loss, classifier.best_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, classifier.excellent_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, classifier.okay_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, classifier.miss_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, classifier.blunder_outcome_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, classifier.blunder_severe_loss, kPreanalysisBoundaryMargin);
+}
+
+int preanalysis_early_stop_min_depth(const AppSettings& settings) {
+  // The user's minimum depth remains the hard ceiling for preparation. Quiet
+  // positions may stop only after a substantial search and several stable
+  // iterations. Depths below 12 are cheap enough that early-stop bookkeeping
+  // is not worthwhile.
+  if (settings.depth < 12) return settings.depth;
+  return std::max(8, settings.depth - 6);
+}
 
 int maximum_worker_threads() {
   const unsigned hardware = std::thread::hardware_concurrency();
@@ -242,6 +326,17 @@ void AnalysisService::cancel_jobs_for_games(
   }
 }
 
+AppSettings AnalysisService::preanalysis_budget_settings() const {
+  auto budget = database_.settings();
+  // min_analysis_depth is the maximum depth of the preparation pass.  Do not
+  // copy the live maximum into budget.depth.  MultiPV, time, threads and hash
+  // remain exactly as configured by the user.
+  budget.depth = std::clamp(
+      budget.min_analysis_depth, AppSettings::min_depth, AppSettings::max_depth);
+  budget.threads = std::clamp(budget.threads, 1, maximum_worker_threads());
+  return budget;
+}
+
 AnalysisRequest AnalysisService::analysis_request(
     const std::string& fen, const AppSettings& settings) const {
   return AnalysisRequest{
@@ -252,6 +347,14 @@ AnalysisRequest AnalysisService::analysis_request(
       .hash_mb = settings.hash_mb,
       .time_limit_seconds = settings.time_limit_seconds,
   };
+}
+
+AnalysisRequest AnalysisService::preanalysis_request(
+    const std::string& fen, const AppSettings& budget) const {
+  // Kept separate from live refinement on purpose.  Later scheduler stages may
+  // choose cheaper per-position requests, but no pre-analysis request may ever
+  // exceed this user-selected budget.
+  return analysis_request(fen, budget);
 }
 
 std::string AnalysisService::analysis_config_hash(const AppSettings& settings) const {
@@ -633,7 +736,10 @@ void AnalysisService::run_analysis(
       std::ostringstream log_message;
       log_message << "game=" << game_id << " started positions=" << positions.size()
                   << " resumedSlots=" << completed_position_slots.size()
-                  << " depth=" << settings.depth << " multipv=" << settings.multi_pv
+                  << " preanalysisBudgetDepth=" << settings.depth
+                  << " preanalysisBudgetMultiPv=" << settings.multi_pv
+                  << " threads=" << settings.threads
+                  << " hashMb=" << settings.hash_mb
                   << " time=" << settings.time_limit_seconds;
       diagnostics::info("analysis", log_message.str());
     }
@@ -644,6 +750,23 @@ void AnalysisService::run_analysis(
     std::unordered_set<int> completed_slots(
         completed_position_slots.begin(), completed_position_slots.end());
     const bool is_fen_position_only = positions.size() == 1;
+
+    // For PGN preparation, slot i is the position before move i. Keep the
+    // actually played move beside that slot so the adaptive scheduler can
+    // decide whether the cheap two-line root search already contains enough
+    // information for classification.
+    std::vector<std::string> played_move_by_slot(positions.size());
+    if (!is_fen_position_only) {
+      if (const auto game = database_.game(game_id); game.has_value()) {
+        for (const auto& move : game->moves) {
+          if (move.ply_index < 0
+              || move.ply_index >= static_cast<int>(played_move_by_slot.size())) {
+            continue;
+          }
+          played_move_by_slot[static_cast<std::size_t>(move.ply_index)] = move.uci;
+        }
+      }
+    }
 
     auto contiguous_completed_moves = [&]() {
       if (is_fen_position_only) {
@@ -661,6 +784,59 @@ void AnalysisService::run_analysis(
     };
 
     job->completed_moves = contiguous_completed_moves();
+
+    // Preparation-pass optimization: Theory moves need no Stockfish work of
+    // their own. Skip only position slots whose adjacent moves are both
+    // Theory, so the boundary position required by the first non-Theory move
+    // is still analyzed normally. This is book-driven, never based on a fixed
+    // opening move count, so an early amateur deviation immediately resumes
+    // normal engine analysis.
+    std::vector<int> theory_skipped_slots;
+    if (!is_fen_position_only) {
+      if (const auto game = database_.game(game_id); game.has_value()) {
+        std::vector<bool> theory_moves(game->moves.size(), false);
+        const auto metadata = opening_theory_->metadata();
+        for (std::size_t index = 0; index < game->moves.size(); ++index) {
+          const auto& move = game->moves[index];
+          if (metadata.max_ply > 0
+              && static_cast<std::uint32_t>(move.ply_index) < metadata.max_ply) {
+            theory_moves[index] =
+                opening_theory_->lookup(move.fen_before, move.uci).is_theory;
+          }
+        }
+        for (int slot = 0; slot < static_cast<int>(positions.size()); ++slot) {
+          const bool previous_requires_engine = slot > 0
+              && !theory_moves[static_cast<std::size_t>(slot - 1)];
+          const bool next_requires_engine = slot < static_cast<int>(theory_moves.size())
+              && !theory_moves[static_cast<std::size_t>(slot)];
+          if (!previous_requires_engine && !next_requires_engine) {
+            theory_skipped_slots.push_back(slot);
+          }
+        }
+      }
+    }
+
+    for (const int slot : theory_skipped_slots) {
+      if (completed_slots.contains(slot)) continue;
+      const std::string cache_fen = canonical_position_cache_fen(positions[slot]);
+      // Reuse a previous checkpoint when one exists, but do not run Stockfish
+      // merely to populate an eval for a move that is classified as Theory.
+      if (settings.use_global_analysis_cache) {
+        if (auto checkpoint = database_.best_position_checkpoint(
+                cache_fen, cache_engine_identity, settings.depth, settings.multi_pv);
+            checkpoint.has_value()) {
+          database_.persist_engine_result(
+              game_id, config_hash, slot, contiguous_completed_moves(),
+              *checkpoint, unix_time_seconds());
+        }
+      }
+      completed_slots.insert(slot);
+    }
+    job->completed_moves = contiguous_completed_moves();
+    if (!theory_skipped_slots.empty()) {
+      rebuild_classification(game_id, config_hash, true, job->completed_moves - 1);
+    }
+
     std::vector<int> analysis_order;
     analysis_order.reserve(positions.size());
     const auto push_slot = [&](const int slot) {
@@ -700,25 +876,127 @@ void AnalysisService::run_analysis(
         diagnostics::debug(
             "cache", "game=" + game_id + " slot=" + std::to_string(ply)
                 + (settings.use_global_analysis_cache ? " miss" : " disabled"));
-        if (!engine_started) {
-          job->engine->start();
-          job->engine->new_game();
-          engine_started = true;
-        }
-        result = job->engine->analyze(analysis_request(positions[ply], settings));
-        if (result->interrupted) {
-          if (job->cancel_requested) {
-            job->state = AnalysisJobState::cancelled;
-            database_.set_analysis_status(game_id, config_hash, "cancelled");
-            job->engine->stop();
-            job->finished = true;
-            return;
+        const auto context = position_context(positions[ply]);
+        if (context.legal_move_count == 0) {
+          // Terminal checkmate/stalemate positions have no candidate move and
+          // therefore need no Stockfish search. Persist an empty terminal
+          // result so the final played move can still be classified from the
+          // board state.
+          result = AnalysisResult{};
+        } else {
+          if (!engine_started) {
+            job->engine->start();
+            job->engine->new_game();
+            engine_started = true;
           }
-          continue;
-        }
-        if (settings.use_global_analysis_cache) {
-          database_.persist_position_analysis(
-              cache_fen, cache_engine_identity, settings, *result, unix_time_seconds());
+
+          // Adaptive preparation stage 1: at the user's full minimum depth,
+          // calculate at most the two most important root alternatives first.
+          // Two lines are enough to distinguish Best/Great and, when the
+          // actually played move is among them, to score that move from the
+          // same root search. The user's MultiPV remains the hard ceiling.
+          auto scout_settings = settings;
+          scout_settings.multi_pv = std::max(
+              1, std::min({settings.multi_pv, context.legal_move_count, 2}));
+
+          std::optional<AnalysisResult> scout;
+          if (settings.use_global_analysis_cache) {
+            scout = database_.compatible_position_analysis(
+                cache_fen, cache_engine_identity, scout_settings);
+          }
+          if (!scout.has_value()) {
+            auto scout_request = preanalysis_request(positions[ply], scout_settings);
+            scout_request.multi_pv = scout_settings.multi_pv;
+            if (scout_settings.depth >= 12) {
+              scout_request.dynamic_early_stop = true;
+              scout_request.early_stop_min_depth =
+                  preanalysis_early_stop_min_depth(scout_settings);
+              scout_request.early_stop_stable_iterations =
+                  kPreanalysisStableIterations;
+              scout_request.early_stop_eval_tolerance_cp =
+                  kPreanalysisStableEvalToleranceCp;
+              scout_request.early_stop_require_cp_scores = true;
+            }
+            scout = job->engine->analyze(scout_request);
+            if (scout->interrupted) {
+              if (job->cancel_requested) {
+                job->state = AnalysisJobState::cancelled;
+                database_.set_analysis_status(game_id, config_hash, "cancelled");
+                job->engine->stop();
+                job->finished = true;
+                return;
+              }
+              continue;
+            }
+            if (settings.use_global_analysis_cache) {
+              database_.persist_position_analysis(
+                  cache_fen, cache_engine_identity, scout_settings, *scout,
+                  unix_time_seconds());
+            }
+          }
+
+          bool needs_full_lines = false;
+          const std::string played_move = ply >= 0
+                  && ply < static_cast<int>(played_move_by_slot.size())
+              ? played_move_by_slot[static_cast<std::size_t>(ply)]
+              : std::string{};
+          const bool played_is_in_scout = !played_move.empty() && std::any_of(
+              scout->lines.begin(), scout->lines.end(), [&](const EngineLine& line) {
+                return line.best_move() == played_move;
+              });
+          if (settings.multi_pv > scout_settings.multi_pv && !played_move.empty()) {
+            // Escalate when the played move is outside the two strongest
+            // candidates. Then the extra configured lines can materially
+            // improve the classification.
+            needs_full_lines = !played_is_in_scout;
+          }
+
+          const bool difficult_position = difficult_preanalysis_position(
+              positions[ply], played_move, *scout);
+          // Step 5: difficult classifications receive the user's full minimum
+          // budget. This is intentionally selective: quiet, clear positions
+          // keep the cheap scout result, while tactical/mate/sacrifice and
+          // boundary cases are verified without early termination.
+          const bool needs_full_verification = difficult_position
+              && (scout->converged_early
+                  || settings.multi_pv > scout_settings.multi_pv
+                  || scout->reached_depth < settings.depth);
+
+          if (needs_full_lines || needs_full_verification) {
+            auto full_request = preanalysis_request(positions[ply], settings);
+            full_request.multi_pv = std::max(
+                1, std::min(full_request.multi_pv, context.legal_move_count));
+            // Deliberately leave dynamic_early_stop disabled. The whole point
+            // of this second pass is to settle a user-visible classification
+            // that the cheap scout could not establish confidently.
+            result = job->engine->analyze(full_request);
+            if (result->interrupted) {
+              if (job->cancel_requested) {
+                job->state = AnalysisJobState::cancelled;
+                database_.set_analysis_status(game_id, config_hash, "cancelled");
+                job->engine->stop();
+                job->finished = true;
+                return;
+              }
+              continue;
+            }
+            if (settings.use_global_analysis_cache) {
+              database_.persist_position_analysis(
+                  cache_fen, cache_engine_identity, settings, *result,
+                  unix_time_seconds());
+            }
+            diagnostics::debug(
+                "analysis", "game=" + game_id + " slot=" + std::to_string(ply)
+                    + " adaptiveLines=" + std::to_string(scout_settings.multi_pv)
+                    + "->" + std::to_string(full_request.multi_pv)
+                    + " difficult=" + (difficult_position ? "1" : "0"));
+          } else {
+            result = std::move(scout);
+            diagnostics::debug(
+                "analysis", "game=" + game_id + " slot=" + std::to_string(ply)
+                    + " adaptiveLines=" + std::to_string(scout_settings.multi_pv)
+                    + " difficult=" + (difficult_position ? "1" : "0"));
+          }
         }
       }
 
@@ -1019,9 +1297,7 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
   }
   if (positions.empty()) throw std::invalid_argument("Game has no analyzable positions");
 
-  const auto maximum_settings = database_.settings();
-  auto settings = maximum_settings;
-  settings.depth = maximum_settings.min_analysis_depth;
+  const auto settings = preanalysis_budget_settings();
   StockfishEngine version_probe;
   const auto config_hash = analysis_config_hash(settings);
   if (auto reusable = reusable_analysis(game_id, settings);
@@ -1096,8 +1372,7 @@ std::string AnalysisService::analysis_status_json(const std::string& game_id) {
     }
   }
   if (!result.has_value()) {
-    auto minimum_settings = database_.settings();
-    minimum_settings.depth = minimum_settings.min_analysis_depth;
+    const auto minimum_settings = preanalysis_budget_settings();
     result = reusable_analysis(game_id, minimum_settings);
   }
   if (!result.has_value()) throw std::runtime_error("Analysis job not found");
@@ -1141,8 +1416,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
     }
   }
   if (!result.has_value()) {
-    auto minimum_settings = database_.settings();
-    minimum_settings.depth = minimum_settings.min_analysis_depth;
+    const auto minimum_settings = preanalysis_budget_settings();
     result = reusable_analysis(game_id, minimum_settings, ply);
   }
   if (!result.has_value() && refinement_job != nullptr) {

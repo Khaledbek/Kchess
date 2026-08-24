@@ -86,8 +86,15 @@ class AnalysisService {
     std::thread worker;
   };
 
+  // Snapshot the complete budget used by the pre-analysis pass.  The minimum
+  // depth is the pre-analysis ceiling; the normal depth remains reserved for
+  // live refinement.  Other user-controlled engine resources remain fully
+  // configurable and are intentionally preserved.
+  AppSettings preanalysis_budget_settings() const;
   AnalysisRequest analysis_request(
       const std::string& fen, const AppSettings& settings) const;
+  AnalysisRequest preanalysis_request(
+      const std::string& fen, const AppSettings& budget) const;
   std::string analysis_config_hash(const AppSettings& settings) const;
   std::optional<PersistedAnalysis> reusable_analysis(
       const std::string& game_id,
