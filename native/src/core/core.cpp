@@ -303,6 +303,10 @@ void Core::cancel_analysis(const std::string& game_id) {
   analysis_service_.cancel_analysis(game_id);
 }
 
+void Core::delete_analysis(const std::string& game_id) {
+  analysis_service_.delete_analysis(game_id);
+}
+
 void Core::clear_engine_cache() {
   analysis_service_.clear_engine_cache();
 }

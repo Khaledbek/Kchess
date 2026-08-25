@@ -338,6 +338,8 @@ class AppSettings {
     this.showClassifications = true,
     this.showAccuracy = true,
     this.showTheory = true,
+    this.showResultSymbols = true,
+    this.adaptiveEarlyStop = true,
     this.showBoardCoordinates = true,
     this.highlightLastMove = true,
     this.highlightSelectedSquare = true,
@@ -366,6 +368,8 @@ class AppSettings {
     showClassifications: json['showClassifications'] as bool? ?? true,
     showAccuracy: json['showAccuracy'] as bool? ?? true,
     showTheory: json['showTheory'] as bool? ?? true,
+    showResultSymbols: json['showResultSymbols'] as bool? ?? true,
+    adaptiveEarlyStop: json['adaptiveEarlyStop'] as bool? ?? true,
     showBoardCoordinates: json['showBoardCoordinates'] as bool? ?? true,
     highlightLastMove: json['highlightLastMove'] as bool? ?? true,
     highlightSelectedSquare: json['highlightSelectedSquare'] as bool? ?? true,
@@ -390,6 +394,8 @@ class AppSettings {
   final bool showClassifications;
   final bool showAccuracy;
   final bool showTheory;
+  final bool showResultSymbols;
+  final bool adaptiveEarlyStop;
   final bool showBoardCoordinates;
   final bool highlightLastMove;
   final bool highlightSelectedSquare;
@@ -419,6 +425,8 @@ class AppSettings {
     bool? showClassifications,
     bool? showAccuracy,
     bool? showTheory,
+    bool? showResultSymbols,
+    bool? adaptiveEarlyStop,
     bool? showBoardCoordinates,
     bool? highlightLastMove,
     bool? highlightSelectedSquare,
@@ -443,6 +451,8 @@ class AppSettings {
     showClassifications: showClassifications ?? this.showClassifications,
     showAccuracy: showAccuracy ?? this.showAccuracy,
     showTheory: showTheory ?? this.showTheory,
+    showResultSymbols: showResultSymbols ?? this.showResultSymbols,
+    adaptiveEarlyStop: adaptiveEarlyStop ?? this.adaptiveEarlyStop,
     showBoardCoordinates: showBoardCoordinates ?? this.showBoardCoordinates,
     highlightLastMove: highlightLastMove ?? this.highlightLastMove,
     highlightSelectedSquare:
@@ -963,6 +973,7 @@ class VariationAnalysisSnapshot {
     this.liveDepth = 0,
     this.moverEvaluationCp,
     this.moverMateIn,
+    this.classification,
     this.error,
   });
 
@@ -977,6 +988,9 @@ class VariationAnalysisSnapshot {
         liveDepth: json['liveDepth'] as int? ?? 0,
         moverEvaluationCp: json['moverEvaluationCp'] as int?,
         moverMateIn: json['moverMateIn'] as int?,
+        classification: MoveClassification.fromJson(
+          json['classification'] as String?,
+        ),
         error: json['error'] as String?,
         lines: (json['lines'] as List<Object?>? ?? const [])
             .cast<Map<String, Object?>>()
@@ -993,6 +1007,7 @@ class VariationAnalysisSnapshot {
   final int liveDepth;
   final int? moverEvaluationCp;
   final int? moverMateIn;
+  final MoveClassification? classification;
   final String? error;
   final List<EngineLine> lines;
 
@@ -1006,6 +1021,7 @@ class VariationAnalysisSnapshot {
     int? liveDepth,
     int? moverEvaluationCp,
     int? moverMateIn,
+    MoveClassification? classification,
     String? error,
     List<EngineLine>? lines,
   }) => VariationAnalysisSnapshot(
@@ -1018,6 +1034,7 @@ class VariationAnalysisSnapshot {
     liveDepth: liveDepth ?? this.liveDepth,
     moverEvaluationCp: moverEvaluationCp ?? this.moverEvaluationCp,
     moverMateIn: moverMateIn ?? this.moverMateIn,
+    classification: classification ?? this.classification,
     error: error ?? this.error,
     lines: lines ?? this.lines,
   );

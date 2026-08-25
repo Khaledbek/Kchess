@@ -380,7 +380,12 @@ class _HomeShellState extends State<HomeShell> {
     final strings = AppLocalizations.of(context);
     final destinations = [
       _Destination(
-        strings.games,
+        strings.gameSection,
+        Icons.view_list_outlined,
+        Icons.view_list,
+      ),
+      _Destination(
+        strings.play,
         Icons.sports_esports_outlined,
         Icons.sports_esports,
       ),
@@ -394,9 +399,13 @@ class _HomeShellState extends State<HomeShell> {
     ];
     final content = switch (_selectedIndex) {
       0 => GamesScreen(controller: widget.controller),
-      1 => FavoritesScreen(controller: widget.controller),
-      2 => StatisticsScreen(controller: widget.controller),
-      3 => SettingsScreen(controller: widget.controller),
+      1 => _EmptySection(
+        title: strings.play,
+        message: strings.playPlaceholder,
+      ),
+      2 => FavoritesScreen(controller: widget.controller),
+      3 => StatisticsScreen(controller: widget.controller),
+      4 => SettingsScreen(controller: widget.controller),
       _ => _EmptySection(title: destinations[_selectedIndex].label),
     };
 
@@ -1284,7 +1293,7 @@ class _GamesScreenState extends State<GamesScreen> {
     final librarySection = widget.savedFilter != null;
     final screenTitle = switch (widget.savedFilter) {
       'favorite' => strings.favorites,
-      _ => strings.games,
+      _ => strings.gameSection,
     };
     final selectedMonth = controller.selectedMonth;
     final playerIdentity =
@@ -4202,6 +4211,7 @@ class _EngineSettingsPage extends StatelessWidget {
                 _DepthRangeSettingTile(
                   key: const Key('engine-depth-range'),
                   title: strings.depth,
+                  description: strings.depthHelp,
                   minimumDepth: controller.settings.minAnalysisDepth,
                   maximumDepth: controller.settings.depth,
                   onMinimumChanged: controller.setMinAnalysisDepth,
@@ -4231,6 +4241,15 @@ class _EngineSettingsPage extends StatelessWidget {
                       ? strings.noTimeLimit
                       : '$value ${strings.secondsShort}',
                   onChanged: controller.setTimeLimitSeconds,
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  key: const Key('adaptive-early-stop'),
+                  secondary: const Icon(Icons.speed_outlined),
+                  title: Text(strings.adaptiveEarlyStop),
+                  subtitle: Text(strings.adaptiveEarlyStopHelp),
+                  value: controller.settings.adaptiveEarlyStop,
+                  onChanged: controller.setAdaptiveEarlyStop,
                 ),
               ],
             ),
@@ -4357,6 +4376,15 @@ class _AnalysisSettingsPage extends StatelessWidget {
                   subtitle: Text(strings.showTheorySettingHelp),
                   value: controller.settings.showTheory,
                   onChanged: controller.setShowTheory,
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  key: const Key('show-result-symbols'),
+                  secondary: const Icon(Icons.emoji_events_outlined),
+                  title: Text(strings.showResultSymbolsSetting),
+                  subtitle: Text(strings.showResultSymbolsSettingHelp),
+                  value: controller.settings.showResultSymbols,
+                  onChanged: controller.setShowResultSymbols,
                 ),
               ],
             ),
@@ -4606,6 +4634,7 @@ class _DataStorageSettingsPage extends StatelessWidget {
 class _DepthRangeSettingTile extends StatelessWidget {
   const _DepthRangeSettingTile({
     required this.title,
+    required this.description,
     required this.minimumDepth,
     required this.maximumDepth,
     required this.onMinimumChanged,
@@ -4614,6 +4643,7 @@ class _DepthRangeSettingTile extends StatelessWidget {
   });
 
   final String title;
+  final String description;
   final int minimumDepth;
   final int maximumDepth;
   final Future<void> Function(int value) onMinimumChanged;
@@ -4627,9 +4657,23 @@ class _DepthRangeSettingTile extends StatelessWidget {
         children: [
           const Icon(Icons.account_tree_outlined),
           const SizedBox(width: 16),
-          Text(title, style: Theme.of(context).textTheme.bodyLarge),
-          const SizedBox(width: 12),
           Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.bodyLarge),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
             child: FittedBox(
               alignment: Alignment.centerRight,
               fit: BoxFit.scaleDown,
@@ -4943,15 +4987,18 @@ class _IntegerSettingTileState extends State<_IntegerSettingTile> {
 }
 
 class _EmptySection extends StatelessWidget {
-  const _EmptySection({required this.title});
+  const _EmptySection({required this.title, this.message});
   final String title;
+  final String? message;
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: MediaQuery.sizeOf(context).width >= 900
         ? AppBar(title: Text(title))
         : null,
-    body: Center(child: Text(AppLocalizations.of(context).emptySection)),
+    body: Center(
+      child: Text(message ?? AppLocalizations.of(context).emptySection),
+    ),
   );
 }
 

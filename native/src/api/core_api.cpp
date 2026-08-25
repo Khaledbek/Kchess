@@ -471,6 +471,14 @@ kc_status kc_cancel_analysis(
       core_from(handle), [=] { core_from(handle)->cancel_analysis(game_id_utf8); });
 }
 
+kc_status kc_delete_analysis(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr)
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Game id is required");
+  return status_call(
+      core_from(handle), [=] { core_from(handle)->delete_analysis(game_id_utf8); });
+}
+
 kc_status kc_clear_engine_cache(const kc_core_handle handle) {
   return status_call(core_from(handle), [=] { core_from(handle)->clear_engine_cache(); });
 }

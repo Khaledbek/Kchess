@@ -28,6 +28,8 @@ std::string SettingsService::settings_json() const {
       {"showClassifications", settings.show_classifications},
       {"showAccuracy", settings.show_accuracy},
       {"showTheory", settings.show_theory},
+      {"showResultSymbols", settings.show_result_symbols},
+      {"adaptiveEarlyStop", settings.adaptive_early_stop},
       {"showBoardCoordinates", settings.show_board_coordinates},
       {"highlightLastMove", settings.highlight_last_move},
       {"highlightSelectedSquare", settings.highlight_selected_square},

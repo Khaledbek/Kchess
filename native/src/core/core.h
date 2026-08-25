@@ -80,6 +80,7 @@ class Core {
   std::string move_analysis_status_json(const std::string& game_id, int ply);
   std::string start_move_refinement_json(const std::string& game_id, int ply);
   void cancel_analysis(const std::string& game_id);
+  void delete_analysis(const std::string& game_id);
   void clear_engine_cache();
   std::string start_variation_analysis_json(
       const std::string& fen, const std::string& uci);

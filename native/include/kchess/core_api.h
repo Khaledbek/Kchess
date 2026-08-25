@@ -21,7 +21,7 @@ typedef void* kc_core_handle;
 
 // Increment only when the C ABI changes incompatibly. Additive exports may
 // keep the same ABI version. Flutter validates this before creating Core.
-#define KCHESS_CORE_ABI_VERSION 2
+#define KCHESS_CORE_ABI_VERSION 3
 
 typedef enum kc_status {
   KC_STATUS_OK = 0,
@@ -159,6 +159,9 @@ KCHESS_API char* kc_move_analysis_status_json(
     const char* game_id_utf8,
     int32_t ply);
 KCHESS_API kc_status kc_cancel_analysis(
+    kc_core_handle handle,
+    const char* game_id_utf8);
+KCHESS_API kc_status kc_delete_analysis(
     kc_core_handle handle,
     const char* game_id_utf8);
 KCHESS_API kc_status kc_clear_engine_cache(kc_core_handle handle);

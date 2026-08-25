@@ -346,6 +346,10 @@ class FakeCoreGateway implements CoreGateway {
       'showClassifications' => currentSettings.copyWith(showClassifications: enabled),
       'showAccuracy' => currentSettings.copyWith(showAccuracy: enabled),
       'showTheory' => currentSettings.copyWith(showTheory: enabled),
+      'showResultSymbols' =>
+        currentSettings.copyWith(showResultSymbols: enabled),
+      'adaptiveEarlyStop' =>
+        currentSettings.copyWith(adaptiveEarlyStop: enabled),
       'showBoardCoordinates' =>
         currentSettings.copyWith(showBoardCoordinates: enabled),
       'highlightLastMove' => currentSettings.copyWith(highlightLastMove: enabled),
@@ -439,6 +443,9 @@ class FakeCoreGateway implements CoreGateway {
 
   @override
   Future<void> cancelAnalysis(String gameId) async {}
+
+  @override
+  Future<void> deleteAnalysis(String gameId) async {}
 
   @override
   Future<void> clearEngineCache() async {}

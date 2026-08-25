@@ -394,6 +394,16 @@ class AppController extends ChangeNotifier {
     settings.copyWith(showTheory: enabled),
   );
 
+  Future<void> setShowResultSymbols(bool enabled) => _setBooleanSetting(
+    'showResultSymbols',
+    settings.copyWith(showResultSymbols: enabled),
+  );
+
+  Future<void> setAdaptiveEarlyStop(bool enabled) => _setBooleanSetting(
+    'adaptiveEarlyStop',
+    settings.copyWith(adaptiveEarlyStop: enabled),
+  );
+
   Future<void> setShowBoardCoordinates(bool enabled) => _setBooleanSetting(
     'showBoardCoordinates',
     settings.copyWith(showBoardCoordinates: enabled),
@@ -445,6 +455,8 @@ class AppController extends ChangeNotifier {
       'showClassifications' => updated.showClassifications,
       'showAccuracy' => updated.showAccuracy,
       'showTheory' => updated.showTheory,
+      'showResultSymbols' => updated.showResultSymbols,
+      'adaptiveEarlyStop' => updated.adaptiveEarlyStop,
       'showBoardCoordinates' => updated.showBoardCoordinates,
       'highlightLastMove' => updated.highlightLastMove,
       'highlightSelectedSquare' => updated.highlightSelectedSquare,
@@ -548,17 +560,6 @@ class AnalysisController extends ChangeNotifier {
   bool _variationPaused = false;
   bool _disposed = false;
 
-  bool _isUnratedTerminalPly(int ply) {
-    final loaded = detail;
-    if (loaded == null || loaded.moves.length <= 1) return false;
-    final result = loaded.summary.result.trim();
-    return (result == '1-0' ||
-            result == '0-1' ||
-            result == '1/2-1/2' ||
-            result == '½-½')
-        && ply == loaded.moves.length - 1;
-  }
-
   Future<void> open() async {
     try {
       detail = await gateway.game(game.id);
@@ -568,9 +569,10 @@ class AnalysisController extends ChangeNotifier {
       if (snapshot?.isRunning == true) {
         _schedulePoll();
       } else if (detail?.moves.isNotEmpty == true) {
-        final last = detail!.moves.length - 1;
-        selectedPly = last;
-        await refinePly(last);
+        // The analysis board opens on the game's starting position. Position
+        // slot 0 is the initial FEN, before the first recorded half-move.
+        selectedPly = 0;
+        await refinePly(0);
       }
     } catch (caught) {
       error = caught;
@@ -591,9 +593,9 @@ class AnalysisController extends ChangeNotifier {
       // minimum configuration may be unchanged while the maximum target has a
       // new config hash and must not remain idle until the user clicks a move.
       if (detail?.moves.isNotEmpty == true) {
-        final last = detail!.moves.length - 1;
-        selectedPly = last;
-        await refinePly(last);
+        // Keep live refinement aligned with the board's initial presentation.
+        selectedPly = 0;
+        await refinePly(0);
       }
     } catch (caught) {
       error = caught;
@@ -632,13 +634,6 @@ class AnalysisController extends ChangeNotifier {
     if (_variationPaused) return;
     final generation = ++_refinementGeneration;
     _timer?.cancel();
-    if (_isUnratedTerminalPly(ply)) {
-      _refinementTimer?.cancel();
-      displayedSnapshot = null;
-      error = null;
-      if (!_disposed) notifyListeners();
-      return;
-    }
     try {
       final started = await gateway.startMoveRefinement(game.id, ply);
       if (_disposed || generation != _refinementGeneration || selectedPly != ply) {

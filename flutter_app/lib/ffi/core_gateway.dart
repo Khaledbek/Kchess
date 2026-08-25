@@ -48,6 +48,7 @@ abstract interface class CoreGateway {
   Future<AnalysisSnapshot> moveAnalysisStatus(String gameId, int ply);
   Future<AnalysisSnapshot> startMoveRefinement(String gameId, int ply);
   Future<void> cancelAnalysis(String gameId);
+  Future<void> deleteAnalysis(String gameId);
   Future<void> clearEngineCache();
   Future<VariationAnalysisSnapshot> startVariationAnalysis({
     required String fen,

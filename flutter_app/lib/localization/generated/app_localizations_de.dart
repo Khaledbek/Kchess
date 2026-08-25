@@ -44,6 +44,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get games => 'Partien';
 
   @override
+  String get gameSection => 'Partie';
+
+  @override
+  String get play => 'Spielen';
+
+  @override
+  String get playPlaceholder =>
+      'Dieser Bereich ist als Platzhalter für zukünftige Spielmodi vorbereitet, z. B. Partien gegen Bots.';
+
+  @override
   String get downloads => 'Downloads';
 
   @override
@@ -173,6 +183,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cancelAnalysis => 'Analyse abbrechen';
+
+  @override
+  String get deleteAnalysis => 'Gespeicherte Analyse löschen';
+
+  @override
+  String get deleteAnalysisQuestion => 'Gespeicherte Analyse löschen?';
+
+  @override
+  String get deleteAnalysisBody =>
+      'Die lokal gespeicherte Analyse und Accuracy dieser Partie werden gelöscht. PGN/FEN und globaler Engine-Cache bleiben erhalten.';
+
+  @override
+  String get analysisDeleted => 'Gespeicherte Analyse wurde gelöscht.';
 
   @override
   String get classificationPending =>
@@ -315,6 +338,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get showTheorySettingHelp =>
       'Zeigt Eröffnungsbuch-Informationen und Theorie-Zähler.';
+
+  @override
+  String get showResultSymbolsSetting => 'Ergebnissymbole anzeigen';
+
+  @override
+  String get showResultSymbolsSettingHelp =>
+      'Zeigt bei beendeten Partien Win-, Loss- oder Draw-Symbole über den Königen.';
 
   @override
   String get designSettingsTitle => 'Design';
@@ -531,7 +561,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get depthHelp =>
-      'Maximale Suchtiefe pro Stellung. Höhere Werte dauern in der Regel länger.';
+      'Min = Tiefe der Voranalyse. Max = maximale Tiefe der Liveanalyse. Höhere Werte dauern in der Regel länger.';
+
+  @override
+  String get adaptiveEarlyStop => 'Adaptive Analyse';
+
+  @override
+  String get adaptiveEarlyStopHelp =>
+      'Beendet ruhige Vor- und Liveanalysen früher, wenn Bewertung und Hauptvarianten stabil sind. Kritische Verifikationen rechnen weiterhin bis zum eingestellten Limit.';
 
   @override
   String get numberOfLinesHelp =>
@@ -557,6 +594,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get boardDisplayTitle => 'Brettdarstellung';
+
+  @override
+  String get rotateBoard => 'Brett drehen';
 
   @override
   String get showBoardCoordinates => 'Brettkoordinaten';

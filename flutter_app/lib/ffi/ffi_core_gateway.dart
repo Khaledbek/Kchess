@@ -126,7 +126,7 @@ typedef _FreeStringNative = Void Function(Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 
 class FfiCoreGateway implements CoreGateway {
-  static const int _supportedAbiVersion = 2;
+  static const int _supportedAbiVersion = 3;
 
   FfiCoreGateway._(this._library, this._dataDirectory) {
     try {
@@ -251,6 +251,10 @@ class FfiCoreGateway implements CoreGateway {
     _cancelAnalysis = _library
         .lookupFunction<_StatusStringNative, _StatusStringDart>(
           'kc_cancel_analysis',
+        );
+    _deleteAnalysis = _library
+        .lookupFunction<_StatusStringNative, _StatusStringDart>(
+          'kc_delete_analysis',
         );
     _clearEngineCache = _library
         .lookupFunction<_StatusNoArgsNative, _StatusNoArgsDart>(
@@ -409,6 +413,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringIntArgDart _startMoveRefinement;
   late final _StringIntArgDart _moveAnalysisStatus;
   late final _StatusStringDart _cancelAnalysis;
+  late final _StatusStringDart _deleteAnalysis;
   late final _StatusNoArgsDart _clearEngineCache;
   late final _StringTwoArgsDart _startVariationAnalysis;
   late final _StartVariationWithSettingsDart _startVariationAnalysisWithSettings;
@@ -684,6 +689,12 @@ class FfiCoreGateway implements CoreGateway {
   Future<void> cancelAnalysis(String gameId) => _withNativeString(
     gameId,
     (value) => _checkStatus(_cancelAnalysis(_handle, value)),
+  );
+
+  @override
+  Future<void> deleteAnalysis(String gameId) => _withNativeString(
+    gameId,
+    (value) => _checkStatus(_deleteAnalysis(_handle, value)),
   );
 
   @override

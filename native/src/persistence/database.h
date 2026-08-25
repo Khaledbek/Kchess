@@ -225,7 +225,8 @@ class Database {
       int total_plies,
       int depth,
       int multi_pv,
-      int time_limit_seconds = 0);
+      int time_limit_seconds = 0,
+      bool adaptive_early_stop = true);
   void persist_engine_result(
       const std::string& game_id,
       const std::string& config_hash,
@@ -266,6 +267,12 @@ class Database {
       const std::string& engine_version,
       const AppSettings& requested,
       int requested_ply = -1) const;
+
+  // Keep only the authoritative saved analysis for a game.  Position-cache
+  // entries are intentionally independent and survive this pruning.
+  void prune_game_analyses_except(
+      const std::string& game_id, const std::string& keep_config_hash);
+  void delete_game_analyses(const std::string& game_id);
 
   std::optional<AnalysisResult> compatible_position_analysis(
       const std::string& position_fen,

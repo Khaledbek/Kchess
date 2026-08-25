@@ -72,6 +72,8 @@ struct AppSettings {
   bool show_classifications{kShowClassificationsSetting.default_bool};
   bool show_accuracy{kShowAccuracySetting.default_bool};
   bool show_theory{kShowTheorySetting.default_bool};
+  bool show_result_symbols{kShowResultSymbolsSetting.default_bool};
+  bool adaptive_early_stop{kAdaptiveEarlyStopSetting.default_bool};
   bool show_board_coordinates{kShowBoardCoordinatesSetting.default_bool};
   bool highlight_last_move{kHighlightLastMoveSetting.default_bool};
   bool highlight_selected_square{kHighlightSelectedSquareSetting.default_bool};

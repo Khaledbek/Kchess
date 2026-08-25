@@ -151,6 +151,23 @@ inline constexpr SettingDescriptor kShowTheorySetting{
     .default_bool = true,
 };
 
+inline constexpr SettingDescriptor kShowResultSymbolsSetting{
+    .key = "showResultSymbols",
+    .type = SettingValueType::boolean,
+    .scope = SettingScope::app,
+    .cache_relevant = false,
+    .default_bool = true,
+};
+
+inline constexpr SettingDescriptor kAdaptiveEarlyStopSetting{
+    .key = "adaptiveEarlyStop",
+    .type = SettingValueType::boolean,
+    .scope = SettingScope::app,
+    .cache_relevant = true,
+    .cache_token = "adaptive",
+    .default_bool = true,
+};
+
 inline constexpr SettingDescriptor kThemeModeSetting{
     .key = "themeMode",
     .type = SettingValueType::string_enum,
@@ -223,7 +240,7 @@ inline constexpr SettingDescriptor kLocaleSetting{
     .default_string = "de",
 };
 
-inline constexpr std::array<SettingDescriptor, 22> kSettingsRegistry{
+inline constexpr std::array<SettingDescriptor, 24> kSettingsRegistry{
     kDepthSetting,
     kMultiPvSetting,
     kTimeLimitSetting,
@@ -237,6 +254,8 @@ inline constexpr std::array<SettingDescriptor, 22> kSettingsRegistry{
     kShowClassificationsSetting,
     kShowAccuracySetting,
     kShowTheorySetting,
+    kShowResultSymbolsSetting,
+    kAdaptiveEarlyStopSetting,
     kThemeModeSetting,
     kShowBoardCoordinatesSetting,
     kHighlightLastMoveSetting,
