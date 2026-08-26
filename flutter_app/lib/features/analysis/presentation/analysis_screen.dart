@@ -62,15 +62,15 @@ Color _classificationColor(
 ) {
   final scheme = Theme.of(context).colorScheme;
   return switch (classification) {
-    MoveClassification.theory => scheme.primary,
-    MoveClassification.brilliant => const Color(0xFF00A6A6),
-    MoveClassification.critical => const Color(0xFFE39A18),
-    MoveClassification.best => const Color(0xFF2E9B55),
-    MoveClassification.excellent => const Color(0xFF4A9B73),
-    MoveClassification.okay => scheme.onSurfaceVariant,
-    MoveClassification.miss => const Color(0xFFE08A1E),
-    MoveClassification.mistake => const Color(0xFFD9682A),
-    MoveClassification.blunder => scheme.error,
+    MoveClassification.theory => const Color(0xCCC9A26A),
+    MoveClassification.brilliant => const Color(0xCC1565C0),
+    MoveClassification.critical => const Color(0xB364B5F6),
+    MoveClassification.best => const Color(0xB343A047),
+    MoveClassification.excellent => const Color(0x99BB6A),
+    MoveClassification.okay => const Color(0x80A5D6A7),
+    MoveClassification.miss => const Color(0x80FFB74D),
+    MoveClassification.mistake => const Color(0x99EF5350),
+    MoveClassification.blunder => const Color(0xB3D32F2F),
     MoveClassification.unknown => scheme.onSurfaceVariant,
   };
 }
@@ -1412,6 +1412,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       _settings.showClassifications && !atInitialPosition
                       ? (variation?.classification ?? displayed?.classification)
                       : null,
+                  suppressLastMoveFallback:
+                      _settings.showClassifications && !atInitialPosition,
                   classificationMoveUci: atInitialPosition
                       ? ''
                       : variation?.playedMove ?? (move?.uci ?? ''),
@@ -1527,6 +1529,7 @@ class _Board extends StatelessWidget {
     required this.onResultPresentationStarted,
     required this.onResultPresentationDocked,
     required this.currentMoveClassification,
+    required this.suppressLastMoveFallback,
     required this.classificationMoveUci,
     required this.selectedSquare,
     required this.onSquareTap,
@@ -1564,6 +1567,7 @@ class _Board extends StatelessWidget {
   final VoidCallback onResultPresentationStarted;
   final VoidCallback onResultPresentationDocked;
   final MoveClassification? currentMoveClassification;
+  final bool suppressLastMoveFallback;
   final String classificationMoveUci;
   final String? selectedSquare;
   final ValueChanged<String> onSquareTap;
@@ -1671,7 +1675,7 @@ class _Board extends StatelessWidget {
                             ).withValues(alpha: 0.42),
                             baseColor,
                           )
-                        : lastMove
+                        : lastMove && !suppressLastMoveFallback
                         ? Color.alphaBlend(
                             scheme.primary.withValues(alpha: 0.30),
                             baseColor,
