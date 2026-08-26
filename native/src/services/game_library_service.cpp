@@ -2,14 +2,20 @@
 
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 #include <iomanip>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include "chess/fen.h"
 #include "chess/pgn.h"
+#include "chess/move.h"
+#include "chess/position_view.h"
 
 namespace kchess {
 namespace {
@@ -165,7 +171,26 @@ std::string GameLibraryService::game_record_json(
        << ",\"analyzed\":" << (game.analyzed ? "true" : "false")
        << ",\"isFixture\":false";
   if (include_moves) {
-    json << ",\"pgn\":\"" << escape_json(game.pgn) << "\",\"moves\":[";
+    nlohmann::json outcome = nullptr;
+    if (!game.moves.empty()) {
+      const auto& final_move = game.moves.back();
+      const bool checkmate = final_move.san.ends_with('#')
+          || final_move.san.ends_with("++");
+      if (checkmate) {
+        outcome = {
+            {"result", final_move.side_to_move == "black" ? "0-1" : "1-0"},
+            {"checkmate", true},
+        };
+      }
+    }
+    if (outcome.is_null()
+        && (game.result == "1-0" || game.result == "0-1"
+            || game.result == "1/2-1/2" || game.result == "½-½")) {
+      outcome = {{"result", game.result}, {"checkmate", false}};
+    }
+    json << ",\"startingPosition\":" << position_view_json(game.starting_fen)
+         << ",\"outcome\":" << outcome.dump()
+         << ",\"pgn\":\"" << escape_json(game.pgn) << "\",\"moves\":[";
     for (std::size_t index = 0; index < game.moves.size(); ++index) {
       if (index != 0) json << ',';
       const auto& move = game.moves[index];
@@ -175,7 +200,9 @@ std::string GameLibraryService::game_record_json(
            << "\",\"san\":\"" << escape_json(move.san)
            << "\",\"uci\":\"" << escape_json(move.uci)
            << "\",\"fenBefore\":\"" << escape_json(move.fen_before)
-           << "\",\"fenAfter\":\"" << escape_json(move.fen_after) << "\"}";
+           << "\",\"fenAfter\":\"" << escape_json(move.fen_after)
+           << "\",\"positionBefore\":" << position_view_json(move.fen_before)
+           << ",\"positionAfter\":" << position_view_json(move.fen_after) << "}";
     }
     json << ']';
   }
@@ -214,6 +241,118 @@ std::string GameLibraryService::game_json(const std::string& game_id) const {
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
   return game_record_json(*game, true);
+}
+
+std::string GameLibraryService::query_games_json(const std::string& query_text) const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) return "[]";
+  const auto query = nlohmann::json::parse(query_text);
+  const auto search = lowercase(query.value("search", std::string{}));
+  const auto outcome = query.value("outcome", std::string{"all"});
+  const auto color = query.value("color", std::string{"all"});
+  const auto month = query.value("month", std::string{});
+  const bool favorite_only = query.value("favoriteOnly", false);
+  const bool apply_month = query.value("applyMonth", false);
+  const auto sort = query.value("sort", std::string{"newest"});
+  const auto controls = query.value("timeControls", std::vector<std::string>{});
+  const bool require_analyzed = std::ranges::find(controls, "analyzed") != controls.end();
+  const bool require_not_analyzed =
+      std::ranges::find(controls, "notAnalyzed") != controls.end();
+  std::vector<std::string> time_controls;
+  for (const auto& value : controls) {
+    if (value != "analyzed" && value != "notAnalyzed") time_controls.push_back(value);
+  }
+
+  const auto identity = lowercase(
+      profile->provider_username.value_or(profile->display_name));
+  auto games = database_.games(profile->id);
+  games.erase(std::remove_if(games.begin(), games.end(), [&](const GameRecord& game) {
+    if (favorite_only && !game.favorite) return true;
+    if (!search.empty() && lowercase(game.white_name).find(search) == std::string::npos
+        && lowercase(game.black_name).find(search) == std::string::npos) return true;
+    if (outcome != "all" && game.provider_outcome != outcome) return true;
+    if (color == "white" && lowercase(game.white_name) != identity) return true;
+    if (color == "black" && lowercase(game.black_name) != identity) return true;
+    if (!time_controls.empty()
+        && std::ranges::find(time_controls, game.time_control_type) == time_controls.end()) {
+      return true;
+    }
+    if (require_analyzed && !game.analyzed) return true;
+    if (require_not_analyzed && game.analyzed) return true;
+    if (apply_month && !month.empty() && game.ended_at > 0) {
+      const std::time_t timestamp = static_cast<std::time_t>(game.ended_at);
+      std::tm utc{};
+#if defined(_WIN32)
+      gmtime_s(&utc, &timestamp);
+#else
+      gmtime_r(&timestamp, &utc);
+#endif
+      std::ostringstream value;
+      value << std::setfill('0') << std::setw(4) << utc.tm_year + 1900
+            << '-' << std::setw(2) << utc.tm_mon + 1;
+      if (value.str() != month) return true;
+    }
+    return false;
+  }), games.end());
+
+  std::ranges::sort(games, [&](const GameRecord& left, const GameRecord& right) {
+    if (sort == "oldest") return left.ended_at < right.ended_at;
+    if (sort == "accuracyHigh" || sort == "accuracyLow") {
+      const auto accuracy = [&](const GameRecord& game) -> double {
+        const bool black = lowercase(game.black_name) == identity;
+        const auto local = black ? game.local_accuracy_black : game.local_accuracy_white;
+        const auto provider = black ? game.provider_accuracy_black : game.provider_accuracy_white;
+        return local.value_or(provider.value_or(sort == "accuracyHigh" ? -1.0 : 101.0));
+      };
+      return sort == "accuracyHigh" ? accuracy(left) > accuracy(right)
+                                     : accuracy(left) < accuracy(right);
+    }
+    return left.ended_at > right.ended_at;
+  });
+
+  std::ostringstream json;
+  json << '[';
+  for (std::size_t index = 0; index < games.size(); ++index) {
+    if (index != 0) json << ',';
+    json << game_record_json(games[index], false);
+  }
+  json << ']';
+  return json.str();
+}
+
+std::string GameLibraryService::resolve_board_move_json(
+    const std::string& game_id,
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target,
+    const int first_candidate_ply) const {
+  validate_token(game_id, "game id");
+  if (source.size() != 2 || target.size() != 2) {
+    throw std::invalid_argument("Board squares must use algebraic coordinates");
+  }
+  const auto game = database_.game(game_id);
+  if (!game.has_value()) throw std::runtime_error("Game not found");
+
+  const auto applied = apply_legal_uci_move(fen, source + target);
+  std::optional<int> main_line_ply;
+  const int start = std::max(0, first_candidate_ply);
+  for (int index = start; index < static_cast<int>(game->moves.size()); ++index) {
+    const auto& recorded = game->moves[static_cast<std::size_t>(index)];
+    if (recorded.uci == applied.uci && same_chess_position(recorded.fen_before, fen)) {
+      main_line_ply = index;
+      break;
+    }
+  }
+
+  nlohmann::json json{
+      {"uci", applied.uci},
+      {"san", applied.san},
+      {"fenAfter", applied.fen_after},
+      {"positionAfter", nlohmann::json::parse(position_view_json(applied.fen_after))},
+      {"mainLinePly", main_line_ply.has_value()
+          ? nlohmann::json(*main_line_ply) : nlohmann::json(nullptr)},
+  };
+  return json.dump();
 }
 
 std::string GameLibraryService::import_pgn_json(const std::string& pgn) {

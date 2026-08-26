@@ -85,10 +85,20 @@ KCHESS_API kc_status kc_set_locale(
     const char* locale_utf8);
 
 KCHESS_API char* kc_games_json(kc_core_handle handle);
+KCHESS_API char* kc_games_query_json(
+    kc_core_handle handle,
+    const char* query_json_utf8);
 KCHESS_API char* kc_favorite_games_json(kc_core_handle handle);
 KCHESS_API char* kc_game_json(
     kc_core_handle handle,
     const char* game_id_utf8);
+KCHESS_API char* kc_resolve_board_move_json(
+    kc_core_handle handle,
+    const char* game_id_utf8,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8,
+    int32_t first_candidate_ply);
 KCHESS_API char* kc_import_pgn_json(
     kc_core_handle handle,
     const char* pgn_utf8);

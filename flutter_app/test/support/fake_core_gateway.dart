@@ -68,6 +68,7 @@ class FakeCoreGateway implements CoreGateway {
     white: PlayerAnalysisSummary(
       theory: 1,
       brilliant: 1,
+      critical: 0,
       best: 2,
       excellent: 1,
       okay: 1,
@@ -81,6 +82,7 @@ class FakeCoreGateway implements CoreGateway {
     black: PlayerAnalysisSummary(
       theory: 1,
       brilliant: 0,
+      critical: 0,
       best: 3,
       excellent: 1,
       okay: 2,
@@ -103,6 +105,7 @@ class FakeCoreGateway implements CoreGateway {
     white: PlayerAnalysisSummary(
       theory: 1,
       brilliant: 0,
+      critical: 0,
       best: 0,
       excellent: 0,
       okay: 0,
@@ -115,6 +118,7 @@ class FakeCoreGateway implements CoreGateway {
     black: PlayerAnalysisSummary(
       theory: 0,
       brilliant: 0,
+      critical: 0,
       best: 0,
       excellent: 0,
       okay: 0,
@@ -182,10 +186,12 @@ class FakeCoreGateway implements CoreGateway {
     String sourceProfileId,
     String targetProfileId,
   ) async {
-    final source =
-        storedProfiles.firstWhere((profile) => profile.id == sourceProfileId);
-    final target =
-        storedProfiles.firstWhere((profile) => profile.id == targetProfileId);
+    final source = storedProfiles.firstWhere(
+      (profile) => profile.id == sourceProfileId,
+    );
+    final target = storedProfiles.firstWhere(
+      (profile) => profile.id == targetProfileId,
+    );
     if (source.type != ProfileType.localPgnFen ||
         target.type == ProfileType.localPgnFen) {
       throw const CoreGatewayException('Invalid profile merge');
@@ -326,7 +332,10 @@ class FakeCoreGateway implements CoreGateway {
   }) async {
     settingWrites++;
     engineSettingWrites++;
-    currentSettings = currentSettings.copyWith(threads: threads, hashMb: hashMb);
+    currentSettings = currentSettings.copyWith(
+      threads: threads,
+      hashMb: hashMb,
+    );
   }
 
   @override
@@ -339,29 +348,44 @@ class FakeCoreGateway implements CoreGateway {
   Future<void> setBooleanSetting(String key, bool enabled) async {
     settingWrites++;
     currentSettings = switch (key) {
-      'showBestMoveArrow' => currentSettings.copyWith(showBestMoveArrow: enabled),
+      'showBestMoveArrow' => currentSettings.copyWith(
+        showBestMoveArrow: enabled,
+      ),
       'showThreatArrow' => currentSettings.copyWith(showThreatArrow: enabled),
-      'showEvaluationBar' => currentSettings.copyWith(showEvaluationBar: enabled),
+      'showEvaluationBar' => currentSettings.copyWith(
+        showEvaluationBar: enabled,
+      ),
       'showEngineLines' => currentSettings.copyWith(showEngineLines: enabled),
-      'showClassifications' => currentSettings.copyWith(showClassifications: enabled),
+      'showClassifications' => currentSettings.copyWith(
+        showClassifications: enabled,
+      ),
       'showAccuracy' => currentSettings.copyWith(showAccuracy: enabled),
       'showTheory' => currentSettings.copyWith(showTheory: enabled),
-      'showResultSymbols' =>
-        currentSettings.copyWith(showResultSymbols: enabled),
-      'adaptiveEarlyStop' =>
-        currentSettings.copyWith(adaptiveEarlyStop: enabled),
-      'showBoardCoordinates' =>
-        currentSettings.copyWith(showBoardCoordinates: enabled),
-      'highlightLastMove' => currentSettings.copyWith(highlightLastMove: enabled),
-      'highlightSelectedSquare' =>
-        currentSettings.copyWith(highlightSelectedSquare: enabled),
+      'showResultSymbols' => currentSettings.copyWith(
+        showResultSymbols: enabled,
+      ),
+      'adaptiveEarlyStop' => currentSettings.copyWith(
+        adaptiveEarlyStop: enabled,
+      ),
+      'showBoardCoordinates' => currentSettings.copyWith(
+        showBoardCoordinates: enabled,
+      ),
+      'highlightLastMove' => currentSettings.copyWith(
+        highlightLastMove: enabled,
+      ),
+      'highlightSelectedSquare' => currentSettings.copyWith(
+        highlightSelectedSquare: enabled,
+      ),
       'autoSyncOnline' => currentSettings.copyWith(autoSyncOnline: enabled),
-      'confirmBeforeDelete' =>
-        currentSettings.copyWith(confirmBeforeDelete: enabled),
-      'useGlobalAnalysisCache' =>
-        currentSettings.copyWith(useGlobalAnalysisCache: enabled),
-      'diagnosticLogging' =>
-        currentSettings.copyWith(diagnosticLogging: enabled),
+      'confirmBeforeDelete' => currentSettings.copyWith(
+        confirmBeforeDelete: enabled,
+      ),
+      'useGlobalAnalysisCache' => currentSettings.copyWith(
+        useGlobalAnalysisCache: enabled,
+      ),
+      'diagnosticLogging' => currentSettings.copyWith(
+        diagnosticLogging: enabled,
+      ),
       _ => currentSettings,
     };
   }
@@ -383,9 +407,18 @@ class FakeCoreGateway implements CoreGateway {
       active == null ? const [] : List.unmodifiable(storedGames);
 
   @override
-  Future<GameDetail> game(String gameId) async => const GameDetail(
+  Future<List<GameSummary>> queryGames(GameQuery query) async => games();
+
+  @override
+  Future<GameDetail> game(String gameId) async => GameDetail(
     summary: fixtureGame,
     pgn: '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6',
+    startingPosition: BoardPosition(
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      pieces: BoardPosition.empty.pieces,
+      sideToMove: 'white',
+      draggableColor: 'white',
+    ),
     moves: [
       ParsedMove(
         plyIndex: 0,
@@ -395,6 +428,12 @@ class FakeCoreGateway implements CoreGateway {
         uci: 'e2e4',
         fenBefore: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
         fenAfter: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+        positionAfter: BoardPosition(
+          fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+          pieces: BoardPosition.empty.pieces,
+          sideToMove: 'black',
+          draggableColor: 'black',
+        ),
       ),
       ParsedMove(
         plyIndex: 1,
@@ -405,8 +444,28 @@ class FakeCoreGateway implements CoreGateway {
         fenBefore: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
         fenAfter:
             'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+        positionAfter: BoardPosition(
+          fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+          pieces: BoardPosition.empty.pieces,
+          sideToMove: 'white',
+          draggableColor: 'white',
+        ),
       ),
     ],
+  );
+
+  @override
+  Future<BoardMoveResolution> resolveBoardMove({
+    required String gameId,
+    required String fen,
+    required String source,
+    required String target,
+    required int firstCandidatePly,
+  }) async => BoardMoveResolution(
+    uci: '$source$target',
+    san: '$source$target',
+    fenAfter: fen,
+    positionAfter: BoardPosition.empty,
   );
 
   @override
@@ -473,7 +532,8 @@ class FakeCoreGateway implements CoreGateway {
       ),
       'f1b5' => (
         san: 'Bb5',
-        fen: 'r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
+        fen:
+            'r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
         best: 'a7a6',
       ),
       'a7a6' => (
@@ -483,7 +543,8 @@ class FakeCoreGateway implements CoreGateway {
       ),
       'b5a4' => (
         san: 'Ba4',
-        fen: 'r1bqkbnr/1ppp1ppp/p1n5/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4',
+        fen:
+            'r1bqkbnr/1ppp1ppp/p1n5/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4',
         best: 'g8f6',
       ),
       _ => throw const CoreGatewayException('Illegal chess move'),
@@ -495,6 +556,12 @@ class FakeCoreGateway implements CoreGateway {
       playedMove: uci,
       playedSan: fixture.san,
       fen: fixture.fen,
+      position: BoardPosition(
+        fen: fixture.fen,
+        pieces: BoardPosition.empty.pieces,
+        sideToMove: variationAnalysisCalls.isOdd ? 'black' : 'white',
+        draggableColor: variationAnalysisCalls.isOdd ? 'black' : 'white',
+      ),
       bestMove: fixture.best,
       moverEvaluationCp: 10 - variationAnalysisCalls,
       lines: [
@@ -513,6 +580,12 @@ class FakeCoreGateway implements CoreGateway {
       playedMove: uci,
       playedSan: fixture.san,
       fen: fixture.fen,
+      position: BoardPosition(
+        fen: fixture.fen,
+        pieces: BoardPosition.empty.pieces,
+        sideToMove: variationAnalysisCalls.isOdd ? 'black' : 'white',
+        draggableColor: variationAnalysisCalls.isOdd ? 'black' : 'white',
+      ),
       bestMove: '',
       lines: [],
     );
@@ -579,8 +652,13 @@ class FakeCoreGateway implements CoreGateway {
   }
 
   @override
-  Future<void> renameFavoriteCollection(String collectionId, String name) async {
-    final index = storedFavoriteCollections.indexWhere((c) => c.id == collectionId);
+  Future<void> renameFavoriteCollection(
+    String collectionId,
+    String name,
+  ) async {
+    final index = storedFavoriteCollections.indexWhere(
+      (c) => c.id == collectionId,
+    );
     if (index >= 0) {
       final old = storedFavoriteCollections[index];
       storedFavoriteCollections[index] = FavoriteCollection(
@@ -598,10 +676,7 @@ class FakeCoreGateway implements CoreGateway {
     for (var index = 0; index < storedGames.length; index++) {
       final game = storedGames[index];
       if (game.favoriteCollectionId == collectionId) {
-        storedGames[index] = _copyGame(
-          game,
-          clearFavoriteCollection: true,
-        );
+        storedGames[index] = _copyGame(game, clearFavoriteCollection: true);
       }
     }
   }
@@ -647,41 +722,43 @@ class FakeCoreGateway implements CoreGateway {
     bool? downloaded,
     String? favoriteCollectionId,
     bool clearFavoriteCollection = false,
-  }) =>
-      GameSummary(
-        id: game.id,
-        kind: game.kind,
-        whiteName: game.whiteName,
-        blackName: game.blackName,
-        whiteRating: game.whiteRating,
-        blackRating: game.blackRating,
-        result: game.result,
-        event: game.event,
-        date: game.date,
-        timeControl: game.timeControl,
-        startingFen: game.startingFen,
-        isFixture: game.isFixture,
-        providerGameId: game.providerGameId,
-        providerUrl: game.providerUrl,
-        providerOutcome: game.providerOutcome,
-        timeControlType: game.timeControlType,
-        providerAccuracy: game.providerAccuracy,
-        localAccuracy: game.localAccuracy,
-        accuracy: game.accuracy,
-        accuracySource: game.accuracySource,
-        favorite: favorite ?? game.favorite,
-        favoriteCollectionId: clearFavoriteCollection
-            ? null
-            : favoriteCollectionId ?? game.favoriteCollectionId,
-        downloaded: downloaded ?? game.downloaded,
-        analyzed: game.analyzed,
-        endedAt: game.endedAt,
-      );
+  }) => GameSummary(
+    id: game.id,
+    kind: game.kind,
+    whiteName: game.whiteName,
+    blackName: game.blackName,
+    whiteRating: game.whiteRating,
+    blackRating: game.blackRating,
+    result: game.result,
+    event: game.event,
+    date: game.date,
+    timeControl: game.timeControl,
+    startingFen: game.startingFen,
+    isFixture: game.isFixture,
+    providerGameId: game.providerGameId,
+    providerUrl: game.providerUrl,
+    providerOutcome: game.providerOutcome,
+    timeControlType: game.timeControlType,
+    providerAccuracy: game.providerAccuracy,
+    localAccuracy: game.localAccuracy,
+    accuracy: game.accuracy,
+    accuracySource: game.accuracySource,
+    favorite: favorite ?? game.favorite,
+    favoriteCollectionId: clearFavoriteCollection
+        ? null
+        : favoriteCollectionId ?? game.favoriteCollectionId,
+    downloaded: downloaded ?? game.downloaded,
+    analyzed: game.analyzed,
+    endedAt: game.endedAt,
+  );
 
   AnalysisSnapshot _snapshot(String gameId, {required bool complete}) =>
       AnalysisSnapshot(
         gameId: gameId,
         status: complete ? 'complete' : 'running',
+        jobState: complete
+            ? AnalysisJobState.completed
+            : AnalysisJobState.running,
         completedPlies: complete ? 8 : 1,
         totalPlies: 8,
         progress: complete ? 1 : 0.125,

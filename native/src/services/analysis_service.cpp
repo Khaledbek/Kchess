@@ -17,6 +17,7 @@
 #include "analysis/accuracy.h"
 #include "analysis/move_classifier.h"
 #include "chess/move.h"
+#include "chess/position_view.h"
 #include "core/settings_registry.h"
 #include "diagnostics/logger.h"
 
@@ -664,6 +665,17 @@ std::string AnalysisService::analysis_json(
   } else {
     json << "null";
   }
+  std::string analyzed_fen;
+  if (const auto game = database_.game(game_id); game.has_value()) {
+    analyzed_fen = game->starting_fen;
+    if (!game->moves.empty() && analysis.latest_ply > 0) {
+      const auto move_index = std::min(
+          static_cast<std::size_t>(analysis.latest_ply - 1),
+          game->moves.size() - 1);
+      analyzed_fen = game->moves[move_index].fen_after;
+    }
+  }
+  const bool line_is_white = analyzed_fen.empty() || white_to_move(analyzed_fen);
   json << ",\"lines\":[";
   const auto line_count = std::min(
       analysis.lines.size(), static_cast<std::size_t>(database_.settings().multi_pv));
@@ -672,13 +684,19 @@ std::string AnalysisService::analysis_json(
     const auto& line = analysis.lines[index];
     json << "{\"rank\":" << line.rank << ",\"depth\":" << line.depth
          << ",\"evaluationCp\":";
-    append_optional_int(json, line.evaluation_cp);
+    append_optional_int(json, line.evaluation_cp.has_value()
+        ? std::optional<int>(line_is_white ? *line.evaluation_cp : -*line.evaluation_cp)
+        : std::nullopt);
     json << ",\"mateIn\":";
-    append_optional_int(json, line.mate_in);
+    append_optional_int(json, line.mate_in.has_value()
+        ? std::optional<int>(line_is_white ? *line.mate_in : -*line.mate_in)
+        : std::nullopt);
     json << ",\"wdl\":";
     if (line.wdl.has_value()) {
-      json << "{\"wins\":" << line.wdl->wins << ",\"draws\":" << line.wdl->draws
-           << ",\"losses\":" << line.wdl->losses << '}';
+      json << "{\"wins\":" << (line_is_white ? line.wdl->wins : line.wdl->losses)
+           << ",\"draws\":" << line.wdl->draws
+           << ",\"losses\":" << (line_is_white ? line.wdl->losses : line.wdl->wins)
+           << '}';
     } else {
       json << "null";
     }
@@ -2257,6 +2275,7 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
       {"playedMove", job->played_move},
       {"playedSan", job->played_san},
       {"fen", job->fen},
+      {"position", nlohmann::json::parse(position_view_json(job->fen))},
       {"error", error.empty() ? nlohmann::json(nullptr) : nlohmann::json(error)},
       {"bestMove", result.best_move},
       {"liveDepth", result.reached_depth},
@@ -2274,22 +2293,25 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
     if (principal.mate_in.has_value()) json["moverMateIn"] = -*principal.mate_in;
   }
   for (const auto& line : result.lines) {
+    const bool line_is_white = white_to_move(job->fen);
     nlohmann::json line_json{
         {"rank", line.rank},
         {"depth", line.depth},
         {"evaluationCp", line.evaluation_cp.has_value()
-            ? nlohmann::json(*line.evaluation_cp) : nlohmann::json(nullptr)},
+            ? nlohmann::json(line_is_white ? *line.evaluation_cp : -*line.evaluation_cp)
+            : nlohmann::json(nullptr)},
         {"mateIn", line.mate_in.has_value()
-            ? nlohmann::json(*line.mate_in) : nlohmann::json(nullptr)},
+            ? nlohmann::json(line_is_white ? *line.mate_in : -*line.mate_in)
+            : nlohmann::json(nullptr)},
         {"nodes", line.nodes},
         {"moves", line.moves},
         {"wdl", nullptr},
     };
     if (line.wdl.has_value()) {
       line_json["wdl"] = {
-          {"wins", line.wdl->wins},
+          {"wins", line_is_white ? line.wdl->wins : line.wdl->losses},
           {"draws", line.wdl->draws},
-          {"losses", line.wdl->losses},
+          {"losses", line_is_white ? line.wdl->losses : line.wdl->wins},
       };
     }
     json["lines"].push_back(std::move(line_json));

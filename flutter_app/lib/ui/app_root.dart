@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -91,8 +92,14 @@ class BrandWordmark extends StatelessWidget {
           height: 1,
         ),
         children: [
-          TextSpan(text: 'K', style: TextStyle(color: scheme.primary)),
-          TextSpan(text: 'Chess', style: TextStyle(color: scheme.onSurface)),
+          TextSpan(
+            text: 'K',
+            style: TextStyle(color: scheme.primary),
+          ),
+          TextSpan(
+            text: 'Chess',
+            style: TextStyle(color: scheme.onSurface),
+          ),
         ],
       ),
     );
@@ -399,10 +406,7 @@ class _HomeShellState extends State<HomeShell> {
     ];
     final content = switch (_selectedIndex) {
       0 => GamesScreen(controller: widget.controller),
-      1 => _EmptySection(
-        title: strings.play,
-        message: strings.playPlaceholder,
-      ),
+      1 => _EmptySection(title: strings.play, message: strings.playPlaceholder),
       2 => FavoritesScreen(controller: widget.controller),
       3 => StatisticsScreen(controller: widget.controller),
       4 => SettingsScreen(controller: widget.controller),
@@ -546,7 +550,10 @@ class _ProfileHeader extends StatelessWidget {
                     Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: scheme.outlineVariant, width: 2),
+                        border: Border.all(
+                          color: scheme.outlineVariant,
+                          width: 2,
+                        ),
                       ),
                       padding: const EdgeInsets.all(2),
                       child: CircleAvatar(
@@ -576,10 +583,7 @@ class _ProfileHeader extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right,
-                      color: scheme.onSurfaceVariant,
-                    ),
+                    Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
                   ],
                 ),
               ),
@@ -804,7 +808,6 @@ Future<bool> _confirmDeleteProfile(
   }
 }
 
-
 String _profileMergeText(
   BuildContext context, {
   required String de,
@@ -869,12 +872,9 @@ Future<bool> _showMergeLocalProfileDialog(
       content: Text(
         _profileMergeText(
           context,
-          de:
-              '$gameCount lokale Partien/Positionen werden zu „${target.displayName}“ verschoben. Doppelte Partien werden erkannt; Favoriten, Sammlungen und die beste vorhandene Analyse bleiben erhalten. Das lokale Profil wird danach entfernt.',
-          en:
-              '$gameCount local games/positions will be moved to “${target.displayName}”. Duplicate games are detected; favorites, collections and the best available analysis are kept. The local profile is removed afterwards.',
-          ar:
-              'سيتم نقل $gameCount من المباريات/الوضعيات المحلية إلى «${target.displayName}». سيتم اكتشاف المباريات المكررة مع الاحتفاظ بالمفضلة والمجموعات وأفضل تحليل متاح. بعد ذلك سيتم حذف الملف الشخصي المحلي.',
+          de: '$gameCount lokale Partien/Positionen werden zu „${target.displayName}“ verschoben. Doppelte Partien werden erkannt; Favoriten, Sammlungen und die beste vorhandene Analyse bleiben erhalten. Das lokale Profil wird danach entfernt.',
+          en: '$gameCount local games/positions will be moved to “${target.displayName}”. Duplicate games are detected; favorites, collections and the best available analysis are kept. The local profile is removed afterwards.',
+          ar: 'سيتم نقل $gameCount من المباريات/الوضعيات المحلية إلى «${target.displayName}». سيتم اكتشاف المباريات المكررة مع الاحتفاظ بالمفضلة والمجموعات وأفضل تحليل متاح. بعد ذلك سيتم حذف الملف الشخصي المحلي.',
         ),
       ),
       actions: [
@@ -992,6 +992,9 @@ class _GamesScreenState extends State<GamesScreen> {
   late String _color;
   late Set<String> _timeControls;
   late String _sort;
+  List<GameSummary> _filteredGames = const [];
+  int _queryGeneration = 0;
+  bool _queryEnabled = true;
 
   @override
   void initState() {
@@ -1010,6 +1013,36 @@ class _GamesScreenState extends State<GamesScreen> {
     _color = _filterSession.color;
     _timeControls = Set<String>.from(_filterSession.timeControls);
     _sort = _filterSession.sort;
+    _filteredGames = controller.games;
+    controller.addListener(_onControllerChanged);
+    unawaited(_refreshNativeGames());
+  }
+
+  void _onControllerChanged() => unawaited(_refreshNativeGames());
+
+  Future<void> _refreshNativeGames() async {
+    if (!mounted || !_queryEnabled) return;
+    final generation = ++_queryGeneration;
+    final online = controller.activeProfile?.type != ProfileType.localPgnFen;
+    final librarySection = widget.savedFilter != null;
+    try {
+      final games = await controller.queryGames(
+        GameQuery(
+          search: _search.text,
+          outcome: _outcome,
+          color: _color,
+          timeControls: _timeControls.toList(growable: false),
+          sort: _sort,
+          month: controller.selectedMonth,
+          favoriteOnly: widget.savedFilter == 'favorite',
+          applyMonth: online && !librarySection,
+        ),
+      );
+      if (!mounted || generation != _queryGeneration) return;
+      setState(() => _filteredGames = games);
+    } catch (_) {
+      // The controller's existing error/notice surfaces own native failures.
+    }
   }
 
   void _persistFilters() {
@@ -1021,6 +1054,7 @@ class _GamesScreenState extends State<GamesScreen> {
     _filterSession.timeControls
       ..clear()
       ..addAll(_timeControls);
+    unawaited(_refreshNativeGames());
   }
 
   void _persistScrollOffset() {
@@ -1154,6 +1188,9 @@ class _GamesScreenState extends State<GamesScreen> {
 
   @override
   void dispose() {
+    _queryEnabled = false;
+    _queryGeneration++;
+    controller.removeListener(_onControllerChanged);
     _persistFilters();
     _persistScrollOffset();
     _scrollController
@@ -1297,61 +1334,10 @@ class _GamesScreenState extends State<GamesScreen> {
     };
     final selectedMonth = controller.selectedMonth;
     final playerIdentity =
-        (controller.activeProfile?.providerUsername ??
-                controller.activeProfile?.displayName ??
-                '')
-            .trim();
-    final filtered = controller.games.where((game) {
-      if (widget.savedFilter == 'favorite' && !game.favorite) return false;
-      final query = _search.text.trim().toLowerCase();
-      if (query.isNotEmpty &&
-          !game.whiteName.toLowerCase().contains(query) &&
-          !game.blackName.toLowerCase().contains(query)) {
-        return false;
-      }
-      if (_outcome != 'all' && game.providerOutcome != _outcome) return false;
-      if (_color != 'all') {
-        final identity = playerIdentity.toLowerCase();
-        final isWhite = game.whiteName.toLowerCase() == identity;
-        final isBlack = game.blackName.toLowerCase() == identity;
-        if ((_color == 'white' && !isWhite) ||
-            (_color == 'black' && !isBlack)) {
-          return false;
-        }
-      }
-      final selectedTimeControls = _timeControls.where(
-        (value) => !_statusFilterValues.contains(value),
-      );
-      if (selectedTimeControls.isNotEmpty &&
-          !selectedTimeControls.contains(game.timeControlType)) {
-        return false;
-      }
-      if (_timeControls.contains('analyzed') && !game.analyzed) return false;
-      if (_timeControls.contains('notAnalyzed') && game.analyzed) return false;
-      if (online &&
-          !librarySection &&
-          selectedMonth != null &&
-          game.endedAt > 0) {
-        final date = DateTime.fromMillisecondsSinceEpoch(
-          game.endedAt * 1000,
-          isUtc: true,
-        );
-        final value =
-            '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
-        if (value != selectedMonth) return false;
-      }
-      return true;
-    }).toList();
-    filtered.sort(
-      (left, right) => switch (_sort) {
-        'oldest' => left.endedAt.compareTo(right.endedAt),
-        'accuracyHigh' => (right.accuracy ?? -1).compareTo(left.accuracy ?? -1),
-        'accuracyLow' => (left.accuracy ?? 101).compareTo(
-          right.accuracy ?? 101,
-        ),
-        _ => right.endedAt.compareTo(left.endedAt),
-      },
-    );
+        controller.activeProfile?.providerUsername ??
+        controller.activeProfile?.displayName ??
+        '';
+    final filtered = _filteredGames;
     return Scaffold(
       appBar: MediaQuery.sizeOf(context).width >= 900
           ? AppBar(
@@ -1405,13 +1391,17 @@ class _GamesScreenState extends State<GamesScreen> {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final labels = _GameFilterLabels.of(context);
-                    final hasMonths = online &&
+                    final hasMonths =
+                        online &&
                         !librarySection &&
-                        (controller.providerOverview?.availableMonths.isNotEmpty ??
+                        (controller
+                                .providerOverview
+                                ?.availableMonths
+                                .isNotEmpty ??
                             false);
                     final months = hasMonths
                         ? ([...controller.providerOverview!.availableMonths]
-                          ..sort((left, right) => right.compareTo(left)))
+                            ..sort((left, right) => right.compareTo(left)))
                         : <String>[];
                     final currentMonth = months.isEmpty
                         ? null
@@ -1419,7 +1409,7 @@ class _GamesScreenState extends State<GamesScreen> {
                         ? controller.selectedMonth!
                         : months.first;
 
-                Widget searchField() => TextField(
+                    Widget searchField() => TextField(
                       key: const Key('game-search'),
                       controller: _search,
                       onChanged: (_) {
@@ -1433,7 +1423,7 @@ class _GamesScreenState extends State<GamesScreen> {
                       ),
                     );
 
-                Widget filterButton() => Stack(
+                    Widget filterButton() => Stack(
                       clipBehavior: Clip.none,
                       children: [
                         IconButton.filledTonal(
@@ -1455,7 +1445,9 @@ class _GamesScreenState extends State<GamesScreen> {
                                 minWidth: 18,
                                 minHeight: 18,
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: Theme.of(context).colorScheme.primary,
@@ -1469,9 +1461,7 @@ class _GamesScreenState extends State<GamesScreen> {
                               ),
                               child: Text(
                                 '$_activeFilterCount',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
+                                style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(
                                       color: Theme.of(context)
                                           .colorScheme
@@ -1499,9 +1489,12 @@ class _GamesScreenState extends State<GamesScreen> {
                           IconButton(
                             tooltip: labels.previousMonth,
                             visualDensity: VisualDensity.compact,
-                            onPressed: olderMonth == null || controller.providerSyncing
+                            onPressed:
+                                olderMonth == null || controller.providerSyncing
                                 ? null
-                                : () => controller.syncProvider(month: olderMonth),
+                                : () => controller.syncProvider(
+                                    month: olderMonth,
+                                  ),
                             icon: const Icon(Icons.chevron_left),
                           ),
                           Container(
@@ -1512,7 +1505,9 @@ class _GamesScreenState extends State<GamesScreen> {
                                   .surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: Theme.of(context).colorScheme.outlineVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant,
                               ),
                             ),
                             child: DropdownButtonHideUnderline(
@@ -1525,7 +1520,9 @@ class _GamesScreenState extends State<GamesScreen> {
                                   for (final month in months)
                                     DropdownMenuItem(
                                       value: month,
-                                      child: Text(_formatGameMonthLabel(context, month)),
+                                      child: Text(
+                                        _formatGameMonthLabel(context, month),
+                                      ),
                                     ),
                                 ],
                                 onChanged: controller.providerSyncing
@@ -1541,9 +1538,12 @@ class _GamesScreenState extends State<GamesScreen> {
                           IconButton(
                             tooltip: labels.nextMonth,
                             visualDensity: VisualDensity.compact,
-                            onPressed: newerMonth == null || controller.providerSyncing
+                            onPressed:
+                                newerMonth == null || controller.providerSyncing
                                 ? null
-                                : () => controller.syncProvider(month: newerMonth),
+                                : () => controller.syncProvider(
+                                    month: newerMonth,
+                                  ),
                             icon: const Icon(Icons.chevron_right),
                           ),
                           IconButton(
@@ -1559,19 +1559,19 @@ class _GamesScreenState extends State<GamesScreen> {
                       );
                     }
 
-                if (constraints.maxWidth >= 720) {
-                  return Row(
-                    children: [
-                      Expanded(child: searchField()),
-                      const SizedBox(width: 10),
-                      filterButton(),
-                      if (hasMonths) ...[
-                        const SizedBox(width: 16),
-                        monthControls(),
-                      ],
-                    ],
-                  );
-                }
+                    if (constraints.maxWidth >= 720) {
+                      return Row(
+                        children: [
+                          Expanded(child: searchField()),
+                          const SizedBox(width: 10),
+                          filterButton(),
+                          if (hasMonths) ...[
+                            const SizedBox(width: 16),
+                            monthControls(),
+                          ],
+                        ],
+                      );
+                    }
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1611,7 +1611,8 @@ class _GamesScreenState extends State<GamesScreen> {
                     labels: _GameFilterLabels.of(context),
                     fallbackText: strings.noGames,
                     hasActiveFilters:
-                        _activeFilterCount > 0 || _search.text.trim().isNotEmpty,
+                        _activeFilterCount > 0 ||
+                        _search.text.trim().isNotEmpty,
                     month: online && !librarySection ? selectedMonth : null,
                     onResetFilters: _resetAllFilters,
                   )
@@ -1646,7 +1647,6 @@ class _GamesScreenState extends State<GamesScreen> {
   }
 }
 
-
 String _formatGameMonthLabel(BuildContext context, String value) {
   final parts = value.split('-');
   if (parts.length != 2) return value;
@@ -1655,21 +1655,54 @@ String _formatGameMonthLabel(BuildContext context, String value) {
   if (year == null || month == null || month < 1 || month > 12) return value;
   final language = Localizations.localeOf(context).languageCode;
   const de = [
-    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+    'Januar',
+    'Februar',
+    'März',
+    'April',
+    'Mai',
+    'Juni',
+    'Juli',
+    'August',
+    'September',
+    'Oktober',
+    'November',
+    'Dezember',
   ];
   const en = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   const ar = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    'يناير',
+    'فبراير',
+    'مارس',
+    'أبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر',
   ];
-  final names = language == 'ar' ? ar : language == 'en' ? en : de;
+  final names = language == 'ar'
+      ? ar
+      : language == 'en'
+      ? en
+      : de;
   return '${names[month - 1]} $year';
 }
-
 
 class _GameFilterSelection {
   const _GameFilterSelection({
@@ -1693,11 +1726,6 @@ const _timeControlFilterValues = <String>[
   'classical',
   'correspondence',
 ];
-
-const _statusFilterValues = <String>{
-  'analyzed',
-  'notAnalyzed',
-};
 
 const _timeAndStatusFilterOrder = <String>[
   ..._timeControlFilterValues,
@@ -1890,8 +1918,14 @@ class _GameFilterPanelState extends State<_GameFilterPanel> {
               prefixIcon: const Icon(Icons.sort),
             ),
             items: [
-              DropdownMenuItem(value: 'newest', child: Text(labels.newestFirst)),
-              DropdownMenuItem(value: 'oldest', child: Text(labels.oldestFirst)),
+              DropdownMenuItem(
+                value: 'newest',
+                child: Text(labels.newestFirst),
+              ),
+              DropdownMenuItem(
+                value: 'oldest',
+                child: Text(labels.oldestFirst),
+              ),
               DropdownMenuItem(
                 value: 'accuracyHigh',
                 child: Text(labels.accuracyDescending),
@@ -2128,12 +2162,14 @@ class _GamesEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final monthLabel = month == null ? null : _formatGameMonthLabel(context, month!);
+    final monthLabel = month == null
+        ? null
+        : _formatGameMonthLabel(context, month!);
     final title = hasActiveFilters
         ? labels.noMatchingGames
         : monthLabel != null
-            ? labels.noGamesForMonth.replaceAll('{month}', monthLabel)
-            : fallbackText;
+        ? labels.noGamesForMonth.replaceAll('{month}', monthLabel)
+        : fallbackText;
     final subtitle = hasActiveFilters ? labels.noMatchingGamesHelp : null;
     return Center(
       child: ConstrainedBox(
@@ -2191,7 +2227,6 @@ class _GamesEmptyState extends StatelessWidget {
     );
   }
 }
-
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({required this.controller, super.key});
@@ -2288,12 +2323,13 @@ class FavoritesScreen extends StatelessWidget {
                             ),
                           ),
                           onRename: () async {
-                            final name = await _showFavoriteCollectionNameDialog(
-                              context,
-                              title: strings.favoriteRenameCollection,
-                              label: strings.favoriteCollectionName,
-                              initialValue: collection.name,
-                            );
+                            final name =
+                                await _showFavoriteCollectionNameDialog(
+                                  context,
+                                  title: strings.favoriteRenameCollection,
+                                  label: strings.favoriteCollectionName,
+                                  initialValue: collection.name,
+                                );
                             if (name == null || !context.mounted) return;
                             try {
                               await controller.renameFavoriteCollection(
@@ -2313,7 +2349,9 @@ class FavoritesScreen extends StatelessWidget {
                               context: context,
                               builder: (dialogContext) => AlertDialog(
                                 title: Text(strings.favoriteDeleteCollection),
-                                content: Text(strings.favoriteDeleteCollectionBody),
+                                content: Text(
+                                  strings.favoriteDeleteCollectionBody,
+                                ),
                                 actions: [
                                   TextButton(
                                     onPressed: () =>
@@ -2330,7 +2368,9 @@ class FavoritesScreen extends StatelessWidget {
                             );
                             if (confirmed != true || !context.mounted) return;
                             try {
-                              await controller.deleteFavoriteCollection(collection);
+                              await controller.deleteFavoriteCollection(
+                                collection,
+                              );
                             } catch (error) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -2356,29 +2396,25 @@ class FavoritesScreen extends StatelessWidget {
               icon: Icons.favorite_border,
               text: strings.favoriteNoLooseGames,
             )
-          else
-            ...[
-              for (final game in looseFavorites) ...[
-                _GameCard(
+          else ...[
+            for (final game in looseFavorites) ...[
+              _GameCard(
+                game: game,
+                online: game.providerGameId != null,
+                onOpen: () => _openAnalysisAndRefreshSettings(
+                  context: context,
+                  controller: controller,
                   game: game,
-                  online: game.providerGameId != null,
-                  onOpen: () => _openAnalysisAndRefreshSettings(
-                    context: context,
-                    controller: controller,
-                    game: game,
-                  ),
-                  onToggleFavorite: () => controller.toggleFavorite(game),
-                  onSaveToDownloads: null,
-                  onMoveFavorite: () => _showFavoriteCollectionPicker(
-                    context,
-                    controller,
-                    game,
-                  ),
-                  onDelete: null,
                 ),
-                const SizedBox(height: 12),
-              ],
+                onToggleFavorite: () => controller.toggleFavorite(game),
+                onSaveToDownloads: null,
+                onMoveFavorite: () =>
+                    _showFavoriteCollectionPicker(context, controller, game),
+                onDelete: null,
+              ),
+              const SizedBox(height: 12),
             ],
+          ],
         ],
       ),
     );
@@ -2400,8 +2436,7 @@ class FavoriteCollectionScreen extends StatelessWidget {
     final strings = AppLocalizations.of(context);
     final games = controller.favoriteGames
         .where(
-          (game) =>
-              game.favorite && game.favoriteCollectionId == collection.id,
+          (game) => game.favorite && game.favoriteCollectionId == collection.id,
         )
         .toList(growable: false);
     return Scaffold(
@@ -2432,11 +2467,8 @@ class FavoriteCollectionScreen extends StatelessWidget {
                   ),
                   onToggleFavorite: () => controller.toggleFavorite(game),
                   onSaveToDownloads: null,
-                  onMoveFavorite: () => _showFavoriteCollectionPicker(
-                    context,
-                    controller,
-                    game,
-                  ),
+                  onMoveFavorite: () =>
+                      _showFavoriteCollectionPicker(context, controller, game),
                   onDelete: null,
                 );
               },
@@ -2814,8 +2846,9 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         child: CircleAvatar(
                           radius: 36,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primaryContainer,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer,
                           child: _profileAvatar(profile, iconSize: 36),
                         ),
                       ),
@@ -2860,8 +2893,7 @@ class ProfileScreen extends StatelessWidget {
                               Text(
                                 'Profil deaktiviert',
                                 style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.error,
+                                  color: Theme.of(context).colorScheme.error,
                                 ),
                               ),
                             ],
@@ -2961,7 +2993,11 @@ class ProfileScreen extends StatelessWidget {
               final overview = _gameOverview(profile);
               final values = <(IconData, String, int?)>[
                 (Icons.sports_esports_outlined, strings.games, overview.games),
-                (Icons.emoji_events_outlined, strings.profileWins, overview.wins),
+                (
+                  Icons.emoji_events_outlined,
+                  strings.profileWins,
+                  overview.wins,
+                ),
                 (Icons.balance_outlined, strings.profileDraws, overview.draws),
                 (Icons.close_rounded, strings.profileLosses, overview.losses),
               ].where((entry) => entry.$3 != null).toList(growable: false);
@@ -2994,7 +3030,9 @@ class ProfileScreen extends StatelessWidget {
 
   List<(String, int)> _ratingEntries(AppProfile profile) {
     final entries = <(String, int)>[];
-    for (final performance in controller.providerOverview?.stats ?? const <ProviderPerformance>[]) {
+    for (final performance
+        in controller.providerOverview?.stats ??
+            const <ProviderPerformance>[]) {
       final rating = performance.currentRating;
       if (rating != null) entries.add((performance.key, rating));
     }
@@ -3021,16 +3059,20 @@ class ProfileScreen extends StatelessWidget {
   ({int? games, int? wins, int? draws, int? losses}) _gameOverview(
     AppProfile profile,
   ) {
-    final stats = controller.providerOverview?.stats ?? const <ProviderPerformance>[];
+    final stats =
+        controller.providerOverview?.stats ?? const <ProviderPerformance>[];
     int? sum(Iterable<int?> values) {
       final present = values.whereType<int>().toList(growable: false);
       return present.isEmpty ? null : present.fold<int>(0, (a, b) => a + b);
     }
 
     final summedGames = sum(stats.map((value) => value.games));
-    final games = profile.providerGames ??
+    final games =
+        profile.providerGames ??
         summedGames ??
-        (profile.type == ProfileType.localPgnFen ? controller.games.length : null);
+        (profile.type == ProfileType.localPgnFen
+            ? controller.games.length
+            : null);
     return (
       games: games,
       wins: profile.providerWins ?? sum(stats.map((value) => value.wins)),
@@ -3196,8 +3238,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _onControllerChanged() {
     final providerSyncing = widget.controller.providerSyncing;
     final profileId = widget.controller.activeProfile?.id;
-    final shouldReload = _profileId != profileId ||
-        (_providerSyncing && !providerSyncing);
+    final shouldReload =
+        _profileId != profileId || (_providerSyncing && !providerSyncing);
     _providerSyncing = providerSyncing;
     _profileId = profileId;
     if (shouldReload && mounted) _reload();
@@ -3243,15 +3285,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _OverviewCard(
-                  future: _overview,
-                  onRetry: _reload,
-                ),
+                _OverviewCard(future: _overview, onRetry: _reload),
                 const SizedBox(height: 20),
-                _OpeningsCard(
-                  future: _openings,
-                  onRetry: _reload,
-                ),
+                _OpeningsCard(future: _openings, onRetry: _reload),
               ],
             ),
           ),
@@ -3374,7 +3410,10 @@ class _OverviewContent extends StatelessWidget {
           runSpacing: 12,
           children: [
             _StatBig(value: '${overview.totalGames}', label: labels.games),
-            _StatBig(value: _formatPercent(overall.winRate), label: labels.winRate),
+            _StatBig(
+              value: _formatPercent(overall.winRate),
+              label: labels.winRate,
+            ),
             _StatBig(
               value: _formatPercent(overall.scorePercent),
               label: labels.score,
@@ -3623,8 +3662,7 @@ _OverviewText _overviewText(BuildContext context) {
         byTimeControl: 'حسب نوع الوقت',
         white: 'أبيض',
         black: 'أسود',
-        empty:
-            'لا توجد مباريات بعد. زامِن حسابًا على الإنترنت أو استورد مباريات لعرض إحصاءاتك.',
+        empty: 'لا توجد مباريات بعد. زامِن حسابًا على الإنترنت أو استورد مباريات لعرض إحصاءاتك.',
         noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.',
         error: 'تعذّر تحميل الإحصاءات.',
         retry: 'إعادة المحاولة',
@@ -3641,8 +3679,7 @@ _OverviewText _overviewText(BuildContext context) {
         byTimeControl: 'By time control',
         white: 'White',
         black: 'Black',
-        empty:
-            'No games yet. Sync an online profile or import games to see your statistics.',
+        empty: 'No games yet. Sync an online profile or import games to see your statistics.',
         noProfile: 'Create or select a profile to see statistics.',
         error: 'Could not load statistics.',
         retry: 'Retry',
@@ -3659,8 +3696,7 @@ _OverviewText _overviewText(BuildContext context) {
         byTimeControl: 'Nach Zeitkontrolle',
         white: 'Weiß',
         black: 'Schwarz',
-        empty:
-            'Noch keine Partien. Synchronisiere ein Online-Profil oder importiere Partien, um deine Statistik zu sehen.',
+        empty: 'Noch keine Partien. Synchronisiere ein Online-Profil oder importiere Partien, um deine Statistik zu sehen.',
         noProfile: 'Erstelle oder wähle ein Profil, um Statistiken zu sehen.',
         error: 'Statistik konnte nicht geladen werden.',
         retry: 'Erneut versuchen',
@@ -3738,7 +3774,9 @@ class _OpeningsContent extends StatelessWidget {
         .take(8)
         .toList(growable: false);
     final unknownOpenings = stats.openings
-        .where((opening) => opening.color != 'white' && opening.color != 'black')
+        .where(
+          (opening) => opening.color != 'white' && opening.color != 'black',
+        )
         .take(8)
         .toList(growable: false);
     return Column(
@@ -3991,8 +4029,7 @@ _OpeningsText _openingsText(BuildContext context) {
         black: 'الأسود',
         unknownColor: 'لون غير معروف',
         score: 'النقاط',
-        empty:
-            'لا توجد افتتاحيات مُصنّفة بعد. تُصنَّف المباريات المستوردة والمتزامنة تلقائيًا.',
+        empty: 'لا توجد افتتاحيات مُصنّفة بعد. تُصنَّف المباريات المستوردة والمتزامنة تلقائيًا.',
         noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الافتتاحيات.',
         error: 'تعذّر تحميل الافتتاحيات.',
         retry: 'إعادة المحاولة',
@@ -4007,8 +4044,7 @@ _OpeningsText _openingsText(BuildContext context) {
         black: 'Black',
         unknownColor: 'Unassigned color',
         score: 'Score',
-        empty:
-            'No named openings yet. Synced and imported games are classified automatically.',
+        empty: 'No named openings yet. Synced and imported games are classified automatically.',
         noProfile: 'Create or select a profile to see openings.',
         error: 'Could not load openings.',
         retry: 'Retry',
@@ -4023,8 +4059,7 @@ _OpeningsText _openingsText(BuildContext context) {
         black: 'Schwarz',
         unknownColor: 'Farbe nicht zugeordnet',
         score: 'Punkte',
-        empty:
-            'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.',
+        empty: 'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.',
         noProfile: 'Erstelle oder wähle ein Profil, um Eröffnungen zu sehen.',
         error: 'Eröffnungen konnten nicht geladen werden.',
         retry: 'Erneut versuchen',
@@ -4032,29 +4067,24 @@ _OpeningsText _openingsText(BuildContext context) {
   }
 }
 
-({
-  String title,
-  String introTitle,
-  String introBody,
-}) _statisticsText(BuildContext context) {
+({String title, String introTitle, String introBody}) _statisticsText(
+  BuildContext context,
+) {
   return switch (Localizations.localeOf(context).languageCode) {
     'ar' => (
       title: 'الإحصائيات',
       introTitle: 'أداؤك في الشطرنج',
-      introBody:
-          'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.',
+      introBody: 'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.',
     ),
     'en' => (
       title: 'Statistics',
       introTitle: 'Your chess performance',
-      introBody:
-          'See your results, recent form and opening record separated by color.',
+      introBody: 'See your results, recent form and opening record separated by color.',
     ),
     _ => (
       title: 'Statistiken',
       introTitle: 'Deine Schachleistung',
-      introBody:
-          'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.',
+      introBody: 'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.',
     ),
   };
 }
@@ -4263,11 +4293,9 @@ class _EngineSettingsPage extends StatelessWidget {
                   icon: Icons.memory_outlined,
                   title: strings.threads,
                   description: strings.threadsHelp,
-                  value: AppController.clampEngineWorkerThreads(
-                    controller.settings.threads,
-                  ),
+                  value: controller.settings.threads,
                   minimum: 1,
-                  maximum: AppController.maximumEngineWorkerThreads,
+                  maximum: controller.settings.maxThreads,
                   onChanged: controller.setThreads,
                 ),
                 const Divider(height: 1),
@@ -4572,15 +4600,14 @@ class _DataStorageSettingsPage extends StatelessWidget {
     try {
       await controller.clearEngineCache();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(strings.analysisCacheCleared)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(strings.analysisCacheCleared)));
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
       }
     }
   }
@@ -4787,7 +4814,9 @@ class _CompactIntegerControlState extends State<_CompactIntegerControl> {
           visualDensity: VisualDensity.compact,
           constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
           padding: EdgeInsets.zero,
-          onPressed: _value > widget.minimum ? () => _changeValue(_value - 1) : null,
+          onPressed: _value > widget.minimum
+              ? () => _changeValue(_value - 1)
+              : null,
           icon: const Icon(Icons.remove, size: 18),
         ),
         SizedBox(
@@ -4812,7 +4841,9 @@ class _CompactIntegerControlState extends State<_CompactIntegerControl> {
           visualDensity: VisualDensity.compact,
           constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
           padding: EdgeInsets.zero,
-          onPressed: _value < widget.maximum ? () => _changeValue(_value + 1) : null,
+          onPressed: _value < widget.maximum
+              ? () => _changeValue(_value + 1)
+              : null,
           icon: const Icon(Icons.add, size: 18),
         ),
       ],
@@ -4937,7 +4968,8 @@ class _IntegerSettingTileState extends State<_IntegerSettingTile> {
     final previous = _previousValue;
     final next = _nextValue;
     final range = '${widget.minimum}–${widget.maximum}';
-    final label = widget.valueLabelBuilder?.call(_value) ??
+    final label =
+        widget.valueLabelBuilder?.call(_value) ??
         widget.valueLabel ??
         '$_value';
     return ListTile(
@@ -4969,12 +5001,18 @@ class _IntegerSettingTileState extends State<_IntegerSettingTile> {
                       if (parsed != null) {
                         final bounded = parsed < widget.minimum
                             ? widget.minimum
-                            : (parsed > widget.maximum ? widget.maximum : parsed);
+                            : (parsed > widget.maximum
+                                  ? widget.maximum
+                                  : parsed);
                         _changeValue(bounded);
                       }
                     },
                   )
-                : Text(label, textAlign: TextAlign.center, textDirection: TextDirection.ltr),
+                : Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.ltr,
+                  ),
           ),
           IconButton(
             onPressed: next == null ? null : () => _changeValue(next),
@@ -5331,9 +5369,7 @@ class _ProfileTag extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurface,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurface),
           ),
         ],
       ),
@@ -5358,14 +5394,20 @@ class _WinLossBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final segments = <Widget>[
       if (wins > 0)
-        Expanded(flex: wins, child: const ColoredBox(color: AppTheme.success)),
+        Expanded(
+          flex: wins,
+          child: const ColoredBox(color: AppTheme.success),
+        ),
       if (draws > 0)
         Expanded(
           flex: draws,
           child: ColoredBox(color: scheme.onSurfaceVariant),
         ),
       if (losses > 0)
-        Expanded(flex: losses, child: ColoredBox(color: scheme.error)),
+        Expanded(
+          flex: losses,
+          child: ColoredBox(color: scheme.error),
+        ),
     ];
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),

@@ -80,6 +80,7 @@ add_library(kchess_core SHARED
   src/chess/fen.cpp
   src/chess/move.cpp
   src/chess/pgn.cpp
+  src/chess/position_view.cpp
   src/core/core.cpp
   src/diagnostics/logger.cpp
   src/engine/stockfish_runtime.cpp
@@ -151,6 +152,7 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     src/chess/fen.cpp
     src/chess/move.cpp
     src/chess/pgn.cpp
+    src/chess/position_view.cpp
     src/engine/stockfish_runtime.cpp
     src/engine/stockfish_engine.cpp
     src/persistence/database.cpp
@@ -163,6 +165,7 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   target_include_directories(kchess_core_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
   )
   target_link_libraries(kchess_core_tests PRIVATE
     kchess_core

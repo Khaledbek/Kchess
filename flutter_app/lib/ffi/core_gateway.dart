@@ -11,7 +11,10 @@ abstract interface class CoreGateway {
   });
   Future<void> setActiveProfile(String profileId);
   Future<void> deleteProfile(String profileId);
-  Future<void> mergeLocalProfile(String sourceProfileId, String targetProfileId);
+  Future<void> mergeLocalProfile(
+    String sourceProfileId,
+    String targetProfileId,
+  );
   Future<ProviderOverview> providerOverview(String profileId);
   Future<StatisticsOverview> statisticsOverview();
   Future<OpeningsStats> openingsStats();
@@ -30,17 +33,22 @@ abstract interface class CoreGateway {
     required int multiPv,
     required int timeLimitSeconds,
   });
-  Future<void> setEngineResources({
-    required int threads,
-    required int hashMb,
-  });
+  Future<void> setEngineResources({required int threads, required int hashMb});
   Future<void> setShowBoardArrows(bool enabled);
   Future<void> setBooleanSetting(String key, bool enabled);
   Future<void> setThemeMode(AppThemeMode mode);
   Future<void> setLocale(String locale);
   Future<List<GameSummary>> games();
+  Future<List<GameSummary>> queryGames(GameQuery query);
   Future<List<GameSummary>> favoriteGames();
   Future<GameDetail> game(String gameId);
+  Future<BoardMoveResolution> resolveBoardMove({
+    required String gameId,
+    required String fen,
+    required String source,
+    required String target,
+    required int firstCandidatePly,
+  });
   Future<GameSummary> importPgn(String pgn);
   Future<GameSummary> importFen({required String fen, required String name});
   Future<AnalysisSnapshot> startAnalysis(String gameId);
@@ -93,10 +101,7 @@ enum CoreErrorCode {
 }
 
 class CoreGatewayException implements Exception {
-  const CoreGatewayException(
-    this.message, {
-    this.code = CoreErrorCode.unknown,
-  });
+  const CoreGatewayException(this.message, {this.code = CoreErrorCode.unknown});
 
   final String message;
   final CoreErrorCode code;

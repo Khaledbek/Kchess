@@ -185,6 +185,11 @@ std::string Core::games_json() {
   return game_library_service_.games_json();
 }
 
+std::string Core::query_games_json(const std::string& query_json) {
+  classify_pending_openings(256);
+  return game_library_service_.query_games_json(query_json);
+}
+
 std::string Core::favorite_games_json() {
   classify_pending_openings(256);
   return game_library_service_.favorite_games_json();
@@ -193,6 +198,16 @@ std::string Core::favorite_games_json() {
 std::string Core::game_json(const std::string& game_id) {
   classify_game_opening(game_id);
   return game_library_service_.game_json(game_id);
+}
+
+std::string Core::resolve_board_move_json(
+    const std::string& game_id,
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target,
+    const int first_candidate_ply) {
+  return game_library_service_.resolve_board_move_json(
+      game_id, fen, source, target, first_candidate_ply);
 }
 
 std::string Core::import_pgn_json(const std::string& pgn) {

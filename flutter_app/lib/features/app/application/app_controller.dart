@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -11,12 +9,6 @@ enum AppPhase { loading, firstRun, ready, error }
 
 class AppController extends ChangeNotifier {
   AppController(this.gateway);
-
-  static int get maximumEngineWorkerThreads =>
-      math.max(1, math.min(32, Platform.numberOfProcessors ~/ 2));
-
-  static int clampEngineWorkerThreads(int threads) =>
-      math.max(1, math.min(threads, maximumEngineWorkerThreads));
 
   final CoreGateway gateway;
   AppPhase phase = AppPhase.loading;
@@ -142,10 +134,7 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> mergeLocalProfile(
-    AppProfile source,
-    AppProfile target,
-  ) async {
+  Future<void> mergeLocalProfile(AppProfile source, AppProfile target) async {
     if (source.type != ProfileType.localPgnFen ||
         target.type == ProfileType.localPgnFen) {
       throw const CoreGatewayException('Invalid profile merge');
@@ -333,6 +322,9 @@ class AppController extends ChangeNotifier {
     return game;
   }
 
+  Future<List<GameSummary>> queryGames(GameQuery query) =>
+      gateway.queryGames(query);
+
   Future<GameSummary> importFen({
     required String fen,
     required String name,
@@ -357,7 +349,8 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setShowBoardArrows(bool enabled) => setShowBestMoveArrow(enabled);
+  Future<void> setShowBoardArrows(bool enabled) =>
+      setShowBestMoveArrow(enabled);
 
   Future<void> setShowBestMoveArrow(bool enabled) => _setBooleanSetting(
     'showBestMoveArrow',
@@ -389,10 +382,8 @@ class AppController extends ChangeNotifier {
     settings.copyWith(showAccuracy: enabled),
   );
 
-  Future<void> setShowTheory(bool enabled) => _setBooleanSetting(
-    'showTheory',
-    settings.copyWith(showTheory: enabled),
-  );
+  Future<void> setShowTheory(bool enabled) =>
+      _setBooleanSetting('showTheory', settings.copyWith(showTheory: enabled));
 
   Future<void> setShowResultSymbols(bool enabled) => _setBooleanSetting(
     'showResultSymbols',
@@ -472,17 +463,20 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> setMinAnalysisDepth(int depth) async {
-    final minimum = depth < 1 ? 1 : (depth > settings.depth ? settings.depth : depth);
-    await gateway.setAnalysisDepthRange(minimumDepth: minimum, maximumDepth: settings.depth);
-    settings = settings.copyWith(minAnalysisDepth: minimum);
+    await gateway.setAnalysisDepthRange(
+      minimumDepth: depth,
+      maximumDepth: settings.depth,
+    );
+    settings = await gateway.settings();
     notifyListeners();
   }
 
   Future<void> setDepth(int depth) async {
-    final maximum = depth < 1 ? 1 : (depth > 64 ? 64 : depth);
-    final minimum = settings.minAnalysisDepth > maximum ? maximum : settings.minAnalysisDepth;
-    await gateway.setAnalysisDepthRange(minimumDepth: minimum, maximumDepth: maximum);
-    settings = settings.copyWith(minAnalysisDepth: minimum, depth: maximum);
+    await gateway.setAnalysisDepthRange(
+      minimumDepth: settings.minAnalysisDepth,
+      maximumDepth: depth,
+    );
+    settings = await gateway.settings();
     notifyListeners();
   }
 
@@ -493,8 +487,7 @@ class AppController extends ChangeNotifier {
       _setEngineSettings(settings.copyWith(timeLimitSeconds: seconds));
 
   Future<void> setThreads(int threads) {
-    final bounded = clampEngineWorkerThreads(threads);
-    return _setEngineResources(settings.copyWith(threads: bounded));
+    return _setEngineResources(settings.copyWith(threads: threads));
   }
 
   Future<void> setHashMb(int hashMb) =>
@@ -506,7 +499,7 @@ class AppController extends ChangeNotifier {
       multiPv: updated.multiPv,
       timeLimitSeconds: updated.timeLimitSeconds,
     );
-    settings = updated;
+    settings = await gateway.settings();
     notifyListeners();
   }
 
@@ -515,7 +508,7 @@ class AppController extends ChangeNotifier {
       threads: updated.threads,
       hashMb: updated.hashMb,
     );
-    settings = updated;
+    settings = await gateway.settings();
     notifyListeners();
   }
 
@@ -620,7 +613,9 @@ class AnalysisController extends ChangeNotifier {
       } else if (selectedPly == null && (snapshot?.completedPlies ?? 0) > 0) {
         final lastIndex = (detail?.moves.length ?? 1) - 1;
         final rawLatest = snapshot!.completedPlies - 1;
-        final latest = rawLatest < 0 ? 0 : (rawLatest > lastIndex ? lastIndex : rawLatest);
+        final latest = rawLatest < 0
+            ? 0
+            : (rawLatest > lastIndex ? lastIndex : rawLatest);
         selectedPly = latest;
         await refinePly(latest);
       }
@@ -636,14 +631,18 @@ class AnalysisController extends ChangeNotifier {
     _timer?.cancel();
     try {
       final started = await gateway.startMoveRefinement(game.id, ply);
-      if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+      if (_disposed ||
+          generation != _refinementGeneration ||
+          selectedPly != ply) {
         return;
       }
       if (started.lines.isNotEmpty) displayedSnapshot = started;
       notifyListeners();
       _scheduleRefinementPoll(ply, generation);
     } catch (caught) {
-      if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+      if (_disposed ||
+          generation != _refinementGeneration ||
+          selectedPly != ply) {
         return;
       }
       error = caught;
@@ -660,19 +659,25 @@ class AnalysisController extends ChangeNotifier {
     }
     _refinementTimer?.cancel();
     _refinementTimer = Timer(pollInterval, () async {
-      if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+      if (_disposed ||
+          generation != _refinementGeneration ||
+          selectedPly != ply) {
         return;
       }
       try {
         final next = await gateway.moveAnalysisStatus(game.id, ply);
-        if (_disposed || generation != _refinementGeneration || selectedPly != ply) {
+        if (_disposed ||
+            generation != _refinementGeneration ||
+            selectedPly != ply) {
           return;
         }
         displayedSnapshot = next;
         notifyListeners();
         if (next.isRunning) _scheduleRefinementPoll(ply, generation);
       } catch (_) {
-        if (!_disposed && generation == _refinementGeneration && selectedPly == ply) {
+        if (!_disposed &&
+            generation == _refinementGeneration &&
+            selectedPly == ply) {
           _scheduleRefinementPoll(ply, generation);
         }
       }
@@ -692,7 +697,6 @@ class AnalysisController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
     if (!_disposed) await refinePly(selected);
   }
-
 
   void pauseForVariation() {
     _variationPaused = true;

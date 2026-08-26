@@ -203,10 +203,11 @@ class StatTally {
 class StatTimeControl {
   const StatTimeControl({required this.type, required this.tally});
 
-  factory StatTimeControl.fromJson(Map<String, Object?> json) => StatTimeControl(
-    type: json['type'] as String? ?? 'unknown',
-    tally: StatTally.fromJson(json),
-  );
+  factory StatTimeControl.fromJson(Map<String, Object?> json) =>
+      StatTimeControl(
+        type: json['type'] as String? ?? 'unknown',
+        tally: StatTally.fromJson(json),
+      );
 
   final String type;
   final StatTally tally;
@@ -330,6 +331,7 @@ class AppSettings {
     this.multiPv = 3,
     this.timeLimitSeconds = 0,
     this.threads = 2,
+    this.maxThreads = 2,
     this.hashMb = 128,
     this.showBestMoveArrow = true,
     this.showThreatArrow = true,
@@ -357,6 +359,7 @@ class AppSettings {
     multiPv: json['multiPv'] as int? ?? 3,
     timeLimitSeconds: json['timeLimitSeconds'] as int? ?? 0,
     threads: json['threads'] as int? ?? 2,
+    maxThreads: json['maxThreads'] as int? ?? json['threads'] as int? ?? 2,
     hashMb: json['hashMb'] as int? ?? 128,
     showBestMoveArrow:
         json['showBestMoveArrow'] as bool? ??
@@ -386,6 +389,7 @@ class AppSettings {
   final int multiPv;
   final int timeLimitSeconds;
   final int threads;
+  final int maxThreads;
   final int hashMb;
   final bool showBestMoveArrow;
   final bool showThreatArrow;
@@ -416,6 +420,7 @@ class AppSettings {
     int? multiPv,
     int? timeLimitSeconds,
     int? threads,
+    int? maxThreads,
     int? hashMb,
     bool? showBestMoveArrow,
     bool? showBoardArrows,
@@ -442,6 +447,7 @@ class AppSettings {
     multiPv: multiPv ?? this.multiPv,
     timeLimitSeconds: timeLimitSeconds ?? this.timeLimitSeconds,
     threads: threads ?? this.threads,
+    maxThreads: maxThreads ?? this.maxThreads,
     hashMb: hashMb ?? this.hashMb,
     showBestMoveArrow:
         showBestMoveArrow ?? showBoardArrows ?? this.showBestMoveArrow,
@@ -475,12 +481,13 @@ class FavoriteCollection {
     required this.createdAt,
   });
 
-  factory FavoriteCollection.fromJson(Map<String, Object?> json) => FavoriteCollection(
-    id: json['id']! as String,
-    name: json['name']! as String,
-    gameCount: json['gameCount'] as int? ?? 0,
-    createdAt: json['createdAt'] as int? ?? 0,
-  );
+  factory FavoriteCollection.fromJson(Map<String, Object?> json) =>
+      FavoriteCollection(
+        id: json['id']! as String,
+        name: json['name']! as String,
+        gameCount: json['gameCount'] as int? ?? 0,
+        createdAt: json['createdAt'] as int? ?? 0,
+      );
 
   final String id;
   final String name;
@@ -584,6 +591,39 @@ class GameSummary {
   final int endedAt;
 }
 
+class GameQuery {
+  const GameQuery({
+    this.search = '',
+    this.outcome = 'all',
+    this.color = 'all',
+    this.timeControls = const <String>[],
+    this.sort = 'newest',
+    this.month,
+    this.favoriteOnly = false,
+    this.applyMonth = false,
+  });
+
+  final String search;
+  final String outcome;
+  final String color;
+  final List<String> timeControls;
+  final String sort;
+  final String? month;
+  final bool favoriteOnly;
+  final bool applyMonth;
+
+  Map<String, Object?> toJson() => {
+    'search': search,
+    'outcome': outcome,
+    'color': color,
+    'timeControls': timeControls,
+    'sort': sort,
+    'month': month,
+    'favoriteOnly': favoriteOnly,
+    'applyMonth': applyMonth,
+  };
+}
+
 class ParsedMove {
   const ParsedMove({
     required this.plyIndex,
@@ -593,6 +633,8 @@ class ParsedMove {
     required this.uci,
     required this.fenBefore,
     required this.fenAfter,
+    this.positionBefore = BoardPosition.empty,
+    this.positionAfter = BoardPosition.empty,
   });
 
   factory ParsedMove.fromJson(Map<String, Object?> json) => ParsedMove(
@@ -603,6 +645,12 @@ class ParsedMove {
     uci: json['uci']! as String,
     fenBefore: json['fenBefore']! as String,
     fenAfter: json['fenAfter']! as String,
+    positionBefore: BoardPosition.fromJson(
+      json['positionBefore']! as Map<String, Object?>,
+    ),
+    positionAfter: BoardPosition.fromJson(
+      json['positionAfter']! as Map<String, Object?>,
+    ),
   );
 
   final int plyIndex;
@@ -612,6 +660,132 @@ class ParsedMove {
   final String uci;
   final String fenBefore;
   final String fenAfter;
+  final BoardPosition positionBefore;
+  final BoardPosition positionAfter;
+}
+
+class BoardPosition {
+  const BoardPosition({
+    required this.fen,
+    required this.pieces,
+    required this.sideToMove,
+    required this.draggableColor,
+    this.fullmoveNumber = 1,
+  });
+
+  static const empty = BoardPosition(
+    fen: '8/8/8/8/8/8/8/8 w - - 0 1',
+    pieces: <String>[
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ],
+    sideToMove: 'white',
+    draggableColor: 'white',
+    fullmoveNumber: 1,
+  );
+
+  factory BoardPosition.fromJson(Map<String, Object?> json) => BoardPosition(
+    fen: json['fen']! as String,
+    pieces: (json['pieces']! as List<Object?>).cast<String>(),
+    sideToMove: json['sideToMove']! as String,
+    draggableColor: json['draggableColor']! as String,
+    fullmoveNumber: json['fullmoveNumber'] as int? ?? 1,
+  );
+
+  final String fen;
+  final List<String> pieces;
+  final String sideToMove;
+  final String draggableColor;
+  final int fullmoveNumber;
+}
+
+class BoardMoveResolution {
+  const BoardMoveResolution({
+    required this.uci,
+    required this.san,
+    required this.fenAfter,
+    required this.positionAfter,
+    this.mainLinePly,
+  });
+
+  factory BoardMoveResolution.fromJson(Map<String, Object?> json) =>
+      BoardMoveResolution(
+        uci: json['uci']! as String,
+        san: json['san']! as String,
+        fenAfter: json['fenAfter']! as String,
+        positionAfter: BoardPosition.fromJson(
+          json['positionAfter']! as Map<String, Object?>,
+        ),
+        mainLinePly: json['mainLinePly'] as int?,
+      );
+
+  final String uci;
+  final String san;
+  final String fenAfter;
+  final BoardPosition positionAfter;
+  final int? mainLinePly;
 }
 
 class GameDetail {
@@ -619,6 +793,8 @@ class GameDetail {
     required this.summary,
     required this.pgn,
     required this.moves,
+    this.startingPosition = BoardPosition.empty,
+    this.outcome,
   });
 
   factory GameDetail.fromJson(Map<String, Object?> json) => GameDetail(
@@ -628,11 +804,31 @@ class GameDetail {
         .cast<Map<String, Object?>>()
         .map(ParsedMove.fromJson)
         .toList(growable: false),
+    startingPosition: BoardPosition.fromJson(
+      json['startingPosition']! as Map<String, Object?>,
+    ),
+    outcome: json['outcome'] == null
+        ? null
+        : GameOutcome.fromJson(json['outcome']! as Map<String, Object?>),
   );
 
   final GameSummary summary;
   final String pgn;
   final List<ParsedMove> moves;
+  final BoardPosition startingPosition;
+  final GameOutcome? outcome;
+}
+
+class GameOutcome {
+  const GameOutcome({required this.result, required this.checkmate});
+
+  factory GameOutcome.fromJson(Map<String, Object?> json) => GameOutcome(
+    result: json['result']! as String,
+    checkmate: json['checkmate']! as bool,
+  );
+
+  final String result;
+  final bool checkmate;
 }
 
 enum MoveClassification {
@@ -834,7 +1030,6 @@ class EngineLine {
   String get bestMove => moves.isEmpty ? '' : moves.first;
 }
 
-
 enum AnalysisJobState {
   queued,
   running,
@@ -845,18 +1040,28 @@ enum AnalysisJobState {
 
   static AnalysisJobState fromJson(String? value, String legacyStatus) {
     switch (value) {
-      case 'queued': return AnalysisJobState.queued;
-      case 'running': return AnalysisJobState.running;
-      case 'cancelling': return AnalysisJobState.cancelling;
-      case 'cancelled': return AnalysisJobState.cancelled;
-      case 'completed': return AnalysisJobState.completed;
-      case 'failed': return AnalysisJobState.failed;
+      case 'queued':
+        return AnalysisJobState.queued;
+      case 'running':
+        return AnalysisJobState.running;
+      case 'cancelling':
+        return AnalysisJobState.cancelling;
+      case 'cancelled':
+        return AnalysisJobState.cancelled;
+      case 'completed':
+        return AnalysisJobState.completed;
+      case 'failed':
+        return AnalysisJobState.failed;
     }
     switch (legacyStatus) {
-      case 'complete': return AnalysisJobState.completed;
-      case 'cancelled': return AnalysisJobState.cancelled;
-      case 'error': return AnalysisJobState.failed;
-      default: return AnalysisJobState.running;
+      case 'complete':
+        return AnalysisJobState.completed;
+      case 'cancelled':
+        return AnalysisJobState.cancelled;
+      case 'error':
+        return AnalysisJobState.failed;
+      default:
+        return AnalysisJobState.running;
     }
   }
 }
@@ -968,6 +1173,7 @@ class VariationAnalysisSnapshot {
     required this.playedMove,
     required this.playedSan,
     required this.fen,
+    this.position = BoardPosition.empty,
     required this.bestMove,
     required this.lines,
     this.liveDepth = 0,
@@ -984,6 +1190,9 @@ class VariationAnalysisSnapshot {
         playedMove: json['playedMove'] as String? ?? '',
         playedSan: json['playedSan'] as String? ?? '',
         fen: json['fen'] as String? ?? '',
+        position: BoardPosition.fromJson(
+          json['position']! as Map<String, Object?>,
+        ),
         bestMove: json['bestMove'] as String? ?? '',
         liveDepth: json['liveDepth'] as int? ?? 0,
         moverEvaluationCp: json['moverEvaluationCp'] as int?,
@@ -1003,6 +1212,7 @@ class VariationAnalysisSnapshot {
   final String playedMove;
   final String playedSan;
   final String fen;
+  final BoardPosition position;
   final String bestMove;
   final int liveDepth;
   final int? moverEvaluationCp;
@@ -1030,6 +1240,7 @@ class VariationAnalysisSnapshot {
     playedMove: playedMove,
     playedSan: playedSan,
     fen: fen,
+    position: position,
     bestMove: bestMove ?? this.bestMove,
     liveDepth: liveDepth ?? this.liveDepth,
     moverEvaluationCp: moverEvaluationCp ?? this.moverEvaluationCp,
