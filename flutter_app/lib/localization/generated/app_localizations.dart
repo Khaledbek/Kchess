@@ -166,6 +166,24 @@ abstract class AppLocalizations {
   /// **'Games'**
   String get games;
 
+  /// No description provided for @gameSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Game'**
+  String get gameSection;
+
+  /// No description provided for @play.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get play;
+
+  /// No description provided for @playPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'This section is reserved for future play modes, such as games against bots.'**
+  String get playPlaceholder;
+
   /// No description provided for @downloads.
   ///
   /// In en, this message translates to:
@@ -411,6 +429,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel analysis'**
   String get cancelAnalysis;
+
+  /// No description provided for @deleteAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete saved analysis'**
+  String get deleteAnalysis;
+
+  /// No description provided for @deleteAnalysisQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete saved analysis?'**
+  String get deleteAnalysisQuestion;
+
+  /// No description provided for @deleteAnalysisBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The locally saved analysis and accuracy for this game will be removed. The PGN/FEN and global engine cache remain.'**
+  String get deleteAnalysisBody;
+
+  /// No description provided for @analysisDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved analysis deleted.'**
+  String get analysisDeleted;
 
   /// No description provided for @classificationPending.
   ///
@@ -675,6 +717,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shows opening-book information and theory counts.'**
   String get showTheorySettingHelp;
+
+  /// No description provided for @showResultSymbolsSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Show result symbols'**
+  String get showResultSymbolsSetting;
+
+  /// No description provided for @showResultSymbolsSettingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shows Win, Loss or Draw symbols above the kings when a game has ended.'**
+  String get showResultSymbolsSettingHelp;
 
   /// No description provided for @designSettingsTitle.
   ///
@@ -1063,8 +1117,20 @@ abstract class AppLocalizations {
   /// No description provided for @depthHelp.
   ///
   /// In en, this message translates to:
-  /// **'Maximum search depth per position. Higher values usually take longer.'**
+  /// **'Min = pre-analysis depth. Max = maximum live-analysis depth. Higher values usually take longer.'**
   String get depthHelp;
+
+  /// No description provided for @adaptiveEarlyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive analysis'**
+  String get adaptiveEarlyStop;
+
+  /// No description provided for @adaptiveEarlyStopHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends quiet pre-analysis and live searches early when the evaluation and principal variations are stable. Critical verification searches still use the configured limit.'**
+  String get adaptiveEarlyStopHelp;
 
   /// No description provided for @numberOfLinesHelp.
   ///
@@ -1107,6 +1173,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Board display'**
   String get boardDisplayTitle;
+
+  /// No description provided for @rotateBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate board'**
+  String get rotateBoard;
 
   /// No description provided for @showBoardCoordinates.
   ///

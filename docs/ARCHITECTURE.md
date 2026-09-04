@@ -24,6 +24,14 @@ Flutter zeigt native DTOs an und übernimmt keine Schachregeln. Die C-ABI
 verwendet opaque Handles, UTF-8, JSON-DTOs und `kc_string_free`; C++-Exceptions
 werden an der ABI-Grenze abgefangen.
 
+Die UI erhält Brettstellungen als `BoardPosition` mit 64 bereits aufgelösten
+Feldern, Zugfarbe und erlaubter Figurenfarbe. Zugnormalisierung (einschließlich
+Standard-Promotion zur Dame), Legalitätsprüfung und Wiederanschluss einer
+Nebenvariante an die PGN-Hauptlinie erfolgen nativ. Ergebnisart sowie Engine-
+Scores/WDL werden vom Core bereits auf eine stabile Weiß-Perspektive abgebildet.
+Auch Suche, Filter, Monatsauswahl und Sortierung der Spieleliste laufen über
+eine native Query; Dart hält nur die aktuell ausgewählten UI-Filter.
+
 ## Import und Stellungsmodell
 
 `native/src/chess/pgn.cpp` liest Tags, SAN, Kommentare, NAGs und geklammerte

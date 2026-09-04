@@ -39,16 +39,22 @@ String? _analysisClassificationAsset(MoveClassification classification) =>
       MoveClassification.unknown => null,
     };
 
-String? _knownGameResult(String? raw) {
-  final result = raw?.trim();
-  return switch (result) {
-    '1-0' || '0-1' || '1/2-1/2' || '½-½' => result,
-    _ => null,
-  };
-}
+bool _isDrawResult(String result) => result == '1/2-1/2' || result == '½-½';
 
-bool _isDrawResult(String result) =>
-    result == '1/2-1/2' || result == '½-½';
+String? _resultAssetForColor(String color, String? result, bool checkmate) {
+  if (result == null) return null;
+  if (_isDrawResult(result)) {
+    return 'assets/analysis_img/result_draw.png';
+  }
+  final whiteWon = result == '1-0';
+  final colorIsWhite = color == 'white';
+  if (whiteWon == colorIsWhite) {
+    return 'assets/analysis_img/result_win.png';
+  }
+  return checkmate
+      ? 'assets/analysis_img/result_loss.png'
+      : 'assets/analysis_img/result_giveup.png';
+}
 
 Color _classificationColor(
   BuildContext context,
@@ -56,15 +62,15 @@ Color _classificationColor(
 ) {
   final scheme = Theme.of(context).colorScheme;
   return switch (classification) {
-    MoveClassification.theory => scheme.primary,
-    MoveClassification.brilliant => const Color(0xFF00A6A6),
-    MoveClassification.critical => const Color(0xFFE39A18),
-    MoveClassification.best => const Color(0xFF2E9B55),
-    MoveClassification.excellent => const Color(0xFF4A9B73),
-    MoveClassification.okay => scheme.onSurfaceVariant,
-    MoveClassification.miss => const Color(0xFFE08A1E),
-    MoveClassification.mistake => const Color(0xFFD9682A),
-    MoveClassification.blunder => scheme.error,
+    MoveClassification.theory => const Color(0xCCC9A26A),
+    MoveClassification.brilliant => const Color(0xCC1565C0),
+    MoveClassification.critical => const Color(0xB364B5F6),
+    MoveClassification.best => const Color(0xB343A047),
+    MoveClassification.excellent => const Color(0x99BB6A),
+    MoveClassification.okay => const Color(0x80A5D6A7),
+    MoveClassification.miss => const Color(0x80FFB74D),
+    MoveClassification.mistake => const Color(0x99EF5350),
+    MoveClassification.blunder => const Color(0xB3D32F2F),
     MoveClassification.unknown => scheme.onSurfaceVariant,
   };
 }
@@ -314,12 +320,12 @@ class _LivePlayerSummary extends StatelessWidget {
         if (settings.showClassifications)
           for (final (label, count) in counts)
             Padding(
-            padding: const EdgeInsets.symmetric(vertical: 1),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [Text(label), Text('$count')],
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [Text(label), Text('$count')],
+              ),
             ),
-          ),
       ],
     );
   }
@@ -344,10 +350,10 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _VariationSession {
-  _VariationSession({required this.parentPly, required this.startingFen});
+  _VariationSession({required this.parentPly, required this.startingPosition});
 
   final int parentPly;
-  final String startingFen;
+  final BoardPosition startingPosition;
   final List<VariationAnalysisSnapshot> moves = [];
   int currentIndex = -1;
 
@@ -360,9 +366,12 @@ class _VariationSession {
 class _AnalysisScreenState extends State<AnalysisScreen> {
   late final AnalysisController _controller;
   late AppSettings _settings;
-  bool _followLatest = true;
+  bool _followLatest = false;
   bool _playing = false;
-  int _currentPly = 0;
+  bool _boardRotated = false;
+  bool _resultPresentationStarted = false;
+  bool _resultPresentationDocked = false;
+  int _currentPly = -1;
   int _selectedLine = 0;
   String? _selectedSquare;
   AnalysisSnapshot? _afterMoveSnapshot;
@@ -386,9 +395,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     _settings = widget.settings;
     _sidelineDepth = _settings.depth;
     _sidelineMultiPv = _settings.multiPv;
-    _sidelineThreads = AppController.clampEngineWorkerThreads(
-      _settings.threads,
-    );
+    _sidelineThreads = _settings.threads;
     _sidelineHashMb = _settings.hashMb;
     _controller = AnalysisController(widget.gateway, widget.game)
       ..addListener(_refresh);
@@ -414,6 +421,45 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.dispose();
   }
 
+  Future<void> _deleteStoredAnalysis() async {
+    final strings = AppLocalizations.of(context);
+    var confirmed = true;
+    if (_settings.confirmBeforeDelete) {
+      confirmed =
+          await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(strings.deleteAnalysisQuestion),
+              content: Text(strings.deleteAnalysisBody),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(strings.cancelAction),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(strings.deleteAction),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+    }
+    if (!confirmed) return;
+
+    try {
+      await widget.gateway.deleteAnalysis(widget.game.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(strings.analysisDeleted)));
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   void _refresh() {
     if (!mounted) return;
     final completedMoves = _controller.snapshot?.completedPlies ?? 0;
@@ -435,11 +481,23 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   Future<void> _loadAfterMoveSnapshot(int moveIndex) async {
     final moves = _controller.detail?.moves;
     if (moves == null || moves.isEmpty) return;
+    if (moveIndex < 0) {
+      _afterMoveLoadGeneration++;
+      if (mounted && (_afterMoveSnapshot != null || _afterMoveSlot != null)) {
+        setState(() {
+          _afterMoveSnapshot = null;
+          _afterMoveSlot = null;
+          _afterMoveLoadingSlot = null;
+        });
+      }
+      return;
+    }
     final clampedMoveIndex = moveIndex < 0
         ? 0
         : (moveIndex >= moves.length ? moves.length - 1 : moveIndex);
     final slot = clampedMoveIndex + 1;
-    final analysisRunning = _controller.snapshot?.isRunning == true ||
+    final analysisRunning =
+        _controller.snapshot?.isRunning == true ||
         _controller.displayedSnapshot?.isRunning == true;
     if (_afterMoveLoadingSlot == slot) return;
     if (_afterMoveSlot == slot &&
@@ -478,14 +536,20 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   Future<void> _selectPly(int value) async {
     if (_variationSession != null) _returnToMainLine();
-    final selected = value < 0
-        ? 0
+    final selected = value < -1
+        ? -1
         : (value > _maximumPly ? _maximumPly : value);
     setState(() {
       _followLatest = false;
       _currentPly = selected;
       _selectedLine = 0;
+      _selectedSquare = null;
     });
+    if (selected < 0) {
+      await _controller.selectPly(0);
+      await _loadAfterMoveSnapshot(-1);
+      return;
+    }
     await _controller.selectPly(selected);
     await _loadAfterMoveSnapshot(selected);
   }
@@ -509,8 +573,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         context: context,
         showDragHandle: true,
         isScrollControlled: true,
-        builder: (context) =>
-            _SummarySheet(summary: summary),
+        builder: (context) => _SummarySheet(summary: summary),
       );
 
   AppSettings _withDisplaySetting(
@@ -522,8 +585,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     'showThreatArrow' => settings.copyWith(showThreatArrow: enabled),
     'showEvaluationBar' => settings.copyWith(showEvaluationBar: enabled),
     'showEngineLines' => settings.copyWith(showEngineLines: enabled),
-    'showClassifications' =>
-      settings.copyWith(showClassifications: enabled),
+    'showClassifications' => settings.copyWith(showClassifications: enabled),
+    'showResultSymbols' => settings.copyWith(showResultSymbols: enabled),
     _ => settings,
   };
 
@@ -562,11 +625,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           Future<void> toggle(String key, bool enabled) async {
             final before = quickSettings;
             setSheetState(() {
-              quickSettings = _withDisplaySetting(
-                quickSettings,
-                key,
-                enabled,
-              );
+              quickSettings = _withDisplaySetting(quickSettings, key, enabled);
             });
             final saved = await _setDisplaySetting(key, enabled);
             if (!saved && sheetContext.mounted) {
@@ -714,6 +773,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       value: quickSettings.showClassifications,
                       icon: Icons.auto_awesome,
                     ),
+                    settingTile(
+                      key: 'showResultSymbols',
+                      title: strings.showResultSymbolsSetting,
+                      subtitle: strings.showResultSymbolsSettingHelp,
+                      value: quickSettings.showResultSymbols,
+                      icon: Icons.emoji_events_outlined,
+                    ),
                     const Divider(height: 26),
                     Row(
                       children: [
@@ -755,14 +821,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     ),
                     numberSlider(
                       title: strings.threads,
-                      value: AppController.clampEngineWorkerThreads(
-                        quickThreads,
-                      ),
+                      value: quickThreads,
                       min: 1,
-                      max: AppController.maximumEngineWorkerThreads,
-                      onChanged: (value) => updateSideline(
-                        threads: AppController.clampEngineWorkerThreads(value),
-                      ),
+                      max: _settings.maxThreads,
+                      onChanged: (value) => updateSideline(threads: value),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
@@ -849,22 +911,36 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   Future<void> _playBoardMove(String source, String target) async {
     if (_variationMovePending) return;
     final session = _variationSession;
-    final activeFen = session == null
-        ? _displayFen
-        : session.current?.fen ?? session.startingFen;
-    var uci = '$source$target';
-    final fields = activeFen.split(' ');
-    final placement = fields.isEmpty ? '' : fields.first;
-    if ((target.endsWith('8') || target.endsWith('1')) &&
-        _pieceAt(placement, source).toLowerCase() == 'p') {
-      uci += 'q';
-    }
+    final activePosition = session == null
+        ? _displayPosition
+        : session.current?.position ?? session.startingPosition;
 
     // A move played on the board is only a sideline when it actually deviates
     // from the recorded PGN. If this exact position + move occurs later in the
     // main line (including a rejoin after a transposition), jump back onto the
     // PGN instead of starting a variation engine job.
-    final mainLinePly = _matchingMainLinePly(activeFen, uci);
+    final firstCandidate = session == null
+        ? _currentPly + 1
+        : session.parentPly + 1;
+    late final BoardMoveResolution resolved;
+    try {
+      resolved = await widget.gateway.resolveBoardMove(
+        gameId: widget.game.id,
+        fen: activePosition.fen,
+        source: source,
+        target: target,
+        firstCandidatePly: firstCandidate,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _selectedSquare = null;
+          _variationError = error;
+        });
+      }
+      return;
+    }
+    final mainLinePly = resolved.mainLinePly;
     if (mainLinePly != null) {
       if (session == null) {
         await _selectPly(mainLinePly);
@@ -886,8 +962,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     });
     try {
       final variation = await widget.gateway.startVariationAnalysis(
-        fen: activeFen,
-        uci: uci,
+        fen: activePosition.fen,
+        uci: resolved.uci,
         depth: _sidelineDepth,
         multiPv: _sidelineMultiPv,
         threads: _sidelineThreads,
@@ -900,8 +976,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         return;
       }
       setState(() {
-        final activeSession = _variationSession ??=
-            _VariationSession(parentPly: _currentPly, startingFen: _displayFen);
+        final activeSession = _variationSession ??= _VariationSession(
+          parentPly: _currentPly,
+          startingPosition: _displayPosition,
+        );
         if (activeSession.currentIndex + 1 < activeSession.moves.length) {
           activeSession.moves.removeRange(
             activeSession.currentIndex + 1,
@@ -929,54 +1007,24 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           _variationError = error;
         });
         if (_variationSession == null) {
-          unawaited(_controller.resumeAfterVariation(_currentPly));
+          unawaited(_controller.resumeAfterVariation(math.max(0, _currentPly)));
         }
       }
     }
   }
 
-  String get _displayFen {
+  BoardPosition get _displayPosition {
     final detail = _controller.detail;
     if (detail == null || detail.moves.isEmpty) {
-      return detail?.summary.startingFen ?? widget.game.startingFen;
+      return detail?.startingPosition ?? BoardPosition.empty;
     }
-    final index = _currentPly < 0
-        ? 0
-        : (_currentPly >= detail.moves.length
-              ? detail.moves.length - 1
-              : _currentPly);
-    return detail.moves[index].fenAfter;
-  }
-
-  int? _matchingMainLinePly(String fen, String uci) {
-    final moves = _controller.detail?.moves;
-    if (moves == null || moves.isEmpty) return null;
-
-    final session = _variationSession;
-    final firstCandidate = session == null
-        ? _currentPly + 1
-        : session.parentPly + 1;
-    final normalizedUci = uci.toLowerCase();
-    for (var index = firstCandidate < 0 ? 0 : firstCandidate;
-        index < moves.length;
-        index++) {
-      final recorded = moves[index];
-      if (recorded.uci.toLowerCase() == normalizedUci &&
-          _sameChessPosition(recorded.fenBefore, fen)) {
-        return index;
-      }
+    if (_currentPly < 0) {
+      return detail.startingPosition;
     }
-    return null;
-  }
-
-  bool _sameChessPosition(String left, String right) {
-    final leftFields = left.trim().split(RegExp(r'\s+'));
-    final rightFields = right.trim().split(RegExp(r'\s+'));
-    if (leftFields.length < 4 || rightFields.length < 4) return left == right;
-    for (var index = 0; index < 4; index++) {
-      if (leftFields[index] != rightFields[index]) return false;
-    }
-    return true;
+    final index = _currentPly >= detail.moves.length
+        ? detail.moves.length - 1
+        : _currentPly;
+    return detail.moves[index].positionAfter;
   }
 
   Future<void> _rejoinMainLineAt(int ply) async {
@@ -1006,32 +1054,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     await _loadAfterMoveSnapshot(ply);
   }
 
-  String _pieceAt(String placement, String square) {
-    if (square.length != 2) return '';
-    final target =
-        (8 - (int.tryParse(square[1]) ?? 0)) * 8 +
-        square.codeUnitAt(0) -
-        'a'.codeUnitAt(0);
-    var index = 0;
-    for (final character in placement.split('')) {
-      final empty = int.tryParse(character);
-      if (empty != null) {
-        if (target >= index && target < index + empty) return '';
-        index += empty;
-      } else if (character != '/') {
-        if (index == target) return character;
-        index++;
-      }
-    }
-    return '';
-  }
-
   void _pollVariation(String jobId, int moveIndex) {
     _variationTimer?.cancel();
     final session = _variationSession;
-    final current = session != null &&
-            moveIndex >= 0 &&
-            moveIndex < session.moves.length
+    final current =
+        session != null && moveIndex >= 0 && moveIndex < session.moves.length
         ? session.moves[moveIndex]
         : null;
     if (current == null ||
@@ -1084,7 +1111,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         // A just-finished live job may already have been reaped natively.
       }
     }
-    if (mounted) await _controller.resumeAfterVariation(_currentPly);
+    if (mounted) {
+      await _controller.resumeAfterVariation(math.max(0, _currentPly));
+    }
   }
 
   void _navigateVariation(int index) {
@@ -1100,8 +1129,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       _selectedSquare = null;
     });
     final current = session.current;
-    if (current?.isRunning == true &&
-        current!.jobId == _activeVariationJobId) {
+    if (current?.isRunning == true && current!.jobId == _activeVariationJobId) {
       _pollVariation(current.jobId, selected);
     }
   }
@@ -1109,9 +1137,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   String _variationPgn(ParsedMove? parent) {
     final session = _variationSession;
     if (session == null || session.moves.isEmpty) return '';
-    final fields = session.startingFen.split(' ');
-    var whiteToMove = fields.length > 1 ? fields[1] == 'w' : true;
-    var moveNumber = fields.length > 5 ? int.tryParse(fields[5]) ?? 1 : 1;
+    var whiteToMove = session.startingPosition.sideToMove == 'white';
+    var moveNumber = session.startingPosition.fullmoveNumber;
     final tokens = <String>[];
     for (var index = 0; index < session.moves.length; index++) {
       final san = session.moves[index].playedSan;
@@ -1135,23 +1162,27 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final snapshot = _controller.snapshot;
     final displayed = _controller.displayedSnapshot;
     final detail = _controller.detail;
+    final gameSummary = detail?.summary ?? widget.game;
+    final atInitialPosition =
+        detail != null && detail.moves.isNotEmpty && _currentPly < 0;
     final moveIndex = detail == null || detail.moves.isEmpty
-        ? 0
-        : (_currentPly < 0
-              ? 0
+        ? -1
+        : (atInitialPosition
+              ? -1
               : (_currentPly >= detail.moves.length
                     ? detail.moves.length - 1
                     : _currentPly));
-    final move = detail != null && detail.moves.isNotEmpty
+    final move = detail != null && moveIndex >= 0
         ? detail.moves[moveIndex]
         : null;
-    final originalFen =
-        move?.fenAfter ??
-        detail?.summary.startingFen ??
-        widget.game.startingFen;
     final variation = _variationSession?.current;
-    final fen = variation?.fen ?? _variationSession?.startingFen ?? originalFen;
-    final afterMoveSnapshot = _afterMoveSlot == moveIndex + 1
+    final position =
+        variation?.position ??
+        _variationSession?.startingPosition ??
+        move?.positionAfter ??
+        detail?.startingPosition ??
+        _displayPosition;
+    final afterMoveSnapshot = moveIndex >= 0 && _afterMoveSlot == moveIndex + 1
         ? _afterMoveSnapshot
         : null;
     final mainPositionLines = move == null
@@ -1167,24 +1198,34 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         variation?.bestMove ??
         (move == null ? displayed?.bestMove : afterMoveSnapshot?.bestMove) ??
         '';
-    final profileSide = snapshot?.summary?.profileSide ?? 'unknown';
+    final profileSide =
+        snapshot?.summary?.profileSide ?? gameSummary.profileColor;
     final playerIsBlack = profileSide == 'black';
     final opponentName = playerIsBlack
-        ? widget.game.whiteName
-        : widget.game.blackName;
+        ? gameSummary.whiteName
+        : gameSummary.blackName;
     final opponentRating = playerIsBlack
-        ? widget.game.whiteRating
-        : widget.game.blackRating;
+        ? gameSummary.whiteRating
+        : gameSummary.blackRating;
     final playerName = playerIsBlack
-        ? widget.game.blackName
-        : widget.game.whiteName;
+        ? gameSummary.blackName
+        : gameSummary.whiteName;
     final playerRating = playerIsBlack
-        ? widget.game.blackRating
-        : widget.game.whiteRating;
-    final fenFields = fen.split(' ');
-    final sideToMove = fenFields.length > 1
-        ? (fenFields[1] == 'b' ? 'black' : 'white')
-        : 'unknown';
+        ? gameSummary.blackRating
+        : gameSummary.whiteRating;
+    final openingName = gameSummary.openingName?.trim() ?? '';
+    final openingEco = gameSummary.openingEco?.trim() ?? '';
+    final openingLabel = openingName.isEmpty
+        ? null
+        : (openingEco.isEmpty ? openingName : '$openingEco · $openingName');
+    final hasKnownProfileColor =
+        profileSide == 'white' || profileSide == 'black';
+    final playerColor = playerIsBlack ? 'black' : 'white';
+    final opponentColor = playerIsBlack ? 'white' : 'black';
+    // By default the account/profile player is always at the bottom.
+    // The rotate button explicitly inverts that orientation.
+    final blackAtBottom = playerIsBlack != _boardRotated;
+    final sideToMove = position.sideToMove;
     final opponentToMove =
         (profileSide == 'white' || profileSide == 'black') &&
         sideToMove != profileSide;
@@ -1195,13 +1236,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         detail != null &&
         detail.moves.isNotEmpty &&
         moveIndex == detail.moves.length - 1;
-    final terminalResult = atMainLineEnd
-        ? _knownGameResult(detail.summary.result)
-        : null;
-    final terminalByCheckmate =
-        terminalResult != null &&
-        !_isDrawResult(terminalResult) &&
-        detail!.moves.last.san.contains('#');
+    final terminalOutcome = atMainLineEnd ? detail.outcome : null;
+    final terminalResult = terminalOutcome?.result;
+    final gameOutcome = detail?.outcome;
 
     return Scaffold(
       appBar: AppBar(
@@ -1214,6 +1251,18 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               tooltip: strings.cancelAnalysis,
               icon: const Icon(Icons.stop_circle_outlined),
             ),
+          IconButton(
+            key: const Key('rotate-analysis-board'),
+            onPressed: () => setState(() => _boardRotated = !_boardRotated),
+            tooltip: strings.rotateBoard,
+            icon: const Icon(Icons.rotate_90_degrees_ccw_rounded),
+          ),
+          IconButton(
+            key: const Key('delete-saved-analysis'),
+            onPressed: _deleteStoredAnalysis,
+            tooltip: strings.deleteAnalysis,
+            icon: const Icon(Icons.delete_outline_rounded),
+          ),
           if (snapshot?.summary case final summary?) ...[
             Builder(
               builder: (context) {
@@ -1242,8 +1291,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 double depthProgress(int depth, bool qualityComplete) =>
                     qualityComplete || maxDepth <= minDepth
                     ? 1.0
-                    : ((depth - minDepth) / (maxDepth - minDepth))
-                          .clamp(0.0, 1.0);
+                    : ((depth - minDepth) / (maxDepth - minDepth)).clamp(
+                        0.0,
+                        1.0,
+                      );
                 final beforeProgress = depthProgress(
                   beforeDepth,
                   displayed?.qualityComplete ?? false,
@@ -1319,10 +1370,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final lastMoveUci = variation?.playedMove ??
+                final lastMoveUci =
+                    variation?.playedMove ??
                     (_variationSession == null ? move?.uci ?? '' : '');
                 final board = _Board(
-                  fen: fen,
+                  position: position,
                   bestArrowMove: bestArrowMove,
                   threatArrowMove: threatArrowMove,
                   lastMoveUci: lastMoveUci,
@@ -1330,22 +1382,41 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   showThreatArrow: _settings.showThreatArrow,
                   showCoordinates: _settings.showBoardCoordinates,
                   highlightLastMove: _settings.highlightLastMove,
-                  highlightSelectedSquare:
-                      _settings.highlightSelectedSquare,
+                  highlightSelectedSquare: _settings.highlightSelectedSquare,
                   opponentName: opponentName,
                   opponentRating: opponentRating,
+                  opponentColor: opponentColor,
                   playerName: playerName,
                   playerRating: playerRating,
+                  playerColor: playerColor,
+                  playerOpening: hasKnownProfileColor ? openingLabel : null,
+                  blackAtBottom: blackAtBottom,
                   evaluationLine: lines.isEmpty ? null : lines.first,
                   showEvaluationBar: _settings.showEvaluationBar,
+                  showResultSymbols: _settings.showResultSymbols,
                   terminalResult: terminalResult,
-                  terminalByCheckmate: terminalByCheckmate,
+                  terminalCheckmate: terminalOutcome?.checkmate ?? false,
+                  gameResult: gameOutcome?.result,
+                  gameCheckmate: gameOutcome?.checkmate ?? false,
+                  resultPresentationStarted: _resultPresentationStarted,
+                  resultPresentationDocked: _resultPresentationDocked,
+                  onResultPresentationStarted: () {
+                    if (!mounted || _resultPresentationStarted) return;
+                    setState(() => _resultPresentationStarted = true);
+                  },
+                  onResultPresentationDocked: () {
+                    if (!mounted || _resultPresentationDocked) return;
+                    setState(() => _resultPresentationDocked = true);
+                  },
                   currentMoveClassification:
-                      _variationSession == null && _settings.showClassifications
-                          ? displayed?.classification
-                          : null,
-                  classificationMoveUci:
-                      _variationSession == null ? (move?.uci ?? '') : '',
+                      _settings.showClassifications && !atInitialPosition
+                      ? (variation?.classification ?? displayed?.classification)
+                      : null,
+                  suppressLastMoveFallback:
+                      _settings.showClassifications && !atInitialPosition,
+                  classificationMoveUci: atInitialPosition
+                      ? ''
+                      : variation?.playedMove ?? (move?.uci ?? ''),
                   selectedSquare: _selectedSquare,
                   onSquareTap: _onBoardSquare,
                   onPieceDrop: _onBoardDrop,
@@ -1385,10 +1456,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Flexible(
-                        flex: 68,
-                        child: SizedBox.expand(child: board),
-                      ),
+                      Flexible(flex: 68, child: SizedBox.expand(child: board)),
                       const VerticalDivider(width: 1),
                       Flexible(flex: 32, child: details),
                     ],
@@ -1416,7 +1484,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             top: false,
             child: _AnalysisControls(
               playing: _playing,
-              onFirst: () => _selectPly(0),
+              onFirst: () => _selectPly(-1),
               onPrevious: () => _selectPly(_currentPly - 1),
               onPlayPause: _togglePlayback,
               onNext: () => _selectPly(_currentPly + 1),
@@ -1432,7 +1500,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
 class _Board extends StatelessWidget {
   const _Board({
-    required this.fen,
+    required this.position,
     required this.bestArrowMove,
     required this.threatArrowMove,
     required this.lastMoveUci,
@@ -1443,13 +1511,25 @@ class _Board extends StatelessWidget {
     required this.highlightSelectedSquare,
     required this.opponentName,
     required this.opponentRating,
+    required this.opponentColor,
     required this.playerName,
     required this.playerRating,
+    required this.playerColor,
+    required this.playerOpening,
+    required this.blackAtBottom,
     required this.evaluationLine,
     required this.showEvaluationBar,
+    required this.showResultSymbols,
     required this.terminalResult,
-    required this.terminalByCheckmate,
+    required this.terminalCheckmate,
+    required this.gameResult,
+    required this.gameCheckmate,
+    required this.resultPresentationStarted,
+    required this.resultPresentationDocked,
+    required this.onResultPresentationStarted,
+    required this.onResultPresentationDocked,
     required this.currentMoveClassification,
+    required this.suppressLastMoveFallback,
     required this.classificationMoveUci,
     required this.selectedSquare,
     required this.onSquareTap,
@@ -1458,7 +1538,7 @@ class _Board extends StatelessWidget {
     required this.onDragEnded,
   });
 
-  final String fen;
+  final BoardPosition position;
   final String bestArrowMove;
   final String threatArrowMove;
   final String lastMoveUci;
@@ -1469,13 +1549,25 @@ class _Board extends StatelessWidget {
   final bool highlightSelectedSquare;
   final String opponentName;
   final int? opponentRating;
+  final String opponentColor;
   final String playerName;
   final int? playerRating;
+  final String playerColor;
+  final String? playerOpening;
+  final bool blackAtBottom;
   final EngineLine? evaluationLine;
   final bool showEvaluationBar;
+  final bool showResultSymbols;
   final String? terminalResult;
-  final bool terminalByCheckmate;
+  final bool terminalCheckmate;
+  final String? gameResult;
+  final bool gameCheckmate;
+  final bool resultPresentationStarted;
+  final bool resultPresentationDocked;
+  final VoidCallback onResultPresentationStarted;
+  final VoidCallback onResultPresentationDocked;
   final MoveClassification? currentMoveClassification;
+  final bool suppressLastMoveFallback;
   final String classificationMoveUci;
   final String? selectedSquare;
   final ValueChanged<String> onSquareTap;
@@ -1498,86 +1590,26 @@ class _Board extends StatelessWidget {
     'p': 'assets/analysis_img/piece_black_pawn.svg',
   };
 
-  String? _kingEndMarker(String piece) {
-    final result = terminalResult;
-    if (result == null || (piece != 'K' && piece != 'k')) return null;
-    if (_isDrawResult(result)) return 'board_remis';
-
-    final whiteWon = result == '1-0';
-    final kingIsWhite = piece == 'K';
-    final isWinner = whiteWon == kingIsWhite;
-    if (isWinner) return 'board_mate_win';
-    return terminalByCheckmate ? 'board_lose' : 'board_giveup';
-  }
-
-  Widget _optionalEndMarker(String baseName) {
-    final aliases = <String>{baseName};
-    if (baseName == 'board_lose') aliases.add('board_mate_lost');
-
-    final candidates = <String>[
-      for (final name in aliases) ...[
-        'assets/analysis_img/$name.png',
-        'assets/$name.png',
-        'assets/analysis_img/$name.webp',
-        'assets/$name.webp',
-        'assets/analysis_img/$name.jpg',
-        'assets/$name.jpg',
-        'assets/analysis_img/$name.jpeg',
-        'assets/$name.jpeg',
-      ],
-    ];
-
-    Widget tryAsset(int index) {
-      if (index >= candidates.length) return const SizedBox.shrink();
-      return Image.asset(
-        candidates[index],
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        errorBuilder: (_, _, _) => tryAsset(index + 1),
-      );
-    }
-
-    return tryAsset(0);
-  }
-
-  List<String> get _pieces {
-    final fields = fen.split(' ');
-    final placement = fields.isEmpty ? '' : fields.first;
-    final result = <String>[];
-    for (final character in placement.split('')) {
-      final empty = int.tryParse(character);
-      if (empty != null) {
-        result.addAll(List.filled(empty, ''));
-      } else if (character != '/') {
-        result.add(character);
-      }
-    }
-    if (result.length != 64) return List.filled(64, '');
-    return result;
-  }
-
   bool _canDragPiece(String piece) {
     if (piece.isEmpty) return false;
-    final fields = fen.split(' ');
-    if (fields.length < 2) return true;
-    final whiteToMove = fields[1] == 'w';
     final whitePiece = piece == piece.toUpperCase();
-    return whitePiece == whiteToMove;
+    return whitePiece == (position.draggableColor == 'white');
   }
 
   @override
   Widget build(BuildContext context) {
-    final pieces = _pieces;
+    final pieces = position.pieces;
     return Padding(
       padding: const EdgeInsets.all(8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          const stripHeight = 34.0;
+          const stripHeight = 58.0;
           const stripGap = 4.0;
           const evaluationHeight = 22.0;
           const evaluationGap = 4.0;
-          final evaluationSpace =
-              showEvaluationBar ? evaluationHeight + evaluationGap : 0.0;
+          final evaluationSpace = showEvaluationBar
+              ? evaluationHeight + evaluationGap
+              : 0.0;
           final boardSide = math
               .max(
                 0.0,
@@ -1605,45 +1637,66 @@ class _Board extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final row = index ~/ 8;
                     final column = index % 8;
+                    final fileIndex = blackAtBottom ? 7 - column : column;
+                    final rank = blackAtBottom ? row + 1 : 8 - row;
                     final square =
-                        '${String.fromCharCode('a'.codeUnitAt(0) + column)}${8 - row}';
+                        '${String.fromCharCode('a'.codeUnitAt(0) + fileIndex)}$rank';
                     final lightSquare = (row + column).isEven;
                     final baseColor = lightSquare
                         ? const Color(0xFFE8E5DC)
                         : const Color(0xFF71867D);
-                    final lastMove = highlightLastMove &&
+                    final lastMove =
+                        highlightLastMove &&
                         lastMoveUci.length >= 4 &&
                         (lastMoveUci.substring(0, 2) == square ||
                             lastMoveUci.substring(2, 4) == square);
                     final selected =
                         highlightSelectedSquare && selectedSquare == square;
                     final scheme = Theme.of(context).colorScheme;
-                    final squareColor = selected
+                    final classification = currentMoveClassification;
+                    final classificationSource =
+                        classificationMoveUci.length >= 4
+                        ? classificationMoveUci.substring(0, 2)
+                        : '';
+                    final classificationTarget =
+                        classificationMoveUci.length >= 4
+                        ? classificationMoveUci.substring(2, 4)
+                        : '';
+                    final classificationSquare =
+                        classification != null &&
+                        classification != MoveClassification.unknown &&
+                        (classificationSource == square ||
+                            classificationTarget == square);
+                    final moveColor = classificationSquare
                         ? Color.alphaBlend(
-                            scheme.tertiary.withValues(alpha: 0.48),
+                            _classificationColor(
+                              context,
+                              classification,
+                            ).withValues(alpha: 0.42),
                             baseColor,
                           )
-                        : lastMove
+                        : lastMove && !suppressLastMoveFallback
                         ? Color.alphaBlend(
                             scheme.primary.withValues(alpha: 0.30),
                             baseColor,
                           )
                         : baseColor;
+                    final squareColor = selected
+                        ? Color.alphaBlend(
+                            scheme.tertiary.withValues(alpha: 0.40),
+                            moveColor,
+                          )
+                        : moveColor;
                     final coordinateColor = lightSquare
                         ? const Color(0xFF53655E)
                         : const Color(0xFFE8E5DC);
-                    final classification = currentMoveClassification;
-                    final classificationTarget =
-                        classificationMoveUci.length >= 4
-                            ? classificationMoveUci.substring(2, 4)
-                            : '';
+                    final pieceIndex = (8 - rank) * 8 + fileIndex;
+                    final piece = pieces[pieceIndex];
+                    final pieceAsset = _pieceAssets[piece];
                     final showClassificationBadge =
                         classification != null &&
                         classification != MoveClassification.unknown &&
                         classificationTarget == square;
-                    final piece = pieces[index];
-                    final pieceAsset = _pieceAssets[piece];
-                    final kingEndMarker = _kingEndMarker(piece);
                     final canDrag = pieceAsset != null && _canDragPiece(piece);
                     final squareSide = boardSide / 8;
                     final pieceInset = squareSide * 0.055;
@@ -1698,32 +1751,7 @@ class _Board extends StatelessWidget {
                                           )
                                         : pieceImage(),
                                   ),
-                                if (kingEndMarker != null)
-                                  Positioned(
-                                    left: 2,
-                                    bottom: 2,
-                                    child: IgnorePointer(
-                                      child: Builder(
-                                        builder: (context) {
-                                          final badgeSize = math.max(
-                                            14.0,
-                                            math.min(
-                                              26.0,
-                                              boardSide / 8 * 0.30,
-                                            ),
-                                          );
-                                          return SizedBox.square(
-                                            dimension: badgeSize,
-                                            child: _optionalEndMarker(
-                                              kingEndMarker,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                if (showClassificationBadge &&
-                                    classification != null)
+                                if (showClassificationBadge)
                                   Positioned(
                                     top: 2,
                                     right: 2,
@@ -1731,13 +1759,16 @@ class _Board extends StatelessWidget {
                                       child: Builder(
                                         builder: (context) {
                                           final badgeSize = math.max(
-                                            12.0,
+                                            18.0,
                                             math.min(
-                                              28.0,
-                                              boardSide / 8 * 0.32,
+                                              36.0,
+                                              boardSide / 8 * 0.46,
                                             ),
                                           );
-                                          final asset = _analysisClassificationAsset(classification);
+                                          final asset =
+                                              _analysisClassificationAsset(
+                                                classification,
+                                              );
                                           if (asset != null) {
                                             return Image.asset(
                                               asset,
@@ -1774,7 +1805,7 @@ class _Board extends StatelessWidget {
                                     left: 3,
                                     top: 2,
                                     child: Text(
-                                      '${8 - row}',
+                                      '$rank',
                                       textDirection: TextDirection.ltr,
                                       style: TextStyle(
                                         color: coordinateColor,
@@ -1789,7 +1820,7 @@ class _Board extends StatelessWidget {
                                     bottom: 1,
                                     child: Text(
                                       String.fromCharCode(
-                                        'a'.codeUnitAt(0) + column,
+                                        'a'.codeUnitAt(0) + fileIndex,
                                       ),
                                       textDirection: TextDirection.ltr,
                                       style: TextStyle(
@@ -1814,6 +1845,7 @@ class _Board extends StatelessWidget {
                       painter: _ArrowPainter(
                         bestArrowMove,
                         Theme.of(context).colorScheme.tertiary,
+                        blackAtBottom: blackAtBottom,
                       ),
                     ),
                   ),
@@ -1824,6 +1856,7 @@ class _Board extends StatelessWidget {
                       painter: _ArrowPainter(
                         threatArrowMove,
                         Theme.of(context).colorScheme.error,
+                        blackAtBottom: blackAtBottom,
                       ),
                     ),
                   ),
@@ -1831,41 +1864,306 @@ class _Board extends StatelessWidget {
             ),
           );
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (showEvaluationBar) ...[
-                SizedBox(
-                  width: boardSide,
-                  height: evaluationHeight,
-                  child: _EvaluationBar(
-                    line: evaluationLine,
-                    fen: fen,
-                    terminalResult: terminalResult,
+          final topBoardColor = blackAtBottom ? 'white' : 'black';
+          final playerOnTop = playerColor == topBoardColor;
+          final topName = playerOnTop ? playerName : opponentName;
+          final topRating = playerOnTop ? playerRating : opponentRating;
+          final topColor = playerOnTop ? playerColor : opponentColor;
+          final topOpening = playerOnTop ? playerOpening : null;
+          final bottomName = playerOnTop ? opponentName : playerName;
+          final bottomRating = playerOnTop ? opponentRating : playerRating;
+          final bottomColor = playerOnTop ? opponentColor : playerColor;
+          final bottomOpening = playerOnTop ? null : playerOpening;
+
+          final dockedResultVisible =
+              showResultSymbols && resultPresentationDocked;
+          final topResultAsset = dockedResultVisible
+              ? _resultAssetForColor(topColor, gameResult, gameCheckmate)
+              : null;
+          final bottomResultAsset = dockedResultVisible
+              ? _resultAssetForColor(bottomColor, gameResult, gameCheckmate)
+              : null;
+          final totalHeight =
+              evaluationSpace + stripHeight * 2 + stripGap * 2 + boardSide;
+          final boardTop = evaluationSpace + stripHeight + stripGap;
+
+          return Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: boardSide,
+              height: totalHeight,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (showEvaluationBar) ...[
+                        SizedBox(
+                          width: boardSide,
+                          height: evaluationHeight,
+                          child: _EvaluationBar(
+                            line: evaluationLine,
+                            terminalResult: terminalResult,
+                          ),
+                        ),
+                        const SizedBox(height: evaluationGap),
+                      ],
+                      SizedBox(
+                        width: boardSide,
+                        height: stripHeight,
+                        child: _BoardPlayerStrip(
+                          name: topName,
+                          rating: topRating,
+                          color: topColor,
+                          opening: topOpening,
+                          resultAsset: topResultAsset,
+                          emphasize: playerOnTop,
+                        ),
+                      ),
+                      const SizedBox(height: stripGap),
+                      board,
+                      const SizedBox(height: stripGap),
+                      SizedBox(
+                        width: boardSide,
+                        height: stripHeight,
+                        child: _BoardPlayerStrip(
+                          name: bottomName,
+                          rating: bottomRating,
+                          color: bottomColor,
+                          opening: bottomOpening,
+                          resultAsset: bottomResultAsset,
+                          emphasize: !playerOnTop,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: evaluationGap),
-              ],
-              SizedBox(
-                width: boardSide,
-                height: stripHeight,
-                child: _BoardPlayerStrip(
-                  name: opponentName,
-                  rating: opponentRating,
-                ),
+                  if (showResultSymbols &&
+                      terminalResult != null &&
+                      !resultPresentationDocked)
+                    Positioned.fill(
+                      child: _BoardResultAnimation(
+                        result: terminalResult!,
+                        checkmate: terminalCheckmate,
+                        topColor: topColor,
+                        bottomColor: bottomColor,
+                        topName: topName,
+                        topRating: topRating,
+                        bottomName: bottomName,
+                        bottomRating: bottomRating,
+                        boardSide: boardSide,
+                        boardTop: boardTop,
+                        stripHeight: stripHeight,
+                        bottomStripTop: boardTop + boardSide + stripGap,
+                        shouldAnimate: !resultPresentationStarted,
+                        onStarted: onResultPresentationStarted,
+                        onCompleted: onResultPresentationDocked,
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: stripGap),
-              board,
-              const SizedBox(height: stripGap),
-              SizedBox(
-                width: boardSide,
-                height: stripHeight,
-                child: _BoardPlayerStrip(
-                  name: playerName,
-                  rating: playerRating,
-                  emphasize: true,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BoardResultAnimation extends StatefulWidget {
+  const _BoardResultAnimation({
+    required this.result,
+    required this.checkmate,
+    required this.topColor,
+    required this.bottomColor,
+    required this.topName,
+    required this.topRating,
+    required this.bottomName,
+    required this.bottomRating,
+    required this.boardSide,
+    required this.boardTop,
+    required this.stripHeight,
+    required this.bottomStripTop,
+    required this.shouldAnimate,
+    required this.onStarted,
+    required this.onCompleted,
+  });
+
+  final String result;
+  final bool checkmate;
+  final String topColor;
+  final String bottomColor;
+  final String topName;
+  final int? topRating;
+  final String bottomName;
+  final int? bottomRating;
+  final double boardSide;
+  final double boardTop;
+  final double stripHeight;
+  final double bottomStripTop;
+  final bool shouldAnimate;
+  final VoidCallback onStarted;
+  final VoidCallback onCompleted;
+
+  @override
+  State<_BoardResultAnimation> createState() => _BoardResultAnimationState();
+}
+
+class _BoardResultAnimationState extends State<_BoardResultAnimation>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final bool _animate;
+  bool _completed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animate = widget.shouldAnimate;
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1450),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed) _finish();
+        });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_animate) {
+        _finish();
+        return;
+      }
+      widget.onStarted();
+      _controller.forward();
+    });
+  }
+
+  void _finish() {
+    if (_completed) return;
+    _completed = true;
+    widget.onCompleted();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  double _labelTargetX(BuildContext context, String name, int? rating) {
+    final label = rating == null ? name : '$name ($rating)';
+    final style = Theme.of(context).textTheme.bodyMedium ?? const TextStyle();
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout(maxWidth: widget.boardSide * 0.62);
+    // Strip padding (10) + color dot (11) + gap (7) + text + small gap.
+    return math.min(
+      widget.boardSide - 18,
+      10 + 11 + 7 + painter.width + 6 + 14,
+    );
+  }
+
+  Widget _animatedBadge({
+    required BuildContext context,
+    required String asset,
+    required bool top,
+    required String name,
+    required int? rating,
+    required double progress,
+  }) {
+    const split = 0.52;
+    final start = Offset(
+      widget.boardSide / 2,
+      widget.boardTop + widget.boardSide / 2,
+    );
+    final peak = Offset(
+      widget.boardSide / 2,
+      widget.boardTop + widget.boardSide * (top ? 0.25 : 0.75),
+    );
+    final end = Offset(
+      _labelTargetX(context, name, rating),
+      (top ? 0.0 : widget.bottomStripTop) + widget.stripHeight / 2,
+    );
+
+    late final Offset center;
+    late final double size;
+    if (progress <= split) {
+      final local = Curves.easeOutCubic.transform(progress / split);
+      center = Offset.lerp(start, peak, local)!;
+      final sizeProgress = Curves.easeOutBack.transform(progress / split);
+      size = 18 + (widget.boardSide * 0.50 - 18) * sizeProgress;
+    } else {
+      final local = Curves.easeInOutCubic.transform(
+        (progress - split) / (1 - split),
+      );
+      center = Offset.lerp(peak, end, local)!;
+      size = widget.boardSide * 0.50 + (28 - widget.boardSide * 0.50) * local;
+    }
+    final opacity = (progress / 0.12).clamp(0.0, 1.0);
+
+    return Positioned(
+      left: center.dx - size / 2,
+      top: center.dy - size / 2,
+      width: size,
+      height: size,
+      child: Opacity(
+        opacity: opacity,
+        child: Image.asset(
+          asset,
+          key: Key('board-result-animation-${top ? 'top' : 'bottom'}'),
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topAsset = _resultAssetForColor(
+      widget.topColor,
+      widget.result,
+      widget.checkmate,
+    );
+    final bottomAsset = _resultAssetForColor(
+      widget.bottomColor,
+      widget.result,
+      widget.checkmate,
+    );
+    if (topAsset == null && bottomAsset == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _finish();
+      });
+      return const SizedBox.shrink();
+    }
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final progress = _animate ? _controller.value : 1.0;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (topAsset != null)
+                _animatedBadge(
+                  context: context,
+                  asset: topAsset,
+                  top: true,
+                  name: widget.topName,
+                  rating: widget.topRating,
+                  progress: progress,
                 ),
-              ),
+              if (bottomAsset != null)
+                _animatedBadge(
+                  context: context,
+                  asset: bottomAsset,
+                  top: false,
+                  name: widget.bottomName,
+                  rating: widget.bottomRating,
+                  progress: progress,
+                ),
             ],
           );
         },
@@ -1878,11 +2176,17 @@ class _BoardPlayerStrip extends StatelessWidget {
   const _BoardPlayerStrip({
     required this.name,
     required this.rating,
+    required this.color,
+    required this.opening,
+    this.resultAsset,
     this.emphasize = false,
   });
 
   final String name;
   final int? rating;
+  final String color;
+  final String? opening;
+  final String? resultAsset;
   final bool emphasize;
 
   @override
@@ -1898,28 +2202,175 @@ class _BoardPlayerStrip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color == 'white' ? Colors.white : Colors.black,
+                    border: Border.all(color: scheme.outline),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (resultAsset != null) ...[
+                  const SizedBox(width: 6),
+                  SizedBox.square(
+                    dimension: 28,
+                    child: Image.asset(
+                      resultAsset!,
+                      key: Key('player-result-$color'),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
+            if (opening != null) ...[
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Icon(
+                    Icons.account_tree_outlined,
+                    size: 15,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: _OpeningMarquee(
+                      text: opening!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
+class _OpeningMarquee extends StatefulWidget {
+  const _OpeningMarquee({required this.text, required this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_OpeningMarquee> createState() => _OpeningMarqueeState();
+}
+
+class _OpeningMarqueeState extends State<_OpeningMarquee>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double _configuredOverflow = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OpeningMarquee oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _configuredOverflow = -1;
+    }
+  }
+
+  void _configureAnimation(double overflow) {
+    if ((_configuredOverflow - overflow).abs() < 0.5) return;
+    _configuredOverflow = overflow;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller
+        ..stop()
+        ..value = 0;
+      if (overflow <= 0) return;
+      final milliseconds = math.max(8000, (overflow / 14 * 1000).round());
+      _controller
+        ..duration = Duration(milliseconds: milliseconds)
+        ..repeat();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: widget.style),
+          maxLines: 1,
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final overflow = math.max(0.0, painter.width - constraints.maxWidth);
+        _configureAnimation(overflow);
+        if (overflow <= 0) {
+          return Text(
+            widget.text,
+            maxLines: 1,
+            textDirection: TextDirection.ltr,
+            style: widget.style,
+          );
+        }
+        return ClipRect(
+          child: AnimatedBuilder(
+            animation: _controller,
+            child: Text(
+              widget.text,
+              maxLines: 1,
+              softWrap: false,
+              textDirection: TextDirection.ltr,
+              style: widget.style,
+            ),
+            builder: (context, child) => Transform.translate(
+              offset: Offset(-overflow * _controller.value, 0),
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ArrowPainter extends CustomPainter {
-  const _ArrowPainter(this.move, this.color);
+  const _ArrowPainter(this.move, this.color, {required this.blackAtBottom});
 
   final String move;
   final Color color;
+  final bool blackAtBottom;
 
   Offset? _squareCenter(String squareName, double square) {
     if (squareName.length != 2) return null;
@@ -1927,6 +2378,9 @@ class _ArrowPainter extends CustomPainter {
     final rank = int.tryParse(squareName[1]);
     if (file < 0 || file > 7 || rank == null || rank < 1 || rank > 8) {
       return null;
+    }
+    if (blackAtBottom) {
+      return Offset((7 - file + 0.5) * square, (rank - 1 + 0.5) * square);
     }
     return Offset((file + 0.5) * square, (8 - rank + 0.5) * square);
   }
@@ -1964,18 +2418,15 @@ class _ArrowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArrowPainter oldDelegate) =>
-      oldDelegate.move != move || oldDelegate.color != color;
+      oldDelegate.move != move ||
+      oldDelegate.color != color ||
+      oldDelegate.blackAtBottom != blackAtBottom;
 }
 
 class _EvaluationBar extends StatelessWidget {
-  const _EvaluationBar({
-    required this.line,
-    required this.fen,
-    required this.terminalResult,
-  });
+  const _EvaluationBar({required this.line, required this.terminalResult});
 
   final EngineLine? line;
-  final String fen;
   final String? terminalResult;
 
   ({double whiteShare, String label}) _value() {
@@ -1986,16 +2437,13 @@ class _EvaluationBar extends StatelessWidget {
       return (whiteShare: 0.5, label: '½-½');
     }
 
-    final fields = fen.split(' ');
-    final blackToMove = fields.length > 1 && fields[1] == 'b';
     final cp = line?.evaluationCp;
     final mate = line?.mateIn;
 
     if (mate != null && mate != 0) {
-      final whiteMate = blackToMove ? -mate : mate;
       return (
-        whiteShare: whiteMate > 0 ? 1.0 : 0.0,
-        label: whiteMate > 0 ? 'M$whiteMate' : '-M${whiteMate.abs()}',
+        whiteShare: mate > 0 ? 1.0 : 0.0,
+        label: mate > 0 ? 'M$mate' : '-M${mate.abs()}',
       );
     }
 
@@ -2003,11 +2451,10 @@ class _EvaluationBar extends StatelessWidget {
       return (whiteShare: 0.5, label: '0.0');
     }
 
-    final whiteCp = blackToMove ? -cp : cp;
-    final whiteShare = (0.5 + whiteCp.clamp(-1000, 1000) / 2000)
+    final whiteShare = (0.5 + cp.clamp(-1000, 1000) / 2000)
         .clamp(0.0, 1.0)
         .toDouble();
-    final pawns = whiteCp / 100.0;
+    final pawns = cp / 100.0;
     final label = pawns.abs() < 0.05
         ? '0.0'
         : '${pawns > 0 ? '+' : ''}${pawns.toStringAsFixed(1)}';
@@ -2064,7 +2511,8 @@ class _EvaluationBar extends StatelessWidget {
                         child: Text(
                           value.label,
                           textDirection: TextDirection.ltr,
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 height: 1.25,
                               ),
@@ -2128,12 +2576,19 @@ class _AnalysisDetails extends StatelessWidget {
   final AppSettings settings;
 
   String _score(EngineLine line) {
-    if (line.mateIn != null) return 'M${line.mateIn}';
+    if (line.mateIn != null) {
+      if (line.mateIn == 0) return 'M0';
+      return line.mateIn! > 0 ? 'M${line.mateIn}' : '-M${line.mateIn!.abs()}';
+    }
     if (line.evaluationCp != null) {
       final value = line.evaluationCp! / 100;
       return '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}';
     }
     return '—';
+  }
+
+  String _wdlScore(WdlScore wdl) {
+    return '${wdl.wins}/${wdl.draws}/${wdl.losses}';
   }
 
   String _variationScore(VariationAnalysisSnapshot value) {
@@ -2196,7 +2651,8 @@ class _AnalysisDetails extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  if (_analysisClassificationAsset(classification) case final asset?)
+                  if (_analysisClassificationAsset(classification)
+                      case final asset?)
                     Image.asset(
                       asset,
                       key: Key('move-icon-${classification.name}'),
@@ -2226,8 +2682,10 @@ class _AnalysisDetails extends StatelessWidget {
               )
             else
               Text(
-                [if (moveNumberLabel != null) moveNumberLabel, playedMove]
-                    .join(' '),
+                [
+                  if (moveNumberLabel != null) moveNumberLabel,
+                  playedMove,
+                ].join(' '),
                 textDirection: TextDirection.ltr,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
@@ -2297,6 +2755,7 @@ class _AnalysisDetails extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final value = variation;
+    final variationClassification = value?.classification;
     return Card(
       key: const Key('variation-analysis'),
       margin: EdgeInsets.zero,
@@ -2346,6 +2805,50 @@ class _AnalysisDetails extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (settings.showClassifications &&
+                    variationClassification != null &&
+                    variationClassification != MoveClassification.unknown) ...[
+                  const SizedBox(height: 7),
+                  Row(
+                    key: Key(
+                      'variation-classification-${variationClassification.name}',
+                    ),
+                    children: [
+                      if (_analysisClassificationAsset(variationClassification)
+                          case final asset?)
+                        Image.asset(
+                          asset,
+                          width: 24,
+                          height: 24,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        )
+                      else
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 20,
+                          color: _classificationColor(
+                            context,
+                            variationClassification,
+                          ),
+                        ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          '${value!.playedSan} · ${_classificationLabel(strings, variationClassification)}',
+                          key: const Key('variation-move-quality-line'),
+                          textDirection: TextDirection.ltr,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: _classificationColor(
+                              context,
+                              variationClassification,
+                            ),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (value != null &&
                     value.lines.isNotEmpty &&
                     value.status != 'error') ...[
@@ -2381,8 +2884,9 @@ class _AnalysisDetails extends StatelessWidget {
                     ),
                     IconButton(
                       key: const Key('variation-previous'),
-                      onPressed:
-                          variationIndex > -1 ? onVariationPrevious : null,
+                      onPressed: variationIndex > -1
+                          ? onVariationPrevious
+                          : null,
                       tooltip: strings.previous,
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.chevron_left, size: 20),
@@ -2496,9 +3000,7 @@ class _AnalysisDetails extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  variationMode
-                      ? Icons.alt_route
-                      : Icons.account_tree_outlined,
+                  variationMode ? Icons.alt_route : Icons.account_tree_outlined,
                   size: 18,
                   color: accent,
                 ),
@@ -2512,14 +3014,14 @@ class _AnalysisDetails extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: accent.withValues(alpha: 0.24),
-                    ),
+                    border: Border.all(color: accent.withValues(alpha: 0.24)),
                   ),
                   child: Text(
                     _analysisModeLabel(strings, variationMode),
@@ -2535,10 +3037,7 @@ class _AnalysisDetails extends StatelessWidget {
           if (shownLines.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-              child: Text(
-                strings.analyzing,
-                style: theme.textTheme.bodySmall,
-              ),
+              child: Text(strings.analyzing, style: theme.textTheme.bodySmall),
             )
           else
             for (var index = 0; index < shownLines.length; index++) ...[
@@ -2589,14 +3088,17 @@ class _AnalysisDetails extends StatelessWidget {
                                             : Text(
                                                 '${shownLines[index].rank}',
                                                 style: theme
-                                                    .textTheme.labelSmall
+                                                    .textTheme
+                                                    .labelSmall
                                                     ?.copyWith(
-                                                  color: index == selectedLine
-                                                      ? accentOn
-                                                      : scheme
-                                                          .onSurfaceVariant,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
+                                                      color:
+                                                          index == selectedLine
+                                                          ? accentOn
+                                                          : scheme
+                                                                .onSurfaceVariant,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
                                               ),
                                       ),
                                     ],
@@ -2615,8 +3117,8 @@ class _AnalysisDetails extends StatelessWidget {
                                             textDirection: TextDirection.ltr,
                                             style: theme.textTheme.bodyMedium
                                                 ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
+                                                  fontWeight: FontWeight.w800,
+                                                ),
                                           ),
                                           const SizedBox(width: 7),
                                           Text(
@@ -2624,8 +3126,9 @@ class _AnalysisDetails extends StatelessWidget {
                                             textDirection: TextDirection.ltr,
                                             style: theme.textTheme.labelSmall
                                                 ?.copyWith(
-                                              color: scheme.onSurfaceVariant,
-                                            ),
+                                                  color:
+                                                      scheme.onSurfaceVariant,
+                                                ),
                                           ),
                                           if (index == 0) ...[
                                             const SizedBox(width: 7),
@@ -2640,13 +3143,16 @@ class _AnalysisDetails extends StatelessWidget {
                                             if (shownLines[index].wdl
                                                 case final wdl?)
                                               Text(
-                                                '${wdl.wins}/${wdl.draws}/${wdl.losses}',
-                                                textDirection: TextDirection.ltr,
-                                                style: theme.textTheme.labelSmall
+                                                _wdlScore(wdl),
+                                                textDirection:
+                                                    TextDirection.ltr,
+                                                style: theme
+                                                    .textTheme
+                                                    .labelSmall
                                                     ?.copyWith(
-                                                  color:
-                                                      scheme.onSurfaceVariant,
-                                                ),
+                                                      color: scheme
+                                                          .onSurfaceVariant,
+                                                    ),
                                               ),
                                           ],
                                         ],
@@ -2779,8 +3285,9 @@ class _AnalysisDetails extends StatelessWidget {
             theory: theory,
             showRecommendedMove: showRecommendedMove,
             recommendedMove: recommendedMove,
-            continuationLine:
-                currentPositionLines.isEmpty ? null : currentPositionLines.first,
+            continuationLine: currentPositionLines.isEmpty
+                ? null
+                : currentPositionLines.first,
           ),
         if (variationActive) ...[
           const SizedBox(height: 10),
@@ -2791,9 +3298,8 @@ class _AnalysisDetails extends StatelessWidget {
           Text(
             strings.illegalOrFailedMove(variationError.toString()),
             key: const Key('variation-error'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.error,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: Theme.of(context).colorScheme.error),
           ),
         ],
         if (settings.showEngineLines) ...[
@@ -2815,9 +3321,8 @@ class _AnalysisDetails extends StatelessWidget {
               childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
               title: Text(
                 strings.pgnLabel,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               children: [
                 Align(
@@ -3023,10 +3528,11 @@ class _PlayerSummaryBlock extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '${accuracy.toStringAsFixed(1)}%',
-            key: Key(isWhite ? 'white-summary-accuracy' : 'black-summary-accuracy'),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+            key: Key(
+              isWhite ? 'white-summary-accuracy' : 'black-summary-accuracy',
             ),
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
         if (visibleCounts.isNotEmpty) ...[
@@ -3071,9 +3577,8 @@ class _SummaryClassificationRow extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$value',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),

@@ -54,6 +54,12 @@ class _KChessAppState extends State<KChessApp> {
       GlobalWidgetsLocalizations.delegate,
       GlobalCupertinoLocalizations.delegate,
     ],
+    // Keep the app layout left-to-right for every locale. Arabic changes the
+    // displayed language only; it must not mirror the board or navigation.
+    builder: (context, child) => Directionality(
+      textDirection: TextDirection.ltr,
+      child: child ?? const SizedBox.shrink(),
+    ),
     theme: AppTheme.light(),
     darkTheme: AppTheme.dark(),
     themeMode: switch (widget.controller.settings.themeMode) {

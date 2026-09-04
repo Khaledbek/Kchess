@@ -15,6 +15,12 @@ namespace {
 
 double clamp_probability(const double value) { return std::clamp(value, 0.0, 1.0); }
 
+std::optional<int> nonnegative_cp_difference(
+    const std::optional<int>& better, const std::optional<int>& worse) {
+  if (!better.has_value() || !worse.has_value()) return std::nullopt;
+  return std::max(0, *better - *worse);
+}
+
 int material_balance(const Stockfish::Position& position, const Stockfish::Color perspective) {
   constexpr int values[] = {0, 100, 320, 330, 500, 900, 0, 0};
   int result = 0;
@@ -86,20 +92,27 @@ MoveCategory classify_move(
   const double second = has_second ? *input.second_best_expected_score : best;
   const double gap = has_second ? std::max(0.0, best - second) : 0.0;
   const bool has_real_alternative = input.legal_move_count > 1 && has_second;
+  const auto played_cp_loss = nonnegative_cp_difference(
+      input.best_evaluation_cp, input.played_evaluation_cp);
+  const auto second_cp_gap = nonnegative_cp_difference(
+      input.best_evaluation_cp, input.second_best_evaluation_cp);
 
-  // Equivalent engine moves can legitimately have effectively identical WDL.
-  // Keep those as Best, but do not promote merely "very good" alternatives to
-  // Best: Excellent exists for that purpose.
-  const bool equivalent_best = input.played_is_best || *loss <= config.best_loss;
+  // Best is intentionally rank-strict. WDL can saturate at 1000/0/0 or
+  // 0/0/1000 in clearly decided positions, making objectively different root
+  // moves appear to have exactly the same expected score. Such alternatives
+  // are Excellent at most; only Stockfish's actual rank-1 move is Best.
 
   // Brilliant is exceptional, but it must not depend on a fragile exact-rank
   // match from one particular search depth. A verified sacrifice that is
   // objectively near-best can still be Brilliant when it preserves a strong
-  // result and has concrete tactical justification. This is especially
-  // important for sacrificial mating attacks whose root ranking can swap
-  // between equivalent moves while Stockfish deepens.
-  const bool near_best = input.played_is_best || *loss <= config.excellent_loss;
-  const bool uniquely_strong_best = has_real_alternative && gap >= config.brilliant_gap;
+  // result and has concrete tactical justification. A centipawn guard prevents
+  // saturated WDL from making a materially worse sacrifice look near-best.
+  const bool cp_near_best = !played_cp_loss.has_value() || *played_cp_loss <= 35;
+  const bool near_best = input.played_is_best
+      || (*loss <= config.excellent_loss && cp_near_best);
+  const bool uniquely_strong_best = has_real_alternative
+      && (gap >= config.brilliant_gap
+          || (second_cp_gap.has_value() && *second_cp_gap >= config.critical_cp_gap));
   const bool brilliant_eligible = near_best
       && !input.was_in_check_before_move
       && input.legal_move_count > 1
@@ -117,10 +130,11 @@ MoveCategory classify_move(
   const bool critical_eligible = input.played_is_best
       && has_real_alternative
       && best >= config.critical_min_best_score
-      && gap >= config.critical_gap;
+      && (gap >= config.critical_gap
+          || (second_cp_gap.has_value() && *second_cp_gap >= config.critical_cp_gap));
   if (critical_eligible) return MoveCategory::critical;
 
-  if (equivalent_best) return MoveCategory::best;
+  if (input.played_is_best) return MoveCategory::best;
 
   // Miss is a concrete missed opportunity, not a synonym for every bad move.
   // Missing a forced mate qualifies. Otherwise require evidence that there was
@@ -146,9 +160,21 @@ MoveCategory classify_move(
   if (had_meaningful_chances && (severe_blunder || outcome_blunder || newly_allowed_mate)) {
     return MoveCategory::blunder;
   }
+  // Even in an already lost position, voluntarily allowing a new forced mate
+  // is not an Excellent move. Keep the old anti-inflation rule (no automatic
+  // Blunder without meaningful chances), but floor the verdict at Mistake.
+  if (input.allowed_forced_mate) return MoveCategory::mistake;
 
-  if (*loss <= config.excellent_loss) return MoveCategory::excellent;
-  if (*loss <= config.okay_loss) return MoveCategory::okay;
+  // WDL alone becomes too coarse once a position is strongly won/lost. Use
+  // centipawn loss as a second guard for ordinary quality buckets so a move
+  // cannot stay Excellent merely because both alternatives round to the same
+  // practical WDL. Mate-only lines have no CP value and keep the WDL path.
+  const bool cp_excellent = !played_cp_loss.has_value()
+      || *played_cp_loss <= config.excellent_cp_loss;
+  const bool cp_okay = !played_cp_loss.has_value()
+      || *played_cp_loss <= config.okay_cp_loss;
+  if (*loss <= config.excellent_loss && cp_excellent) return MoveCategory::excellent;
+  if (*loss <= config.okay_loss && cp_okay) return MoveCategory::okay;
   return MoveCategory::mistake;
 }
 

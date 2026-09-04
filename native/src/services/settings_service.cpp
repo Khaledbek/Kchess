@@ -1,6 +1,8 @@
 #include "services/settings_service.h"
 
+#include <algorithm>
 #include <stdexcept>
+#include <thread>
 
 #include <nlohmann/json.hpp>
 
@@ -9,6 +11,16 @@
 #include "persistence/database.h"
 
 namespace kchess {
+namespace {
+
+int maximum_engine_threads() noexcept {
+  const auto logical = std::thread::hardware_concurrency();
+  const int half = logical == 0 ? kThreadsSetting.max_int
+                                : static_cast<int>(logical / 2);
+  return std::clamp(half, kThreadsSetting.min_int, kThreadsSetting.max_int);
+}
+
+}  // namespace
 
 std::string SettingsService::settings_json() const {
   const auto settings = database_.settings();
@@ -19,6 +31,7 @@ std::string SettingsService::settings_json() const {
       {"multiPv", settings.multi_pv},
       {"timeLimitSeconds", settings.time_limit_seconds},
       {"threads", settings.threads},
+      {"maxThreads", maximum_engine_threads()},
       {"hashMb", settings.hash_mb},
       {"showBoardArrows", settings.show_board_arrows},
       {"showBestMoveArrow", settings.show_board_arrows},
@@ -28,6 +41,8 @@ std::string SettingsService::settings_json() const {
       {"showClassifications", settings.show_classifications},
       {"showAccuracy", settings.show_accuracy},
       {"showTheory", settings.show_theory},
+      {"showResultSymbols", settings.show_result_symbols},
+      {"adaptiveEarlyStop", settings.adaptive_early_stop},
       {"showBoardCoordinates", settings.show_board_coordinates},
       {"highlightLastMove", settings.highlight_last_move},
       {"highlightSelectedSquare", settings.highlight_selected_square},
@@ -60,17 +75,17 @@ void SettingsService::set_analysis_depth_range(
       || !valid_integer_setting(kDepthSetting, maximum_depth)) {
     throw std::invalid_argument("analysis depth must be between 1 and 64");
   }
-  if (minimum_depth > maximum_depth) {
-    throw std::invalid_argument("minimum analysis depth cannot exceed maximum depth");
-  }
+  const int normalized_minimum = std::min(minimum_depth, maximum_depth);
   const auto current = database_.settings();
-  database_.set_setting("minAnalysisDepth", std::to_string(minimum_depth));
+  database_.set_setting("minAnalysisDepth", std::to_string(normalized_minimum));
   database_.set_engine_settings(maximum_depth, current.multi_pv, current.time_limit_seconds);
 }
 
 void SettingsService::set_engine_resources(const int threads, const int hash_mb) {
-  if (!valid_integer_setting(kThreadsSetting, threads))
-    throw std::invalid_argument("threads must be between 1 and 32");
+  if (!valid_integer_setting(kThreadsSetting, threads)
+      || threads > maximum_engine_threads()) {
+    throw std::invalid_argument("threads exceed the safe device limit");
+  }
   if (!valid_integer_setting(kHashMbSetting, hash_mb))
     throw std::invalid_argument("hash must be between 16 and 2048 MB");
   database_.set_engine_resources(threads, hash_mb);

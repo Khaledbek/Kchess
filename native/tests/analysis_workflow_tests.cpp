@@ -52,6 +52,34 @@ int main() {
     const auto pgn_game_id = pgn_game.at("id").get<std::string>();
     const auto original_detail = take_json(
         kc_game_json(core, pgn_game_id.c_str()), core);
+    expect(original_detail.at("startingPosition").at("pieces").size() == 64,
+           "game detail exposes a native 64-square board DTO");
+    expect(original_detail.at("startingPosition").at("sideToMove") == "white",
+           "game detail exposes native side-to-move");
+    const auto queried_games = take_json(
+        kc_games_query_json(
+            core,
+            R"({"search":"white","color":"black","sort":"oldest","timeControls":[]})"),
+        core);
+    expect(queried_games.size() == 1 && queried_games.front().at("id") == pgn_game_id,
+           "search, profile color and sorting are owned by the native game query");
+
+    const auto rejoin = take_json(
+        kc_resolve_board_move_json(
+            core, pgn_game_id.c_str(),
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "e2", "e4", 0),
+        core);
+    expect(rejoin.at("uci") == "e2e4" && rejoin.at("mainLinePly") == 0,
+           "native board resolution rejoins the matching PGN ply");
+
+    const auto promotion = take_json(
+        kc_resolve_board_move_json(
+            core, pgn_game_id.c_str(),
+            "4k3/P7/8/8/8/8/8/4K3 w - - 0 1", "a7", "a8", 0),
+        core);
+    expect(promotion.at("uci") == "a7a8q",
+           "native board resolution defaults a UI promotion to queen");
 
     constexpr auto start_fen =
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -60,6 +88,9 @@ int main() {
     expect(variation.at("playedSan") == "Nf3", "legal UCI move converted to SAN");
     expect(variation.at("fen").get<std::string>().find("5N2") != std::string::npos,
            "temporary FEN contains the played knight move");
+    expect(variation.at("position").at("pieces").size() == 64
+               && variation.at("position").at("sideToMove") == "black",
+           "variation exposes its native presentation-ready board DTO");
     const auto job_id = variation.at("jobId").get<std::string>();
     for (int attempt = 0;
          variation.at("status") == "running" && attempt < 500; ++attempt) {

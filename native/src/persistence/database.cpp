@@ -259,7 +259,8 @@ constexpr const char* kGameColumns =
     "AND f.game_id=g.id),(SELECT f.collection_id FROM favorites f WHERE "
     "f.profile_id=g.profile_id AND f.game_id=g.id),"
     "EXISTS(SELECT 1 FROM favorites f JOIN favorite_collections c ON c.id=f.collection_id "
-    "WHERE f.game_id=g.id AND c.name='Downloads' COLLATE NOCASE),(ar.id IS NOT NULL)";
+    "WHERE f.game_id=g.id AND c.name='Downloads' COLLATE NOCASE),(ar.id IS NOT NULL),"
+    "g.opening_eco,g.opening_name,g.opening_ply";
 
 constexpr const char* kGameJoins =
     " FROM games g LEFT JOIN game_sources gs ON gs.game_id=g.id "
@@ -296,6 +297,9 @@ GameRecord read_game_record(sqlite3_stmt* statement) {
   game.favorite_collection_id = optional_text_column(statement, 25);
   game.downloaded = sqlite3_column_int(statement, 26) != 0;
   game.analyzed = sqlite3_column_int(statement, 27) != 0;
+  game.opening_eco = optional_text_column(statement, 28);
+  game.opening_name = optional_text_column(statement, 29);
+  game.opening_ply = optional_int_column(statement, 30);
   return game;
 }
 
@@ -744,6 +748,38 @@ ALTER TABLE games ADD COLUMN opening_ply INTEGER;
 PRAGMA user_version = 13;
 )sql";
 
+// Accuracy algorithm v2 changes the meaning of local_accuracy. Do not surface
+// stale v1 values after an upgrade; completed engine analysis remains reusable
+// and the inexpensive classification/accuracy pass repopulates these fields
+// the next time that game analysis is opened.
+constexpr const char* kMigration14 = R"sql(
+UPDATE games SET local_accuracy=NULL;
+UPDATE analysis_runs
+SET local_accuracy=NULL,white_local_accuracy=NULL,black_local_accuracy=NULL,
+    accuracy_algorithm_version=0;
+PRAGMA user_version = 14;
+)sql";
+
+// Saved-analysis compatibility needs to know whether a completed run was
+// allowed to stop adaptively.  Strict (adaptive=0) runs can satisfy both
+// strict and adaptive requests; adaptive runs must never masquerade as strict.
+constexpr const char* kMigration15 = R"sql(
+ALTER TABLE analysis_runs ADD COLUMN adaptive_early_stop INTEGER NOT NULL DEFAULT 1;
+PRAGMA user_version = 15;
+)sql";
+
+// Accuracy algorithm v3 no longer consumes Stockfish WDL and therefore cannot
+// reuse the persisted v2 percentages. Keep all engine position analysis intact;
+// only invalidate the cheap derived accuracy fields so they are recomputed from
+// the already saved CP/mate lines when the analysis is next opened.
+constexpr const char* kMigration16 = R"sql(
+UPDATE games SET local_accuracy=NULL;
+UPDATE analysis_runs
+SET local_accuracy=NULL,white_local_accuracy=NULL,black_local_accuracy=NULL,
+    accuracy_algorithm_version=0;
+PRAGMA user_version = 16;
+)sql";
+
 }  // namespace
 
 Database::Database(std::filesystem::path data_directory)
@@ -789,6 +825,25 @@ void Database::open_and_migrate() {
     if (version < 11) execute(kMigration11);
     if (version < 12) execute(kMigration12);
     if (version < 13) execute(kMigration13);
+    if (version < 14) execute(kMigration14);
+    if (version < 15) execute(kMigration15);
+    if (version < 16) execute(kMigration16);
+
+    // Older builds could leave several completed/cancelled analysis_runs for
+    // the same game. At process startup there are no live workers, so collapse
+    // them to one authoritative saved run. Prefer a complete run, then the
+    // highest analysis quality. The independent position cache is untouched.
+    execute(
+        "DELETE FROM analysis_runs WHERE id NOT IN ("
+        "SELECT (SELECT candidate.id FROM analysis_runs candidate "
+        "WHERE candidate.game_id=grouped.game_id ORDER BY "
+        "CASE WHEN candidate.status='complete' THEN 0 ELSE 1 END ASC,"
+        "candidate.depth DESC,candidate.multi_pv DESC,"
+        "CASE WHEN candidate.time_limit_seconds=0 THEN 2147483647 "
+        "ELSE candidate.time_limit_seconds END DESC,"
+        "candidate.adaptive_early_stop ASC,"
+        "COALESCE(candidate.completed_at,0) DESC,candidate.started_at DESC LIMIT 1) "
+        "FROM analysis_runs grouped GROUP BY grouped.game_id);");
 
     // Privacy hardening for online profiles. Earlier builds could persist public
     // real-world/account metadata returned by provider profile endpoints. Kchess
@@ -1391,6 +1446,8 @@ AppSettings Database::settings() const {
   result.show_classifications = setting("showClassifications").value_or("true") == "true";
   result.show_accuracy = setting("showAccuracy").value_or("true") == "true";
   result.show_theory = setting("showTheory").value_or("true") == "true";
+  result.show_result_symbols = setting("showResultSymbols").value_or("true") == "true";
+  result.adaptive_early_stop = setting("adaptiveEarlyStop").value_or("true") == "true";
   result.show_board_coordinates = setting("showBoardCoordinates").value_or("true") == "true";
   result.highlight_last_move = setting("highlightLastMove").value_or("true") == "true";
   result.highlight_selected_square = setting("highlightSelectedSquare").value_or("true") == "true";
@@ -2036,6 +2093,30 @@ std::vector<GameStatRow> Database::games_for_statistics(
   return result;
 }
 
+std::vector<GamePhaseRow> Database::games_for_phases(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT provider_outcome,result,white_name,black_name,"
+      "(SELECT MAX(ply_index) FROM game_moves m WHERE m.game_id=games.id) "
+      "FROM games WHERE profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GamePhaseRow> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    const int max_ply = sqlite3_column_type(statement.get(), 4) == SQLITE_NULL
+        ? -1
+        : sqlite3_column_int(statement.get(), 4);
+    result.push_back(GamePhaseRow{
+        .provider_outcome = text_column(statement.get(), 0),
+        .result = text_column(statement.get(), 1),
+        .white_name = text_column(statement.get(), 2),
+        .black_name = text_column(statement.get(), 3),
+        .max_ply = max_ply,
+    });
+  }
+  return result;
+}
+
 void Database::delete_local_game(
     const std::string& profile_id, const std::string& game_id) {
   auto statement = prepare(
@@ -2167,7 +2248,8 @@ PersistedAnalysis Database::prepare_analysis(
     const int total_plies,
     const int depth,
     const int multi_pv,
-    const int time_limit_seconds) {
+    const int time_limit_seconds,
+    const bool adaptive_early_stop) {
   if (const auto existing = analysis(game_id, config_hash); existing.has_value()) {
     if (existing->status != "complete") {
       set_analysis_status(game_id, config_hash, "running");
@@ -2183,8 +2265,8 @@ PersistedAnalysis Database::prepare_analysis(
       db_,
       "INSERT INTO analysis_runs(id,game_id,analysis_version,engine_name,engine_version,"
       "depth,multi_pv,status,total_plies,completed_plies,started_at,config_hash,"
-      "engine_analysis_version,engine_config_hash,time_limit_seconds) "
-      "VALUES(?,? ,?,'Stockfish',?,?,?,'running',?,0,?,?,'2',?,?);");
+      "engine_analysis_version,engine_config_hash,time_limit_seconds,adaptive_early_stop) "
+      "VALUES(?,? ,?,'Stockfish',?,?,?,'running',?,0,?,?,'2',?,?,?);");
   sqlite3_bind_text(statement.get(), 1, id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 3, config_hash.c_str(), -1, SQLITE_TRANSIENT);
@@ -2196,6 +2278,7 @@ PersistedAnalysis Database::prepare_analysis(
   sqlite3_bind_text(statement.get(), 9, config_hash.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 10, config_hash.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_int(statement.get(), 11, time_limit_seconds);
+  sqlite3_bind_int(statement.get(), 12, adaptive_early_stop ? 1 : 0);
   check(sqlite3_step(statement.get()), db_, "create analysis run");
   return analysis(game_id, config_hash).value();
 }
@@ -2616,19 +2699,57 @@ std::optional<PersistedAnalysis> Database::compatible_analysis(
       "SELECT config_hash FROM analysis_runs WHERE game_id=? AND status='complete' "
       "AND engine_analysis_version='2' AND engine_version=? AND depth>=? AND multi_pv>=? "
       "AND (time_limit_seconds=0 OR (? > 0 AND time_limit_seconds>=?)) "
-      "ORDER BY depth ASC,multi_pv ASC,"
-      "CASE WHEN time_limit_seconds=0 THEN 2147483647 ELSE time_limit_seconds END ASC,"
-      "completed_at DESC LIMIT 1;");
+      "AND (adaptive_early_stop=0 OR ?=1) "
+      "ORDER BY depth DESC,multi_pv DESC,"
+      "CASE WHEN time_limit_seconds=0 THEN 2147483647 ELSE time_limit_seconds END DESC,"
+      "adaptive_early_stop ASC,completed_at DESC LIMIT 1;");
   sqlite3_bind_text(statement.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 2, engine_version.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_int(statement.get(), 3, requested.depth);
   sqlite3_bind_int(statement.get(), 4, requested.multi_pv);
   sqlite3_bind_int(statement.get(), 5, requested.time_limit_seconds);
   sqlite3_bind_int(statement.get(), 6, requested.time_limit_seconds);
+  sqlite3_bind_int(statement.get(), 7, requested.adaptive_early_stop ? 1 : 0);
   if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
   return analysis(game_id, text_column(statement.get(), 0), requested_ply);
 }
 
+
+void Database::prune_game_analyses_except(
+    const std::string& game_id, const std::string& keep_config_hash) {
+  execute("BEGIN IMMEDIATE;");
+  try {
+    auto prune = prepare(
+        db_, "DELETE FROM analysis_runs WHERE game_id=? AND config_hash<>?;");
+    sqlite3_bind_text(prune.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(
+        prune.get(), 2, keep_config_hash.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(prune.get()), db_, "prune superseded game analyses");
+    execute("COMMIT;");
+  } catch (...) {
+    sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+    throw;
+  }
+}
+
+void Database::delete_game_analyses(const std::string& game_id) {
+  execute("BEGIN IMMEDIATE;");
+  try {
+    auto remove = prepare(db_, "DELETE FROM analysis_runs WHERE game_id=?;");
+    sqlite3_bind_text(remove.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(remove.get()), db_, "delete game analyses");
+
+    auto clear_accuracy = prepare(
+        db_, "UPDATE games SET local_accuracy=NULL WHERE id=?;");
+    sqlite3_bind_text(
+        clear_accuracy.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(clear_accuracy.get()), db_, "clear deleted analysis accuracy");
+    execute("COMMIT;");
+  } catch (...) {
+    sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+    throw;
+  }
+}
 
 std::optional<AnalysisResult> Database::compatible_position_analysis(
     const std::string& position_fen,

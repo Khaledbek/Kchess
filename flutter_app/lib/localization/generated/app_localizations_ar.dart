@@ -44,6 +44,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get games => 'المباريات';
 
   @override
+  String get gameSection => 'المباراة';
+
+  @override
+  String get play => 'اللعب';
+
+  @override
+  String get playPlaceholder =>
+      'هذا القسم محجوز كعنصر نائب لأنماط لعب مستقبلية، مثل اللعب ضد البوتات.';
+
+  @override
   String get downloads => 'التنزيلات';
 
   @override
@@ -172,6 +182,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cancelAnalysis => 'إلغاء التحليل';
+
+  @override
+  String get deleteAnalysis => 'حذف التحليل المحفوظ';
+
+  @override
+  String get deleteAnalysisQuestion => 'حذف التحليل المحفوظ؟';
+
+  @override
+  String get deleteAnalysisBody =>
+      'سيتم حذف التحليل المحلي المحفوظ ودقة هذه المباراة. سيبقى PGN/FEN وذاكرة المحرك العامة.';
+
+  @override
+  String get analysisDeleted => 'تم حذف التحليل المحفوظ.';
 
   @override
   String get classificationPending => 'تصنيف هذه النقلة غير متاح بعد.';
@@ -311,6 +334,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get showTheorySettingHelp =>
       'يعرض معلومات كتاب الافتتاح وعدّادات النقلات النظرية.';
+
+  @override
+  String get showResultSymbolsSetting => 'إظهار رموز النتيجة';
+
+  @override
+  String get showResultSymbolsSettingHelp =>
+      'يعرض رموز الفوز أو الخسارة أو التعادل فوق الملكين عند انتهاء المباراة.';
 
   @override
   String get designSettingsTitle => 'التصميم';
@@ -527,7 +557,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get depthHelp =>
-      'أقصى عمق بحث لكل وضعية. القيم الأعلى تستغرق عادة وقتًا أطول.';
+      'Min = عمق التحليل المسبق. Max = أقصى عمق للتحليل المباشر. القيم الأعلى تستغرق عادة وقتًا أطول.';
+
+  @override
+  String get adaptiveEarlyStop => 'تحليل تكيفي';
+
+  @override
+  String get adaptiveEarlyStopHelp =>
+      'ينهي التحليل المسبق والتحليل المباشر الهادئ مبكرًا عندما يثبت التقييم وخطوط اللعب الرئيسية. تستمر عمليات التحقق الحرجة حتى الحد المحدد.';
 
   @override
   String get numberOfLinesHelp =>
@@ -553,6 +590,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get boardDisplayTitle => 'عرض الرقعة';
+
+  @override
+  String get rotateBoard => 'تدوير الرقعة';
 
   @override
   String get showBoardCoordinates => 'إحداثيات الرقعة';

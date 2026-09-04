@@ -44,6 +44,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get games => 'Games';
 
   @override
+  String get gameSection => 'Game';
+
+  @override
+  String get play => 'Play';
+
+  @override
+  String get playPlaceholder =>
+      'This section is reserved for future play modes, such as games against bots.';
+
+  @override
   String get downloads => 'Downloads';
 
   @override
@@ -172,6 +182,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancelAnalysis => 'Cancel analysis';
+
+  @override
+  String get deleteAnalysis => 'Delete saved analysis';
+
+  @override
+  String get deleteAnalysisQuestion => 'Delete saved analysis?';
+
+  @override
+  String get deleteAnalysisBody =>
+      'The locally saved analysis and accuracy for this game will be removed. The PGN/FEN and global engine cache remain.';
+
+  @override
+  String get analysisDeleted => 'Saved analysis deleted.';
 
   @override
   String get classificationPending =>
@@ -315,6 +338,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get showTheorySettingHelp =>
       'Shows opening-book information and theory counts.';
+
+  @override
+  String get showResultSymbolsSetting => 'Show result symbols';
+
+  @override
+  String get showResultSymbolsSettingHelp =>
+      'Shows Win, Loss or Draw symbols above the kings when a game has ended.';
 
   @override
   String get designSettingsTitle => 'Design';
@@ -531,7 +561,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get depthHelp =>
-      'Maximum search depth per position. Higher values usually take longer.';
+      'Min = pre-analysis depth. Max = maximum live-analysis depth. Higher values usually take longer.';
+
+  @override
+  String get adaptiveEarlyStop => 'Adaptive analysis';
+
+  @override
+  String get adaptiveEarlyStopHelp =>
+      'Ends quiet pre-analysis and live searches early when the evaluation and principal variations are stable. Critical verification searches still use the configured limit.';
 
   @override
   String get numberOfLinesHelp =>
@@ -557,6 +594,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get boardDisplayTitle => 'Board display';
+
+  @override
+  String get rotateBoard => 'Rotate board';
 
   @override
   String get showBoardCoordinates => 'Board coordinates';

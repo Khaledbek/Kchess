@@ -59,6 +59,22 @@ typedef _StringIntArgDart = Pointer<Utf8> Function(
   Pointer<Utf8>,
   int,
 );
+typedef _ResolveBoardMoveNative = Pointer<Utf8> Function(
+  Pointer<Void>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  Int32,
+);
+typedef _ResolveBoardMoveDart = Pointer<Utf8> Function(
+  Pointer<Void>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  Pointer<Utf8>,
+  int,
+);
 typedef _StatusStringNative = Int32 Function(Pointer<Void>, Pointer<Utf8>);
 typedef _StatusStringDart = int Function(Pointer<Void>, Pointer<Utf8>);
 typedef _StatusTwoStringsNative = Int32 Function(
@@ -126,7 +142,7 @@ typedef _FreeStringNative = Void Function(Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 
 class FfiCoreGateway implements CoreGateway {
-  static const int _supportedAbiVersion = 2;
+  static const int _supportedAbiVersion = 3;
 
   FfiCoreGateway._(this._library, this._dataDirectory) {
     try {
@@ -186,8 +202,8 @@ class FfiCoreGateway implements CoreGateway {
     _setArrows = _library.lookupFunction<_StatusIntNative, _StatusIntDart>(
       'kc_set_show_board_arrows',
     );
-    _setBooleanSetting =
-        _library.lookupFunction<_StatusStringIntNative, _StatusStringIntDart>(
+    _setBooleanSetting = _library
+        .lookupFunction<_StatusStringIntNative, _StatusStringIntDart>(
           'kc_set_boolean_setting',
         );
     _setAnalysisDepthRange = _library
@@ -217,16 +233,31 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_openings_json',
         );
+    _statisticsTerminations = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_terminations_json',
+        );
+    _statisticsPhases = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_phases_json',
+        );
     _games = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_games_json',
     );
-    _favoriteGames =
-        _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+    _queryGames = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_games_query_json',
+    );
+    _favoriteGames = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_favorite_games_json',
         );
     _game = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_game_json',
     );
+    _resolveBoardMove = _library
+        .lookupFunction<_ResolveBoardMoveNative, _ResolveBoardMoveDart>(
+          'kc_resolve_board_move_json',
+        );
     _importPgn = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_import_pgn_json',
     );
@@ -252,6 +283,10 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StatusStringNative, _StatusStringDart>(
           'kc_cancel_analysis',
         );
+    _deleteAnalysis = _library
+        .lookupFunction<_StatusStringNative, _StatusStringDart>(
+          'kc_delete_analysis',
+        );
     _clearEngineCache = _library
         .lookupFunction<_StatusNoArgsNative, _StatusNoArgsDart>(
           'kc_clear_engine_cache',
@@ -260,10 +295,11 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringTwoArgsNative, _StringTwoArgsDart>(
           'kc_start_variation_analysis_json',
         );
-    _startVariationAnalysisWithSettings = _library.lookupFunction<
-      _StartVariationWithSettingsNative,
-      _StartVariationWithSettingsDart
-    >('kc_start_variation_analysis_with_settings_json');
+    _startVariationAnalysisWithSettings = _library
+        .lookupFunction<
+          _StartVariationWithSettingsNative,
+          _StartVariationWithSettingsDart
+        >('kc_start_variation_analysis_with_settings_json');
     _variationAnalysisStatus = _library
         .lookupFunction<_StringArgNative, _StringArgDart>(
           'kc_variation_analysis_status_json',
@@ -400,8 +436,10 @@ class FfiCoreGateway implements CoreGateway {
   late final _StatusStringDart _setTheme;
   late final _StatusStringDart _setLocale;
   late final _StringNoArgsDart _games;
+  late final _StringArgDart _queryGames;
   late final _StringNoArgsDart _favoriteGames;
   late final _StringArgDart _game;
+  late final _ResolveBoardMoveDart _resolveBoardMove;
   late final _StringArgDart _importPgn;
   late final _StringTwoArgsDart _importFen;
   late final _StringArgDart _startAnalysis;
@@ -409,9 +447,11 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringIntArgDart _startMoveRefinement;
   late final _StringIntArgDart _moveAnalysisStatus;
   late final _StatusStringDart _cancelAnalysis;
+  late final _StatusStringDart _deleteAnalysis;
   late final _StatusNoArgsDart _clearEngineCache;
   late final _StringTwoArgsDart _startVariationAnalysis;
-  late final _StartVariationWithSettingsDart _startVariationAnalysisWithSettings;
+  late final _StartVariationWithSettingsDart
+  _startVariationAnalysisWithSettings;
   late final _StringArgDart _variationAnalysisStatus;
   late final _StatusStringDart _cancelVariationAnalysis;
   late final _StartProviderProfileDart _startProviderProfile;
@@ -421,6 +461,8 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _providerOverview;
   late final _StringNoArgsDart _statisticsOverview;
   late final _StringNoArgsDart _statisticsOpenings;
+  late final _StringNoArgsDart _statisticsTerminations;
+  late final _StringNoArgsDart _statisticsPhases;
   late final _StatusStringIntDart _setGameFavorite;
   late final _StringNoArgsDart _favoriteCollections;
   late final _StringArgDart _createFavoriteCollection;
@@ -565,9 +607,8 @@ class FfiCoreGateway implements CoreGateway {
   Future<void> setAnalysisDepthRange({
     required int minimumDepth,
     required int maximumDepth,
-  }) async => _checkStatus(
-    _setAnalysisDepthRange(_handle, minimumDepth, maximumDepth),
-  );
+  }) async =>
+      _checkStatus(_setAnalysisDepthRange(_handle, minimumDepth, maximumDepth));
 
   @override
   Future<void> setEngineSettings({
@@ -591,7 +632,8 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<void> setBooleanSetting(String key, bool enabled) => _withNativeString(
     key,
-    (value) => _checkStatus(_setBooleanSetting(_handle, value, enabled ? 1 : 0)),
+    (value) =>
+        _checkStatus(_setBooleanSetting(_handle, value, enabled ? 1 : 0)),
   );
 
   @override
@@ -618,8 +660,27 @@ class FfiCoreGateway implements CoreGateway {
   );
 
   @override
+  Future<TerminationStats> terminationStats() async => TerminationStats.fromJson(
+    _readJson(_statisticsTerminations(_handle))! as Map<String, Object?>,
+  );
+
+  @override
+  Future<PhaseStats> phaseStats() async => PhaseStats.fromJson(
+    _readJson(_statisticsPhases(_handle))! as Map<String, Object?>,
+  );
+
+  @override
   Future<List<GameSummary>> games() async =>
       _readList(_games(_handle), (json) => GameSummary.fromJson(json));
+
+  @override
+  Future<List<GameSummary>> queryGames(GameQuery query) => _withNativeString(
+    jsonEncode(query.toJson()),
+    (value) => _readList(
+      _queryGames(_handle, value),
+      (json) => GameSummary.fromJson(json),
+    ),
+  );
 
   @override
   Future<List<GameSummary>> favoriteGames() async =>
@@ -630,6 +691,40 @@ class FfiCoreGateway implements CoreGateway {
     final json = _readJson(_game(_handle, value))! as Map<String, Object?>;
     return GameDetail.fromJson(json);
   });
+
+  @override
+  Future<BoardMoveResolution> resolveBoardMove({
+    required String gameId,
+    required String fen,
+    required String source,
+    required String target,
+    required int firstCandidatePly,
+  }) async {
+    final nativeGameId = gameId.toNativeUtf8();
+    final nativeFen = fen.toNativeUtf8();
+    final nativeSource = source.toNativeUtf8();
+    final nativeTarget = target.toNativeUtf8();
+    try {
+      final json =
+          _readJson(
+                _resolveBoardMove(
+                  _handle,
+                  nativeGameId,
+                  nativeFen,
+                  nativeSource,
+                  nativeTarget,
+                  firstCandidatePly,
+                ),
+              )!
+              as Map<String, Object?>;
+      return BoardMoveResolution.fromJson(json);
+    } finally {
+      malloc.free(nativeGameId);
+      malloc.free(nativeFen);
+      malloc.free(nativeSource);
+      malloc.free(nativeTarget);
+    }
+  }
 
   @override
   Future<GameSummary> importPgn(String pgn) => _withNativeString(pgn, (value) {
@@ -666,8 +761,9 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<AnalysisSnapshot> startMoveRefinement(String gameId, int ply) =>
       _withNativeString(gameId, (value) {
-        final json = _readJson(_startMoveRefinement(_handle, value, ply))!
-            as Map<String, Object?>;
+        final json =
+            _readJson(_startMoveRefinement(_handle, value, ply))!
+                as Map<String, Object?>;
         return AnalysisSnapshot.fromJson(json);
       });
 
@@ -687,6 +783,12 @@ class FfiCoreGateway implements CoreGateway {
   );
 
   @override
+  Future<void> deleteAnalysis(String gameId) => _withNativeString(
+    gameId,
+    (value) => _checkStatus(_deleteAnalysis(_handle, value)),
+  );
+
+  @override
   Future<void> clearEngineCache() async =>
       _checkStatus(_clearEngineCache(_handle));
 
@@ -702,7 +804,10 @@ class FfiCoreGateway implements CoreGateway {
     final hasOverrides =
         depth != null || multiPv != null || threads != null || hashMb != null;
     if (hasOverrides &&
-        (depth == null || multiPv == null || threads == null || hashMb == null)) {
+        (depth == null ||
+            multiPv == null ||
+            threads == null ||
+            hashMb == null)) {
       throw ArgumentError(
         'Sideline engine overrides require depth, multiPv, threads and hashMb.',
       );
@@ -759,13 +864,17 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<FavoriteCollection> createFavoriteCollection(String name) =>
       _withNativeString(name, (value) {
-        final json = _readJson(_createFavoriteCollection(_handle, value))!
-            as Map<String, Object?>;
+        final json =
+            _readJson(_createFavoriteCollection(_handle, value))!
+                as Map<String, Object?>;
         return FavoriteCollection.fromJson(json);
       });
 
   @override
-  Future<void> renameFavoriteCollection(String collectionId, String name) async {
+  Future<void> renameFavoriteCollection(
+    String collectionId,
+    String name,
+  ) async {
     final nativeCollection = collectionId.toNativeUtf8();
     final nativeName = name.toNativeUtf8();
     try {
@@ -914,8 +1023,8 @@ class FfiCoreGateway implements CoreGateway {
   }
 
   CoreGatewayException _nativeException([int? status]) {
-    final nativeStatus = status ??
-        (_handle == nullptr ? 5 : _lastStatus(_handle));
+    final nativeStatus =
+        status ?? (_handle == nullptr ? 5 : _lastStatus(_handle));
     final message = _handle == nullptr
         ? 'Native Kchess core is not available'
         : _lastError(_handle).toDartString();

@@ -243,6 +243,16 @@ char* kc_games_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [handle] { return core_from(handle)->games_json(); });
 }
 
+char* kc_games_query_json(
+    const kc_core_handle handle, const char* query_json_utf8) {
+  if (query_json_utf8 == nullptr) {
+    return invalid_string_argument(core_from(handle), "Game query is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->query_games_json(query_json_utf8);
+  });
+}
+
 char* kc_favorite_games_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [handle] {
     return core_from(handle)->favorite_games_json();
@@ -254,6 +264,24 @@ char* kc_game_json(const kc_core_handle handle, const char* game_id_utf8) {
     return invalid_string_argument(core_from(handle), "Game id is required");
   return string_call(
       core_from(handle), [=] { return core_from(handle)->game_json(game_id_utf8); });
+}
+
+char* kc_resolve_board_move_json(
+    const kc_core_handle handle,
+    const char* game_id_utf8,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8,
+    const int32_t first_candidate_ply) {
+  auto* core = core_from(handle);
+  if (game_id_utf8 == nullptr || fen_utf8 == nullptr || source_utf8 == nullptr
+      || target_utf8 == nullptr) {
+    return invalid_string_argument(core, "Board move arguments are required");
+  }
+  return string_call(core, [&] {
+    return core->resolve_board_move_json(
+        game_id_utf8, fen_utf8, source_utf8, target_utf8, first_candidate_ply);
+  });
 }
 
 char* kc_import_pgn_json(const kc_core_handle handle, const char* pgn_utf8) {
@@ -333,6 +361,16 @@ char* kc_statistics_overview_json(const kc_core_handle handle) {
 char* kc_statistics_openings_json(const kc_core_handle handle) {
   return string_call(
       core_from(handle), [handle] { return core_from(handle)->statistics_openings_json(); });
+}
+
+char* kc_statistics_terminations_json(const kc_core_handle handle) {
+  return string_call(
+      core_from(handle), [handle] { return core_from(handle)->statistics_terminations_json(); });
+}
+
+char* kc_statistics_phases_json(const kc_core_handle handle) {
+  return string_call(
+      core_from(handle), [handle] { return core_from(handle)->statistics_phases_json(); });
 }
 
 kc_status kc_set_game_favorite(
@@ -469,6 +507,14 @@ kc_status kc_cancel_analysis(
     return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Game id is required");
   return status_call(
       core_from(handle), [=] { core_from(handle)->cancel_analysis(game_id_utf8); });
+}
+
+kc_status kc_delete_analysis(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr)
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Game id is required");
+  return status_call(
+      core_from(handle), [=] { core_from(handle)->delete_analysis(game_id_utf8); });
 }
 
 kc_status kc_clear_engine_cache(const kc_core_handle handle) {

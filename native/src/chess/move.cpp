@@ -85,7 +85,14 @@ AppliedMove apply_legal_uci_move(const std::string& fen, const std::string& uci)
   std::deque<Stockfish::StateInfo> states(1);
   Stockfish::Position position;
   position.set(validation.normalized, false, &states.back());
-  const auto move = Stockfish::UCIEngine::to_move(position, uci);
+  auto normalized_uci = uci;
+  // A board tap/drag supplies source and target squares. Resolve the standard
+  // UI promotion choice natively so Flutter never inspects pieces or ranks.
+  auto move = Stockfish::UCIEngine::to_move(position, normalized_uci);
+  if (move == Stockfish::Move::none() && normalized_uci.size() == 4) {
+    normalized_uci.push_back('q');
+    move = Stockfish::UCIEngine::to_move(position, normalized_uci);
+  }
   if (move == Stockfish::Move::none()) throw std::invalid_argument("Illegal chess move");
   const auto san = move_san(position, move);
   states.emplace_back();

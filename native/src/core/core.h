@@ -49,8 +49,15 @@ class Core {
   void set_locale(const std::string& locale);
 
   std::string games_json();
+  std::string query_games_json(const std::string& query_json);
   std::string favorite_games_json();
   std::string game_json(const std::string& game_id);
+  std::string resolve_board_move_json(
+      const std::string& game_id,
+      const std::string& fen,
+      const std::string& source,
+      const std::string& target,
+      int first_candidate_ply);
   std::string import_pgn_json(const std::string& pgn);
   std::string import_fen_json(const std::string& fen, const std::string& display_name);
   void set_favorite(const std::string& game_id, bool value);
@@ -74,12 +81,15 @@ class Core {
 
   std::string statistics_overview_json();
   std::string statistics_openings_json();
+  std::string statistics_terminations_json();
+  std::string statistics_phases_json();
 
   std::string start_analysis_json(const std::string& game_id);
   std::string analysis_status_json(const std::string& game_id);
   std::string move_analysis_status_json(const std::string& game_id, int ply);
   std::string start_move_refinement_json(const std::string& game_id, int ply);
   void cancel_analysis(const std::string& game_id);
+  void delete_analysis(const std::string& game_id);
   void clear_engine_cache();
   std::string start_variation_analysis_json(
       const std::string& fen, const std::string& uci);
@@ -105,6 +115,7 @@ class Core {
   // opening-name index and persist each result. Idempotent and cheap; a single
   // unparseable game is marked processed rather than aborting the sweep.
   void classify_pending_openings(int limit);
+  void classify_game_opening(const std::string& game_id);
 
   std::filesystem::path data_directory_;
   Database database_;

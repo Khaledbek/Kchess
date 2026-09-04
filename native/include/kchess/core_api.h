@@ -21,7 +21,7 @@ typedef void* kc_core_handle;
 
 // Increment only when the C ABI changes incompatibly. Additive exports may
 // keep the same ABI version. Flutter validates this before creating Core.
-#define KCHESS_CORE_ABI_VERSION 2
+#define KCHESS_CORE_ABI_VERSION 3
 
 typedef enum kc_status {
   KC_STATUS_OK = 0,
@@ -85,10 +85,20 @@ KCHESS_API kc_status kc_set_locale(
     const char* locale_utf8);
 
 KCHESS_API char* kc_games_json(kc_core_handle handle);
+KCHESS_API char* kc_games_query_json(
+    kc_core_handle handle,
+    const char* query_json_utf8);
 KCHESS_API char* kc_favorite_games_json(kc_core_handle handle);
 KCHESS_API char* kc_game_json(
     kc_core_handle handle,
     const char* game_id_utf8);
+KCHESS_API char* kc_resolve_board_move_json(
+    kc_core_handle handle,
+    const char* game_id_utf8,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8,
+    int32_t first_candidate_ply);
 KCHESS_API char* kc_import_pgn_json(
     kc_core_handle handle,
     const char* pgn_utf8);
@@ -116,6 +126,8 @@ KCHESS_API char* kc_provider_overview_json(
     const char* profile_id_utf8);
 KCHESS_API char* kc_statistics_overview_json(kc_core_handle handle);
 KCHESS_API char* kc_statistics_openings_json(kc_core_handle handle);
+KCHESS_API char* kc_statistics_terminations_json(kc_core_handle handle);
+KCHESS_API char* kc_statistics_phases_json(kc_core_handle handle);
 KCHESS_API kc_status kc_set_game_favorite(
     kc_core_handle handle,
     const char* game_id_utf8,
@@ -159,6 +171,9 @@ KCHESS_API char* kc_move_analysis_status_json(
     const char* game_id_utf8,
     int32_t ply);
 KCHESS_API kc_status kc_cancel_analysis(
+    kc_core_handle handle,
+    const char* game_id_utf8);
+KCHESS_API kc_status kc_delete_analysis(
     kc_core_handle handle,
     const char* game_id_utf8);
 KCHESS_API kc_status kc_clear_engine_cache(kc_core_handle handle);

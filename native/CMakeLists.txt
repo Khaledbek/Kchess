@@ -15,20 +15,34 @@ if(KCHESS_WITH_STOCKFISH)
   )
   list(REMOVE_ITEM STOCKFISH_SOURCES "${STOCKFISH_SOURCE_DIR}/main.cpp")
 
-  add_library(stockfish_official STATIC ${STOCKFISH_SOURCES})
-  target_compile_features(stockfish_official PUBLIC cxx_std_20)
-  target_include_directories(stockfish_official PUBLIC ${STOCKFISH_SOURCE_DIR})
-  set_target_properties(stockfish_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
   set(STOCKFISH_BIG_NET
     "${STOCKFISH_SOURCE_DIR}/nn-c288c895ea92.nnue"
   )
   set(STOCKFISH_SMALL_NET
     "${STOCKFISH_SOURCE_DIR}/nn-37f18f62d772.nnue"
   )
-  set_property(SOURCE "${STOCKFISH_SOURCE_DIR}/nnue/network.cpp" APPEND PROPERTY
-    OBJECT_DEPENDS "${STOCKFISH_BIG_NET};${STOCKFISH_SMALL_NET}"
-  )
+
+  # Keep Stockfish in a small subdirectory so its MSVC Debug flags can be
+  # optimized independently from the rest of Kchess. Flutter Debug builds keep
+  # their normal debug/runtime-check settings; only the engine uses release-like
+  # code generation for search speed.
+  add_subdirectory(cmake/stockfish_target)
+  target_compile_features(stockfish_official PUBLIC cxx_std_20)
+  target_include_directories(stockfish_official PUBLIC ${STOCKFISH_SOURCE_DIR})
+  set_target_properties(stockfish_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+  # Stockfish's Makefile normally selects the SIMD backend. Kchess builds the
+  # engine through CMake, so select the safe baseline explicitly instead of
+  # falling back to scalar NNUE code.
+  if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    # SSE2 is part of the x86-64 baseline on Windows. Do not force AVX2 here:
+    # doing so would make the packaged DLL unusable on older x64 CPUs.
+    target_compile_definitions(stockfish_official PRIVATE USE_SSE2)
+  elseif(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    # NEON/Advanced SIMD is mandatory for AArch64. Stockfish uses the numeric
+    # value to distinguish the ARM generation in a few NNUE code paths.
+    target_compile_definitions(stockfish_official PRIVATE USE_NEON=8 USE_POPCNT IS_64BIT)
+  endif()
 
   if(MSVC)
     # Stockfish has many translation units that MSBuild compiles in parallel.
@@ -66,6 +80,7 @@ add_library(kchess_core SHARED
   src/chess/fen.cpp
   src/chess/move.cpp
   src/chess/pgn.cpp
+  src/chess/position_view.cpp
   src/core/core.cpp
   src/diagnostics/logger.cpp
   src/engine/stockfish_runtime.cpp
@@ -137,6 +152,7 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     src/chess/fen.cpp
     src/chess/move.cpp
     src/chess/pgn.cpp
+    src/chess/position_view.cpp
     src/engine/stockfish_runtime.cpp
     src/engine/stockfish_engine.cpp
     src/persistence/database.cpp
@@ -149,6 +165,7 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   target_include_directories(kchess_core_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
   )
   target_link_libraries(kchess_core_tests PRIVATE
     kchess_core

@@ -86,6 +86,62 @@ int main() {
            }) == MoveCategory::best,
            "a normal engine-best move remains Best");
     expect(kchess::classify_move({
+               .played_is_best = false,
+               .legal_move_count = 20,
+               .best_expected_score = .99,
+               .played_expected_score = .99,
+               .second_best_expected_score = .99,
+               .best_evaluation_cp = 420,
+               .played_evaluation_cp = 405,
+               .second_best_evaluation_cp = 405,
+           }) == MoveCategory::excellent,
+           "a WDL-tied alternative is Excellent, never Best unless it is Stockfish rank 1");
+    expect(kchess::classify_move({
+               .played_is_best = false,
+               .legal_move_count = 20,
+               .best_expected_score = .99,
+               .played_expected_score = .99,
+               .second_best_expected_score = .99,
+               .best_evaluation_cp = 420,
+               .played_evaluation_cp = 330,
+               .second_best_evaluation_cp = 405,
+           }) == MoveCategory::okay,
+           "a 90cp WDL-tied alternative is Okay rather than inflated to Excellent");
+    expect(kchess::classify_move({
+               .played_is_best = false,
+               .legal_move_count = 20,
+               .best_expected_score = .99,
+               .played_expected_score = .99,
+               .second_best_expected_score = .99,
+               .best_evaluation_cp = 420,
+               .played_evaluation_cp = 210,
+               .second_best_evaluation_cp = 405,
+           }) == MoveCategory::mistake,
+           "a large CP drop cannot hide behind saturated WDL");
+    expect(kchess::classify_move({
+               .played_is_best = true,
+               .legal_move_count = 20,
+               .best_expected_score = .99,
+               .played_expected_score = .99,
+               .second_best_expected_score = .99,
+               .best_evaluation_cp = 430,
+               .played_evaluation_cp = 430,
+               .second_best_evaluation_cp = 260,
+           }) == MoveCategory::critical,
+           "centipawn gap can identify an only/critical best move when WDL is saturated");
+    expect(kchess::classify_move({
+               .played_is_best = false,
+               .material_sacrifice = true,
+               .legal_move_count = 20,
+               .best_expected_score = .99,
+               .played_expected_score = .99,
+               .second_best_expected_score = .99,
+               .best_evaluation_cp = 500,
+               .played_evaluation_cp = 320,
+               .second_best_evaluation_cp = 300,
+           }) != MoveCategory::brilliant,
+           "saturated WDL cannot promote a materially worse sacrifice to Brilliant");
+    expect(kchess::classify_move({
                .played_is_best = true,
                .legal_move_count = 20,
                .best_expected_score = .74,
@@ -166,8 +222,8 @@ int main() {
                .legal_move_count = 15,
                .best_expected_score = .03,
                .played_expected_score = .01,
-           }) == MoveCategory::excellent,
-           "an already lost position does not inflate a small loss into Blunder");
+           }) == MoveCategory::mistake,
+           "allowing a new forced mate is at least a Mistake even when already lost");
 
     const kchess::PositionEvaluation favorable_to_side{
         .wdl = kchess::WdlScore{.wins = 700, .draws = 200, .losses = 100}};

@@ -1,5 +1,7 @@
 #include "services/statistics_service.h"
 
+#include "services/termination.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -93,6 +95,17 @@ std::string effective_outcome(
   return "unknown";
 }
 
+// Base opening family: everything before the first ':' or ',' (trimmed).
+// "Scandinavian Defense: Mieses-Kotroc Variation" -> "Scandinavian Defense".
+std::string opening_family(const std::string& name) {
+  const auto pos = name.find_first_of(":,");
+  std::string base = pos == std::string::npos ? name : name.substr(0, pos);
+  const auto last = base.find_last_not_of(" \t");
+  if (last == std::string::npos) return {};
+  base.erase(last + 1);
+  return base.substr(base.find_first_not_of(" \t"));
+}
+
 }  // namespace
 
 StatisticsService::StatisticsService(Database& database) : database_(database) {}
@@ -103,7 +116,8 @@ std::string StatisticsService::overview_json() const {
     return nlohmann::json{{"hasProfile", false}, {"totalGames", 0}}.dump();
   }
 
-  const std::string username = profile->provider_username.value_or("");
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
   const auto rows = database_.games_for_statistics(profile->id);
 
   Tally overall;
@@ -171,16 +185,22 @@ std::string StatisticsService::openings_json() const {
     return nlohmann::json{{"hasProfile", false}, {"gamesWithOpening", 0}}.dump();
   }
 
-  const std::string username = profile->provider_username.value_or("");
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
   const auto rows = database_.games_for_statistics(profile->id);
 
-  struct OpeningEntry {
+  struct Variation {
     std::string eco;
-    std::string name;
-    std::string color;
+    std::string name;  // full opening name, e.g. "Scandinavian Defense: Main Line"
     Tally tally;
   };
-  std::map<std::string, OpeningEntry> openings;  // key: name + unit separator + color
+  struct Family {
+    std::string family;  // base name, e.g. "Scandinavian Defense"
+    std::string color;
+    Tally tally;
+    std::map<std::string, Variation> variations;  // key: full opening name
+  };
+  std::map<std::string, Family> families;  // key: family + unit separator + color
   int games_with_opening = 0;
   int games_without_opening = 0;
 
@@ -192,33 +212,58 @@ std::string StatisticsService::openings_json() const {
     games_with_opening += 1;
     const std::string color = game_color(username, row.white_name, row.black_name);
     const std::string outcome = effective_outcome(row.provider_outcome, color, row.result);
-    auto& entry = openings[row.opening_name + '\x1f' + color];
-    if (entry.tally.games == 0) {
-      entry.eco = row.opening_eco;
-      entry.name = row.opening_name;
-      entry.color = color;
+    const std::string family_name = opening_family(row.opening_name);
+
+    auto& family = families[family_name + '\x1f' + color];
+    if (family.tally.games == 0) {
+      family.family = family_name;
+      family.color = color;
     }
-    add_outcome(entry.tally, outcome);
+    add_outcome(family.tally, outcome);
+
+    auto& variation = family.variations[row.opening_name];
+    if (variation.tally.games == 0) {
+      variation.eco = row.opening_eco;
+      variation.name = row.opening_name;
+    }
+    add_outcome(variation.tally, outcome);
   }
 
-  std::vector<const OpeningEntry*> ordered;
-  ordered.reserve(openings.size());
-  for (const auto& item : openings) ordered.push_back(&item.second);
-  std::sort(
-      ordered.begin(), ordered.end(),
-      [](const OpeningEntry* a, const OpeningEntry* b) {
-        if (a->tally.games != b->tally.games) return a->tally.games > b->tally.games;
-        if (a->name != b->name) return a->name < b->name;
-        return a->color < b->color;
-      });
+  std::vector<const Family*> ordered;
+  ordered.reserve(families.size());
+  for (const auto& item : families) ordered.push_back(&item.second);
+  std::sort(ordered.begin(), ordered.end(), [](const Family* a, const Family* b) {
+    if (a->tally.games != b->tally.games) return a->tally.games > b->tally.games;
+    if (a->family != b->family) return a->family < b->family;
+    return a->color < b->color;
+  });
 
-  constexpr std::size_t kMaxOpenings = 80;
+  constexpr std::size_t kMaxFamilies = 60;
   nlohmann::json list = nlohmann::json::array();
-  for (std::size_t index = 0; index < ordered.size() && index < kMaxOpenings; ++index) {
-    nlohmann::json node = tally_json(ordered[index]->tally);
-    node["eco"] = ordered[index]->eco;
-    node["name"] = ordered[index]->name;
-    node["color"] = ordered[index]->color;
+  for (std::size_t index = 0; index < ordered.size() && index < kMaxFamilies; ++index) {
+    const Family& family = *ordered[index];
+    // Variations, most played first; the family's base ECO follows the dominant
+    // line so the collapsed header shows a representative code.
+    std::vector<const Variation*> variations;
+    variations.reserve(family.variations.size());
+    for (const auto& item : family.variations) variations.push_back(&item.second);
+    std::sort(variations.begin(), variations.end(),
+              [](const Variation* a, const Variation* b) {
+                if (a->tally.games != b->tally.games) return a->tally.games > b->tally.games;
+                return a->name < b->name;
+              });
+    nlohmann::json variation_list = nlohmann::json::array();
+    for (const Variation* variation : variations) {
+      nlohmann::json node = tally_json(variation->tally);
+      node["eco"] = variation->eco;
+      node["name"] = variation->name;
+      variation_list.push_back(std::move(node));
+    }
+    nlohmann::json node = tally_json(family.tally);
+    node["family"] = family.family;
+    node["color"] = family.color;
+    node["eco"] = variations.empty() ? std::string{} : variations.front()->eco;
+    node["variations"] = std::move(variation_list);
     list.push_back(std::move(node));
   }
 
@@ -226,8 +271,88 @@ std::string StatisticsService::openings_json() const {
       {"hasProfile", true},
       {"gamesWithOpening", games_with_opening},
       {"gamesWithoutOpening", games_without_opening},
-      {"distinctOpenings", static_cast<int>(openings.size())},
-      {"openings", list},
+      {"distinctFamilies", static_cast<int>(families.size())},
+      {"families", list},
+  };
+  return root.dump();
+}
+
+std::string StatisticsService::terminations_json() const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) {
+    return nlohmann::json{{"hasProfile", false}, {"totalGames", 0}}.dump();
+  }
+
+  // Termination reason lives only in the stored PGN, so read full records here
+  // (unlike the lean overview/openings queries).
+  const auto games = database_.games(profile->id);
+  std::map<std::string, int> counts;
+  for (const auto& game : games) {
+    counts[termination_bucket(game.pgn, game.result)] += 1;
+  }
+
+  static constexpr std::array<const char*, 5> kOrder{
+      "checkmate", "resignation", "timeout", "draw", "other"};
+  nlohmann::json list = nlohmann::json::array();
+  for (const char* type : kOrder) {
+    const auto found = counts.find(type);
+    if (found == counts.end() || found->second == 0) continue;
+    list.push_back({{"type", type}, {"count", found->second}});
+  }
+
+  nlohmann::json root{
+      {"hasProfile", true},
+      {"totalGames", static_cast<int>(games.size())},
+      {"terminations", list},
+  };
+  return root.dump();
+}
+
+std::string StatisticsService::phases_json() const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) {
+    return nlohmann::json{{"hasProfile", false}, {"totalGames", 0}}.dump();
+  }
+
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
+  const auto rows = database_.games_for_phases(profile->id);
+
+  // Heuristic phase boundaries by the game's ending full-move number.
+  constexpr int kOpeningMax = 12;     // moves 1-12
+  constexpr int kMiddlegameMax = 30;  // moves 13-30; 31+ is endgame
+
+  Tally opening;
+  Tally middlegame;
+  Tally endgame;
+  int classified = 0;
+  for (const auto& row : rows) {
+    if (row.max_ply < 0) continue;  // no stored moves (e.g. FEN import)
+    const int move_number = (row.max_ply / 2) + 1;
+    const std::string color = game_color(username, row.white_name, row.black_name);
+    const std::string outcome = effective_outcome(row.provider_outcome, color, row.result);
+    Tally& bucket = move_number <= kOpeningMax
+        ? opening
+        : (move_number <= kMiddlegameMax ? middlegame : endgame);
+    add_outcome(bucket, outcome);
+    classified += 1;
+  }
+
+  auto phase_node = [](const char* phase, const Tally& tally) {
+    nlohmann::json node = tally_json(tally);
+    node["phase"] = phase;
+    return node;
+  };
+  nlohmann::json phases = nlohmann::json::array();
+  phases.push_back(phase_node("opening", opening));
+  phases.push_back(phase_node("middlegame", middlegame));
+  phases.push_back(phase_node("endgame", endgame));
+
+  nlohmann::json root{
+      {"hasProfile", true},
+      {"totalGames", static_cast<int>(rows.size())},
+      {"classified", classified},
+      {"phases", phases},
   };
   return root.dump();
 }

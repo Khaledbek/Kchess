@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include "chess/pgn.h"
 #include "diagnostics/logger.h"
 #include "theory/opening_name_index.h"
 
@@ -75,19 +74,28 @@ void Core::initialize() {
 
 void Core::classify_pending_openings(const int limit) {
   if (opening_names_->max_ply() == 0) return;  // Index unavailable.
-  for (const auto& [game_id, pgn] : database_.games_needing_opening(limit)) {
-    std::optional<OpeningName> opening;
-    try {
-      const auto parsed = parse_pgn(pgn);
-      if (parsed.valid) opening = classify_opening(*opening_names_, parsed.game.moves);
-    } catch (const std::exception&) {
-      opening.reset();  // Fall through and mark the game processed.
+  for (const auto& pending : database_.games_needing_opening(limit)) {
+    classify_game_opening(pending.first);
+  }
+}
+
+void Core::classify_game_opening(const std::string& game_id) {
+  if (opening_names_->max_ply() == 0) return;
+  const auto game = database_.game(game_id);
+  if (!game.has_value() || game->opening_ply.has_value()) return;
+
+  std::optional<OpeningName> opening;
+  try {
+    if (!game->moves.empty()) {
+      opening = classify_opening(*opening_names_, game->moves);
     }
-    if (opening.has_value()) {
-      database_.set_game_opening(game_id, opening->eco, opening->name, opening->ply);
-    } else {
-      database_.set_game_opening(game_id, std::nullopt, std::nullopt, 0);
-    }
+  } catch (const std::exception&) {
+    opening.reset();
+  }
+  if (opening.has_value()) {
+    database_.set_game_opening(game_id, opening->eco, opening->name, opening->ply);
+  } else {
+    database_.set_game_opening(game_id, std::nullopt, std::nullopt, 0);
   }
 }
 
@@ -173,15 +181,33 @@ void Core::set_locale(const std::string& locale) {
 }
 
 std::string Core::games_json() {
+  classify_pending_openings(256);
   return game_library_service_.games_json();
 }
 
+std::string Core::query_games_json(const std::string& query_json) {
+  classify_pending_openings(256);
+  return game_library_service_.query_games_json(query_json);
+}
+
 std::string Core::favorite_games_json() {
+  classify_pending_openings(256);
   return game_library_service_.favorite_games_json();
 }
 
 std::string Core::game_json(const std::string& game_id) {
+  classify_game_opening(game_id);
   return game_library_service_.game_json(game_id);
+}
+
+std::string Core::resolve_board_move_json(
+    const std::string& game_id,
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target,
+    const int first_candidate_ply) {
+  return game_library_service_.resolve_board_move_json(
+      game_id, fen, source, target, first_candidate_ply);
 }
 
 std::string Core::import_pgn_json(const std::string& pgn) {
@@ -224,7 +250,18 @@ std::string Core::statistics_overview_json() {
 }
 
 std::string Core::statistics_openings_json() {
+  // This is an explicit user request for opening statistics, so finish the
+  // remaining local backfill now instead of waiting for another app launch.
+  classify_pending_openings(0);
   return statistics_service_.openings_json();
+}
+
+std::string Core::statistics_terminations_json() {
+  return statistics_service_.terminations_json();
+}
+
+std::string Core::statistics_phases_json() {
+  return statistics_service_.phases_json();
 }
 
 void Core::set_favorite(const std::string& game_id, const bool value) {
@@ -287,6 +324,10 @@ std::string Core::start_move_refinement_json(
 
 void Core::cancel_analysis(const std::string& game_id) {
   analysis_service_.cancel_analysis(game_id);
+}
+
+void Core::delete_analysis(const std::string& game_id) {
+  analysis_service_.delete_analysis(game_id);
 }
 
 void Core::clear_engine_cache() {
