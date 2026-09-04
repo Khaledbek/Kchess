@@ -287,8 +287,20 @@ class FakeCoreGateway implements CoreGateway {
     hasProfile: true,
     totalGames: 3,
     terminations: [
-      GameTermination(type: 'resignation', count: 2),
-      GameTermination(type: 'checkmate', count: 1),
+      GameTermination(
+        type: 'resignation',
+        tally: StatTally(
+          games: 2,
+          wins: 1,
+          losses: 1,
+          winRate: 0.5,
+          scorePercent: 0.5,
+        ),
+      ),
+      GameTermination(
+        type: 'checkmate',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+      ),
     ],
   );
 

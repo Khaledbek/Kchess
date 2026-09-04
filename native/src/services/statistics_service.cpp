@@ -285,19 +285,26 @@ std::string StatisticsService::terminations_json() const {
 
   // Termination reason lives only in the stored PGN, so read full records here
   // (unlike the lean overview/openings queries).
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
   const auto games = database_.games(profile->id);
-  std::map<std::string, int> counts;
+  std::map<std::string, Tally> tallies;
   for (const auto& game : games) {
-    counts[termination_bucket(game.pgn, game.result)] += 1;
+    const std::string bucket = termination_bucket(game.pgn, game.result);
+    const std::string color = game_color(username, game.white_name, game.black_name);
+    const std::string outcome = effective_outcome(game.provider_outcome, color, game.result);
+    add_outcome(tallies[bucket], outcome);
   }
 
   static constexpr std::array<const char*, 5> kOrder{
       "checkmate", "resignation", "timeout", "draw", "other"};
   nlohmann::json list = nlohmann::json::array();
   for (const char* type : kOrder) {
-    const auto found = counts.find(type);
-    if (found == counts.end() || found->second == 0) continue;
-    list.push_back({{"type", type}, {"count", found->second}});
+    const auto found = tallies.find(type);
+    if (found == tallies.end() || found->second.games == 0) continue;
+    nlohmann::json node = tally_json(found->second);
+    node["type"] = type;
+    list.push_back(std::move(node));
   }
 
   nlohmann::json root{

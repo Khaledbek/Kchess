@@ -345,18 +345,20 @@ class OpeningsStats {
 }
 
 /// One game-termination bucket (checkmate, resignation, timeout, draw, other)
-/// with how many of the profile's games ended that way.
+/// with the profile's win/draw/loss split among the games that ended that way.
 class GameTermination {
-  const GameTermination({required this.type, required this.count});
+  const GameTermination({required this.type, required this.tally});
 
   factory GameTermination.fromJson(Map<String, Object?> json) =>
       GameTermination(
         type: json['type'] as String? ?? 'other',
-        count: json['count'] as int? ?? 0,
+        tally: StatTally.fromJson(json),
       );
 
   final String type; // checkmate | resignation | timeout | draw | other
-  final int count;
+  final StatTally tally;
+
+  int get count => tally.games;
 }
 
 /// How the active profile's games ended, aggregated in the native layer from
