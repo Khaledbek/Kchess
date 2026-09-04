@@ -363,6 +363,11 @@ char* kc_statistics_openings_json(const kc_core_handle handle) {
       core_from(handle), [handle] { return core_from(handle)->statistics_openings_json(); });
 }
 
+char* kc_statistics_terminations_json(const kc_core_handle handle) {
+  return string_call(
+      core_from(handle), [handle] { return core_from(handle)->statistics_terminations_json(); });
+}
+
 kc_status kc_set_game_favorite(
     const kc_core_handle handle, const char* game_id_utf8, const int32_t enabled) {
   if (game_id_utf8 == nullptr)

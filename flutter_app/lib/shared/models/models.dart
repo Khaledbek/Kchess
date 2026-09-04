@@ -259,57 +259,130 @@ class StatisticsOverview {
   bool get isEmpty => totalGames == 0;
 }
 
-/// Performance in one named opening playing a given color, from the profile's
+/// One specific line within an opening family (e.g. "Scandinavian Defense:
+/// Mieses-Kotroc Variation"), with its win/draw/loss tally from the profile's
 /// perspective.
-class OpeningStat {
-  const OpeningStat({
+class OpeningVariation {
+  const OpeningVariation({
     required this.eco,
     required this.name,
-    required this.color,
     required this.tally,
   });
 
-  factory OpeningStat.fromJson(Map<String, Object?> json) => OpeningStat(
-    eco: json['eco'] as String? ?? '',
-    name: json['name'] as String? ?? '',
-    color: json['color'] as String? ?? 'unknown',
-    tally: StatTally.fromJson(json),
-  );
+  factory OpeningVariation.fromJson(Map<String, Object?> json) =>
+      OpeningVariation(
+        eco: json['eco'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        tally: StatTally.fromJson(json),
+      );
 
   final String eco;
-  final String name;
-  final String color; // white | black | unknown
+  final String name; // full opening name, including the family prefix
   final StatTally tally;
 }
 
-/// Win-rate-by-opening for the active profile, most played first.
+/// A base opening family (e.g. "Scandinavian Defense") aggregating every
+/// variation the profile played with a given color, most played first.
+class OpeningFamily {
+  const OpeningFamily({
+    required this.familyName,
+    required this.baseEco,
+    required this.color,
+    required this.tally,
+    required this.variations,
+  });
+
+  factory OpeningFamily.fromJson(Map<String, Object?> json) => OpeningFamily(
+    familyName: json['family'] as String? ?? '',
+    baseEco: json['eco'] as String? ?? '',
+    color: json['color'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+    variations: (json['variations'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(OpeningVariation.fromJson)
+        .toList(growable: false),
+  );
+
+  final String familyName;
+  final String baseEco;
+  final String color; // white | black | unknown
+  final StatTally tally;
+  final List<OpeningVariation> variations;
+
+  bool get hasDistinctVariations =>
+      variations.length > 1 ||
+      (variations.length == 1 && variations.first.name != familyName);
+}
+
+/// Opening families for the active profile, grouped and most played first.
 class OpeningsStats {
   const OpeningsStats({
     this.hasProfile = false,
     this.gamesWithOpening = 0,
     this.gamesWithoutOpening = 0,
-    this.distinctOpenings = 0,
-    this.openings = const [],
+    this.distinctFamilies = 0,
+    this.families = const [],
   });
 
   factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
     hasProfile: json['hasProfile'] as bool? ?? false,
     gamesWithOpening: json['gamesWithOpening'] as int? ?? 0,
     gamesWithoutOpening: json['gamesWithoutOpening'] as int? ?? 0,
-    distinctOpenings: json['distinctOpenings'] as int? ?? 0,
-    openings: (json['openings'] as List<Object?>? ?? const [])
+    distinctFamilies: json['distinctFamilies'] as int? ?? 0,
+    families: (json['families'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>()
-        .map(OpeningStat.fromJson)
+        .map(OpeningFamily.fromJson)
         .toList(growable: false),
   );
 
   final bool hasProfile;
   final int gamesWithOpening;
   final int gamesWithoutOpening;
-  final int distinctOpenings;
-  final List<OpeningStat> openings;
+  final int distinctFamilies;
+  final List<OpeningFamily> families;
 
   bool get isEmpty => gamesWithOpening == 0;
+}
+
+/// One game-termination bucket (checkmate, resignation, timeout, draw, other)
+/// with how many of the profile's games ended that way.
+class GameTermination {
+  const GameTermination({required this.type, required this.count});
+
+  factory GameTermination.fromJson(Map<String, Object?> json) =>
+      GameTermination(
+        type: json['type'] as String? ?? 'other',
+        count: json['count'] as int? ?? 0,
+      );
+
+  final String type; // checkmate | resignation | timeout | draw | other
+  final int count;
+}
+
+/// How the active profile's games ended, aggregated in the native layer from
+/// the stored PGN Termination tags.
+class TerminationStats {
+  const TerminationStats({
+    this.hasProfile = false,
+    this.totalGames = 0,
+    this.terminations = const [],
+  });
+
+  factory TerminationStats.fromJson(Map<String, Object?> json) =>
+      TerminationStats(
+        hasProfile: json['hasProfile'] as bool? ?? false,
+        totalGames: json['totalGames'] as int? ?? 0,
+        terminations: (json['terminations'] as List<Object?>? ?? const [])
+            .cast<Map<String, Object?>>()
+            .map(GameTermination.fromJson)
+            .toList(growable: false),
+      );
+
+  final bool hasProfile;
+  final int totalGames;
+  final List<GameTermination> terminations;
+
+  bool get isEmpty => terminations.isEmpty;
 }
 
 enum AppThemeMode {
@@ -525,6 +598,7 @@ class GameSummary {
     this.favoriteCollectionId,
     this.downloaded = false,
     this.analyzed = false,
+    this.termination = 'unknown',
     this.endedAt = 0,
   });
 
@@ -557,6 +631,7 @@ class GameSummary {
     favoriteCollectionId: json['favoriteCollectionId'] as String?,
     downloaded: json['downloaded'] as bool? ?? false,
     analyzed: json['analyzed'] as bool? ?? false,
+    termination: json['termination'] as String? ?? 'unknown',
     endedAt: json['endedAt'] as int? ?? 0,
   );
 
@@ -588,6 +663,7 @@ class GameSummary {
   final String? favoriteCollectionId;
   final bool downloaded;
   final bool analyzed;
+  final String termination; // checkmate | resignation | timeout | draw | other | unknown
   final int endedAt;
 }
 
@@ -618,7 +694,10 @@ class GameQuery {
     'color': color,
     'timeControls': timeControls,
     'sort': sort,
-    'month': month,
+    // Only send `month` when set: the native query reads it with a string
+    // default that is used solely when the key is absent, so a JSON `null`
+    // would throw there instead of falling back.
+    if (month != null) 'month': month,
     'favoriteOnly': favoriteOnly,
     'applyMonth': applyMonth,
   };

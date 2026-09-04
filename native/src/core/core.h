@@ -81,6 +81,7 @@ class Core {
 
   std::string statistics_overview_json();
   std::string statistics_openings_json();
+  std::string statistics_terminations_json();
 
   std::string start_analysis_json(const std::string& game_id);
   std::string analysis_status_json(const std::string& game_id);

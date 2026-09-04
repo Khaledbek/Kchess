@@ -19,9 +19,14 @@ class StatisticsService {
   // when no profile is active.
   std::string overview_json() const;
 
-  // Per named opening win/draw/loss and score, split by the color the profile
-  // played, for the active profile. Openings come from the classified games.
+  // Openings grouped into base families with nested variations, each with
+  // win/draw/loss and score, split by the color the profile played. Openings
+  // come from the classified games.
   std::string openings_json() const;
+
+  // How the active profile's games ended (checkmate, resignation, timeout,
+  // draw, other), aggregated from the stored PGN Termination tags.
+  std::string terminations_json() const;
 
  private:
   Database& database_;

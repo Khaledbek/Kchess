@@ -16,6 +16,7 @@
 #include "chess/pgn.h"
 #include "chess/move.h"
 #include "chess/position_view.h"
+#include "services/termination.h"
 
 namespace kchess {
 namespace {
@@ -169,7 +170,8 @@ std::string GameLibraryService::game_record_json(
   append_optional_string(json, game.favorite_collection_id);
   json << ",\"downloaded\":" << (game.downloaded ? "true" : "false")
        << ",\"analyzed\":" << (game.analyzed ? "true" : "false")
-       << ",\"isFixture\":false";
+       << ",\"termination\":\"" << termination_bucket(game.pgn, game.result)
+       << "\",\"isFixture\":false";
   if (include_moves) {
     nlohmann::json outcome = nullptr;
     if (!game.moves.empty()) {

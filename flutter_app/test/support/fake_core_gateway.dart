@@ -239,11 +239,11 @@ class FakeCoreGateway implements CoreGateway {
     hasProfile: true,
     gamesWithOpening: 3,
     gamesWithoutOpening: 0,
-    distinctOpenings: 2,
-    openings: [
-      OpeningStat(
-        eco: 'C65',
-        name: 'Ruy Lopez: Berlin Defense',
+    distinctFamilies: 2,
+    families: [
+      OpeningFamily(
+        familyName: 'Ruy Lopez',
+        baseEco: 'C65',
         color: 'white',
         tally: StatTally(
           games: 2,
@@ -252,13 +252,43 @@ class FakeCoreGateway implements CoreGateway {
           winRate: 0.5,
           scorePercent: 0.5,
         ),
+        variations: [
+          OpeningVariation(
+            eco: 'C65',
+            name: 'Ruy Lopez: Berlin Defense',
+            tally: StatTally(
+              games: 2,
+              wins: 1,
+              losses: 1,
+              winRate: 0.5,
+              scorePercent: 0.5,
+            ),
+          ),
+        ],
       ),
-      OpeningStat(
-        eco: 'B10',
-        name: 'Caro-Kann Defense',
+      OpeningFamily(
+        familyName: 'Caro-Kann Defense',
+        baseEco: 'B10',
         color: 'black',
         tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+        variations: [
+          OpeningVariation(
+            eco: 'B10',
+            name: 'Caro-Kann Defense',
+            tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+          ),
+        ],
       ),
+    ],
+  );
+
+  @override
+  Future<TerminationStats> terminationStats() async => const TerminationStats(
+    hasProfile: true,
+    totalGames: 3,
+    terminations: [
+      GameTermination(type: 'resignation', count: 2),
+      GameTermination(type: 'checkmate', count: 1),
     ],
   );
 

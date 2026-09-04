@@ -1,10 +1,15 @@
 part of '../../../ui/app_root.dart';
 
 class _OpeningsCard extends StatelessWidget {
-  const _OpeningsCard({required this.future, required this.onRetry});
+  const _OpeningsCard({
+    required this.future,
+    required this.onRetry,
+    required this.controller,
+  });
 
   final Future<OpeningsStats> future;
   final VoidCallback onRetry;
+  final AppController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +22,7 @@ class _OpeningsCard extends StatelessWidget {
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const SizedBox(
-                height: 140,
+                height: 160,
                 child: Center(child: CircularProgressIndicator()),
               );
             }
@@ -44,7 +49,11 @@ class _OpeningsCard extends StatelessWidget {
                 text: labels.empty,
               );
             }
-            return _OpeningsContent(stats: stats, labels: labels);
+            return _OpeningsContent(
+              stats: stats,
+              labels: labels,
+              controller: controller,
+            );
           },
         ),
       ),
@@ -52,207 +61,446 @@ class _OpeningsCard extends StatelessWidget {
   }
 }
 
-class _OpeningsContent extends StatelessWidget {
-  const _OpeningsContent({required this.stats, required this.labels});
+enum _OpeningSort { mostPlayed, bestWinRate }
+
+class _OpeningsContent extends StatefulWidget {
+  const _OpeningsContent({
+    required this.stats,
+    required this.labels,
+    required this.controller,
+  });
 
   final OpeningsStats stats;
   final _OpeningsText labels;
+  final AppController controller;
+
+  @override
+  State<_OpeningsContent> createState() => _OpeningsContentState();
+}
+
+class _OpeningsContentState extends State<_OpeningsContent> {
+  /// Best-win-rate ranking ignores tiny samples so one lucky game can't top the
+  /// list.
+  static const _minGamesForWinRate = 3;
+  static const _maxRows = 12;
+
+  late String _color;
+  _OpeningSort _sort = _OpeningSort.mostPlayed;
+
+  List<String> get _availableColors {
+    final colors = <String>[];
+    if (_familiesFor('white').isNotEmpty) colors.add('white');
+    if (_familiesFor('black').isNotEmpty) colors.add('black');
+    if (_familiesFor('unknown').isNotEmpty) colors.add('unknown');
+    return colors;
+  }
+
+  List<OpeningFamily> _familiesFor(String color) {
+    if (color == 'unknown') {
+      return widget.stats.families
+          .where((f) => f.color != 'white' && f.color != 'black')
+          .toList(growable: false);
+    }
+    return widget.stats.families
+        .where((f) => f.color == color)
+        .toList(growable: false);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _color = _defaultColor();
+  }
+
+  String _defaultColor() {
+    int total(String color) =>
+        _familiesFor(color).fold(0, (sum, f) => sum + f.tally.games);
+    final colors = _availableColors;
+    if (colors.isEmpty) return 'white';
+    colors.sort((a, b) => total(b).compareTo(total(a)));
+    return colors.first;
+  }
+
+  List<OpeningFamily> _rows() {
+    final families = List<OpeningFamily>.from(_familiesFor(_color));
+    if (_sort == _OpeningSort.bestWinRate) {
+      final ranked = families
+          .where(
+            (f) =>
+                f.tally.games >= _minGamesForWinRate && f.tally.winRate != null,
+          )
+          .toList();
+      ranked.sort((a, b) {
+        final rate = b.tally.winRate!.compareTo(a.tally.winRate!);
+        if (rate != 0) return rate;
+        return b.tally.games.compareTo(a.tally.games);
+      });
+      return ranked.take(_maxRows).toList(growable: false);
+    }
+    families.sort((a, b) => b.tally.games.compareTo(a.tally.games));
+    return families.take(_maxRows).toList(growable: false);
+  }
+
+  String _colorLabel(String color) => switch (color) {
+    'white' => widget.labels.white,
+    'black' => widget.labels.black,
+    _ => widget.labels.unknownColor,
+  };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final whiteOpenings = stats.openings
-        .where((opening) => opening.color == 'white')
-        .take(8)
-        .toList(growable: false);
-    final blackOpenings = stats.openings
-        .where((opening) => opening.color == 'black')
-        .take(8)
-        .toList(growable: false);
-    final unknownOpenings = stats.openings
-        .where(
-          (opening) => opening.color != 'white' && opening.color != 'black',
-        )
-        .take(8)
-        .toList(growable: false);
+    final labels = widget.labels;
+    final colors = _availableColors;
+    if (colors.isNotEmpty && !colors.contains(_color)) _color = colors.first;
+    final rows = _rows();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.account_tree_outlined, color: theme.colorScheme.primary),
+            Icon(Icons.auto_stories_outlined, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
-            Text(
-              labels.title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+            Expanded(
+              child: Text(
+                labels.title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
-          '${stats.gamesWithOpening} ${labels.classifiedGames}',
+          '${widget.stats.gamesWithOpening} ${labels.classifiedGames}',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 16),
-        Text(labels.mostPlayed, style: _overviewSectionLabel(theme)),
-        const SizedBox(height: 8),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final sections = <Widget>[
-              if (whiteOpenings.isNotEmpty)
-                _OpeningColorSection(
-                  color: 'white',
-                  title: labels.white,
-                  openings: whiteOpenings,
-                  labels: labels,
-                ),
-              if (blackOpenings.isNotEmpty)
-                _OpeningColorSection(
-                  color: 'black',
-                  title: labels.black,
-                  openings: blackOpenings,
-                  labels: labels,
-                ),
-              if (unknownOpenings.isNotEmpty)
-                _OpeningColorSection(
-                  color: 'unknown',
-                  title: labels.unknownColor,
-                  openings: unknownOpenings,
-                  labels: labels,
-                ),
-            ];
-            if (constraints.maxWidth >= 720 && sections.length == 2) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        // Colour "tabs" + sort toggle. Both wrap so they stay usable on a
+        // narrow card.
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (colors.length > 1)
+              SegmentedButton<String>(
+                showSelectedIcon: false,
+                segments: [
+                  for (final color in colors)
+                    ButtonSegment<String>(
+                      value: color,
+                      icon: _ColorDot(color: color),
+                      label: Text(_colorLabel(color)),
+                    ),
+                ],
+                selected: {_color},
+                onSelectionChanged: (selection) =>
+                    setState(() => _color = selection.first),
+              )
+            else if (colors.length == 1)
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(child: sections[0]),
-                  const SizedBox(width: 20),
-                  Expanded(child: sections[1]),
+                  _ColorDot(color: colors.first),
+                  const SizedBox(width: 8),
+                  Text(
+                    _colorLabel(colors.first),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var index = 0; index < sections.length; index++) ...[
-                  if (index > 0) const SizedBox(height: 16),
-                  sections[index],
-                ],
+              ),
+            SegmentedButton<_OpeningSort>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: _OpeningSort.mostPlayed,
+                  icon: const Icon(Icons.bar_chart, size: 18),
+                  label: Text(labels.mostPlayed),
+                ),
+                ButtonSegment(
+                  value: _OpeningSort.bestWinRate,
+                  icon: const Icon(Icons.trending_up, size: 18),
+                  label: Text(labels.bestWinRate),
+                ),
               ],
-            );
-          },
+              selected: {_sort},
+              onSelectionChanged: (selection) =>
+                  setState(() => _sort = selection.first),
+            ),
+          ],
         ),
+        if (_sort == _OpeningSort.bestWinRate) ...[
+          const SizedBox(height: 8),
+          Text(
+            labels.minGamesHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        if (rows.isEmpty)
+          _OverviewMessage(
+            icon: Icons.filter_alt_off_outlined,
+            text: _sort == _OpeningSort.bestWinRate
+                ? labels.noOpeningsForWinRate
+                : labels.noOpeningsForColor,
+          )
+        else
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _OpeningFamilyTile(
+              // Reset expansion state when the colour or ordering changes.
+              key: ValueKey('${_color}_${_sort.name}_${rows[i].familyName}'),
+              family: rows[i],
+              labels: labels,
+              controller: widget.controller,
+            ),
+          ],
       ],
     );
   }
 }
 
-class _OpeningColorSection extends StatelessWidget {
-  const _OpeningColorSection({
-    required this.color,
-    required this.title,
-    required this.openings,
+/// A drill-down family row: a tappable header (family, games, win/draw/loss bar,
+/// win rate) that expands to reveal its individual variations.
+class _OpeningFamilyTile extends StatefulWidget {
+  const _OpeningFamilyTile({
+    required this.family,
     required this.labels,
+    required this.controller,
+    super.key,
   });
 
-  final String color;
-  final String title;
-  final List<OpeningStat> openings;
+  final OpeningFamily family;
   final _OpeningsText labels;
+  final AppController controller;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _ColorDot(color: color),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            for (final opening in openings)
-              _OpeningLine(opening: opening, labels: labels),
-          ],
-        ),
-      ),
-    );
-  }
+  State<_OpeningFamilyTile> createState() => _OpeningFamilyTileState();
 }
 
-class _OpeningLine extends StatelessWidget {
-  const _OpeningLine({required this.opening, required this.labels});
+class _OpeningFamilyTileState extends State<_OpeningFamilyTile> {
+  bool _expanded = false;
 
-  final OpeningStat opening;
-  final _OpeningsText labels;
+  String _variationLabel(OpeningVariation variation) {
+    final family = widget.family.familyName;
+    final name = variation.name;
+    if (name == family) return widget.labels.baseLine;
+    if (name.startsWith(family)) {
+      final rest = name
+          .substring(family.length)
+          .replaceFirst(RegExp(r'^\s*[:,]\s*'), '')
+          .trim();
+      if (rest.isNotEmpty) return rest;
+    }
+    return name;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tally = opening.tally;
+    final scheme = theme.colorScheme;
+    final family = widget.family;
+    final tally = family.tally;
+    final expandable = family.hasDistinctVariations;
     final subtitle = <String>[
-      if (opening.eco.isNotEmpty) opening.eco,
-      '${tally.games} ${labels.games}',
+      if (family.baseEco.isNotEmpty) family.baseEco,
+      '${tally.games} ${widget.labels.games}',
+      if (expandable) '${family.variations.length} ${widget.labels.variations}',
     ].join(' · ');
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+
+    final header = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
-          _ColorDot(color: opening.color),
-          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  opening.name,
+                  family.familyName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _WinLossDrawBar(tally: tally, height: 8),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          SizedBox(
+            width: 56,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _formatPercent(tally.winRate),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  widget.labels.winRateShort,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          SizedBox(width: 84, child: _WdlBar(tally: tally)),
-          const SizedBox(width: 10),
           SizedBox(
-            width: 92,
-            child: Text(
-              '${labels.score}: ${_formatPercent(tally.scorePercent)}',
-              textAlign: TextAlign.end,
-              maxLines: 1,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            width: 28,
+            child: expandable
+                ? AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(
+                      Icons.expand_more,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (expandable)
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(12),
+              child: header,
+            )
+          else
+            header,
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 180),
+            crossFadeState: _expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Column(
+                children: [
+                  Divider(height: 1, color: scheme.outlineVariant),
+                  const SizedBox(height: 6),
+                  for (final variation in family.variations)
+                    _OpeningVariationRow(
+                      label: _variationLabel(variation),
+                      variation: variation,
+                      labels: widget.labels,
+                      onTap: () => _showOpeningGames(
+                        context: context,
+                        controller: widget.controller,
+                        family: family,
+                        variation: variation,
+                        variationLabel: _variationLabel(variation),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OpeningVariationRow extends StatelessWidget {
+  const _OpeningVariationRow({
+    required this.label,
+    required this.variation,
+    required this.labels,
+    required this.onTap,
+  });
+
+  final String label;
+  final OpeningVariation variation;
+  final _OpeningsText labels;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tally = variation.tally;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Icon(
+                Icons.subdirectory_arrow_right,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${tally.games} ${labels.games}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(width: 96, child: _WinLossDrawBar(tally: tally, height: 6)),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 42,
+              child: Text(
+                _formatPercent(tally.winRate),
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: scheme.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }
@@ -287,12 +535,18 @@ class _OpeningsText {
   const _OpeningsText({
     required this.title,
     required this.mostPlayed,
+    required this.bestWinRate,
+    required this.minGamesHint,
     required this.classifiedGames,
     required this.games,
+    required this.variations,
+    required this.baseLine,
     required this.white,
     required this.black,
     required this.unknownColor,
-    required this.score,
+    required this.winRateShort,
+    required this.noOpeningsForColor,
+    required this.noOpeningsForWinRate,
     required this.empty,
     required this.noProfile,
     required this.error,
@@ -301,12 +555,18 @@ class _OpeningsText {
 
   final String title;
   final String mostPlayed;
+  final String bestWinRate;
+  final String minGamesHint;
   final String classifiedGames;
   final String games;
+  final String variations;
+  final String baseLine;
   final String white;
   final String black;
   final String unknownColor;
-  final String score;
+  final String winRateShort;
+  final String noOpeningsForColor;
+  final String noOpeningsForWinRate;
   final String empty;
   final String noProfile;
   final String error;
@@ -317,14 +577,20 @@ _OpeningsText _openingsText(BuildContext context) {
   switch (Localizations.localeOf(context).languageCode) {
     case 'ar':
       return const _OpeningsText(
-        title: 'الافتتاحيات',
+        title: 'أنجح الافتتاحيات',
         mostPlayed: 'الأكثر لعبًا',
+        bestWinRate: 'أفضل نسبة فوز',
+        minGamesHint: '‏3 مباريات على الأقل لكل افتتاحية.',
         classifiedGames: 'مباراة بافتتاحية معروفة',
         games: 'مباراة',
+        variations: 'تنويعات',
+        baseLine: 'الشكل الأساسي',
         white: 'الأبيض',
         black: 'الأسود',
-        unknownColor: 'لون غير معروف',
-        score: 'النقاط',
+        unknownColor: 'أخرى',
+        winRateShort: 'فوز',
+        noOpeningsForColor: 'لا توجد افتتاحيات لهذا اللون.',
+        noOpeningsForWinRate: 'لا توجد افتتاحية بثلاث مباريات على الأقل.',
         empty: 'لا توجد افتتاحيات مُصنّفة بعد. تُصنَّف المباريات المستوردة والمتزامنة تلقائيًا.',
         noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الافتتاحيات.',
         error: 'تعذّر تحميل الافتتاحيات.',
@@ -332,14 +598,20 @@ _OpeningsText _openingsText(BuildContext context) {
       );
     case 'en':
       return const _OpeningsText(
-        title: 'Openings',
+        title: 'Top openings',
         mostPlayed: 'Most played',
+        bestWinRate: 'Best win rate',
+        minGamesHint: 'At least 3 games per opening.',
         classifiedGames: 'games with a named opening',
         games: 'games',
+        variations: 'variations',
+        baseLine: 'Base line',
         white: 'White',
         black: 'Black',
-        unknownColor: 'Unassigned color',
-        score: 'Score',
+        unknownColor: 'Other',
+        winRateShort: 'win',
+        noOpeningsForColor: 'No openings for this color yet.',
+        noOpeningsForWinRate: 'No opening with at least 3 games.',
         empty: 'No named openings yet. Synced and imported games are classified automatically.',
         noProfile: 'Create or select a profile to see openings.',
         error: 'Could not load openings.',
@@ -347,14 +619,20 @@ _OpeningsText _openingsText(BuildContext context) {
       );
     default:
       return const _OpeningsText(
-        title: 'Eröffnungen',
+        title: 'Erfolgreichste Eröffnungen',
         mostPlayed: 'Meistgespielt',
+        bestWinRate: 'Beste Siegquote',
+        minGamesHint: 'Mindestens 3 Partien pro Eröffnung.',
         classifiedGames: 'Partien mit benannter Eröffnung',
         games: 'Partien',
+        variations: 'Varianten',
+        baseLine: 'Grundform',
         white: 'Weiß',
         black: 'Schwarz',
-        unknownColor: 'Farbe nicht zugeordnet',
-        score: 'Punkte',
+        unknownColor: 'Andere',
+        winRateShort: 'Sieg',
+        noOpeningsForColor: 'Noch keine Eröffnungen für diese Farbe.',
+        noOpeningsForWinRate: 'Keine Eröffnung mit mindestens 3 Partien.',
         empty: 'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.',
         noProfile: 'Erstelle oder wähle ein Profil, um Eröffnungen zu sehen.',
         error: 'Eröffnungen konnten nicht geladen werden.',
@@ -362,26 +640,3 @@ _OpeningsText _openingsText(BuildContext context) {
       );
   }
 }
-
-({String title, String introTitle, String introBody}) _statisticsText(
-  BuildContext context,
-) {
-  return switch (Localizations.localeOf(context).languageCode) {
-    'ar' => (
-      title: 'الإحصائيات',
-      introTitle: 'أداؤك في الشطرنج',
-      introBody: 'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.',
-    ),
-    'en' => (
-      title: 'Statistics',
-      introTitle: 'Your chess performance',
-      introBody: 'See your results, recent form and opening record separated by color.',
-    ),
-    _ => (
-      title: 'Statistiken',
-      introTitle: 'Deine Schachleistung',
-      introBody: 'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.',
-    ),
-  };
-}
-

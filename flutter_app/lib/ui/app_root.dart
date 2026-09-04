@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../localization/generated/app_localizations.dart';
 import '../shared/models/models.dart';
@@ -25,8 +25,13 @@ part '../features/favorites/presentation/favorite_dialogs.dart';
 part '../features/games/presentation/import_dialogs.dart';
 part '../features/profile/presentation/profile_screen.dart';
 part '../features/statistics/presentation/statistics_screen.dart';
+part '../features/statistics/presentation/stats_widgets.dart';
 part '../features/statistics/presentation/overview_section.dart';
+part '../features/statistics/presentation/form_section.dart';
+part '../features/statistics/presentation/rating_section.dart';
+part '../features/statistics/presentation/termination_section.dart';
 part '../features/statistics/presentation/openings_section.dart';
+part '../features/statistics/presentation/opening_games_sheet.dart';
 part '../features/settings/presentation/settings_screen.dart';
 part '../features/settings/presentation/engine_settings_page.dart';
 part '../features/settings/presentation/analysis_settings_page.dart';
