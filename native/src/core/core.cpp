@@ -260,6 +260,10 @@ std::string Core::statistics_terminations_json() {
   return statistics_service_.terminations_json();
 }
 
+std::string Core::statistics_phases_json() {
+  return statistics_service_.phases_json();
+}
+
 void Core::set_favorite(const std::string& game_id, const bool value) {
   game_library_service_.set_favorite(game_id, value);
 }

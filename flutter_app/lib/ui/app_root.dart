@@ -30,6 +30,7 @@ part '../features/statistics/presentation/overview_section.dart';
 part '../features/statistics/presentation/form_section.dart';
 part '../features/statistics/presentation/rating_section.dart';
 part '../features/statistics/presentation/termination_section.dart';
+part '../features/statistics/presentation/phase_section.dart';
 part '../features/statistics/presentation/openings_section.dart';
 part '../features/statistics/presentation/opening_games_sheet.dart';
 part '../features/settings/presentation/settings_screen.dart';

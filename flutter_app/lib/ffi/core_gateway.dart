@@ -19,6 +19,7 @@ abstract interface class CoreGateway {
   Future<StatisticsOverview> statisticsOverview();
   Future<OpeningsStats> openingsStats();
   Future<TerminationStats> terminationStats();
+  Future<PhaseStats> phaseStats();
   Future<ProviderOverview> syncProvider(
     String profileId, {
     int year = 0,

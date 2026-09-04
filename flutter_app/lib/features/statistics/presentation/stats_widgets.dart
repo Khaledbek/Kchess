@@ -49,8 +49,63 @@ class _TimeControlFilterBar extends StatelessWidget {
   }
 }
 
-/// Proportional, themed win / draw / loss ribbon. Replaces the old raw-colour
-/// `_WdlBar`; segments carry tooltips and can optionally show a count legend.
+/// Shared win / draw / loss palette for every proportion bar and legend in the
+/// statistics tab, so the mini bars and their keys always agree.
+const _kWinColor = Color(0xFF22C55E); // vibrant green
+const _kDrawColor = Color(0xFF64748B); // muted slate grey
+const _kLossColor = Color(0xFFEF4444); // vibrant red
+const _kEmptyTrackColor = Color(0xFF1E293B); // muted track when no games
+
+/// Reusable horizontal stacked win/draw/loss proportion bar. Segments are sized
+/// by count; an all-zero tally shows a muted empty track.
+class _WinLossDrawRatioBar extends StatelessWidget {
+  const _WinLossDrawRatioBar({
+    required this.wins,
+    required this.draws,
+    required this.losses,
+    this.height = 6,
+  });
+
+  final int wins;
+  final int draws;
+  final int losses;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = _statsLabels(context);
+    final total = wins + draws + losses;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: SizedBox(
+        height: height,
+        child: total == 0
+            ? const ColoredBox(color: _kEmptyTrackColor)
+            : Row(
+                children: [
+                  _segment(wins, _kWinColor, labels.wins, total),
+                  _segment(draws, _kDrawColor, labels.draws, total),
+                  _segment(losses, _kLossColor, labels.losses, total),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _segment(int count, Color color, String label, int total) {
+    if (count == 0) return const SizedBox.shrink();
+    final percent = (count / total * 100).round();
+    return Expanded(
+      flex: count,
+      child: Tooltip(
+        message: '$label · $count ($percent%)',
+        child: ColoredBox(color: color),
+      ),
+    );
+  }
+}
+
+/// Convenience wrapper that draws a [_WinLossDrawRatioBar] from a [StatTally].
 class _WinLossDrawBar extends StatelessWidget {
   const _WinLossDrawBar({required this.tally, this.height = 12});
 
@@ -58,53 +113,12 @@ class _WinLossDrawBar extends StatelessWidget {
   final double height;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final labels = _statsLabels(context);
-    final radius = height;
-    final decided = tally.decided;
-    if (decided == 0) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: SizedBox(
-          height: height,
-          child: ColoredBox(color: scheme.surfaceContainerHighest),
-        ),
-      );
-    }
-
-    Widget segment(int flex, Color color, String label, int count) {
-      if (flex == 0) return const SizedBox.shrink();
-      final percent = (count / decided * 100).round();
-      return Expanded(
-        flex: flex,
-        child: Tooltip(
-          message: '$label · $count ($percent%)',
-          child: ColoredBox(color: color),
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: SizedBox(
-        height: height,
-        child: Row(
-          children: [
-            segment(tally.wins, AppTheme.success, labels.wins, tally.wins),
-            segment(
-              tally.draws,
-              scheme.onSurfaceVariant,
-              labels.draws,
-              tally.draws,
-            ),
-            segment(tally.losses, scheme.error, labels.losses, tally.losses),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _WinLossDrawRatioBar(
+    wins: tally.wins,
+    draws: tally.draws,
+    losses: tally.losses,
+    height: height,
+  );
 }
 
 /// Small win/draw/loss colour key shown beside a [_WinLossDrawBar].
@@ -139,9 +153,9 @@ class _WdlLegend extends StatelessWidget {
       spacing: 16,
       runSpacing: 4,
       children: [
-        dot(AppTheme.success, labels.wins, tally.wins),
-        dot(scheme.onSurfaceVariant, labels.draws, tally.draws),
-        dot(scheme.error, labels.losses, tally.losses),
+        dot(_kWinColor, labels.wins, tally.wins),
+        dot(_kDrawColor, labels.draws, tally.draws),
+        dot(_kLossColor, labels.losses, tally.losses),
       ],
     );
   }

@@ -8,9 +8,33 @@ class _RatingPoint {
   final int rating;
 }
 
-/// Rating-over-time line chart for the active profile, built from the ratings
-/// the profile carried in each (filtered) game. Falls back to a hint when there
-/// is not enough rating data (e.g. local PGN libraries without ratings).
+/// One rating line for a time-control category (Blitz, Bullet, Rapid, Daily …),
+/// sorted oldest → newest with bad points already filtered out.
+class _RatingSeries {
+  const _RatingSeries({
+    required this.timeControl,
+    required this.color,
+    required this.points,
+  });
+
+  final String timeControl;
+  final Color color;
+  final List<_RatingPoint> points;
+
+  int get current => points.last.rating;
+}
+
+/// Distinct colours per time control so the merged "Alle" view reads as several
+/// separate lines instead of one jagged line across incompatible scales.
+const _kRatingSeriesColors = <String, Color>{
+  'blitz': Color(0xFF3B82F6), // electric blue
+  'bullet': Color(0xFFF59E0B), // amber
+  'rapid': Color(0xFF10B981), // emerald green
+  'daily': Color(0xFF8B5CF6), // purple
+};
+
+/// Rating-over-time line chart for the active profile. Under "Alle" it draws one
+/// line per time control; a specific top-filter (or a legend tap) isolates one.
 class _RatingTrendCard extends StatelessWidget {
   const _RatingTrendCard({
     required this.future,
@@ -22,35 +46,62 @@ class _RatingTrendCard extends StatelessWidget {
   final String timeControl;
   final VoidCallback onRetry;
 
-  /// Fraction of the median rating below which a point is treated as bad data.
-  /// Chess.com occasionally records unrated/variant games at a wildly different
-  /// scale (e.g. a 70 or 178 among 400s); those plunges skew the axis and the
-  /// "Tiefststand", so they are dropped before plotting.
+  /// Fraction of a series' median rating below which a point is treated as bad
+  /// data (chess.com occasionally records unrated/variant games at a wildly
+  /// different scale). Applied per series so each scale is judged on its own.
   static const _outlierFloorFactor = 0.6;
 
-  List<_RatingPoint> _points(List<GameSummary> games) {
-    final raw = <_RatingPoint>[];
-    for (final game in games) {
-      final rating = _statProfileRating(game);
-      // Skip unrated / zero / null ratings and games without a timestamp.
-      if (rating == null || rating <= 0 || game.endedAt <= 0) continue;
-      raw.add(_RatingPoint(endedAt: game.endedAt, rating: rating));
-    }
-
+  List<_RatingPoint> _hygiene(List<_RatingPoint> raw) {
     List<_RatingPoint> points = raw;
     if (raw.length >= 3) {
-      // Robust gate around the median (resistant to a handful of bad points).
       final ratings = raw.map((p) => p.rating).toList()..sort();
       final median = ratings[ratings.length ~/ 2];
       final floor = (median * _outlierFloorFactor).round();
       final cleaned = raw.where((p) => p.rating >= floor).toList();
-      // Only apply the filter if it still leaves a usable trend.
       if (cleaned.length >= 2) points = cleaned;
     }
-
-    // queryGames returns newest-first; a trend reads oldest → newest.
     points.sort((a, b) => a.endedAt.compareTo(b.endedAt));
     return points;
+  }
+
+  List<_RatingSeries> _buildSeries(BuildContext context, List<GameSummary> games) {
+    final byTimeControl = <String, List<_RatingPoint>>{};
+    for (final game in games) {
+      final rating = _statProfileRating(game);
+      if (rating == null || rating <= 0 || game.endedAt <= 0) continue;
+      (byTimeControl[game.timeControlType] ??= []).add(
+        _RatingPoint(endedAt: game.endedAt, rating: rating),
+      );
+    }
+
+    // Stable order: the four named controls first, then any extras.
+    const order = [
+      'bullet',
+      'blitz',
+      'rapid',
+      'daily',
+      'classical',
+      'correspondence',
+    ];
+    final keys = <String>[
+      ...order.where(byTimeControl.containsKey),
+      ...byTimeControl.keys.where((k) => !order.contains(k)),
+    ];
+
+    final scheme = Theme.of(context).colorScheme;
+    final series = <_RatingSeries>[];
+    for (final tc in keys) {
+      final points = _hygiene(byTimeControl[tc]!);
+      if (points.isEmpty) continue;
+      series.add(
+        _RatingSeries(
+          timeControl: tc,
+          color: _kRatingSeriesColors[tc] ?? scheme.onSurfaceVariant,
+          points: points,
+        ),
+      );
+    }
+    return series;
   }
 
   @override
@@ -81,13 +132,13 @@ class _RatingTrendCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             FutureBuilder<List<GameSummary>>(
               future: future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
                   return const SizedBox(
-                    height: 200,
+                    height: 220,
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
@@ -101,14 +152,14 @@ class _RatingTrendCard extends StatelessWidget {
                     ),
                   );
                 }
-                final points = _points(snapshot.data!);
-                if (points.length < 2) {
+                final series = _buildSeries(context, snapshot.data!);
+                if (series.isEmpty) {
                   return _OverviewMessage(
                     icon: Icons.stacked_line_chart_outlined,
                     text: labels.empty,
                   );
                 }
-                return _RatingTrendChart(points: points, labels: labels);
+                return _RatingTrendChart(series: series);
               },
             ),
           ],
@@ -118,55 +169,79 @@ class _RatingTrendCard extends StatelessWidget {
   }
 }
 
-class _RatingTrendChart extends StatelessWidget {
-  const _RatingTrendChart({required this.points, required this.labels});
+class _RatingTrendChart extends StatefulWidget {
+  const _RatingTrendChart({required this.series});
 
-  final List<_RatingPoint> points;
-  final _RatingText labels;
+  final List<_RatingSeries> series;
+
+  @override
+  State<_RatingTrendChart> createState() => _RatingTrendChartState();
+}
+
+class _RatingTrendChartState extends State<_RatingTrendChart> {
+  String? _isolated; // when set, only this time control's line is drawn
+
+  @override
+  void didUpdateWidget(_RatingTrendChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Drop an isolation that no longer matches the (re-filtered) data.
+    if (_isolated != null &&
+        !widget.series.any((s) => s.timeControl == _isolated)) {
+      _isolated = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    var minRating = points.first.rating;
-    var maxRating = points.first.rating;
-    for (final point in points) {
-      minRating = point.rating < minRating ? point.rating : minRating;
-      maxRating = point.rating > maxRating ? point.rating : maxRating;
+    final visible = _isolated == null
+        ? widget.series
+        : widget.series.where((s) => s.timeControl == _isolated).toList();
+
+    // Combined bounds over the visible series.
+    var minRating = visible.first.points.first.rating;
+    var maxRating = minRating;
+    var minX = visible.first.points.first.endedAt;
+    var maxX = minX;
+    for (final s in visible) {
+      for (final p in s.points) {
+        if (p.rating < minRating) minRating = p.rating;
+        if (p.rating > maxRating) maxRating = p.rating;
+        if (p.endedAt < minX) minX = p.endedAt;
+        if (p.endedAt > maxX) maxX = p.endedAt;
+      }
     }
-    final current = points.last.rating;
-    // Pad the axis so the line never touches the frame; round to tidy tick
-    // boundaries so left-axis labels read as round numbers.
     final span = (maxRating - minRating).clamp(20, 100000);
     final pad = (span * 0.15).ceil().clamp(10, 100);
     final minY = ((minRating - pad) / 10).floor() * 10.0;
     final maxY = ((maxRating + pad) / 10).ceil() * 10.0;
     final labelInterval = (((maxY - minY) / 4) / 10).ceil() * 10.0;
-
-    final spots = <FlSpot>[
-      for (var i = 0; i < points.length; i++)
-        FlSpot(i.toDouble(), points[i].rating.toDouble()),
-    ];
+    final minXd = minX.toDouble();
+    final maxXd = (maxX == minX ? minX + 1 : maxX).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Inline legend: one entry per series with its current rating; tapping
+        // isolates that line.
         Wrap(
-          spacing: 20,
-          runSpacing: 8,
+          spacing: 14,
+          runSpacing: 6,
           children: [
-            _RatingStat(label: labels.current, value: '$current'),
-            _RatingStat(
-              label: labels.peak,
-              value: '$maxRating',
-              color: AppTheme.success,
-            ),
-            _RatingStat(
-              label: labels.low,
-              value: '$minRating',
-              color: scheme.error,
-            ),
+            for (final s in widget.series)
+              _RatingLegendChip(
+                label: _timeControlLabel(s.timeControl),
+                rating: s.current,
+                color: s.color,
+                active: _isolated == null || _isolated == s.timeControl,
+                onTap: () => setState(
+                  () => _isolated = _isolated == s.timeControl
+                      ? null
+                      : s.timeControl,
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 16),
@@ -176,17 +251,15 @@ class _RatingTrendChart extends StatelessWidget {
             LineChartData(
               minY: minY,
               maxY: maxY,
-              minX: 0,
-              maxX: (points.length - 1).toDouble(),
+              minX: minXd,
+              maxX: maxXd,
               clipData: FlClipData.all(),
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: false,
                 horizontalInterval: labelInterval,
-                getDrawingHorizontalLine: (_) => FlLine(
-                  color: scheme.outlineVariant,
-                  strokeWidth: 1,
-                ),
+                getDrawingHorizontalLine: (_) =>
+                    FlLine(color: scheme.outlineVariant, strokeWidth: 1),
               ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
@@ -226,38 +299,45 @@ class _RatingTrendChart extends StatelessWidget {
                   getTooltipColor: (_) => scheme.inverseSurface,
                   getTooltipItems: (touched) => [
                     for (final spot in touched)
-                      LineTooltipItem(
-                        '${spot.y.toInt()}\n${_formatPointDate(points[spot.x.toInt()].endedAt)}',
-                        theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onInverseSurface,
-                              fontWeight: FontWeight.w600,
-                            ) ??
-                            const TextStyle(),
-                      ),
+                      _tooltipItem(context, visible, spot),
                   ],
                 ),
               ),
               lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: true,
-                  curveSmoothness: 0.2,
-                  preventCurveOverShooting: true,
-                  color: scheme.primary,
-                  barWidth: 2.5,
-                  dotData: FlDotData(show: points.length <= 30),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    color: scheme.primary.withValues(alpha: 0.12),
+                for (final s in visible)
+                  LineChartBarData(
+                    spots: [
+                      for (final p in s.points)
+                        FlSpot(p.endedAt.toDouble(), p.rating.toDouble()),
+                    ],
+                    isCurved: true,
+                    curveSmoothness: 0.2,
+                    preventCurveOverShooting: true,
+                    color: s.color,
+                    barWidth: 2.5,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, bar, index) =>
+                          FlDotCirclePainter(
+                            radius: 2.8,
+                            color: s.color,
+                            strokeWidth: 0,
+                          ),
+                    ),
+                    // A single visible line gets a faint fill; multiple lines
+                    // stay clean with no overlapping areas.
+                    belowBarData: BarAreaData(
+                      show: visible.length == 1,
+                      color: s.color.withValues(alpha: 0.10),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          '${_formatPointDate(points.first.endedAt)}  —  ${_formatPointDate(points.last.endedAt)}',
+          '${_formatPointDate(minX)}  —  ${_formatPointDate(maxX)}',
           style: theme.textTheme.bodySmall?.copyWith(
             color: scheme.onSurfaceVariant,
           ),
@@ -265,36 +345,72 @@ class _RatingTrendChart extends StatelessWidget {
       ],
     );
   }
+
+  LineTooltipItem _tooltipItem(
+    BuildContext context,
+    List<_RatingSeries> visible,
+    LineBarSpot spot,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final series = visible[spot.barIndex];
+    final point = series.points[spot.spotIndex];
+    return LineTooltipItem(
+      '${_timeControlLabel(series.timeControl)} · ${point.rating}\n'
+      '${_formatPointDate(point.endedAt)}',
+      TextStyle(
+        color: scheme.onInverseSurface,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
+    );
+  }
 }
 
-class _RatingStat extends StatelessWidget {
-  const _RatingStat({required this.label, required this.value, this.color});
+class _RatingLegendChip extends StatelessWidget {
+  const _RatingLegendChip({
+    required this.label,
+    required this.rating,
+    required this.color,
+    required this.active,
+    required this.onTap,
+  });
 
   final String label;
-  final String value;
-  final Color? color;
+  final int rating;
+  final Color color;
+  final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: color,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Opacity(
+        opacity: active ? 1 : 0.4,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$label: $rating',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
           ),
         ),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -311,18 +427,12 @@ String _formatPointDate(int endedAtSeconds) {
 class _RatingText {
   const _RatingText({
     required this.title,
-    required this.current,
-    required this.peak,
-    required this.low,
     required this.empty,
     required this.error,
     required this.retry,
   });
 
   final String title;
-  final String current;
-  final String peak;
-  final String low;
   final String empty;
   final String error;
   final String retry;
@@ -333,9 +443,6 @@ _RatingText _ratingText(BuildContext context) {
     case 'ar':
       return const _RatingText(
         title: 'تطوّر التصنيف',
-        current: 'الحالي',
-        peak: 'الأعلى',
-        low: 'الأدنى',
         empty: 'لا توجد بيانات تصنيف كافية لرسم منحنى.',
         error: 'تعذّر تحميل بيانات التصنيف.',
         retry: 'إعادة المحاولة',
@@ -343,9 +450,6 @@ _RatingText _ratingText(BuildContext context) {
     case 'en':
       return const _RatingText(
         title: 'Rating trend',
-        current: 'Current',
-        peak: 'Peak',
-        low: 'Low',
         empty: 'Not enough rating data to draw a trend.',
         error: 'Could not load rating data.',
         retry: 'Retry',
@@ -353,9 +457,6 @@ _RatingText _ratingText(BuildContext context) {
     default:
       return const _RatingText(
         title: 'Rating-Verlauf',
-        current: 'Aktuell',
-        peak: 'Höchststand',
-        low: 'Tiefststand',
         empty: 'Nicht genügend Rating-Daten für einen Verlauf.',
         error: 'Rating-Daten konnten nicht geladen werden.',
         retry: 'Erneut versuchen',

@@ -237,6 +237,10 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_terminations_json',
         );
+    _statisticsPhases = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_phases_json',
+        );
     _games = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_games_json',
     );
@@ -458,6 +462,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringNoArgsDart _statisticsOverview;
   late final _StringNoArgsDart _statisticsOpenings;
   late final _StringNoArgsDart _statisticsTerminations;
+  late final _StringNoArgsDart _statisticsPhases;
   late final _StatusStringIntDart _setGameFavorite;
   late final _StringNoArgsDart _favoriteCollections;
   late final _StringArgDart _createFavoriteCollection;
@@ -657,6 +662,11 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<TerminationStats> terminationStats() async => TerminationStats.fromJson(
     _readJson(_statisticsTerminations(_handle))! as Map<String, Object?>,
+  );
+
+  @override
+  Future<PhaseStats> phaseStats() async => PhaseStats.fromJson(
+    _readJson(_statisticsPhases(_handle))! as Map<String, Object?>,
   );
 
   @override

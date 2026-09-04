@@ -293,6 +293,27 @@ class FakeCoreGateway implements CoreGateway {
   );
 
   @override
+  Future<PhaseStats> phaseStats() async => const PhaseStats(
+    hasProfile: true,
+    totalGames: 3,
+    classified: 3,
+    phases: [
+      GamePhase(
+        phase: 'opening',
+        tally: StatTally(games: 1, losses: 1),
+      ),
+      GamePhase(
+        phase: 'middlegame',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+      ),
+      GamePhase(
+        phase: 'endgame',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+      ),
+    ],
+  );
+
+  @override
   Future<ProviderOverview> providerOverview(String profileId) async =>
       ProviderOverview(
         profile: storedProfiles.firstWhere((value) => value.id == profileId),

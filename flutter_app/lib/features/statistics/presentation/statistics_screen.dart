@@ -13,6 +13,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   late Future<StatisticsOverview> _overview;
   late Future<OpeningsStats> _openings;
   late Future<TerminationStats> _terminations;
+  late Future<PhaseStats> _phases;
   late Future<List<GameSummary>> _games;
   late bool _providerSyncing;
   String? _profileId;
@@ -52,9 +53,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _loadStats() {
     _overview = widget.controller.gateway.statisticsOverview();
     _openings = widget.controller.gateway.openingsStats();
-    // Termination data comes from stored PGNs across the whole library, so it is
-    // not affected by the time-control filter.
+    // Termination and phase data span the whole library (stored PGNs / move
+    // counts), so they are not affected by the time-control filter.
     _terminations = widget.controller.gateway.terminationStats();
+    _phases = widget.controller.gateway.phaseStats();
   }
 
   /// The form strip and rating trend derive from per-game rows; a filtered
@@ -158,6 +160,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       future: _terminations,
       onRetry: _reloadAll,
     );
+    final phase = _PhaseCard(future: _phases, onRetry: _reloadAll);
     final openings = _OpeningsCard(
       future: _openings,
       onRetry: _reloadAll,
@@ -191,6 +194,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         form,
                         const SizedBox(height: 20),
                         rating,
+                        const SizedBox(height: 20),
+                        phase,
                       ],
                     ),
                   ),
@@ -207,6 +212,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             overview,
             const SizedBox(height: 20),
             termination,
+            const SizedBox(height: 20),
+            phase,
             const SizedBox(height: 20),
             form,
             const SizedBox(height: 20),

@@ -2093,6 +2093,30 @@ std::vector<GameStatRow> Database::games_for_statistics(
   return result;
 }
 
+std::vector<GamePhaseRow> Database::games_for_phases(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT provider_outcome,result,white_name,black_name,"
+      "(SELECT MAX(ply_index) FROM game_moves m WHERE m.game_id=games.id) "
+      "FROM games WHERE profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GamePhaseRow> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    const int max_ply = sqlite3_column_type(statement.get(), 4) == SQLITE_NULL
+        ? -1
+        : sqlite3_column_int(statement.get(), 4);
+    result.push_back(GamePhaseRow{
+        .provider_outcome = text_column(statement.get(), 0),
+        .result = text_column(statement.get(), 1),
+        .white_name = text_column(statement.get(), 2),
+        .black_name = text_column(statement.get(), 3),
+        .max_ply = max_ply,
+    });
+  }
+  return result;
+}
+
 void Database::delete_local_game(
     const std::string& profile_id, const std::string& game_id) {
   auto statement = prepare(

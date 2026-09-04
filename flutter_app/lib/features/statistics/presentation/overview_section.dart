@@ -213,27 +213,31 @@ class _TallyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 92,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(child: _WinLossDrawBar(tally: tally, height: 10)),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 96,
-            child: Text(
-              '${tally.games} · ${_formatPercent(tally.scorePercent)}',
-              textAlign: TextAlign.end,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
+              Text(
+                '${tally.games} · ${_formatPercent(tally.winRate)}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _WinLossDrawRatioBar(
+            wins: tally.wins,
+            draws: tally.draws,
+            losses: tally.losses,
           ),
         ],
       ),

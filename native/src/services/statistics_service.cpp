@@ -308,4 +308,53 @@ std::string StatisticsService::terminations_json() const {
   return root.dump();
 }
 
+std::string StatisticsService::phases_json() const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) {
+    return nlohmann::json{{"hasProfile", false}, {"totalGames", 0}}.dump();
+  }
+
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
+  const auto rows = database_.games_for_phases(profile->id);
+
+  // Heuristic phase boundaries by the game's ending full-move number.
+  constexpr int kOpeningMax = 12;     // moves 1-12
+  constexpr int kMiddlegameMax = 30;  // moves 13-30; 31+ is endgame
+
+  Tally opening;
+  Tally middlegame;
+  Tally endgame;
+  int classified = 0;
+  for (const auto& row : rows) {
+    if (row.max_ply < 0) continue;  // no stored moves (e.g. FEN import)
+    const int move_number = (row.max_ply / 2) + 1;
+    const std::string color = game_color(username, row.white_name, row.black_name);
+    const std::string outcome = effective_outcome(row.provider_outcome, color, row.result);
+    Tally& bucket = move_number <= kOpeningMax
+        ? opening
+        : (move_number <= kMiddlegameMax ? middlegame : endgame);
+    add_outcome(bucket, outcome);
+    classified += 1;
+  }
+
+  auto phase_node = [](const char* phase, const Tally& tally) {
+    nlohmann::json node = tally_json(tally);
+    node["phase"] = phase;
+    return node;
+  };
+  nlohmann::json phases = nlohmann::json::array();
+  phases.push_back(phase_node("opening", opening));
+  phases.push_back(phase_node("middlegame", middlegame));
+  phases.push_back(phase_node("endgame", endgame));
+
+  nlohmann::json root{
+      {"hasProfile", true},
+      {"totalGames", static_cast<int>(rows.size())},
+      {"classified", classified},
+      {"phases", phases},
+  };
+  return root.dump();
+}
+
 }  // namespace kchess

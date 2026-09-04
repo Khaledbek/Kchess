@@ -385,6 +385,48 @@ class TerminationStats {
   bool get isEmpty => terminations.isEmpty;
 }
 
+/// Win/draw/loss tally for the games that ended in one game phase (opening,
+/// middlegame, endgame), from the profile's perspective.
+class GamePhase {
+  const GamePhase({required this.phase, required this.tally});
+
+  factory GamePhase.fromJson(Map<String, Object?> json) => GamePhase(
+    phase: json['phase'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+  );
+
+  final String phase; // opening | middlegame | endgame
+  final StatTally tally;
+}
+
+/// Distribution of the active profile's games across the phase in which they
+/// ended, aggregated in the native layer from each game's final move number.
+class PhaseStats {
+  const PhaseStats({
+    this.hasProfile = false,
+    this.totalGames = 0,
+    this.classified = 0,
+    this.phases = const [],
+  });
+
+  factory PhaseStats.fromJson(Map<String, Object?> json) => PhaseStats(
+    hasProfile: json['hasProfile'] as bool? ?? false,
+    totalGames: json['totalGames'] as int? ?? 0,
+    classified: json['classified'] as int? ?? 0,
+    phases: (json['phases'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(GamePhase.fromJson)
+        .toList(growable: false),
+  );
+
+  final bool hasProfile;
+  final int totalGames;
+  final int classified;
+  final List<GamePhase> phases;
+
+  bool get isEmpty => classified == 0;
+}
+
 enum AppThemeMode {
   system,
   light,

@@ -28,6 +28,11 @@ class StatisticsService {
   // draw, other), aggregated from the stored PGN Termination tags.
   std::string terminations_json() const;
 
+  // Win/draw/loss split by the game phase in which each game ended (opening,
+  // middlegame, endgame), derived from each game's final move number. This is a
+  // "where games conclude" heuristic, not an engine-based blunder location.
+  std::string phases_json() const;
+
  private:
   Database& database_;
 };
