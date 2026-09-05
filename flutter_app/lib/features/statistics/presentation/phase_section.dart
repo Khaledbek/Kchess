@@ -1,21 +1,14 @@
 part of '../../../ui/app_root.dart';
 
-/// "Nach Spielphase": distribution of the profile's games across the phase in
-/// which they ended (opening / middlegame / endgame), with an All ↔ Losses
-/// toggle. This is a "where games conclude" heuristic from the ending move
-/// number — not an engine-based blunder location.
-class _PhaseCard extends StatefulWidget {
+/// "Nach Spielphase": the profile's win rate in each phase a game ends in
+/// (opening / middlegame / endgame), by ending move number. A single-glance
+/// card — one row per phase with a win/draw/loss ratio bar and the win rate.
+/// This is a "where games conclude" heuristic, not engine-based blunder finding.
+class _PhaseCard extends StatelessWidget {
   const _PhaseCard({required this.future, required this.onRetry});
 
   final Future<PhaseStats> future;
   final VoidCallback onRetry;
-
-  @override
-  State<_PhaseCard> createState() => _PhaseCardState();
-}
-
-class _PhaseCardState extends State<_PhaseCard> {
-  bool _lossesOnly = true;
 
   @override
   Widget build(BuildContext context) {
@@ -48,23 +41,9 @@ class _PhaseCardState extends State<_PhaseCard> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<bool>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(value: true, label: Text(labels.losses)),
-                  ButtonSegment(value: false, label: Text(labels.all)),
-                ],
-                selected: {_lossesOnly},
-                onSelectionChanged: (selection) =>
-                    setState(() => _lossesOnly = selection.first),
-              ),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             FutureBuilder<PhaseStats>(
-              future: widget.future,
+              future: future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
                   return const SizedBox(
@@ -77,7 +56,7 @@ class _PhaseCardState extends State<_PhaseCard> {
                     icon: Icons.error_outline,
                     text: labels.error,
                     action: TextButton(
-                      onPressed: widget.onRetry,
+                      onPressed: onRetry,
                       child: Text(labels.retry),
                     ),
                   );
@@ -95,11 +74,7 @@ class _PhaseCardState extends State<_PhaseCard> {
                     text: labels.empty,
                   );
                 }
-                return _PhaseContent(
-                  stats: stats,
-                  lossesOnly: _lossesOnly,
-                  labels: labels,
-                );
+                return _PhaseContent(stats: stats, labels: labels);
               },
             ),
           ],
@@ -110,14 +85,9 @@ class _PhaseCardState extends State<_PhaseCard> {
 }
 
 class _PhaseContent extends StatelessWidget {
-  const _PhaseContent({
-    required this.stats,
-    required this.lossesOnly,
-    required this.labels,
-  });
+  const _PhaseContent({required this.stats, required this.labels});
 
   final PhaseStats stats;
-  final bool lossesOnly;
   final _PhaseText labels;
 
   @override
@@ -126,57 +96,18 @@ class _PhaseContent extends StatelessWidget {
     // Stable phase order for colours and positions.
     const order = ['opening', 'middlegame', 'endgame'];
     final byPhase = {for (final p in stats.phases) p.phase: p.tally};
-    final entries = [
-      for (final phase in order)
-        (
-          phase: phase,
-          value: lossesOnly
-              ? (byPhase[phase]?.losses ?? 0)
-              : (byPhase[phase]?.games ?? 0),
-        ),
-    ];
-    final total = entries.fold(0, (sum, e) => sum + e.value);
-
-    if (total == 0) {
-      return _OverviewMessage(
-        icon: lossesOnly ? Icons.sentiment_satisfied_outlined : Icons.timeline_outlined,
-        text: lossesOnly ? labels.noLosses : labels.empty,
-      );
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: SizedBox(
-            height: 14,
-            child: Row(
-              children: [
-                for (final entry in entries)
-                  if (entry.value > 0)
-                    Expanded(
-                      flex: entry.value,
-                      child: Tooltip(
-                        message:
-                            '${labels.phase(entry.phase)} · ${entry.value} (${_percent(entry.value, total)})',
-                        child: ColoredBox(color: _phaseColor(entry.phase)),
-                      ),
-                    ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        for (final entry in entries)
+        for (final phase in order)
           _PhaseRow(
-            phase: entry.phase,
-            value: entry.value,
-            total: total,
+            phase: phase,
+            tally: byPhase[phase] ?? const StatTally(),
             labels: labels,
           ),
         if (stats.classified < stats.totalGames) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             labels.classifiedNote(stats.classified, stats.totalGames),
             style: theme.textTheme.bodySmall?.copyWith(
@@ -192,42 +123,69 @@ class _PhaseContent extends StatelessWidget {
 class _PhaseRow extends StatelessWidget {
   const _PhaseRow({
     required this.phase,
-    required this.value,
-    required this.total,
+    required this.tally,
     required this.labels,
   });
 
   final String phase;
-  final int value;
-  final int total;
+  final StatTally tally;
   final _PhaseText labels;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: _phaseColor(phase),
-              borderRadius: BorderRadius.circular(3),
+          // Left: phase dot + label with move range.
+          SizedBox(
+            width: 156,
+            child: Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: _phaseColor(phase),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    labels.phase(phase),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
+          // Center: win/draw/loss proportion for this phase.
           Expanded(
-            child: Text(
-              labels.phase(phase),
-              style: const TextStyle(fontWeight: FontWeight.w600),
+            child: _WinLossDrawRatioBar(
+              wins: tally.wins,
+              draws: tally.draws,
+              losses: tally.losses,
+              height: 8,
             ),
           ),
-          Text(
-            '$value · ${_percent(value, total)}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(width: 12),
+          // Right: win rate (wins / total) and sample size.
+          SizedBox(
+            width: 128,
+            child: Text(
+              '${_percent(tally.wins, tally.games)} · ${tally.games} ${labels.games}',
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -249,12 +207,10 @@ class _PhaseText {
   const _PhaseText({
     required this.title,
     required this.subtitle,
-    required this.all,
-    required this.losses,
     required this.opening,
     required this.middlegame,
     required this.endgame,
-    required this.noLosses,
+    required this.games,
     required this.empty,
     required this.noProfile,
     required this.error,
@@ -264,12 +220,10 @@ class _PhaseText {
 
   final String title;
   final String subtitle;
-  final String all;
-  final String losses;
   final String opening;
   final String middlegame;
   final String endgame;
-  final String noLosses;
+  final String games;
   final String empty;
   final String noProfile;
   final String error;
@@ -290,12 +244,10 @@ _PhaseText _phaseText(BuildContext context) {
       return _PhaseText(
         title: 'حسب مرحلة اللعب',
         subtitle: 'المرحلة التي تنتهي فيها المباريات.',
-        all: 'الكل',
-        losses: 'الهزائم',
         opening: 'الافتتاح (1–12)',
         middlegame: 'وسط اللعب (13–30)',
         endgame: 'النهاية (+31)',
-        noLosses: 'لا توجد هزائم لعرضها.',
+        games: 'مباراة',
         empty: 'لا توجد بيانات كافية عن مراحل اللعب.',
         noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.',
         error: 'تعذّر تحميل مراحل اللعب.',
@@ -306,12 +258,10 @@ _PhaseText _phaseText(BuildContext context) {
       return _PhaseText(
         title: 'By game phase',
         subtitle: 'The phase your games end in.',
-        all: 'All',
-        losses: 'Losses',
         opening: 'Opening (1–12)',
         middlegame: 'Middlegame (13–30)',
         endgame: 'Endgame (31+)',
-        noLosses: 'No losses to show.',
+        games: 'games',
         empty: 'Not enough data on game phases.',
         noProfile: 'Create or select a profile to see statistics.',
         error: 'Could not load game phases.',
@@ -322,12 +272,10 @@ _PhaseText _phaseText(BuildContext context) {
       return _PhaseText(
         title: 'Nach Spielphase',
         subtitle: 'In welcher Phase deine Partien enden.',
-        all: 'Alle',
-        losses: 'Niederlagen',
         opening: 'Eröffnung (1–12)',
         middlegame: 'Mittelspiel (13–30)',
         endgame: 'Endspiel (31+)',
-        noLosses: 'Keine Niederlagen vorhanden.',
+        games: 'Partien',
         empty: 'Nicht genügend Daten zu Spielphasen.',
         noProfile: 'Erstelle oder wähle ein Profil, um Statistiken zu sehen.',
         error: 'Spielphasen konnten nicht geladen werden.',
