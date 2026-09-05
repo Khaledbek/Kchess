@@ -621,6 +621,7 @@ class _CompareMetric extends StatelessWidget {
                 FractionallySizedBox(
                   alignment: Alignment.centerLeft,
                   widthFactor: fraction,
+                  heightFactor: 1,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: color,
