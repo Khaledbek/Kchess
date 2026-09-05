@@ -123,6 +123,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => _PlayerComparisonScreen(
+                            controller: widget.controller,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.compare_arrows),
+                      label: Text(_comparisonText(context).title),
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   _TimeControlFilterBar(
                     selected: _timeControl,

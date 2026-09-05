@@ -346,6 +346,93 @@ class FakeCoreGateway implements CoreGateway {
       );
 
   @override
+  Future<ProviderOverview> scoutPlayer(String username) async => ProviderOverview(
+    profile: AppProfile(
+      id: 'scout:$username',
+      type: ProfileType.chessCom,
+      displayName: username,
+      providerUsername: username,
+      avatarAsset: 'profile_unknown.png',
+    ),
+    stats: const [
+      ProviderPerformance(
+        key: 'blitz',
+        currentRating: 1500,
+        bestRating: 1600,
+        games: 100,
+        wins: 45,
+        losses: 45,
+        draws: 10,
+      ),
+    ],
+    availableMonths: const [],
+    offlineReady: false,
+    retryAfterSeconds: 0,
+  );
+
+  @override
+  Future<ScoutReport> scoutReport(String username) async => ScoutReport(
+    hasProfile: true,
+    profile: AppProfile(
+      id: 'scout:$username',
+      type: ProfileType.chessCom,
+      displayName: username,
+      providerUsername: username,
+      avatarAsset: 'profile_unknown.png',
+    ),
+    stats: const [
+      ProviderPerformance(key: 'blitz', currentRating: 1500),
+    ],
+    gamesAnalyzed: 40,
+    monthsFetched: 2,
+    overall: const StatTally(
+      games: 40,
+      wins: 18,
+      draws: 4,
+      losses: 18,
+      winRate: 0.45,
+      scorePercent: 0.5,
+    ),
+    white: const StatTally(
+      games: 20,
+      wins: 11,
+      draws: 2,
+      losses: 7,
+      winRate: 0.55,
+      scorePercent: 0.6,
+    ),
+    black: const StatTally(
+      games: 20,
+      wins: 7,
+      draws: 2,
+      losses: 11,
+      winRate: 0.35,
+      scorePercent: 0.4,
+    ),
+    byTimeControl: const [],
+    terminations: const [
+      GameTermination(
+        type: 'timeout',
+        tally: StatTally(games: 8, wins: 3, losses: 5),
+      ),
+    ],
+    openings: const [
+      ScoutOpening(
+        eco: 'B01',
+        name: 'Scandinavian Defense',
+        color: 'black',
+        tally: StatTally(
+          games: 6,
+          wins: 2,
+          losses: 4,
+          winRate: 0.333,
+          scorePercent: 0.333,
+        ),
+      ),
+    ],
+  );
+
+  @override
   Future<ProviderOverview> syncProvider(
     String profileId, {
     int year = 0,

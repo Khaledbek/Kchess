@@ -312,6 +312,14 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
           'kc_start_provider_profile_json',
         );
+    _startScout = _library
+        .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
+          'kc_start_scout_json',
+        );
+    _startScoutReport = _library
+        .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
+          'kc_start_scout_report_json',
+        );
     _startProviderSync = _library
         .lookupFunction<_StartProviderSyncNative, _StartProviderSyncDart>(
           'kc_start_provider_sync_json',
@@ -455,6 +463,8 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _variationAnalysisStatus;
   late final _StatusStringDart _cancelVariationAnalysis;
   late final _StartProviderProfileDart _startProviderProfile;
+  late final _StartProviderProfileDart _startScout;
+  late final _StartProviderProfileDart _startScoutReport;
   late final _StartProviderSyncDart _startProviderSync;
   late final _StringArgDart _providerJobStatus;
   late final _StatusStringDart _cancelProviderJob;
@@ -578,6 +588,44 @@ class FfiCoreGateway implements CoreGateway {
                 as Map<String, Object?>;
         return ProviderOverview.fromJson(json);
       });
+
+  @override
+  Future<ProviderOverview> scoutPlayer(String username) async {
+    final native = username.toNativeUtf8();
+    late final String jobId;
+    try {
+      final started =
+          _readJson(
+                _startScout(_handle, ProfileType.chessCom.nativeValue, native),
+              )!
+              as Map<String, Object?>;
+      jobId = started['jobId']! as String;
+    } finally {
+      malloc.free(native);
+    }
+    return _waitProviderJob(jobId);
+  }
+
+  @override
+  Future<ScoutReport> scoutReport(String username) async {
+    final native = username.toNativeUtf8();
+    late final String jobId;
+    try {
+      final started =
+          _readJson(
+                _startScoutReport(
+                  _handle,
+                  ProfileType.chessCom.nativeValue,
+                  native,
+                ),
+              )!
+              as Map<String, Object?>;
+      jobId = started['jobId']! as String;
+    } finally {
+      malloc.free(native);
+    }
+    return ScoutReport.fromJson(await _waitJobResult(jobId));
+  }
 
   @override
   Future<ProviderOverview> syncProvider(
@@ -937,7 +985,12 @@ class FfiCoreGateway implements CoreGateway {
     }
   }
 
-  Future<ProviderOverview> _waitProviderJob(String jobId) async {
+  Future<ProviderOverview> _waitProviderJob(String jobId) async =>
+      ProviderOverview.fromJson(await _waitJobResult(jobId));
+
+  /// Polls a provider/scout job to completion and returns its raw result map,
+  /// translating provider errors into a [CoreGatewayException].
+  Future<Map<String, Object?>> _waitJobResult(String jobId) async {
     _activeProviderJobId = jobId;
     try {
       while (true) {
@@ -955,7 +1008,7 @@ class FfiCoreGateway implements CoreGateway {
               ),
             );
           }
-          return ProviderOverview.fromJson(result);
+          return result;
         }
         await Future<void>.delayed(const Duration(milliseconds: 120));
       }

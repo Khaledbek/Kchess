@@ -16,6 +16,13 @@ abstract interface class CoreGateway {
     String targetProfileId,
   );
   Future<ProviderOverview> providerOverview(String profileId);
+  /// Fetch a public player's profile + ratings for a scouting comparison,
+  /// without creating a profile or storing any games.
+  Future<ProviderOverview> scoutPlayer(String username);
+  /// Deep scouting report for a public player: profile, ratings and their
+  /// win/draw/loss by colour, time control, termination and opening, aggregated
+  /// natively from recent archives without persistence.
+  Future<ScoutReport> scoutReport(String username);
   Future<StatisticsOverview> statisticsOverview();
   Future<OpeningsStats> openingsStats();
   Future<TerminationStats> terminationStats();

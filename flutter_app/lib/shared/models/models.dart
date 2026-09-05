@@ -429,6 +429,95 @@ class PhaseStats {
   bool get isEmpty => classified == 0;
 }
 
+/// One opening a scouted opponent played with a given colour, with their
+/// win/draw/loss tally. `eco` is the join key for the repertoire clash.
+class ScoutOpening {
+  const ScoutOpening({
+    required this.eco,
+    required this.name,
+    required this.color,
+    required this.tally,
+  });
+
+  factory ScoutOpening.fromJson(Map<String, Object?> json) => ScoutOpening(
+    eco: json['eco'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    color: json['color'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+  );
+
+  final String eco;
+  final String name;
+  final String color; // white | black | unknown
+  final StatTally tally;
+}
+
+/// A deep scouting report for a public opponent: profile, ratings and their
+/// win/draw/loss aggregated by colour, time control, termination and opening —
+/// computed in the native layer from recent archives, without persistence.
+class ScoutReport {
+  const ScoutReport({
+    this.hasProfile = false,
+    required this.profile,
+    this.stats = const [],
+    this.gamesAnalyzed = 0,
+    this.monthsFetched = 0,
+    this.overall = const StatTally(),
+    this.white = const StatTally(),
+    this.black = const StatTally(),
+    this.byTimeControl = const [],
+    this.terminations = const [],
+    this.openings = const [],
+  });
+
+  factory ScoutReport.fromJson(Map<String, Object?> json) {
+    final byColor = json['byColor'] as Map<String, Object?>? ?? const {};
+    return ScoutReport(
+      hasProfile: json['hasProfile'] as bool? ?? false,
+      profile: AppProfile.fromJson(json['profile']! as Map<String, Object?>),
+      stats: (json['stats'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(ProviderPerformance.fromJson)
+          .toList(growable: false),
+      gamesAnalyzed: json['gamesAnalyzed'] as int? ?? 0,
+      monthsFetched: json['monthsFetched'] as int? ?? 0,
+      overall: StatTally.fromJson(
+        json['overall'] as Map<String, Object?>? ?? const {},
+      ),
+      white: StatTally.fromJson(
+        byColor['white'] as Map<String, Object?>? ?? const {},
+      ),
+      black: StatTally.fromJson(
+        byColor['black'] as Map<String, Object?>? ?? const {},
+      ),
+      byTimeControl: (json['byTimeControl'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(StatTimeControl.fromJson)
+          .toList(growable: false),
+      terminations: (json['terminations'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(GameTermination.fromJson)
+          .toList(growable: false),
+      openings: (json['openings'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(ScoutOpening.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  final bool hasProfile;
+  final AppProfile profile;
+  final List<ProviderPerformance> stats;
+  final int gamesAnalyzed;
+  final int monthsFetched;
+  final StatTally overall;
+  final StatTally white;
+  final StatTally black;
+  final List<StatTimeControl> byTimeControl;
+  final List<GameTermination> terminations;
+  final List<ScoutOpening> openings;
+}
+
 enum AppThemeMode {
   system,
   light,

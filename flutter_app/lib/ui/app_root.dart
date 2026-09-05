@@ -33,6 +33,7 @@ part '../features/statistics/presentation/termination_section.dart';
 part '../features/statistics/presentation/phase_section.dart';
 part '../features/statistics/presentation/openings_section.dart';
 part '../features/statistics/presentation/opening_games_sheet.dart';
+part '../features/statistics/presentation/player_comparison.dart';
 part '../features/settings/presentation/settings_screen.dart';
 part '../features/settings/presentation/engine_settings_page.dart';
 part '../features/settings/presentation/analysis_settings_page.dart';

@@ -110,6 +110,14 @@ KCHESS_API char* kc_start_provider_profile_json(
     kc_core_handle handle,
     int32_t profile_type,
     const char* username_utf8);
+KCHESS_API char* kc_start_scout_json(
+    kc_core_handle handle,
+    int32_t profile_type,
+    const char* username_utf8);
+KCHESS_API char* kc_start_scout_report_json(
+    kc_core_handle handle,
+    int32_t profile_type,
+    const char* username_utf8);
 KCHESS_API char* kc_start_provider_sync_json(
     kc_core_handle handle,
     const char* profile_id_utf8,

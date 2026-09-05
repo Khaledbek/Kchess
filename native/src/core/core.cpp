@@ -228,6 +228,16 @@ std::string Core::start_provider_profile_json(
   return provider_service_.start_provider_profile_json(type, username);
 }
 
+std::string Core::start_scout_json(
+    const ProfileType type, const std::string& username) {
+  return provider_service_.start_scout_json(type, username);
+}
+
+std::string Core::start_scout_report_json(
+    const ProfileType type, const std::string& username) {
+  return provider_service_.start_scout_report_json(type, username);
+}
+
 std::string Core::start_provider_sync_json(
     const std::string& profile_id, const int year, const int month) {
   return provider_service_.start_provider_sync_json(profile_id, year, month);

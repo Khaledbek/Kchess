@@ -5,6 +5,7 @@
 #include <cctype>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -16,6 +17,7 @@
 #include "chess/pgn.h"
 #include "providers/provider_common.h"
 #include "providers/provider_models.h"
+#include "services/termination.h"
 
 namespace kchess {
 namespace {
@@ -117,6 +119,100 @@ std::string normalized_stats_json(const ProviderStats& stats) {
     result.push_back(performance_json(performance));
   }
   return result.dump();
+}
+
+// AppProfile-shaped JSON for a scouted (non-persisted) player. The id is a
+// synthetic "scout:" handle so it can never collide with a real profile.
+nlohmann::json scout_profile_object(const ProviderProfile& profile) {
+  nlohmann::json result{
+      {"id", "scout:" + profile.username},
+      {"type", profile.provider == ProviderType::lichess ? "lichess" : "chessCom"},
+      {"displayName", profile.display_name.empty() ? profile.username : profile.display_name},
+      {"providerUsername", profile.username},
+      {"avatarAsset", profile.fallback_asset},
+  };
+  const auto put = [&](const char* key, const auto& item) {
+    if (item.has_value()) result[key] = *item;
+  };
+  put("title", profile.title);
+  put("avatarUrl", profile.avatar_url);
+  put("publicUrl", profile.public_url);
+  put("country", profile.country);
+  return result;
+}
+
+std::string scout_profile_json(const ProviderProfile& profile) {
+  return scout_profile_object(profile).dump();
+}
+
+// Lightweight win/draw/loss tally for the in-memory scouting aggregation. Kept
+// local to this module (the statistics service keeps its own equivalent).
+struct ScoutTally {
+  int games{0};
+  int wins{0};
+  int draws{0};
+  int losses{0};
+  void add(const std::string& outcome) {
+    games += 1;
+    if (outcome == "win") wins += 1;
+    else if (outcome == "loss") losses += 1;
+    else if (outcome == "draw") draws += 1;
+  }
+};
+
+nlohmann::json scout_tally_json(const ScoutTally& tally) {
+  const int decided = tally.wins + tally.draws + tally.losses;
+  nlohmann::json node{
+      {"games", tally.games},
+      {"wins", tally.wins},
+      {"draws", tally.draws},
+      {"losses", tally.losses},
+      {"undecided", tally.games - decided},
+  };
+  if (decided > 0) {
+    node["winRate"] = static_cast<double>(tally.wins) / decided;
+    node["scorePercent"] = (static_cast<double>(tally.wins) + 0.5 * tally.draws) / decided;
+  } else {
+    node["winRate"] = nullptr;
+    node["scorePercent"] = nullptr;
+  }
+  return node;
+}
+
+// Value of a PGN tag with its original casing preserved (unlike the lowercasing
+// pgn_tag_value used for termination matching). Empty when absent.
+std::string pgn_tag_raw(const std::string& pgn, const std::string& tag) {
+  const std::string key = "[" + tag + " \"";
+  const auto start = pgn.find(key);
+  if (start == std::string::npos) return {};
+  const auto from = start + key.size();
+  const auto end = pgn.find('"', from);
+  if (end == std::string::npos) return {};
+  return pgn.substr(from, end - from);
+}
+
+// Human opening name from a Chess.com PGN's [ECOUrl] slug, e.g.
+// ".../openings/Caro-Kann-Defense-Advance" -> "Caro Kann Defense Advance". The
+// trailing move sequence Chess.com appends (a token starting with a digit) is
+// dropped.
+std::string scout_opening_name(const std::string& pgn) {
+  const std::string url = pgn_tag_raw(pgn, "ECOUrl");
+  if (url.empty()) return {};
+  const std::string marker = "/openings/";
+  const auto pos = url.find(marker);
+  const std::string slug = pos == std::string::npos ? url : url.substr(pos + marker.size());
+  std::string spaced;
+  spaced.reserve(slug.size());
+  for (const char c : slug) spaced.push_back(c == '-' || c == '_' ? ' ' : c);
+  std::istringstream words(spaced);
+  std::string word;
+  std::string name;
+  while (words >> word) {
+    if (!word.empty() && std::isdigit(static_cast<unsigned char>(word.front()))) break;
+    if (!name.empty()) name.push_back(' ');
+    name += word;
+  }
+  return name.empty() ? spaced : name;
 }
 
 std::string lowercase(std::string value) {
@@ -458,6 +554,188 @@ void ProviderService::run_provider_create(
   }
 }
 
+void ProviderService::run_scout(
+    const ProfileType type,
+    std::string username,
+    const std::shared_ptr<ProviderJob>& job) noexcept {
+  try {
+    auto provider = provider_for(type);
+    auto remote_profile = provider->fetch_profile(username, {}, job->cancel);
+    if (!remote_profile.value.has_value()) {
+      throw ProviderException(HttpError::invalid_response, "provider returned no profile");
+    }
+    std::string stats_json = "[]";
+    const auto stats = provider->fetch_stats(username, {}, job->cancel);
+    if (stats.value.has_value()) {
+      stats_json = normalized_stats_json(*stats.value);
+    }
+    std::ostringstream json;
+    json << "{\"profile\":" << scout_profile_json(*remote_profile.value)
+         << ",\"stats\":" << stats_json << ",\"availableMonths\":[]"
+         << ",\"offlineReady\":false,\"retryAfterSeconds\":0}";
+    finish_provider_job(job, "complete", json.str());
+  } catch (const ProviderException& error) {
+    finish_provider_job(job, "error", {}, http_error_name(error.kind()), error.what());
+  } catch (const std::exception& error) {
+    finish_provider_job(job, "error", {}, "internal", error.what());
+  } catch (...) {
+    finish_provider_job(job, "error", {}, "internal", "unknown provider error");
+  }
+}
+
+void ProviderService::run_scout_report(
+    const ProfileType type,
+    std::string username,
+    const std::shared_ptr<ProviderJob>& job) noexcept {
+  const auto check_cancel = [&] {
+    if (job->cancel->is_cancelled()) {
+      throw ProviderException(HttpError::cancelled, "provider request cancelled");
+    }
+  };
+  try {
+    auto provider = provider_for(type);
+    auto remote_profile = provider->fetch_profile(username, {}, job->cancel);
+    if (!remote_profile.value.has_value()) {
+      throw ProviderException(HttpError::invalid_response, "provider returned no profile");
+    }
+    nlohmann::json stats_arr = nlohmann::json::array();
+    const auto stats = provider->fetch_stats(username, {}, job->cancel);
+    if (stats.value.has_value()) {
+      for (const auto& performance : stats.value->performances) {
+        stats_arr.push_back(performance_json(performance));
+      }
+    }
+
+    std::vector<std::string> months;
+    const auto months_res = provider->fetch_available_months(username, {}, job->cancel);
+    if (months_res.value.has_value()) months = *months_res.value;
+    std::sort(months.begin(), months.end(), std::greater<>());
+
+    constexpr std::size_t kMaxMonths = 6;
+    constexpr int kMaxGames = 1200;
+    const std::string requested = lowercase(username);
+
+    ScoutTally overall;
+    ScoutTally white;
+    ScoutTally black;
+    std::map<std::string, ScoutTally> by_time_control;
+    std::map<std::string, ScoutTally> terminations;
+    struct OpeningEntry {
+      std::string eco;
+      std::string name;
+      std::string color;
+      ScoutTally tally;
+    };
+    std::map<std::string, OpeningEntry> openings;  // key: eco + separator + color
+    int games_analyzed = 0;
+    int months_fetched = 0;
+
+    for (std::size_t index = 0;
+         index < months.size() && index < kMaxMonths && games_analyzed < kMaxGames;
+         ++index) {
+      check_cancel();
+      const auto& label = months[index];
+      const auto dash = label.find('-');
+      if (dash == std::string::npos) continue;
+      int year = 0;
+      int month = 0;
+      try {
+        year = std::stoi(label.substr(0, dash));
+        month = std::stoi(label.substr(dash + 1));
+      } catch (...) {
+        continue;
+      }
+      if (year < 2000 || month < 1 || month > 12) continue;
+      ProviderGameQuery query;
+      try {
+        query = provider_month_query(year, month);
+      } catch (...) {
+        continue;
+      }
+      const auto games = provider->fetch_games(username, query, {}, job->cancel);
+      if (!games.value.has_value()) continue;
+      months_fetched += 1;
+      for (const auto& game : *games.value) {
+        if (game.rules != "chess") continue;  // standard chess only
+        const std::string outcome = provider_outcome_name(game.profile_outcome);
+        std::string color = "unknown";
+        if (lowercase(game.white_username) == requested) color = "white";
+        else if (lowercase(game.black_username) == requested) color = "black";
+        overall.add(outcome);
+        if (color == "white") white.add(outcome);
+        else if (color == "black") black.add(outcome);
+        by_time_control[time_control_name(game.time_control_type)].add(outcome);
+        terminations[termination_bucket(game.pgn, game.result)].add(outcome);
+        const std::string eco = pgn_tag_raw(game.pgn, "ECO");
+        const std::string name = scout_opening_name(game.pgn);
+        if (!eco.empty() || !name.empty()) {
+          auto& entry = openings[eco + '\x1f' + color];
+          if (entry.tally.games == 0) {
+            entry.eco = eco;
+            entry.name = name;
+            entry.color = color;
+          }
+          entry.tally.add(outcome);
+        }
+        games_analyzed += 1;
+        if (games_analyzed >= kMaxGames) break;
+      }
+    }
+
+    nlohmann::json tc_list = nlohmann::json::array();
+    for (const auto& [tc, tally] : by_time_control) {
+      if (tally.games == 0) continue;
+      nlohmann::json node = scout_tally_json(tally);
+      node["type"] = tc;
+      tc_list.push_back(std::move(node));
+    }
+    nlohmann::json term_list = nlohmann::json::array();
+    for (const auto& [bucket, tally] : terminations) {
+      if (tally.games == 0) continue;
+      nlohmann::json node = scout_tally_json(tally);
+      node["type"] = bucket;
+      term_list.push_back(std::move(node));
+    }
+    std::vector<const OpeningEntry*> ordered;
+    ordered.reserve(openings.size());
+    for (const auto& item : openings) ordered.push_back(&item.second);
+    std::sort(ordered.begin(), ordered.end(),
+              [](const OpeningEntry* a, const OpeningEntry* b) {
+                return a->tally.games > b->tally.games;
+              });
+    nlohmann::json opening_list = nlohmann::json::array();
+    constexpr std::size_t kMaxOpenings = 60;
+    for (std::size_t i = 0; i < ordered.size() && i < kMaxOpenings; ++i) {
+      nlohmann::json node = scout_tally_json(ordered[i]->tally);
+      node["eco"] = ordered[i]->eco;
+      node["name"] = ordered[i]->name;
+      node["color"] = ordered[i]->color;
+      opening_list.push_back(std::move(node));
+    }
+
+    nlohmann::json report{
+        {"hasProfile", true},
+        {"profile", scout_profile_object(*remote_profile.value)},
+        {"stats", stats_arr},
+        {"gamesAnalyzed", games_analyzed},
+        {"monthsFetched", months_fetched},
+        {"overall", scout_tally_json(overall)},
+        {"byColor",
+         {{"white", scout_tally_json(white)}, {"black", scout_tally_json(black)}}},
+        {"byTimeControl", tc_list},
+        {"terminations", term_list},
+        {"openings", opening_list},
+    };
+    finish_provider_job(job, "complete", report.dump());
+  } catch (const ProviderException& error) {
+    finish_provider_job(job, "error", {}, http_error_name(error.kind()), error.what());
+  } catch (const std::exception& error) {
+    finish_provider_job(job, "error", {}, "internal", error.what());
+  } catch (...) {
+    finish_provider_job(job, "error", {}, "internal", "unknown provider error");
+  }
+}
+
 void ProviderService::run_provider_sync(
     std::string profile_id,
     const int year,
@@ -506,6 +784,40 @@ std::string ProviderService::start_provider_profile_json(
   }
   job->worker = std::thread(
       [this, type, username, job] { run_provider_create(type, username, job); });
+  return "{\"jobId\":\"" + escape_json(job->id) + "\"}";
+}
+
+std::string ProviderService::start_scout_json(
+    const ProfileType type, const std::string& username) {
+  if (type != ProfileType::chess_com && type != ProfileType::lichess) {
+    throw std::invalid_argument("online provider required");
+  }
+  validate_token(username, "provider username");
+  auto job = std::make_shared<ProviderJob>();
+  job->id = "scout-" + std::to_string(next_provider_job_id_++);
+  {
+    std::lock_guard lock(provider_jobs_mutex_);
+    provider_jobs_.emplace(job->id, job);
+  }
+  job->worker = std::thread(
+      [this, type, username, job] { run_scout(type, username, job); });
+  return "{\"jobId\":\"" + escape_json(job->id) + "\"}";
+}
+
+std::string ProviderService::start_scout_report_json(
+    const ProfileType type, const std::string& username) {
+  if (type != ProfileType::chess_com && type != ProfileType::lichess) {
+    throw std::invalid_argument("online provider required");
+  }
+  validate_token(username, "provider username");
+  auto job = std::make_shared<ProviderJob>();
+  job->id = "scout-report-" + std::to_string(next_provider_job_id_++);
+  {
+    std::lock_guard lock(provider_jobs_mutex_);
+    provider_jobs_.emplace(job->id, job);
+  }
+  job->worker = std::thread(
+      [this, type, username, job] { run_scout_report(type, username, job); });
   return "{\"jobId\":\"" + escape_json(job->id) + "\"}";
 }
 

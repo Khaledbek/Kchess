@@ -73,6 +73,8 @@ class Core {
   void clear_cached_month(const std::string& profile_id, const std::string& month);
 
   std::string start_provider_profile_json(ProfileType type, const std::string& username);
+  std::string start_scout_json(ProfileType type, const std::string& username);
+  std::string start_scout_report_json(ProfileType type, const std::string& username);
   std::string start_provider_sync_json(
       const std::string& profile_id, int year, int month);
   std::string provider_job_status_json(const std::string& job_id);
