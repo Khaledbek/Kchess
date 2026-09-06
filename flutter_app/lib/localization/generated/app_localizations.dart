@@ -2126,6 +2126,12 @@ abstract class AppLocalizations {
     String oppRate,
     String oppColor,
   );
+
+  /// No description provided for @statsTerminationSpotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Most common ending: {label} — {share}% of all games, {lossPercent}% of them losses.'**
+  String statsTerminationSpotlight(String label, int share, int lossPercent);
 }
 
 class _AppLocalizationsDelegate

@@ -93,6 +93,17 @@ class _TerminationContent extends StatelessWidget {
     ];
     final total = stats.totalGames;
 
+    // Shared scale for the diverging bars: the widest single side across every
+    // category. Counted in half-units (1 game = 2 units) so a draw can straddle
+    // the axis evenly. Sharing one scale is what makes the rows comparable.
+    var maxUnits = 0;
+    for (final entry in entries) {
+      final tally = entry.tally;
+      final side = tally.wins > tally.losses ? tally.wins : tally.losses;
+      final units = side * 2 + tally.draws;
+      if (units > maxUnits) maxUnits = units;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -117,14 +128,228 @@ class _TerminationContent extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
+        _TerminationSpotlight(entries: entries, total: total, labels: labels),
+        const SizedBox(height: 14),
+        const _DivergingAxisKey(),
         for (final entry in entries)
           _TerminationTile(
             termination: entry,
             totalGames: total,
+            maxUnits: maxUnits,
             labels: labels,
           ),
       ],
+    );
+  }
+}
+
+/// Names the single ending that accounts for the most games and says whether it
+/// is costing the profile points — the one sentence worth reading on this card.
+/// Tinted by that verdict rather than decoratively.
+class _TerminationSpotlight extends StatelessWidget {
+  const _TerminationSpotlight({
+    required this.entries,
+    required this.total,
+    required this.labels,
+  });
+
+  final List<GameTermination> entries;
+  final int total;
+  final _TerminationText labels;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty || total == 0) return const SizedBox.shrink();
+    var top = entries.first;
+    for (final entry in entries) {
+      if (entry.count > top.count) top = entry;
+    }
+    final tally = top.tally;
+    if (tally.games == 0) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final sharePercent = (top.count / total * 100).round();
+    final lossPercent = (tally.losses / tally.games * 100).round();
+    // A dominant ending that is mostly losses is a warning; otherwise it is
+    // simply the shape of the profile's games.
+    final costly = lossPercent >= 50;
+    final accent = costly ? scheme.error : scheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            costly ? Icons.warning_amber_rounded : Icons.insights_outlined,
+            size: 18,
+            color: accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context).statsTerminationSpotlight(
+                    labels.label(top.type),
+                    sharePercent,
+                    lossPercent,
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurface,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _WinLossDrawRatioBar(
+                  wins: tally.wins,
+                  draws: tally.draws,
+                  losses: tally.losses,
+                  height: 4,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tiny key telling the reader which way the diverging bars run.
+class _DivergingAxisKey extends StatelessWidget {
+  const _DivergingAxisKey();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labels = _statsLabels(context);
+    Widget side(Color color, String text, {required bool trailing}) {
+      final dot = Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+      final label = Text(
+        text,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      );
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: trailing
+            ? [dot, const SizedBox(width: 6), label]
+            : [label, const SizedBox(width: 6), dot],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: side(_kLossColor, labels.losses, trailing: false),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: side(_kWinColor, labels.wins, trailing: true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Win/loss balance for one ending, drawn either side of a shared centre axis:
+/// losses run left, wins run right, and draws straddle the axis as a neutral
+/// core. Every row uses the same [maxUnits] scale, so the bars are comparable
+/// down the card — the point being to see at a glance which endings pay.
+class _TerminationDivergingBar extends StatelessWidget {
+  const _TerminationDivergingBar({
+    required this.tally,
+    required this.maxUnits,
+  });
+
+  final StatTally tally;
+  final int maxUnits;
+
+  static const _height = 10.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final labels = _statsLabels(context);
+    if (maxUnits <= 0) {
+      return SizedBox(
+        height: _height,
+        child: ColoredBox(color: scheme.outlineVariant),
+      );
+    }
+
+    // 1 game = 2 units, so half a draw lands on each side of the axis.
+    final lossUnits = tally.losses * 2;
+    final winUnits = tally.wins * 2;
+    final drawUnits = tally.draws;
+    final leftPad = maxUnits - lossUnits - drawUnits;
+    final rightPad = maxUnits - winUnits - drawUnits;
+
+    final message = [
+      if (tally.wins > 0) '${tally.wins} ${labels.wins}',
+      if (tally.draws > 0) '${tally.draws} ${labels.draws}',
+      if (tally.losses > 0) '${tally.losses} ${labels.losses}',
+    ].join(', ');
+
+    Widget segment(int flex, Color color) =>
+        Expanded(flex: flex, child: ColoredBox(color: color));
+
+    return Tooltip(
+      message: message,
+      child: SizedBox(
+        height: _height,
+        child: Row(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  if (leftPad > 0)
+                    Expanded(flex: leftPad, child: const SizedBox()),
+                  if (lossUnits > 0) segment(lossUnits, _kLossColor),
+                  if (drawUnits > 0) segment(drawUnits, _kDrawColor),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 1,
+              child: ColoredBox(color: scheme.outline),
+            ),
+            Expanded(
+              child: Row(
+                children: [
+                  if (drawUnits > 0) segment(drawUnits, _kDrawColor),
+                  if (winUnits > 0) segment(winUnits, _kWinColor),
+                  if (rightPad > 0)
+                    Expanded(flex: rightPad, child: const SizedBox()),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -136,11 +361,13 @@ class _TerminationTile extends StatefulWidget {
   const _TerminationTile({
     required this.termination,
     required this.totalGames,
+    required this.maxUnits,
     required this.labels,
   });
 
   final GameTermination termination;
   final int totalGames;
+  final int maxUnits;
   final _TerminationText labels;
 
   @override
@@ -196,10 +423,9 @@ class _TerminationTileState extends State<_TerminationTile> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                _WinLossDrawRatioBar(
-                  wins: tally.wins,
-                  draws: tally.draws,
-                  losses: tally.losses,
+                _TerminationDivergingBar(
+                  tally: tally,
+                  maxUnits: widget.maxUnits,
                 ),
               ],
             ),
@@ -317,7 +543,7 @@ Color _terminationColor(BuildContext context, String type) {
   return switch (type) {
     'checkmate' => scheme.primary,
     'resignation' => AppTheme.warning,
-    'timeout' => const Color(0xFF7C6FF0),
+    'timeout' => const Color(0xFF8B7BC8), // soft violet, matching the palette
     'draw' => scheme.onSurfaceVariant,
     _ => scheme.outline,
   };

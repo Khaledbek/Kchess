@@ -447,5 +447,19 @@
         "type": "String"
       }
     }
+  },
+  "statsTerminationSpotlight": "Most common ending: {label} — {share}% of all games, {lossPercent}% of them losses.",
+  "@statsTerminationSpotlight": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "share": {
+        "type": "int"
+      },
+      "lossPercent": {
+        "type": "int"
+      }
+    }
   }
 }

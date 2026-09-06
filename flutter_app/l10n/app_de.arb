@@ -411,5 +411,6 @@
   "statsCompareColorBlack": "Schwarz",
   "statsCompareErrorPrefix": "Fehler",
   "statsCompareGamesAnalyzed": "{games} Partien aus {months} Monaten ausgewertet",
-  "statsCompareLeakSentence": "Spiele {opening} mit {userColor} — der Gegner gewinnt dort nur {oppRate} mit {oppColor}."
+  "statsCompareLeakSentence": "Spiele {opening} mit {userColor} — der Gegner gewinnt dort nur {oppRate} mit {oppColor}.",
+  "statsTerminationSpotlight": "Häufigstes Partie-Ende: {label} — {share}% aller Partien, davon {lossPercent}% Niederlagen."
 }

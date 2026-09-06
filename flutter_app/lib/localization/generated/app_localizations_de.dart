@@ -1107,4 +1107,9 @@ class AppLocalizationsDe extends AppLocalizations {
   ) {
     return 'Spiele $opening mit $userColor — der Gegner gewinnt dort nur $oppRate mit $oppColor.';
   }
+
+  @override
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'Häufigstes Partie-Ende: $label — $share% aller Partien, davon $lossPercent% Niederlagen.';
+  }
 }

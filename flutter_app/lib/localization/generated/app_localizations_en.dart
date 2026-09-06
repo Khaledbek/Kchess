@@ -1103,4 +1103,9 @@ class AppLocalizationsEn extends AppLocalizations {
   ) {
     return 'Play $opening as $userColor — the opponent wins only $oppRate as $oppColor.';
   }
+
+  @override
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'Most common ending: $label — $share% of all games, $lossPercent% of them losses.';
+  }
 }

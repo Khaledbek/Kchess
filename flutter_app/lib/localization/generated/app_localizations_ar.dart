@@ -1097,4 +1097,9 @@ class AppLocalizationsAr extends AppLocalizations {
   ) {
     return 'العب $opening بالـ$userColor — يفوز الخصم بنسبة $oppRate فقط بالـ$oppColor.';
   }
+
+  @override
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'أكثر نهاية شيوعًا: $label — $share% من كل المباريات، منها $lossPercent% خسائر.';
+  }
 }

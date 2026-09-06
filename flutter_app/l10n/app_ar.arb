@@ -411,5 +411,6 @@
   "statsCompareColorBlack": "الأسود",
   "statsCompareErrorPrefix": "خطأ",
   "statsCompareGamesAnalyzed": "تم تحليل {games} مباراة من {months} أشهر",
-  "statsCompareLeakSentence": "العب {opening} بالـ{userColor} — يفوز الخصم بنسبة {oppRate} فقط بالـ{oppColor}."
+  "statsCompareLeakSentence": "العب {opening} بالـ{userColor} — يفوز الخصم بنسبة {oppRate} فقط بالـ{oppColor}.",
+  "statsTerminationSpotlight": "أكثر نهاية شيوعًا: {label} — {share}% من كل المباريات، منها {lossPercent}% خسائر."
 }
