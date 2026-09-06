@@ -358,11 +358,12 @@ class _PhaseOutcomeBar extends StatelessWidget {
   final StatTally tally;
   final int total;
 
-  static const _trackColor = Color(0x0FFFFFFF); // ~6% white
-
   @override
   Widget build(BuildContext context) {
     final labels = _statsLabels(context);
+    // A theme token rather than a translucent white, so the unfilled remainder
+    // reads as a track on light surfaces as well as dark.
+    final trackColor = Theme.of(context).colorScheme.outlineVariant;
     // Everything is weighted in units of games out of [total], so each phase's
     // fill occupies exactly its share of the row.
     final decided = tally.wins + tally.draws + tally.losses;
@@ -389,7 +390,7 @@ class _PhaseOutcomeBar extends StatelessWidget {
       child: SizedBox(
         height: 10,
         child: total == 0
-            ? const ColoredBox(color: _trackColor)
+            ? ColoredBox(color: trackColor)
             : Row(
                 children: [
                   if (tally.wins > 0) segment(tally.wins, _kWinColor),
@@ -403,10 +404,7 @@ class _PhaseOutcomeBar extends StatelessWidget {
                       ),
                     ),
                   if (rest > 0)
-                    Expanded(
-                      flex: rest,
-                      child: const ColoredBox(color: _trackColor),
-                    ),
+                    Expanded(flex: rest, child: ColoredBox(color: trackColor)),
                 ],
               ),
       ),
@@ -421,11 +419,15 @@ Color _rateColor(BuildContext context, double? rate) {
   return Theme.of(context).colorScheme.onSurface;
 }
 
+/// Phase identity colours. Kept in the same soft, desaturated register as the
+/// app's own accents (primary #7CA2FF, tertiary #E5C07B) so the strip reads as
+/// part of the surface rather than sitting on top of it — while staying light
+/// enough for the dark ink label inside each segment (>6:1 contrast).
 Color _phaseColor(String phase) => switch (phase) {
-  'opening' => const Color(0xFF38BDF8), // sky
-  'middlegame' => const Color(0xFFFB923C), // orange
-  'endgame' => const Color(0xFFA855F7), // purple
-  _ => const Color(0xFF64748B),
+  'opening' => const Color(0xFF5FA8D3), // soft steel blue
+  'middlegame' => const Color(0xFFD69A57), // soft amber
+  'endgame' => const Color(0xFF9C87C8), // soft violet
+  _ => const Color(0xFF6E7A90),
 };
 
 // Note: `_percent` is shared from termination_section.dart (same library).

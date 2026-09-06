@@ -51,10 +51,14 @@ class _TimeControlFilterBar extends StatelessWidget {
 
 /// Shared win / draw / loss palette for every proportion bar and legend in the
 /// statistics tab, so the mini bars and their keys always agree.
-const _kWinColor = Color(0xFF22C55E); // vibrant green
-const _kDrawColor = Color(0xFF64748B); // muted slate grey
-const _kLossColor = Color(0xFFEF4444); // vibrant red
-const _kEmptyTrackColor = Colors.white10; // muted track when no games
+// Tuned to the app's own palette rather than to a bright chart palette: the
+// dark scheme is deliberately soft (primary #7CA2FF, tertiary #E5C07B, error
+// #EB6B72), so saturated chart colours sit on top of the surface instead of in
+// it. These are mid-tones, which keeps them legible on both themes.
+const _kWinColor = AppTheme.success; // #2E9E5B, the theme's own win green
+const _kDrawColor = Color(0xFF6E7A90); // muted slate
+const _kLossColor = Color(0xFFD2555F); // muted brick red, between the two
+// error tones the light/dark schemes use
 
 /// Reusable horizontal stacked win/draw/loss proportion bar. Segments are sized
 /// by count; an all-zero tally shows a muted empty track.
@@ -83,7 +87,9 @@ class _WinLossDrawRatioBar extends StatelessWidget {
       child: SizedBox(
         height: height,
         child: total == 0
-            ? const ColoredBox(color: _kEmptyTrackColor)
+            // A theme token, so the empty track stays visible on light surfaces
+            // too (a translucent white track vanishes there).
+            ? ColoredBox(color: Theme.of(context).colorScheme.outlineVariant)
             : Row(
                 children: [
                   _segment(wins, _kWinColor, message),
