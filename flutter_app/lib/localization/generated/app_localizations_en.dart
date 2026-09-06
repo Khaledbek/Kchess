@@ -907,4 +907,200 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statsTerminationRetry => 'Retry';
+
+  @override
+  String get statsRatingTitle => 'Rating trend';
+
+  @override
+  String get statsRatingEmpty => 'Not enough rating data to draw a trend.';
+
+  @override
+  String get statsRatingError => 'Could not load rating data.';
+
+  @override
+  String get statsRatingRetry => 'Retry';
+
+  @override
+  String get statsOpeningGamesAll => 'All';
+
+  @override
+  String get statsOpeningGamesWon => 'Won';
+
+  @override
+  String get statsOpeningGamesLost => 'Lost';
+
+  @override
+  String get statsOpeningGamesByCheckmate => 'by checkmate';
+
+  @override
+  String get statsOpeningGamesByResignation => 'by resignation';
+
+  @override
+  String get statsOpeningGamesByTimeout => 'on time';
+
+  @override
+  String get statsOpeningGamesByDraw => 'draw';
+
+  @override
+  String get statsOpeningGamesEmpty => 'No games for this selection.';
+
+  @override
+  String get statsOpeningGamesError => 'Could not load games.';
+
+  @override
+  String get statsOpeningsTitle => 'Top openings';
+
+  @override
+  String get statsOpeningsMostPlayed => 'Most played';
+
+  @override
+  String get statsOpeningsBestWinRate => 'Best win rate';
+
+  @override
+  String get statsOpeningsMinGamesHint => 'At least 3 games per opening.';
+
+  @override
+  String get statsOpeningsClassifiedGames => 'games with a named opening';
+
+  @override
+  String get statsOpeningsGames => 'games';
+
+  @override
+  String get statsOpeningsVariations => 'variations';
+
+  @override
+  String get statsOpeningsBaseLine => 'Base line';
+
+  @override
+  String get statsOpeningsWhite => 'White';
+
+  @override
+  String get statsOpeningsBlack => 'Black';
+
+  @override
+  String get statsOpeningsUnknownColor => 'Other';
+
+  @override
+  String get statsOpeningsWinRateShort => 'win';
+
+  @override
+  String get statsOpeningsNoOpeningsForColor =>
+      'No openings for this color yet.';
+
+  @override
+  String get statsOpeningsNoOpeningsForWinRate =>
+      'No opening with at least 3 games.';
+
+  @override
+  String get statsOpeningsEmpty =>
+      'No named openings yet. Synced and imported games are classified automatically.';
+
+  @override
+  String get statsOpeningsNoProfile =>
+      'Create or select a profile to see openings.';
+
+  @override
+  String get statsOpeningsError => 'Could not load openings.';
+
+  @override
+  String get statsOpeningsRetry => 'Retry';
+
+  @override
+  String get statsCompareTitle => 'Player comparison';
+
+  @override
+  String get statsCompareUsernameLabel => 'Chess.com username';
+
+  @override
+  String get statsCompareUsernameHint => 'e.g. hikaru';
+
+  @override
+  String get statsCompareCompare => 'Compare';
+
+  @override
+  String get statsCompareLoadingHint =>
+      'Fetching and analysing the opponent\'s games…';
+
+  @override
+  String get statsComparePrompt =>
+      'Enter a Chess.com username to compare stats.';
+
+  @override
+  String get statsCompareYou => 'You';
+
+  @override
+  String get statsCompareOpponent => 'Opponent';
+
+  @override
+  String get statsCompareH2hTitle => 'Head-to-head';
+
+  @override
+  String get statsCompareDirectGames => 'direct games';
+
+  @override
+  String get statsCompareWins => 'Wins';
+
+  @override
+  String get statsCompareDraws => 'Draws';
+
+  @override
+  String get statsCompareLosses => 'Losses';
+
+  @override
+  String get statsComparePerformanceCompare => 'Performance comparison';
+
+  @override
+  String get statsCompareWinRateWhite => 'Win rate as White';
+
+  @override
+  String get statsCompareWinRateBlack => 'Win rate as Black';
+
+  @override
+  String get statsCompareFlagging => 'Losses on time';
+
+  @override
+  String get statsCompareOpeningMatchup => 'Opening matchup';
+
+  @override
+  String get statsCompareMatchupSubtitle =>
+      'Your openings vs. the opponent\'s win rate with the opposite colour.';
+
+  @override
+  String get statsCompareOpeningColumn => 'Opening';
+
+  @override
+  String get statsCompareGamesShort => 'games';
+
+  @override
+  String get statsCompareNoMatchups => 'No shared openings found.';
+
+  @override
+  String get statsCompareNoLeaks => 'No clear weaknesses found.';
+
+  @override
+  String get statsCompareStrategyTitle => 'Recommended strategy';
+
+  @override
+  String get statsCompareColorWhite => 'White';
+
+  @override
+  String get statsCompareColorBlack => 'Black';
+
+  @override
+  String get statsCompareErrorPrefix => 'Error';
+
+  @override
+  String statsCompareGamesAnalyzed(int games, int months) {
+    return '$games games analysed across $months months';
+  }
+
+  @override
+  String statsCompareLeakSentence(
+    String opening,
+    String userColor,
+    String oppRate,
+    String oppColor,
+  ) {
+    return 'Play $opening as $userColor — the opponent wins only $oppRate as $oppColor.';
+  }
 }

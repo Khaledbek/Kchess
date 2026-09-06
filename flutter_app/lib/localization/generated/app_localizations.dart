@@ -1761,6 +1761,371 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get statsTerminationRetry;
+
+  /// No description provided for @statsRatingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating trend'**
+  String get statsRatingTitle;
+
+  /// No description provided for @statsRatingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough rating data to draw a trend.'**
+  String get statsRatingEmpty;
+
+  /// No description provided for @statsRatingError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load rating data.'**
+  String get statsRatingError;
+
+  /// No description provided for @statsRatingRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get statsRatingRetry;
+
+  /// No description provided for @statsOpeningGamesAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get statsOpeningGamesAll;
+
+  /// No description provided for @statsOpeningGamesWon.
+  ///
+  /// In en, this message translates to:
+  /// **'Won'**
+  String get statsOpeningGamesWon;
+
+  /// No description provided for @statsOpeningGamesLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost'**
+  String get statsOpeningGamesLost;
+
+  /// No description provided for @statsOpeningGamesByCheckmate.
+  ///
+  /// In en, this message translates to:
+  /// **'by checkmate'**
+  String get statsOpeningGamesByCheckmate;
+
+  /// No description provided for @statsOpeningGamesByResignation.
+  ///
+  /// In en, this message translates to:
+  /// **'by resignation'**
+  String get statsOpeningGamesByResignation;
+
+  /// No description provided for @statsOpeningGamesByTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'on time'**
+  String get statsOpeningGamesByTimeout;
+
+  /// No description provided for @statsOpeningGamesByDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'draw'**
+  String get statsOpeningGamesByDraw;
+
+  /// No description provided for @statsOpeningGamesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No games for this selection.'**
+  String get statsOpeningGamesEmpty;
+
+  /// No description provided for @statsOpeningGamesError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load games.'**
+  String get statsOpeningGamesError;
+
+  /// No description provided for @statsOpeningsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top openings'**
+  String get statsOpeningsTitle;
+
+  /// No description provided for @statsOpeningsMostPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Most played'**
+  String get statsOpeningsMostPlayed;
+
+  /// No description provided for @statsOpeningsBestWinRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Best win rate'**
+  String get statsOpeningsBestWinRate;
+
+  /// No description provided for @statsOpeningsMinGamesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 3 games per opening.'**
+  String get statsOpeningsMinGamesHint;
+
+  /// No description provided for @statsOpeningsClassifiedGames.
+  ///
+  /// In en, this message translates to:
+  /// **'games with a named opening'**
+  String get statsOpeningsClassifiedGames;
+
+  /// No description provided for @statsOpeningsGames.
+  ///
+  /// In en, this message translates to:
+  /// **'games'**
+  String get statsOpeningsGames;
+
+  /// No description provided for @statsOpeningsVariations.
+  ///
+  /// In en, this message translates to:
+  /// **'variations'**
+  String get statsOpeningsVariations;
+
+  /// No description provided for @statsOpeningsBaseLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Base line'**
+  String get statsOpeningsBaseLine;
+
+  /// No description provided for @statsOpeningsWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get statsOpeningsWhite;
+
+  /// No description provided for @statsOpeningsBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get statsOpeningsBlack;
+
+  /// No description provided for @statsOpeningsUnknownColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get statsOpeningsUnknownColor;
+
+  /// No description provided for @statsOpeningsWinRateShort.
+  ///
+  /// In en, this message translates to:
+  /// **'win'**
+  String get statsOpeningsWinRateShort;
+
+  /// No description provided for @statsOpeningsNoOpeningsForColor.
+  ///
+  /// In en, this message translates to:
+  /// **'No openings for this color yet.'**
+  String get statsOpeningsNoOpeningsForColor;
+
+  /// No description provided for @statsOpeningsNoOpeningsForWinRate.
+  ///
+  /// In en, this message translates to:
+  /// **'No opening with at least 3 games.'**
+  String get statsOpeningsNoOpeningsForWinRate;
+
+  /// No description provided for @statsOpeningsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No named openings yet. Synced and imported games are classified automatically.'**
+  String get statsOpeningsEmpty;
+
+  /// No description provided for @statsOpeningsNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or select a profile to see openings.'**
+  String get statsOpeningsNoProfile;
+
+  /// No description provided for @statsOpeningsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load openings.'**
+  String get statsOpeningsError;
+
+  /// No description provided for @statsOpeningsRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get statsOpeningsRetry;
+
+  /// No description provided for @statsCompareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Player comparison'**
+  String get statsCompareTitle;
+
+  /// No description provided for @statsCompareUsernameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Chess.com username'**
+  String get statsCompareUsernameLabel;
+
+  /// No description provided for @statsCompareUsernameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. hikaru'**
+  String get statsCompareUsernameHint;
+
+  /// No description provided for @statsCompareCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get statsCompareCompare;
+
+  /// No description provided for @statsCompareLoadingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching and analysing the opponent\'s games…'**
+  String get statsCompareLoadingHint;
+
+  /// No description provided for @statsComparePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a Chess.com username to compare stats.'**
+  String get statsComparePrompt;
+
+  /// No description provided for @statsCompareYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get statsCompareYou;
+
+  /// No description provided for @statsCompareOpponent.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent'**
+  String get statsCompareOpponent;
+
+  /// No description provided for @statsCompareH2hTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Head-to-head'**
+  String get statsCompareH2hTitle;
+
+  /// No description provided for @statsCompareDirectGames.
+  ///
+  /// In en, this message translates to:
+  /// **'direct games'**
+  String get statsCompareDirectGames;
+
+  /// No description provided for @statsCompareWins.
+  ///
+  /// In en, this message translates to:
+  /// **'Wins'**
+  String get statsCompareWins;
+
+  /// No description provided for @statsCompareDraws.
+  ///
+  /// In en, this message translates to:
+  /// **'Draws'**
+  String get statsCompareDraws;
+
+  /// No description provided for @statsCompareLosses.
+  ///
+  /// In en, this message translates to:
+  /// **'Losses'**
+  String get statsCompareLosses;
+
+  /// No description provided for @statsComparePerformanceCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance comparison'**
+  String get statsComparePerformanceCompare;
+
+  /// No description provided for @statsCompareWinRateWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'Win rate as White'**
+  String get statsCompareWinRateWhite;
+
+  /// No description provided for @statsCompareWinRateBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Win rate as Black'**
+  String get statsCompareWinRateBlack;
+
+  /// No description provided for @statsCompareFlagging.
+  ///
+  /// In en, this message translates to:
+  /// **'Losses on time'**
+  String get statsCompareFlagging;
+
+  /// No description provided for @statsCompareOpeningMatchup.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening matchup'**
+  String get statsCompareOpeningMatchup;
+
+  /// No description provided for @statsCompareMatchupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your openings vs. the opponent\'s win rate with the opposite colour.'**
+  String get statsCompareMatchupSubtitle;
+
+  /// No description provided for @statsCompareOpeningColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get statsCompareOpeningColumn;
+
+  /// No description provided for @statsCompareGamesShort.
+  ///
+  /// In en, this message translates to:
+  /// **'games'**
+  String get statsCompareGamesShort;
+
+  /// No description provided for @statsCompareNoMatchups.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared openings found.'**
+  String get statsCompareNoMatchups;
+
+  /// No description provided for @statsCompareNoLeaks.
+  ///
+  /// In en, this message translates to:
+  /// **'No clear weaknesses found.'**
+  String get statsCompareNoLeaks;
+
+  /// No description provided for @statsCompareStrategyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended strategy'**
+  String get statsCompareStrategyTitle;
+
+  /// No description provided for @statsCompareColorWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get statsCompareColorWhite;
+
+  /// No description provided for @statsCompareColorBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get statsCompareColorBlack;
+
+  /// No description provided for @statsCompareErrorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get statsCompareErrorPrefix;
+
+  /// No description provided for @statsCompareGamesAnalyzed.
+  ///
+  /// In en, this message translates to:
+  /// **'{games} games analysed across {months} months'**
+  String statsCompareGamesAnalyzed(int games, int months);
+
+  /// No description provided for @statsCompareLeakSentence.
+  ///
+  /// In en, this message translates to:
+  /// **'Play {opening} as {userColor} — the opponent wins only {oppRate} as {oppColor}.'**
+  String statsCompareLeakSentence(
+    String opening,
+    String userColor,
+    String oppRate,
+    String oppColor,
+  );
 }
 
 class _AppLocalizationsDelegate

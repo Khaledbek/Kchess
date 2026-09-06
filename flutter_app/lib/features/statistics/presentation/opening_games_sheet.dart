@@ -370,42 +370,16 @@ class _OpeningGamesText {
 }
 
 _OpeningGamesText _openingGamesText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _OpeningGamesText(
-        all: 'الكل',
-        won: 'فوز',
-        lost: 'خسارة',
-        byCheckmate: 'بكش ملك',
-        byResignation: 'بالاستسلام',
-        byTimeout: 'بانتهاء الوقت',
-        byDraw: 'تعادل',
-        empty: 'لا توجد مباريات لهذه الاختيار.',
-        error: 'تعذّر تحميل المباريات.',
-      );
-    case 'en':
-      return const _OpeningGamesText(
-        all: 'All',
-        won: 'Won',
-        lost: 'Lost',
-        byCheckmate: 'by checkmate',
-        byResignation: 'by resignation',
-        byTimeout: 'on time',
-        byDraw: 'draw',
-        empty: 'No games for this selection.',
-        error: 'Could not load games.',
-      );
-    default:
-      return const _OpeningGamesText(
-        all: 'Alle',
-        won: 'Gewonnen',
-        lost: 'Verloren',
-        byCheckmate: 'durch Matt',
-        byResignation: 'durch Aufgabe',
-        byTimeout: 'durch Zeit',
-        byDraw: 'Remis',
-        empty: 'Keine Partien für diese Auswahl.',
-        error: 'Partien konnten nicht geladen werden.',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _OpeningGamesText(
+    all: strings.statsOpeningGamesAll,
+    won: strings.statsOpeningGamesWon,
+    lost: strings.statsOpeningGamesLost,
+    byCheckmate: strings.statsOpeningGamesByCheckmate,
+    byResignation: strings.statsOpeningGamesByResignation,
+    byTimeout: strings.statsOpeningGamesByTimeout,
+    byDraw: strings.statsOpeningGamesByDraw,
+    empty: strings.statsOpeningGamesEmpty,
+    error: strings.statsOpeningGamesError,
+  );
 }

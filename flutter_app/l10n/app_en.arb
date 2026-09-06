@@ -361,5 +361,91 @@
   "statsTerminationEmpty": "Not enough data on how games ended.",
   "statsTerminationNoProfile": "Create or select a profile to see statistics.",
   "statsTerminationError": "Could not load game endings.",
-  "statsTerminationRetry": "Retry"
+  "statsTerminationRetry": "Retry",
+  "statsRatingTitle": "Rating trend",
+  "statsRatingEmpty": "Not enough rating data to draw a trend.",
+  "statsRatingError": "Could not load rating data.",
+  "statsRatingRetry": "Retry",
+  "statsOpeningGamesAll": "All",
+  "statsOpeningGamesWon": "Won",
+  "statsOpeningGamesLost": "Lost",
+  "statsOpeningGamesByCheckmate": "by checkmate",
+  "statsOpeningGamesByResignation": "by resignation",
+  "statsOpeningGamesByTimeout": "on time",
+  "statsOpeningGamesByDraw": "draw",
+  "statsOpeningGamesEmpty": "No games for this selection.",
+  "statsOpeningGamesError": "Could not load games.",
+  "statsOpeningsTitle": "Top openings",
+  "statsOpeningsMostPlayed": "Most played",
+  "statsOpeningsBestWinRate": "Best win rate",
+  "statsOpeningsMinGamesHint": "At least 3 games per opening.",
+  "statsOpeningsClassifiedGames": "games with a named opening",
+  "statsOpeningsGames": "games",
+  "statsOpeningsVariations": "variations",
+  "statsOpeningsBaseLine": "Base line",
+  "statsOpeningsWhite": "White",
+  "statsOpeningsBlack": "Black",
+  "statsOpeningsUnknownColor": "Other",
+  "statsOpeningsWinRateShort": "win",
+  "statsOpeningsNoOpeningsForColor": "No openings for this color yet.",
+  "statsOpeningsNoOpeningsForWinRate": "No opening with at least 3 games.",
+  "statsOpeningsEmpty": "No named openings yet. Synced and imported games are classified automatically.",
+  "statsOpeningsNoProfile": "Create or select a profile to see openings.",
+  "statsOpeningsError": "Could not load openings.",
+  "statsOpeningsRetry": "Retry",
+  "statsCompareTitle": "Player comparison",
+  "statsCompareUsernameLabel": "Chess.com username",
+  "statsCompareUsernameHint": "e.g. hikaru",
+  "statsCompareCompare": "Compare",
+  "statsCompareLoadingHint": "Fetching and analysing the opponent's games…",
+  "statsComparePrompt": "Enter a Chess.com username to compare stats.",
+  "statsCompareYou": "You",
+  "statsCompareOpponent": "Opponent",
+  "statsCompareH2hTitle": "Head-to-head",
+  "statsCompareDirectGames": "direct games",
+  "statsCompareWins": "Wins",
+  "statsCompareDraws": "Draws",
+  "statsCompareLosses": "Losses",
+  "statsComparePerformanceCompare": "Performance comparison",
+  "statsCompareWinRateWhite": "Win rate as White",
+  "statsCompareWinRateBlack": "Win rate as Black",
+  "statsCompareFlagging": "Losses on time",
+  "statsCompareOpeningMatchup": "Opening matchup",
+  "statsCompareMatchupSubtitle": "Your openings vs. the opponent's win rate with the opposite colour.",
+  "statsCompareOpeningColumn": "Opening",
+  "statsCompareGamesShort": "games",
+  "statsCompareNoMatchups": "No shared openings found.",
+  "statsCompareNoLeaks": "No clear weaknesses found.",
+  "statsCompareStrategyTitle": "Recommended strategy",
+  "statsCompareColorWhite": "White",
+  "statsCompareColorBlack": "Black",
+  "statsCompareErrorPrefix": "Error",
+  "statsCompareGamesAnalyzed": "{games} games analysed across {months} months",
+  "@statsCompareGamesAnalyzed": {
+    "placeholders": {
+      "games": {
+        "type": "int"
+      },
+      "months": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareLeakSentence": "Play {opening} as {userColor} — the opponent wins only {oppRate} as {oppColor}.",
+  "@statsCompareLeakSentence": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      },
+      "userColor": {
+        "type": "String"
+      },
+      "oppRate": {
+        "type": "String"
+      },
+      "oppColor": {
+        "type": "String"
+      }
+    }
+  }
 }

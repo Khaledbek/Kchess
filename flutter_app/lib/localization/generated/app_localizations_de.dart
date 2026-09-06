@@ -909,4 +909,202 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get statsTerminationRetry => 'Erneut versuchen';
+
+  @override
+  String get statsRatingTitle => 'Rating-Verlauf';
+
+  @override
+  String get statsRatingEmpty =>
+      'Nicht genügend Rating-Daten für einen Verlauf.';
+
+  @override
+  String get statsRatingError => 'Rating-Daten konnten nicht geladen werden.';
+
+  @override
+  String get statsRatingRetry => 'Erneut versuchen';
+
+  @override
+  String get statsOpeningGamesAll => 'Alle';
+
+  @override
+  String get statsOpeningGamesWon => 'Gewonnen';
+
+  @override
+  String get statsOpeningGamesLost => 'Verloren';
+
+  @override
+  String get statsOpeningGamesByCheckmate => 'durch Matt';
+
+  @override
+  String get statsOpeningGamesByResignation => 'durch Aufgabe';
+
+  @override
+  String get statsOpeningGamesByTimeout => 'durch Zeit';
+
+  @override
+  String get statsOpeningGamesByDraw => 'Remis';
+
+  @override
+  String get statsOpeningGamesEmpty => 'Keine Partien für diese Auswahl.';
+
+  @override
+  String get statsOpeningGamesError => 'Partien konnten nicht geladen werden.';
+
+  @override
+  String get statsOpeningsTitle => 'Erfolgreichste Eröffnungen';
+
+  @override
+  String get statsOpeningsMostPlayed => 'Meistgespielt';
+
+  @override
+  String get statsOpeningsBestWinRate => 'Beste Siegquote';
+
+  @override
+  String get statsOpeningsMinGamesHint => 'Mindestens 3 Partien pro Eröffnung.';
+
+  @override
+  String get statsOpeningsClassifiedGames => 'Partien mit benannter Eröffnung';
+
+  @override
+  String get statsOpeningsGames => 'Partien';
+
+  @override
+  String get statsOpeningsVariations => 'Varianten';
+
+  @override
+  String get statsOpeningsBaseLine => 'Grundform';
+
+  @override
+  String get statsOpeningsWhite => 'Weiß';
+
+  @override
+  String get statsOpeningsBlack => 'Schwarz';
+
+  @override
+  String get statsOpeningsUnknownColor => 'Andere';
+
+  @override
+  String get statsOpeningsWinRateShort => 'Sieg';
+
+  @override
+  String get statsOpeningsNoOpeningsForColor =>
+      'Noch keine Eröffnungen für diese Farbe.';
+
+  @override
+  String get statsOpeningsNoOpeningsForWinRate =>
+      'Keine Eröffnung mit mindestens 3 Partien.';
+
+  @override
+  String get statsOpeningsEmpty =>
+      'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.';
+
+  @override
+  String get statsOpeningsNoProfile =>
+      'Erstelle oder wähle ein Profil, um Eröffnungen zu sehen.';
+
+  @override
+  String get statsOpeningsError => 'Eröffnungen konnten nicht geladen werden.';
+
+  @override
+  String get statsOpeningsRetry => 'Erneut versuchen';
+
+  @override
+  String get statsCompareTitle => 'Spielervergleich';
+
+  @override
+  String get statsCompareUsernameLabel => 'Chess.com-Benutzername';
+
+  @override
+  String get statsCompareUsernameHint => 'z. B. hikaru';
+
+  @override
+  String get statsCompareCompare => 'Vergleichen';
+
+  @override
+  String get statsCompareLoadingHint =>
+      'Partien des Gegners werden geladen und ausgewertet…';
+
+  @override
+  String get statsComparePrompt =>
+      'Gib einen Chess.com-Benutzernamen ein, um Statistiken zu vergleichen.';
+
+  @override
+  String get statsCompareYou => 'Du';
+
+  @override
+  String get statsCompareOpponent => 'Gegner';
+
+  @override
+  String get statsCompareH2hTitle => 'Direktvergleich';
+
+  @override
+  String get statsCompareDirectGames => 'direkte Partien';
+
+  @override
+  String get statsCompareWins => 'Siege';
+
+  @override
+  String get statsCompareDraws => 'Remis';
+
+  @override
+  String get statsCompareLosses => 'Niederlagen';
+
+  @override
+  String get statsComparePerformanceCompare => 'Leistungsvergleich';
+
+  @override
+  String get statsCompareWinRateWhite => 'Siegquote mit Weiß';
+
+  @override
+  String get statsCompareWinRateBlack => 'Siegquote mit Schwarz';
+
+  @override
+  String get statsCompareFlagging => 'Niederlagen auf Zeit';
+
+  @override
+  String get statsCompareOpeningMatchup => 'Eröffnungs-Duelle';
+
+  @override
+  String get statsCompareMatchupSubtitle =>
+      'Deine Eröffnungen gegen die Siegquote des Gegners mit der Gegenfarbe.';
+
+  @override
+  String get statsCompareOpeningColumn => 'Eröffnung';
+
+  @override
+  String get statsCompareGamesShort => 'Partien';
+
+  @override
+  String get statsCompareNoMatchups =>
+      'Keine gemeinsamen Eröffnungen gefunden.';
+
+  @override
+  String get statsCompareNoLeaks => 'Keine klaren Schwächen gefunden.';
+
+  @override
+  String get statsCompareStrategyTitle => 'Empfohlene Strategie';
+
+  @override
+  String get statsCompareColorWhite => 'Weiß';
+
+  @override
+  String get statsCompareColorBlack => 'Schwarz';
+
+  @override
+  String get statsCompareErrorPrefix => 'Fehler';
+
+  @override
+  String statsCompareGamesAnalyzed(int games, int months) {
+    return '$games Partien aus $months Monaten ausgewertet';
+  }
+
+  @override
+  String statsCompareLeakSentence(
+    String opening,
+    String userColor,
+    String oppRate,
+    String oppColor,
+  ) {
+    return 'Spiele $opening mit $userColor — der Gegner gewinnt dort nur $oppRate mit $oppColor.';
+  }
 }

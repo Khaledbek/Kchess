@@ -574,69 +574,25 @@ class _OpeningsText {
 }
 
 _OpeningsText _openingsText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _OpeningsText(
-        title: 'أنجح الافتتاحيات',
-        mostPlayed: 'الأكثر لعبًا',
-        bestWinRate: 'أفضل نسبة فوز',
-        minGamesHint: '‏3 مباريات على الأقل لكل افتتاحية.',
-        classifiedGames: 'مباراة بافتتاحية معروفة',
-        games: 'مباراة',
-        variations: 'تنويعات',
-        baseLine: 'الشكل الأساسي',
-        white: 'الأبيض',
-        black: 'الأسود',
-        unknownColor: 'أخرى',
-        winRateShort: 'فوز',
-        noOpeningsForColor: 'لا توجد افتتاحيات لهذا اللون.',
-        noOpeningsForWinRate: 'لا توجد افتتاحية بثلاث مباريات على الأقل.',
-        empty: 'لا توجد افتتاحيات مُصنّفة بعد. تُصنَّف المباريات المستوردة والمتزامنة تلقائيًا.',
-        noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الافتتاحيات.',
-        error: 'تعذّر تحميل الافتتاحيات.',
-        retry: 'إعادة المحاولة',
-      );
-    case 'en':
-      return const _OpeningsText(
-        title: 'Top openings',
-        mostPlayed: 'Most played',
-        bestWinRate: 'Best win rate',
-        minGamesHint: 'At least 3 games per opening.',
-        classifiedGames: 'games with a named opening',
-        games: 'games',
-        variations: 'variations',
-        baseLine: 'Base line',
-        white: 'White',
-        black: 'Black',
-        unknownColor: 'Other',
-        winRateShort: 'win',
-        noOpeningsForColor: 'No openings for this color yet.',
-        noOpeningsForWinRate: 'No opening with at least 3 games.',
-        empty: 'No named openings yet. Synced and imported games are classified automatically.',
-        noProfile: 'Create or select a profile to see openings.',
-        error: 'Could not load openings.',
-        retry: 'Retry',
-      );
-    default:
-      return const _OpeningsText(
-        title: 'Erfolgreichste Eröffnungen',
-        mostPlayed: 'Meistgespielt',
-        bestWinRate: 'Beste Siegquote',
-        minGamesHint: 'Mindestens 3 Partien pro Eröffnung.',
-        classifiedGames: 'Partien mit benannter Eröffnung',
-        games: 'Partien',
-        variations: 'Varianten',
-        baseLine: 'Grundform',
-        white: 'Weiß',
-        black: 'Schwarz',
-        unknownColor: 'Andere',
-        winRateShort: 'Sieg',
-        noOpeningsForColor: 'Noch keine Eröffnungen für diese Farbe.',
-        noOpeningsForWinRate: 'Keine Eröffnung mit mindestens 3 Partien.',
-        empty: 'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.',
-        noProfile: 'Erstelle oder wähle ein Profil, um Eröffnungen zu sehen.',
-        error: 'Eröffnungen konnten nicht geladen werden.',
-        retry: 'Erneut versuchen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _OpeningsText(
+    title: strings.statsOpeningsTitle,
+    mostPlayed: strings.statsOpeningsMostPlayed,
+    bestWinRate: strings.statsOpeningsBestWinRate,
+    minGamesHint: strings.statsOpeningsMinGamesHint,
+    classifiedGames: strings.statsOpeningsClassifiedGames,
+    games: strings.statsOpeningsGames,
+    variations: strings.statsOpeningsVariations,
+    baseLine: strings.statsOpeningsBaseLine,
+    white: strings.statsOpeningsWhite,
+    black: strings.statsOpeningsBlack,
+    unknownColor: strings.statsOpeningsUnknownColor,
+    winRateShort: strings.statsOpeningsWinRateShort,
+    noOpeningsForColor: strings.statsOpeningsNoOpeningsForColor,
+    noOpeningsForWinRate: strings.statsOpeningsNoOpeningsForWinRate,
+    empty: strings.statsOpeningsEmpty,
+    noProfile: strings.statsOpeningsNoProfile,
+    error: strings.statsOpeningsError,
+    retry: strings.statsOpeningsRetry,
+  );
 }

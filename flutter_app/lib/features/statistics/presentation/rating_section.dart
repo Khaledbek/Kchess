@@ -439,27 +439,11 @@ class _RatingText {
 }
 
 _RatingText _ratingText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _RatingText(
-        title: 'تطوّر التصنيف',
-        empty: 'لا توجد بيانات تصنيف كافية لرسم منحنى.',
-        error: 'تعذّر تحميل بيانات التصنيف.',
-        retry: 'إعادة المحاولة',
-      );
-    case 'en':
-      return const _RatingText(
-        title: 'Rating trend',
-        empty: 'Not enough rating data to draw a trend.',
-        error: 'Could not load rating data.',
-        retry: 'Retry',
-      );
-    default:
-      return const _RatingText(
-        title: 'Rating-Verlauf',
-        empty: 'Nicht genügend Rating-Daten für einen Verlauf.',
-        error: 'Rating-Daten konnten nicht geladen werden.',
-        retry: 'Erneut versuchen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _RatingText(
+    title: strings.statsRatingTitle,
+    empty: strings.statsRatingEmpty,
+    error: strings.statsRatingError,
+    retry: strings.statsRatingRetry,
+  );
 }
