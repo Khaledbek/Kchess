@@ -715,4 +715,198 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ratingFide => 'FIDE';
+
+  @override
+  String get statsWins => 'Siege';
+
+  @override
+  String get statsDraws => 'Remis';
+
+  @override
+  String get statsLosses => 'Niederlagen';
+
+  @override
+  String get statsAll => 'Alle';
+
+  @override
+  String get statsAllTimeControlsNote => 'Alle Zeitkontrollen';
+
+  @override
+  String get statsPhaseTitle => 'Nach Spielphase';
+
+  @override
+  String get statsPhaseSubtitle =>
+      'In welcher Phase deine Partien enden und wie du abschneidest.';
+
+  @override
+  String get statsPhaseOpening => 'Eröffnung (1–12)';
+
+  @override
+  String get statsPhaseMiddlegame => 'Mittelspiel (13–30)';
+
+  @override
+  String get statsPhaseEndgame => 'Endspiel (31+)';
+
+  @override
+  String get statsPhaseOpeningShort => 'Eröffnung';
+
+  @override
+  String get statsPhaseMiddlegameShort => 'Mittelspiel';
+
+  @override
+  String get statsPhaseEndgameShort => 'Endspiel';
+
+  @override
+  String get statsPhaseGames => 'Partien';
+
+  @override
+  String get statsPhaseWinWord => 'Sieg';
+
+  @override
+  String get statsPhaseEmpty => 'Nicht genügend Daten zu Spielphasen.';
+
+  @override
+  String get statsPhaseNoProfile =>
+      'Erstelle oder wähle ein Profil, um Statistiken zu sehen.';
+
+  @override
+  String get statsPhaseError => 'Spielphasen konnten nicht geladen werden.';
+
+  @override
+  String get statsPhaseRetry => 'Erneut versuchen';
+
+  @override
+  String statsPhaseClassifiedNote(int classified, int total) {
+    return '$classified von $total Partien';
+  }
+
+  @override
+  String get statsTitle => 'Statistiken';
+
+  @override
+  String get statsIntroTitle => 'Deine Schachleistung';
+
+  @override
+  String get statsIntroBody =>
+      'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.';
+
+  @override
+  String get statsFormTitle => 'Aktuelle Form';
+
+  @override
+  String get statsFormHint =>
+      'Tippe auf ein Ergebnis, um die Partie zu öffnen.';
+
+  @override
+  String get statsFormVersus => 'gegen';
+
+  @override
+  String get statsFormEmpty => 'Keine aktuellen Partien vorhanden.';
+
+  @override
+  String get statsFormError => 'Aktuelle Partien konnten nicht geladen werden.';
+
+  @override
+  String get statsFormRetry => 'Erneut versuchen';
+
+  @override
+  String get statsOverviewTitle => 'Übersicht';
+
+  @override
+  String get statsOverviewGames => 'Partien';
+
+  @override
+  String get statsOverviewWinRate => 'Siegquote';
+
+  @override
+  String get statsOverviewScore => 'Score';
+
+  @override
+  String get statsOverviewRecord => 'Bilanz';
+
+  @override
+  String get statsOverviewByColor => 'Nach Farbe';
+
+  @override
+  String get statsOverviewByTimeControl => 'Nach Zeitkontrolle';
+
+  @override
+  String get statsOverviewWhite => 'Weiß';
+
+  @override
+  String get statsOverviewBlack => 'Schwarz';
+
+  @override
+  String get statsOverviewEmpty =>
+      'Noch keine Partien. Synchronisiere ein Online-Profil oder importiere Partien, um deine Statistik zu sehen.';
+
+  @override
+  String get statsOverviewNoProfile =>
+      'Erstelle oder wähle ein Profil, um Statistiken zu sehen.';
+
+  @override
+  String get statsOverviewNoGamesForFilter =>
+      'Keine Partien für die gewählte Zeitkontrolle.';
+
+  @override
+  String get statsOverviewError => 'Statistik konnte nicht geladen werden.';
+
+  @override
+  String get statsOverviewRetry => 'Erneut versuchen';
+
+  @override
+  String get statsTerminationTitle => 'Partie-Ende Statistik';
+
+  @override
+  String get statsTerminationCheckmate => 'Matt';
+
+  @override
+  String get statsTerminationResignation => 'Aufgabe';
+
+  @override
+  String get statsTerminationTimeout => 'Zeit';
+
+  @override
+  String get statsTerminationDraw => 'Remis';
+
+  @override
+  String get statsTerminationOther => 'Andere';
+
+  @override
+  String get statsTerminationWonByCheckmate => 'Gewonnen durch Matt';
+
+  @override
+  String get statsTerminationLostByCheckmate => 'Verloren durch Matt';
+
+  @override
+  String get statsTerminationOpponentResigned => 'Gegner gab auf';
+
+  @override
+  String get statsTerminationSelfResigned => 'Selbst aufgegeben';
+
+  @override
+  String get statsTerminationOpponentFlagged => 'Gegner-Zeit abgelaufen';
+
+  @override
+  String get statsTerminationSelfFlagged => 'Eigene Zeit abgelaufen';
+
+  @override
+  String get statsTerminationWonGeneric => 'Gewonnen';
+
+  @override
+  String get statsTerminationLostGeneric => 'Verloren';
+
+  @override
+  String get statsTerminationEmpty => 'Nicht genügend Daten zum Partie-Ende.';
+
+  @override
+  String get statsTerminationNoProfile =>
+      'Erstelle oder wähle ein Profil, um Statistiken zu sehen.';
+
+  @override
+  String get statsTerminationError =>
+      'Partie-Enden konnten nicht geladen werden.';
+
+  @override
+  String get statsTerminationRetry => 'Erneut versuchen';
 }

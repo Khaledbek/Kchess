@@ -329,57 +329,21 @@ class _OverviewText {
 }
 
 _OverviewText _overviewText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _OverviewText(
-        title: 'نظرة عامة',
-        games: 'المباريات',
-        winRate: 'نسبة الفوز',
-        score: 'النتيجة',
-        record: 'السجل',
-        byColor: 'حسب اللون',
-        byTimeControl: 'حسب نوع الوقت',
-        white: 'أبيض',
-        black: 'أسود',
-        empty: 'لا توجد مباريات بعد. زامِن حسابًا على الإنترنت أو استورد مباريات لعرض إحصاءاتك.',
-        noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.',
-        noGamesForFilter: 'لا توجد مباريات لنوع الوقت المحدد.',
-        error: 'تعذّر تحميل الإحصاءات.',
-        retry: 'إعادة المحاولة',
-      );
-    case 'en':
-      return const _OverviewText(
-        title: 'Overview',
-        games: 'Games',
-        winRate: 'Win rate',
-        score: 'Score',
-        record: 'Record',
-        byColor: 'By color',
-        byTimeControl: 'By time control',
-        white: 'White',
-        black: 'Black',
-        empty: 'No games yet. Sync an online profile or import games to see your statistics.',
-        noProfile: 'Create or select a profile to see statistics.',
-        noGamesForFilter: 'No games for the selected time control.',
-        error: 'Could not load statistics.',
-        retry: 'Retry',
-      );
-    default:
-      return const _OverviewText(
-        title: 'Übersicht',
-        games: 'Partien',
-        winRate: 'Siegquote',
-        score: 'Score',
-        record: 'Bilanz',
-        byColor: 'Nach Farbe',
-        byTimeControl: 'Nach Zeitkontrolle',
-        white: 'Weiß',
-        black: 'Schwarz',
-        empty: 'Noch keine Partien. Synchronisiere ein Online-Profil oder importiere Partien, um deine Statistik zu sehen.',
-        noProfile: 'Erstelle oder wähle ein Profil, um Statistiken zu sehen.',
-        noGamesForFilter: 'Keine Partien für die gewählte Zeitkontrolle.',
-        error: 'Statistik konnte nicht geladen werden.',
-        retry: 'Erneut versuchen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _OverviewText(
+    title: strings.statsOverviewTitle,
+    games: strings.statsOverviewGames,
+    winRate: strings.statsOverviewWinRate,
+    score: strings.statsOverviewScore,
+    record: strings.statsOverviewRecord,
+    byColor: strings.statsOverviewByColor,
+    byTimeControl: strings.statsOverviewByTimeControl,
+    white: strings.statsOverviewWhite,
+    black: strings.statsOverviewBlack,
+    empty: strings.statsOverviewEmpty,
+    noProfile: strings.statsOverviewNoProfile,
+    noGamesForFilter: strings.statsOverviewNoGamesForFilter,
+    error: strings.statsOverviewError,
+    retry: strings.statsOverviewRetry,
+  );
 }

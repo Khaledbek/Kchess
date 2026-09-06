@@ -249,33 +249,13 @@ class _FormText {
 }
 
 _FormText _formText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _FormText(
-        title: 'الأداء الأخير',
-        hint: 'اضغط على نتيجة لفتح المباراة.',
-        versus: 'ضد',
-        empty: 'لا توجد مباريات حديثة لعرضها.',
-        error: 'تعذّر تحميل المباريات الأخيرة.',
-        retry: 'إعادة المحاولة',
-      );
-    case 'en':
-      return const _FormText(
-        title: 'Recent form',
-        hint: 'Tap a result to open the game.',
-        versus: 'vs',
-        empty: 'No recent games to show.',
-        error: 'Could not load recent games.',
-        retry: 'Retry',
-      );
-    default:
-      return const _FormText(
-        title: 'Aktuelle Form',
-        hint: 'Tippe auf ein Ergebnis, um die Partie zu öffnen.',
-        versus: 'gegen',
-        empty: 'Keine aktuellen Partien vorhanden.',
-        error: 'Aktuelle Partien konnten nicht geladen werden.',
-        retry: 'Erneut versuchen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _FormText(
+    title: strings.statsFormTitle,
+    hint: strings.statsFormHint,
+    versus: strings.statsFormVersus,
+    empty: strings.statsFormEmpty,
+    error: strings.statsFormError,
+    retry: strings.statsFormRetry,
+  );
 }

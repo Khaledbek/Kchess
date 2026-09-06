@@ -711,4 +711,196 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get ratingFide => 'FIDE';
+
+  @override
+  String get statsWins => 'انتصارات';
+
+  @override
+  String get statsDraws => 'تعادلات';
+
+  @override
+  String get statsLosses => 'هزائم';
+
+  @override
+  String get statsAll => 'الكل';
+
+  @override
+  String get statsAllTimeControlsNote => 'كل أنواع الوقت';
+
+  @override
+  String get statsPhaseTitle => 'حسب مرحلة اللعب';
+
+  @override
+  String get statsPhaseSubtitle =>
+      'في أي مرحلة تنتهي مبارياتك وكيف تكون نتيجتك.';
+
+  @override
+  String get statsPhaseOpening => 'الافتتاح (1–12)';
+
+  @override
+  String get statsPhaseMiddlegame => 'وسط اللعب (13–30)';
+
+  @override
+  String get statsPhaseEndgame => 'النهاية (+31)';
+
+  @override
+  String get statsPhaseOpeningShort => 'الافتتاح';
+
+  @override
+  String get statsPhaseMiddlegameShort => 'وسط اللعب';
+
+  @override
+  String get statsPhaseEndgameShort => 'النهاية';
+
+  @override
+  String get statsPhaseGames => 'مباراة';
+
+  @override
+  String get statsPhaseWinWord => 'فوز';
+
+  @override
+  String get statsPhaseEmpty => 'لا توجد بيانات كافية عن مراحل اللعب.';
+
+  @override
+  String get statsPhaseNoProfile => 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.';
+
+  @override
+  String get statsPhaseError => 'تعذّر تحميل مراحل اللعب.';
+
+  @override
+  String get statsPhaseRetry => 'إعادة المحاولة';
+
+  @override
+  String statsPhaseClassifiedNote(int classified, int total) {
+    return '$classified من $total مباراة';
+  }
+
+  @override
+  String get statsTitle => 'الإحصائيات';
+
+  @override
+  String get statsIntroTitle => 'أداؤك في الشطرنج';
+
+  @override
+  String get statsIntroBody =>
+      'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.';
+
+  @override
+  String get statsFormTitle => 'الأداء الأخير';
+
+  @override
+  String get statsFormHint => 'اضغط على نتيجة لفتح المباراة.';
+
+  @override
+  String get statsFormVersus => 'ضد';
+
+  @override
+  String get statsFormEmpty => 'لا توجد مباريات حديثة لعرضها.';
+
+  @override
+  String get statsFormError => 'تعذّر تحميل المباريات الأخيرة.';
+
+  @override
+  String get statsFormRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsOverviewTitle => 'نظرة عامة';
+
+  @override
+  String get statsOverviewGames => 'المباريات';
+
+  @override
+  String get statsOverviewWinRate => 'نسبة الفوز';
+
+  @override
+  String get statsOverviewScore => 'النتيجة';
+
+  @override
+  String get statsOverviewRecord => 'السجل';
+
+  @override
+  String get statsOverviewByColor => 'حسب اللون';
+
+  @override
+  String get statsOverviewByTimeControl => 'حسب نوع الوقت';
+
+  @override
+  String get statsOverviewWhite => 'أبيض';
+
+  @override
+  String get statsOverviewBlack => 'أسود';
+
+  @override
+  String get statsOverviewEmpty =>
+      'لا توجد مباريات بعد. زامِن حسابًا على الإنترنت أو استورد مباريات لعرض إحصاءاتك.';
+
+  @override
+  String get statsOverviewNoProfile =>
+      'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.';
+
+  @override
+  String get statsOverviewNoGamesForFilter =>
+      'لا توجد مباريات لنوع الوقت المحدد.';
+
+  @override
+  String get statsOverviewError => 'تعذّر تحميل الإحصاءات.';
+
+  @override
+  String get statsOverviewRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsTerminationTitle => 'طريقة انتهاء المباريات';
+
+  @override
+  String get statsTerminationCheckmate => 'كش ملك';
+
+  @override
+  String get statsTerminationResignation => 'استسلام';
+
+  @override
+  String get statsTerminationTimeout => 'انتهاء الوقت';
+
+  @override
+  String get statsTerminationDraw => 'تعادل';
+
+  @override
+  String get statsTerminationOther => 'أخرى';
+
+  @override
+  String get statsTerminationWonByCheckmate => 'فوز بكش ملك';
+
+  @override
+  String get statsTerminationLostByCheckmate => 'خسارة بكش ملك';
+
+  @override
+  String get statsTerminationOpponentResigned => 'استسلم الخصم';
+
+  @override
+  String get statsTerminationSelfResigned => 'استسلمت';
+
+  @override
+  String get statsTerminationOpponentFlagged => 'نفد وقت الخصم';
+
+  @override
+  String get statsTerminationSelfFlagged => 'نفد وقتك';
+
+  @override
+  String get statsTerminationWonGeneric => 'فوز';
+
+  @override
+  String get statsTerminationLostGeneric => 'خسارة';
+
+  @override
+  String get statsTerminationEmpty =>
+      'لا توجد بيانات كافية عن نهايات المباريات.';
+
+  @override
+  String get statsTerminationNoProfile =>
+      'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.';
+
+  @override
+  String get statsTerminationError => 'تعذّر تحميل نهايات المباريات.';
+
+  @override
+  String get statsTerminationRetry => 'إعادة المحاولة';
 }

@@ -389,69 +389,25 @@ class _TerminationText {
 }
 
 _TerminationText _terminationText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _TerminationText(
-        title: 'طريقة انتهاء المباريات',
-        checkmate: 'كش ملك',
-        resignation: 'استسلام',
-        timeout: 'انتهاء الوقت',
-        draw: 'تعادل',
-        other: 'أخرى',
-        wonByCheckmate: 'فوز بكش ملك',
-        lostByCheckmate: 'خسارة بكش ملك',
-        opponentResigned: 'استسلم الخصم',
-        selfResigned: 'استسلمت',
-        opponentFlagged: 'نفد وقت الخصم',
-        selfFlagged: 'نفد وقتك',
-        wonGeneric: 'فوز',
-        lostGeneric: 'خسارة',
-        empty: 'لا توجد بيانات كافية عن نهايات المباريات.',
-        noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.',
-        error: 'تعذّر تحميل نهايات المباريات.',
-        retry: 'إعادة المحاولة',
-      );
-    case 'en':
-      return const _TerminationText(
-        title: 'How games end',
-        checkmate: 'Checkmate',
-        resignation: 'Resignation',
-        timeout: 'On time',
-        draw: 'Draw',
-        other: 'Other',
-        wonByCheckmate: 'Won by checkmate',
-        lostByCheckmate: 'Lost by checkmate',
-        opponentResigned: 'Opponent resigned',
-        selfResigned: 'Resigned',
-        opponentFlagged: 'Opponent ran out of time',
-        selfFlagged: 'Ran out of time',
-        wonGeneric: 'Won',
-        lostGeneric: 'Lost',
-        empty: 'Not enough data on how games ended.',
-        noProfile: 'Create or select a profile to see statistics.',
-        error: 'Could not load game endings.',
-        retry: 'Retry',
-      );
-    default:
-      return const _TerminationText(
-        title: 'Partie-Ende Statistik',
-        checkmate: 'Matt',
-        resignation: 'Aufgabe',
-        timeout: 'Zeit',
-        draw: 'Remis',
-        other: 'Andere',
-        wonByCheckmate: 'Gewonnen durch Matt',
-        lostByCheckmate: 'Verloren durch Matt',
-        opponentResigned: 'Gegner gab auf',
-        selfResigned: 'Selbst aufgegeben',
-        opponentFlagged: 'Gegner-Zeit abgelaufen',
-        selfFlagged: 'Eigene Zeit abgelaufen',
-        wonGeneric: 'Gewonnen',
-        lostGeneric: 'Verloren',
-        empty: 'Nicht genügend Daten zum Partie-Ende.',
-        noProfile: 'Erstelle oder wähle ein Profil, um Statistiken zu sehen.',
-        error: 'Partie-Enden konnten nicht geladen werden.',
-        retry: 'Erneut versuchen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _TerminationText(
+    title: strings.statsTerminationTitle,
+    checkmate: strings.statsTerminationCheckmate,
+    resignation: strings.statsTerminationResignation,
+    timeout: strings.statsTerminationTimeout,
+    draw: strings.statsTerminationDraw,
+    other: strings.statsTerminationOther,
+    wonByCheckmate: strings.statsTerminationWonByCheckmate,
+    lostByCheckmate: strings.statsTerminationLostByCheckmate,
+    opponentResigned: strings.statsTerminationOpponentResigned,
+    selfResigned: strings.statsTerminationSelfResigned,
+    opponentFlagged: strings.statsTerminationOpponentFlagged,
+    selfFlagged: strings.statsTerminationSelfFlagged,
+    wonGeneric: strings.statsTerminationWonGeneric,
+    lostGeneric: strings.statsTerminationLostGeneric,
+    empty: strings.statsTerminationEmpty,
+    noProfile: strings.statsTerminationNoProfile,
+    error: strings.statsTerminationError,
+    retry: strings.statsTerminationRetry,
+  );
 }

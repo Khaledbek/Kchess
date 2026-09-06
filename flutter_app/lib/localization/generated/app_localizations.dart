@@ -1395,6 +1395,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'FIDE'**
   String get ratingFide;
+
+  /// No description provided for @statsWins.
+  ///
+  /// In en, this message translates to:
+  /// **'Wins'**
+  String get statsWins;
+
+  /// No description provided for @statsDraws.
+  ///
+  /// In en, this message translates to:
+  /// **'Draws'**
+  String get statsDraws;
+
+  /// No description provided for @statsLosses.
+  ///
+  /// In en, this message translates to:
+  /// **'Losses'**
+  String get statsLosses;
+
+  /// No description provided for @statsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get statsAll;
+
+  /// No description provided for @statsAllTimeControlsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'All time controls'**
+  String get statsAllTimeControlsNote;
+
+  /// No description provided for @statsPhaseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'By game phase'**
+  String get statsPhaseTitle;
+
+  /// No description provided for @statsPhaseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Where your games end and how you score there.'**
+  String get statsPhaseSubtitle;
+
+  /// No description provided for @statsPhaseOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening (1–12)'**
+  String get statsPhaseOpening;
+
+  /// No description provided for @statsPhaseMiddlegame.
+  ///
+  /// In en, this message translates to:
+  /// **'Middlegame (13–30)'**
+  String get statsPhaseMiddlegame;
+
+  /// No description provided for @statsPhaseEndgame.
+  ///
+  /// In en, this message translates to:
+  /// **'Endgame (31+)'**
+  String get statsPhaseEndgame;
+
+  /// No description provided for @statsPhaseOpeningShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get statsPhaseOpeningShort;
+
+  /// No description provided for @statsPhaseMiddlegameShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Middlegame'**
+  String get statsPhaseMiddlegameShort;
+
+  /// No description provided for @statsPhaseEndgameShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Endgame'**
+  String get statsPhaseEndgameShort;
+
+  /// No description provided for @statsPhaseGames.
+  ///
+  /// In en, this message translates to:
+  /// **'games'**
+  String get statsPhaseGames;
+
+  /// No description provided for @statsPhaseWinWord.
+  ///
+  /// In en, this message translates to:
+  /// **'win'**
+  String get statsPhaseWinWord;
+
+  /// No description provided for @statsPhaseEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough data on game phases.'**
+  String get statsPhaseEmpty;
+
+  /// No description provided for @statsPhaseNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or select a profile to see statistics.'**
+  String get statsPhaseNoProfile;
+
+  /// No description provided for @statsPhaseError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load game phases.'**
+  String get statsPhaseError;
+
+  /// No description provided for @statsPhaseRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get statsPhaseRetry;
+
+  /// No description provided for @statsPhaseClassifiedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{classified} of {total} games'**
+  String statsPhaseClassifiedNote(int classified, int total);
+
+  /// No description provided for @statsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get statsTitle;
+
+  /// No description provided for @statsIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your chess performance'**
+  String get statsIntroTitle;
+
+  /// No description provided for @statsIntroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'See your results, recent form and opening record separated by color.'**
+  String get statsIntroBody;
+
+  /// No description provided for @statsFormTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent form'**
+  String get statsFormTitle;
+
+  /// No description provided for @statsFormHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a result to open the game.'**
+  String get statsFormHint;
+
+  /// No description provided for @statsFormVersus.
+  ///
+  /// In en, this message translates to:
+  /// **'vs'**
+  String get statsFormVersus;
+
+  /// No description provided for @statsFormEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent games to show.'**
+  String get statsFormEmpty;
+
+  /// No description provided for @statsFormError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load recent games.'**
+  String get statsFormError;
+
+  /// No description provided for @statsFormRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get statsFormRetry;
+
+  /// No description provided for @statsOverviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get statsOverviewTitle;
+
+  /// No description provided for @statsOverviewGames.
+  ///
+  /// In en, this message translates to:
+  /// **'Games'**
+  String get statsOverviewGames;
+
+  /// No description provided for @statsOverviewWinRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Win rate'**
+  String get statsOverviewWinRate;
+
+  /// No description provided for @statsOverviewScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Score'**
+  String get statsOverviewScore;
+
+  /// No description provided for @statsOverviewRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get statsOverviewRecord;
+
+  /// No description provided for @statsOverviewByColor.
+  ///
+  /// In en, this message translates to:
+  /// **'By color'**
+  String get statsOverviewByColor;
+
+  /// No description provided for @statsOverviewByTimeControl.
+  ///
+  /// In en, this message translates to:
+  /// **'By time control'**
+  String get statsOverviewByTimeControl;
+
+  /// No description provided for @statsOverviewWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get statsOverviewWhite;
+
+  /// No description provided for @statsOverviewBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get statsOverviewBlack;
+
+  /// No description provided for @statsOverviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No games yet. Sync an online profile or import games to see your statistics.'**
+  String get statsOverviewEmpty;
+
+  /// No description provided for @statsOverviewNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or select a profile to see statistics.'**
+  String get statsOverviewNoProfile;
+
+  /// No description provided for @statsOverviewNoGamesForFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'No games for the selected time control.'**
+  String get statsOverviewNoGamesForFilter;
+
+  /// No description provided for @statsOverviewError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load statistics.'**
+  String get statsOverviewError;
+
+  /// No description provided for @statsOverviewRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get statsOverviewRetry;
+
+  /// No description provided for @statsTerminationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How games end'**
+  String get statsTerminationTitle;
+
+  /// No description provided for @statsTerminationCheckmate.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkmate'**
+  String get statsTerminationCheckmate;
+
+  /// No description provided for @statsTerminationResignation.
+  ///
+  /// In en, this message translates to:
+  /// **'Resignation'**
+  String get statsTerminationResignation;
+
+  /// No description provided for @statsTerminationTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get statsTerminationTimeout;
+
+  /// No description provided for @statsTerminationDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw'**
+  String get statsTerminationDraw;
+
+  /// No description provided for @statsTerminationOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get statsTerminationOther;
+
+  /// No description provided for @statsTerminationWonByCheckmate.
+  ///
+  /// In en, this message translates to:
+  /// **'Won by checkmate'**
+  String get statsTerminationWonByCheckmate;
+
+  /// No description provided for @statsTerminationLostByCheckmate.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost by checkmate'**
+  String get statsTerminationLostByCheckmate;
+
+  /// No description provided for @statsTerminationOpponentResigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent resigned'**
+  String get statsTerminationOpponentResigned;
+
+  /// No description provided for @statsTerminationSelfResigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Resigned'**
+  String get statsTerminationSelfResigned;
+
+  /// No description provided for @statsTerminationOpponentFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent ran out of time'**
+  String get statsTerminationOpponentFlagged;
+
+  /// No description provided for @statsTerminationSelfFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'Ran out of time'**
+  String get statsTerminationSelfFlagged;
+
+  /// No description provided for @statsTerminationWonGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Won'**
+  String get statsTerminationWonGeneric;
+
+  /// No description provided for @statsTerminationLostGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost'**
+  String get statsTerminationLostGeneric;
+
+  /// No description provided for @statsTerminationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough data on how games ended.'**
+  String get statsTerminationEmpty;
+
+  /// No description provided for @statsTerminationNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or select a profile to see statistics.'**
+  String get statsTerminationNoProfile;
+
+  /// No description provided for @statsTerminationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load game endings.'**
+  String get statsTerminationError;
+
+  /// No description provided for @statsTerminationRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get statsTerminationRetry;
 }
 
 class _AppLocalizationsDelegate

@@ -1,10 +1,13 @@
 part of '../../../ui/app_root.dart';
 
-/// "Nach Spielphase": the profile's win rate in each phase a game ends in
-/// (opening / middlegame / endgame), by ending move number. Each phase shows a
-/// prominent win/draw/loss bar and win rate so the user can see at a glance
-/// where they are strongest and weakest. A "where games conclude" heuristic,
-/// not engine-based blunder finding.
+/// "Nach Spielphase": where the profile's games end (opening / middlegame /
+/// endgame, by ending move number) and how they score there.
+///
+/// The card leads with a segmented distribution strip so the spread reads at a
+/// glance, then gives each phase a "volume × outcome" bar: the bar's *length* is
+/// that phase's share of all games, and its *segments* are the win/draw/loss
+/// split inside that phase. A "where games conclude" heuristic, not engine-based
+/// blunder finding.
 class _PhaseCard extends StatelessWidget {
   const _PhaseCard({required this.future, required this.onRetry});
 
@@ -106,10 +109,9 @@ class _PhaseContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Macro distribution strip: the share of games each phase holds, so the
-        // spread (most games ending in the middlegame) reads at a glance.
+        // Macro distribution strip: how the games split across phases.
         if (total > 0) ...[
-          _distributionStrip(tallies, total),
+          _PhaseDistributionStrip(tallies: tallies, total: total, labels: labels),
           const SizedBox(height: 8),
           _distributionCaption(context, tallies, total),
           const SizedBox(height: 16),
@@ -119,12 +121,21 @@ class _PhaseContent extends StatelessWidget {
           _PhaseRow(
             phase: _order[i],
             tally: tallies[_order[i]]!,
-            share: total == 0 ? 0 : tallies[_order[i]]!.games / total,
+            total: total,
             labels: labels,
           ),
         ],
+        const SizedBox(height: 14),
+        // Key for the win/draw/loss segments inside each phase bar.
+        _WdlLegend(
+          tally: StatTally(
+            wins: _order.fold(0, (s, p) => s + tallies[p]!.wins),
+            draws: _order.fold(0, (s, p) => s + tallies[p]!.draws),
+            losses: _order.fold(0, (s, p) => s + tallies[p]!.losses),
+          ),
+        ),
         if (stats.classified < stats.totalGames) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Text(
             labels.classifiedNote(stats.classified, stats.totalGames),
             style: theme.textTheme.bodySmall?.copyWith(
@@ -133,31 +144,6 @@ class _PhaseContent extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-
-  /// Full-width segmented strip weighted by each phase's game count, with a thin
-  /// gap between segments so they read as distinct blocks.
-  Widget _distributionStrip(Map<String, StatTally> tallies, int total) {
-    final segments = <Widget>[];
-    for (final phase in _order) {
-      final games = tallies[phase]!.games;
-      if (games <= 0) continue;
-      if (segments.isNotEmpty) segments.add(const SizedBox(width: 2));
-      final pct = (games / total * 100).round();
-      segments.add(
-        Expanded(
-          flex: games,
-          child: Tooltip(
-            message: '${labels.shortPhase(phase)} · $games ($pct%)',
-            child: ColoredBox(color: _phaseColor(phase)),
-          ),
-        ),
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(5),
-      child: SizedBox(height: 9, child: Row(children: segments)),
     );
   }
 
@@ -203,17 +189,94 @@ class _PhaseContent extends StatelessWidget {
   }
 }
 
+/// Full-width segmented strip weighted by each phase's game count. Segments wide
+/// enough to hold text label themselves ("56% Mittelspiel"); narrower ones fall
+/// back to just the percentage, then to colour alone — so it never overflows.
+class _PhaseDistributionStrip extends StatelessWidget {
+  const _PhaseDistributionStrip({
+    required this.tallies,
+    required this.total,
+    required this.labels,
+  });
+
+  final Map<String, StatTally> tallies;
+  final int total;
+  final _PhaseText labels;
+
+  static const _inkColor = Color(0xFF0B1220); // dark ink on bright segments
+  static const _gap = 2.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final phases = [
+      for (final phase in _PhaseContent._order)
+        if (tallies[phase]!.games > 0) phase,
+    ];
+    if (phases.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available =
+            constraints.maxWidth - _gap * (phases.length - 1);
+        final children = <Widget>[];
+        for (final phase in phases) {
+          if (children.isNotEmpty) children.add(const SizedBox(width: _gap));
+          final games = tallies[phase]!.games;
+          final share = games / total;
+          final width = available * share;
+          final percent = '${(share * 100).round()}%';
+          // Only draw text the segment can actually hold.
+          final label = width >= 96
+              ? '$percent ${labels.shortPhase(phase)}'
+              : width >= 42
+              ? percent
+              : '';
+          children.add(
+            Expanded(
+              flex: games,
+              child: Tooltip(
+                message:
+                    '${labels.shortPhase(phase)} · $games ($percent)',
+                child: Container(
+                  color: _phaseColor(phase),
+                  alignment: Alignment.center,
+                  child: label.isEmpty
+                      ? null
+                      : Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: const TextStyle(
+                            color: _inkColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          );
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(height: 22, child: Row(children: children)),
+        );
+      },
+    );
+  }
+}
+
 class _PhaseRow extends StatelessWidget {
   const _PhaseRow({
     required this.phase,
     required this.tally,
-    required this.share,
+    required this.total,
     required this.labels,
   });
 
   final String phase;
   final StatTally tally;
-  final double share; // this phase's fraction of all classified games
+  final int total; // games across all three phases
   final _PhaseText labels;
 
   @override
@@ -221,7 +284,7 @@ class _PhaseRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final winRate = tally.games > 0 ? tally.wins / tally.games : null;
-    final sharePct = (share * 100).round();
+    final sharePct = total == 0 ? 0 : (tally.games / total * 100).round();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,40 +341,74 @@ class _PhaseRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        // Line 2: volume bar — coloured fill spans this phase's share of games.
-        _PhaseVolumeBar(share: share, color: _phaseColor(phase)),
+        // Line 2: volume × outcome bar.
+        _PhaseOutcomeBar(tally: tally, total: total),
       ],
     );
   }
 }
 
-/// A 6px track whose coloured fill spans [share] (0–1) of the row width, so the
-/// relative volume of each phase is legible at a glance. Uses flex weights so it
-/// scales cleanly with the card width and never overflows.
-class _PhaseVolumeBar extends StatelessWidget {
-  const _PhaseVolumeBar({required this.share, required this.color});
+/// One phase's bar: its **length** is the phase's share of all classified games,
+/// and the fill is split into win / draw / loss segments, so a single bar answers
+/// both "how often do my games end here?" and "how do I score when they do?".
+/// Pure flex weights, so it scales with the card and never overflows.
+class _PhaseOutcomeBar extends StatelessWidget {
+  const _PhaseOutcomeBar({required this.tally, required this.total});
 
-  final double share;
-  final Color color;
+  final StatTally tally;
+  final int total;
+
+  static const _trackColor = Color(0x0FFFFFFF); // ~6% white
 
   @override
   Widget build(BuildContext context) {
-    final fill = (share.clamp(0.0, 1.0) * 1000).round();
-    final rest = 1000 - fill;
+    final labels = _statsLabels(context);
+    // Everything is weighted in units of games out of [total], so each phase's
+    // fill occupies exactly its share of the row.
+    final decided = tally.wins + tally.draws + tally.losses;
+    final undecided = (tally.games - decided).clamp(0, tally.games);
+    final rest = (total - tally.games).clamp(0, total);
+
+    final message = tally.games == 0
+        ? null
+        : [
+            if (tally.wins > 0) '${tally.wins} ${labels.wins}',
+            if (tally.draws > 0) '${tally.draws} ${labels.draws}',
+            if (tally.losses > 0) '${tally.losses} ${labels.losses}',
+          ].join(', ');
+
+    Widget segment(int weight, Color color) => Expanded(
+      flex: weight,
+      child: message == null
+          ? ColoredBox(color: color)
+          : Tooltip(message: message, child: ColoredBox(color: color)),
+    );
+
     return ClipRRect(
-      borderRadius: BorderRadius.circular(3),
+      borderRadius: BorderRadius.circular(5),
       child: SizedBox(
-        height: 6,
-        child: Row(
-          children: [
-            if (fill > 0) Expanded(flex: fill, child: ColoredBox(color: color)),
-            if (rest > 0)
-              Expanded(
-                flex: rest,
-                child: ColoredBox(color: Colors.white.withValues(alpha: 0.06)),
+        height: 10,
+        child: total == 0
+            ? const ColoredBox(color: _trackColor)
+            : Row(
+                children: [
+                  if (tally.wins > 0) segment(tally.wins, _kWinColor),
+                  if (tally.draws > 0) segment(tally.draws, _kDrawColor),
+                  if (tally.losses > 0) segment(tally.losses, _kLossColor),
+                  if (undecided > 0)
+                    Expanded(
+                      flex: undecided,
+                      child: ColoredBox(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                  if (rest > 0)
+                    Expanded(
+                      flex: rest,
+                      child: const ColoredBox(color: _trackColor),
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
     );
   }
@@ -340,6 +437,9 @@ class _PhaseText {
     required this.opening,
     required this.middlegame,
     required this.endgame,
+    required this.openingShort,
+    required this.middlegameShort,
+    required this.endgameShort,
     required this.games,
     required this.winWord,
     required this.empty,
@@ -354,6 +454,9 @@ class _PhaseText {
   final String opening;
   final String middlegame;
   final String endgame;
+  final String openingShort;
+  final String middlegameShort;
+  final String endgameShort;
   final String games;
   final String winWord;
   final String empty;
@@ -362,6 +465,7 @@ class _PhaseText {
   final String retry;
   final String Function(int classified, int total) classifiedNote;
 
+  /// Phase name including its move range, e.g. "Mittelspiel (13–30)".
   String phase(String phase) => switch (phase) {
     'opening' => opening,
     'middlegame' => middlegame,
@@ -369,57 +473,32 @@ class _PhaseText {
     _ => phase,
   };
 
-  /// The phase name without its move-range suffix, for compact captions
-  /// ("Eröffnung (1–12)" → "Eröffnung"). Falls back to the full label.
-  String shortPhase(String phase) => this.phase(phase).split(' (').first;
+  /// Phase name on its own, for compact captions and strip segments.
+  String shortPhase(String phase) => switch (phase) {
+    'opening' => openingShort,
+    'middlegame' => middlegameShort,
+    'endgame' => endgameShort,
+    _ => phase,
+  };
 }
 
 _PhaseText _phaseText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return _PhaseText(
-        title: 'حسب مرحلة اللعب',
-        subtitle: 'في أي مرحلة تنتهي مبارياتك وكيف تكون نتيجتك.',
-        opening: 'الافتتاح (1–12)',
-        middlegame: 'وسط اللعب (13–30)',
-        endgame: 'النهاية (+31)',
-        games: 'مباراة',
-        winWord: 'فوز',
-        empty: 'لا توجد بيانات كافية عن مراحل اللعب.',
-        noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.',
-        error: 'تعذّر تحميل مراحل اللعب.',
-        retry: 'إعادة المحاولة',
-        classifiedNote: (classified, total) => '‏$classified من $total مباراة',
-      );
-    case 'en':
-      return _PhaseText(
-        title: 'By game phase',
-        subtitle: 'Where your games end and how you score there.',
-        opening: 'Opening (1–12)',
-        middlegame: 'Middlegame (13–30)',
-        endgame: 'Endgame (31+)',
-        games: 'games',
-        winWord: 'win',
-        empty: 'Not enough data on game phases.',
-        noProfile: 'Create or select a profile to see statistics.',
-        error: 'Could not load game phases.',
-        retry: 'Retry',
-        classifiedNote: (classified, total) => '$classified of $total games',
-      );
-    default:
-      return _PhaseText(
-        title: 'Nach Spielphase',
-        subtitle: 'In welcher Phase deine Partien enden und wie du abschneidest.',
-        opening: 'Eröffnung (1–12)',
-        middlegame: 'Mittelspiel (13–30)',
-        endgame: 'Endspiel (31+)',
-        games: 'Partien',
-        winWord: 'Sieg',
-        empty: 'Nicht genügend Daten zu Spielphasen.',
-        noProfile: 'Erstelle oder wähle ein Profil, um Statistiken zu sehen.',
-        error: 'Spielphasen konnten nicht geladen werden.',
-        retry: 'Erneut versuchen',
-        classifiedNote: (classified, total) => '$classified von $total Partien',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _PhaseText(
+    title: strings.statsPhaseTitle,
+    subtitle: strings.statsPhaseSubtitle,
+    opening: strings.statsPhaseOpening,
+    middlegame: strings.statsPhaseMiddlegame,
+    endgame: strings.statsPhaseEndgame,
+    openingShort: strings.statsPhaseOpeningShort,
+    middlegameShort: strings.statsPhaseMiddlegameShort,
+    endgameShort: strings.statsPhaseEndgameShort,
+    games: strings.statsPhaseGames,
+    winWord: strings.statsPhaseWinWord,
+    empty: strings.statsPhaseEmpty,
+    noProfile: strings.statsPhaseNoProfile,
+    error: strings.statsPhaseError,
+    retry: strings.statsPhaseRetry,
+    classifiedNote: strings.statsPhaseClassifiedNote,
+  );
 }

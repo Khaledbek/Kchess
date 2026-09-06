@@ -245,21 +245,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 ({String title, String introTitle, String introBody}) _statisticsText(
   BuildContext context,
 ) {
-  return switch (Localizations.localeOf(context).languageCode) {
-    'ar' => (
-      title: 'الإحصائيات',
-      introTitle: 'أداؤك في الشطرنج',
-      introBody: 'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.',
-    ),
-    'en' => (
-      title: 'Statistics',
-      introTitle: 'Your chess performance',
-      introBody: 'See your results, recent form and opening record separated by color.',
-    ),
-    _ => (
-      title: 'Statistiken',
-      introTitle: 'Deine Schachleistung',
-      introBody: 'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.',
-    ),
-  };
+  final strings = AppLocalizations.of(context);
+  return (
+    title: strings.statsTitle,
+    introTitle: strings.statsIntroTitle,
+    introBody: strings.statsIntroBody,
+  );
 }

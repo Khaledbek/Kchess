@@ -715,4 +715,196 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ratingFide => 'FIDE';
+
+  @override
+  String get statsWins => 'Wins';
+
+  @override
+  String get statsDraws => 'Draws';
+
+  @override
+  String get statsLosses => 'Losses';
+
+  @override
+  String get statsAll => 'All';
+
+  @override
+  String get statsAllTimeControlsNote => 'All time controls';
+
+  @override
+  String get statsPhaseTitle => 'By game phase';
+
+  @override
+  String get statsPhaseSubtitle =>
+      'Where your games end and how you score there.';
+
+  @override
+  String get statsPhaseOpening => 'Opening (1–12)';
+
+  @override
+  String get statsPhaseMiddlegame => 'Middlegame (13–30)';
+
+  @override
+  String get statsPhaseEndgame => 'Endgame (31+)';
+
+  @override
+  String get statsPhaseOpeningShort => 'Opening';
+
+  @override
+  String get statsPhaseMiddlegameShort => 'Middlegame';
+
+  @override
+  String get statsPhaseEndgameShort => 'Endgame';
+
+  @override
+  String get statsPhaseGames => 'games';
+
+  @override
+  String get statsPhaseWinWord => 'win';
+
+  @override
+  String get statsPhaseEmpty => 'Not enough data on game phases.';
+
+  @override
+  String get statsPhaseNoProfile =>
+      'Create or select a profile to see statistics.';
+
+  @override
+  String get statsPhaseError => 'Could not load game phases.';
+
+  @override
+  String get statsPhaseRetry => 'Retry';
+
+  @override
+  String statsPhaseClassifiedNote(int classified, int total) {
+    return '$classified of $total games';
+  }
+
+  @override
+  String get statsTitle => 'Statistics';
+
+  @override
+  String get statsIntroTitle => 'Your chess performance';
+
+  @override
+  String get statsIntroBody =>
+      'See your results, recent form and opening record separated by color.';
+
+  @override
+  String get statsFormTitle => 'Recent form';
+
+  @override
+  String get statsFormHint => 'Tap a result to open the game.';
+
+  @override
+  String get statsFormVersus => 'vs';
+
+  @override
+  String get statsFormEmpty => 'No recent games to show.';
+
+  @override
+  String get statsFormError => 'Could not load recent games.';
+
+  @override
+  String get statsFormRetry => 'Retry';
+
+  @override
+  String get statsOverviewTitle => 'Overview';
+
+  @override
+  String get statsOverviewGames => 'Games';
+
+  @override
+  String get statsOverviewWinRate => 'Win rate';
+
+  @override
+  String get statsOverviewScore => 'Score';
+
+  @override
+  String get statsOverviewRecord => 'Record';
+
+  @override
+  String get statsOverviewByColor => 'By color';
+
+  @override
+  String get statsOverviewByTimeControl => 'By time control';
+
+  @override
+  String get statsOverviewWhite => 'White';
+
+  @override
+  String get statsOverviewBlack => 'Black';
+
+  @override
+  String get statsOverviewEmpty =>
+      'No games yet. Sync an online profile or import games to see your statistics.';
+
+  @override
+  String get statsOverviewNoProfile =>
+      'Create or select a profile to see statistics.';
+
+  @override
+  String get statsOverviewNoGamesForFilter =>
+      'No games for the selected time control.';
+
+  @override
+  String get statsOverviewError => 'Could not load statistics.';
+
+  @override
+  String get statsOverviewRetry => 'Retry';
+
+  @override
+  String get statsTerminationTitle => 'How games end';
+
+  @override
+  String get statsTerminationCheckmate => 'Checkmate';
+
+  @override
+  String get statsTerminationResignation => 'Resignation';
+
+  @override
+  String get statsTerminationTimeout => 'On time';
+
+  @override
+  String get statsTerminationDraw => 'Draw';
+
+  @override
+  String get statsTerminationOther => 'Other';
+
+  @override
+  String get statsTerminationWonByCheckmate => 'Won by checkmate';
+
+  @override
+  String get statsTerminationLostByCheckmate => 'Lost by checkmate';
+
+  @override
+  String get statsTerminationOpponentResigned => 'Opponent resigned';
+
+  @override
+  String get statsTerminationSelfResigned => 'Resigned';
+
+  @override
+  String get statsTerminationOpponentFlagged => 'Opponent ran out of time';
+
+  @override
+  String get statsTerminationSelfFlagged => 'Ran out of time';
+
+  @override
+  String get statsTerminationWonGeneric => 'Won';
+
+  @override
+  String get statsTerminationLostGeneric => 'Lost';
+
+  @override
+  String get statsTerminationEmpty => 'Not enough data on how games ended.';
+
+  @override
+  String get statsTerminationNoProfile =>
+      'Create or select a profile to see statistics.';
+
+  @override
+  String get statsTerminationError => 'Could not load game endings.';
+
+  @override
+  String get statsTerminationRetry => 'Retry';
 }

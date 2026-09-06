@@ -380,30 +380,12 @@ class _StatsLabels {
 }
 
 _StatsLabels _statsLabels(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _StatsLabels(
-        wins: 'انتصارات',
-        draws: 'تعادلات',
-        losses: 'هزائم',
-        all: 'الكل',
-        allTimeControlsNote: 'كل أنواع الوقت',
-      );
-    case 'en':
-      return const _StatsLabels(
-        wins: 'Wins',
-        draws: 'Draws',
-        losses: 'Losses',
-        all: 'All',
-        allTimeControlsNote: 'All time controls',
-      );
-    default:
-      return const _StatsLabels(
-        wins: 'Siege',
-        draws: 'Remis',
-        losses: 'Niederlagen',
-        all: 'Alle',
-        allTimeControlsNote: 'Alle Zeitkontrollen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _StatsLabels(
+    wins: strings.statsWins,
+    draws: strings.statsDraws,
+    losses: strings.statsLosses,
+    all: strings.statsAll,
+    allTimeControlsNote: strings.statsAllTimeControlsNote,
+  );
 }
