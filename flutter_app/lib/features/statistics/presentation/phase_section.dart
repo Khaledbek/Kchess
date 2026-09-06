@@ -91,21 +91,35 @@ class _PhaseContent extends StatelessWidget {
   final PhaseStats stats;
   final _PhaseText labels;
 
+  // Stable phase order so colours and positions never shuffle.
+  static const _order = ['opening', 'middlegame', 'endgame'];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Stable phase order so colours and positions never shuffle.
-    const order = ['opening', 'middlegame', 'endgame'];
     final byPhase = {for (final p in stats.phases) p.phase: p.tally};
+    final tallies = {
+      for (final phase in _order) phase: byPhase[phase] ?? const StatTally(),
+    };
+    final total = _order.fold<int>(0, (sum, p) => sum + tallies[p]!.games);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < order.length; i++) ...[
+        // Macro distribution strip: the share of games each phase holds, so the
+        // spread (most games ending in the middlegame) reads at a glance.
+        if (total > 0) ...[
+          _distributionStrip(tallies, total),
+          const SizedBox(height: 8),
+          _distributionCaption(context, tallies, total),
+          const SizedBox(height: 16),
+        ],
+        for (var i = 0; i < _order.length; i++) ...[
           if (i > 0) const SizedBox(height: 14),
           _PhaseRow(
-            phase: order[i],
-            tally: byPhase[order[i]] ?? const StatTally(),
+            phase: _order[i],
+            tally: tallies[_order[i]]!,
+            share: total == 0 ? 0 : tallies[_order[i]]!.games / total,
             labels: labels,
           ),
         ],
@@ -121,17 +135,85 @@ class _PhaseContent extends StatelessWidget {
       ],
     );
   }
+
+  /// Full-width segmented strip weighted by each phase's game count, with a thin
+  /// gap between segments so they read as distinct blocks.
+  Widget _distributionStrip(Map<String, StatTally> tallies, int total) {
+    final segments = <Widget>[];
+    for (final phase in _order) {
+      final games = tallies[phase]!.games;
+      if (games <= 0) continue;
+      if (segments.isNotEmpty) segments.add(const SizedBox(width: 2));
+      final pct = (games / total * 100).round();
+      segments.add(
+        Expanded(
+          flex: games,
+          child: Tooltip(
+            message: '${labels.shortPhase(phase)} · $games ($pct%)',
+            child: ColoredBox(color: _phaseColor(phase)),
+          ),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: SizedBox(height: 9, child: Row(children: segments)),
+    );
+  }
+
+  /// "15% Eröffnung · 56% Mittelspiel · 29% Endspiel" — the shares spelled out,
+  /// each percentage tinted with its phase colour.
+  Widget _distributionCaption(
+    BuildContext context,
+    Map<String, StatTally> tallies,
+    int total,
+  ) {
+    final theme = Theme.of(context);
+    final spans = <InlineSpan>[];
+    for (final phase in _order) {
+      final games = tallies[phase]!.games;
+      if (games <= 0) continue;
+      if (spans.isNotEmpty) {
+        spans.add(
+          TextSpan(
+            text: '  ·  ',
+            style: TextStyle(color: theme.colorScheme.outline),
+          ),
+        );
+      }
+      spans.add(
+        TextSpan(
+          text: '${(games / total * 100).round()}% ',
+          style: TextStyle(
+            color: _phaseColor(phase),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+      spans.add(TextSpan(text: labels.shortPhase(phase)));
+    }
+    return Text.rich(
+      TextSpan(
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        children: spans,
+      ),
+    );
+  }
 }
 
 class _PhaseRow extends StatelessWidget {
   const _PhaseRow({
     required this.phase,
     required this.tally,
+    required this.share,
     required this.labels,
   });
 
   final String phase;
   final StatTally tally;
+  final double share; // this phase's fraction of all classified games
   final _PhaseText labels;
 
   @override
@@ -139,11 +221,12 @@ class _PhaseRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final winRate = tally.games > 0 ? tally.wins / tally.games : null;
+    final sharePct = (share * 100).round();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Line 1: phase dot + label (left), win rate + game count (right).
+        // Line 1: phase dot + label (left), win rate + game volume (right).
         Row(
           children: [
             Container(
@@ -177,7 +260,7 @@ class _PhaseRow extends StatelessWidget {
                     ),
                     TextSpan(
                       text:
-                          ' ${labels.winWord} · ${tally.games} ${labels.games}',
+                          ' ${labels.winWord} · ${tally.games} ${labels.games} ($sharePct%)',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -195,14 +278,41 @@ class _PhaseRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        // Line 2: full-width green/grey/red segmented win/draw/loss bar.
-        _WinLossDrawRatioBar(
-          wins: tally.wins,
-          draws: tally.draws,
-          losses: tally.losses,
-          height: 6,
-        ),
+        // Line 2: volume bar — coloured fill spans this phase's share of games.
+        _PhaseVolumeBar(share: share, color: _phaseColor(phase)),
       ],
+    );
+  }
+}
+
+/// A 6px track whose coloured fill spans [share] (0–1) of the row width, so the
+/// relative volume of each phase is legible at a glance. Uses flex weights so it
+/// scales cleanly with the card width and never overflows.
+class _PhaseVolumeBar extends StatelessWidget {
+  const _PhaseVolumeBar({required this.share, required this.color});
+
+  final double share;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = (share.clamp(0.0, 1.0) * 1000).round();
+    final rest = 1000 - fill;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: SizedBox(
+        height: 6,
+        child: Row(
+          children: [
+            if (fill > 0) Expanded(flex: fill, child: ColoredBox(color: color)),
+            if (rest > 0)
+              Expanded(
+                flex: rest,
+                child: ColoredBox(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -217,7 +327,7 @@ Color _rateColor(BuildContext context, double? rate) {
 Color _phaseColor(String phase) => switch (phase) {
   'opening' => const Color(0xFF38BDF8), // sky
   'middlegame' => const Color(0xFFFB923C), // orange
-  'endgame' => const Color(0xFFA78BFA), // violet
+  'endgame' => const Color(0xFFA855F7), // purple
   _ => const Color(0xFF64748B),
 };
 
@@ -258,6 +368,10 @@ class _PhaseText {
     'endgame' => endgame,
     _ => phase,
   };
+
+  /// The phase name without its move-range suffix, for compact captions
+  /// ("Eröffnung (1–12)" → "Eröffnung"). Falls back to the full label.
+  String shortPhase(String phase) => this.phase(phase).split(' (').first;
 }
 
 _PhaseText _phaseText(BuildContext context) {
