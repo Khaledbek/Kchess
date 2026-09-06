@@ -54,7 +54,7 @@ class _TimeControlFilterBar extends StatelessWidget {
 const _kWinColor = Color(0xFF22C55E); // vibrant green
 const _kDrawColor = Color(0xFF64748B); // muted slate grey
 const _kLossColor = Color(0xFFEF4444); // vibrant red
-const _kEmptyTrackColor = Color(0xFF1E293B); // muted track when no games
+const _kEmptyTrackColor = Colors.white10; // muted track when no games
 
 /// Reusable horizontal stacked win/draw/loss proportion bar. Segments are sized
 /// by count; an all-zero tally shows a muted empty track.
@@ -75,6 +75,9 @@ class _WinLossDrawRatioBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final labels = _statsLabels(context);
     final total = wins + draws + losses;
+    // Hovering any segment surfaces the whole win/draw/loss breakdown, so the
+    // bar reads the same wherever the cursor lands.
+    final message = _breakdown(labels, total);
     return ClipRRect(
       borderRadius: BorderRadius.circular(3),
       child: SizedBox(
@@ -83,22 +86,33 @@ class _WinLossDrawRatioBar extends StatelessWidget {
             ? const ColoredBox(color: _kEmptyTrackColor)
             : Row(
                 children: [
-                  _segment(wins, _kWinColor, labels.wins, total),
-                  _segment(draws, _kDrawColor, labels.draws, total),
-                  _segment(losses, _kLossColor, labels.losses, total),
+                  _segment(wins, _kWinColor, message),
+                  _segment(draws, _kDrawColor, message),
+                  _segment(losses, _kLossColor, message),
                 ],
               ),
       ),
     );
   }
 
-  Widget _segment(int count, Color color, String label, int total) {
+  /// e.g. "61 Siege (41%), 16 Remis (11%), 70 Niederlagen (48%)" — only the
+  /// outcomes that actually occurred are listed.
+  String _breakdown(_StatsLabels labels, int total) {
+    String part(int count, String label) =>
+        '$count $label (${total == 0 ? 0 : (count / total * 100).round()}%)';
+    return [
+      if (wins > 0) part(wins, labels.wins),
+      if (draws > 0) part(draws, labels.draws),
+      if (losses > 0) part(losses, labels.losses),
+    ].join(', ');
+  }
+
+  Widget _segment(int count, Color color, String message) {
     if (count == 0) return const SizedBox.shrink();
-    final percent = (count / total * 100).round();
     return Expanded(
       flex: count,
       child: Tooltip(
-        message: '$label · $count ($percent%)',
+        message: message,
         child: ColoredBox(color: color),
       ),
     );

@@ -238,6 +238,7 @@ class _TallyRow extends StatelessWidget {
             wins: tally.wins,
             draws: tally.draws,
             losses: tally.losses,
+            height: 4,
           ),
         ],
       ),

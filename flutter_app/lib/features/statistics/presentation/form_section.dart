@@ -32,18 +32,39 @@ class _RecentFormCard extends StatelessWidget {
               children: [
                 Icon(Icons.timeline_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Expanded(
+                Flexible(
                   child: Text(
                     labels.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                if (timeControl != 'all')
+                // Active win/loss streak, read from the same recent games as the
+                // strip below (newest first). Hidden until the data resolves.
+                FutureBuilder<List<GameSummary>>(
+                  future: future,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final streak = _currentStreak(snapshot.data!);
+                    if (streak == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _StreakBadge(
+                        count: streak.length,
+                        outcome: streak.outcome,
+                      ),
+                    );
+                  },
+                ),
+                if (timeControl != 'all') ...[
+                  const Spacer(),
                   _FilterPill(
                     label: _statsLabels(context).timeControl(timeControl),
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -143,6 +164,68 @@ class _RecentFormCard extends StatelessWidget {
             style: TextStyle(color: onInverse.withValues(alpha: 0.8)),
           ),
       ],
+    );
+  }
+}
+
+/// The current run of identical results counting back from the most recent
+/// game, as (outcome, length). Only win or loss runs of two or more are
+/// reported; a leading draw, a lone result, or no games yields null. Games
+/// whose outcome can't be attributed are skipped rather than breaking the run.
+({String outcome, int length})? _currentStreak(List<GameSummary> games) {
+  String? outcome;
+  var length = 0;
+  for (final game in games) {
+    final result = _statGameOutcome(game);
+    if (result == 'unknown') continue;
+    if (outcome == null) {
+      outcome = result;
+      length = 1;
+    } else if (result == outcome) {
+      length++;
+    } else {
+      break;
+    }
+  }
+  if (length < 2 || (outcome != 'win' && outcome != 'loss')) return null;
+  return (outcome: outcome!, length: length);
+}
+
+/// Compact "🔥 3 Siege" / "⚠️ 2 Niederlagen" chip summarising the active streak:
+/// green tint for a winning run, muted red tint for a losing one.
+class _StreakBadge extends StatelessWidget {
+  const _StreakBadge({required this.count, required this.outcome});
+
+  final int count;
+  final String outcome; // 'win' | 'loss'
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labels = _statsLabels(context);
+    final isWin = outcome == 'win';
+    final color = isWin ? AppTheme.success : theme.colorScheme.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.40)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(isWin ? '🔥' : '⚠️', style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          Text(
+            '$count ${isWin ? labels.wins : labels.losses}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
