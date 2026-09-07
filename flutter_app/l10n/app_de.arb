@@ -411,6 +411,14 @@
   "statsCompareColorBlack": "Schwarz",
   "statsCompareErrorPrefix": "Fehler",
   "statsCompareGamesAnalyzed": "{games} Partien aus {months} Monaten ausgewertet",
-  "statsCompareLeakSentence": "Spiele {opening} mit {userColor} — der Gegner gewinnt dort nur {oppRate} mit {oppColor}.",
-  "statsTerminationSpotlight": "Häufigstes Partie-Ende: {label} — {share}% aller Partien, davon {lossPercent}% Niederlagen."
+  "statsTerminationSpotlight": "Häufigstes Partie-Ende: {label} — {share}% aller Partien, davon {lossPercent}% Niederlagen.",
+  "statsCompareSelfBadge": "Selbstvergleich (Spiegelung)",
+  "statsCompareSelfH2H": "Keine Partien gegen dich selbst · Dies ist eine Selbstanalyse deines eigenen Profils.",
+  "statsCompareScopeNote": "Vergleich basiert auf den letzten {games} geladenen Partien.",
+  "statsCompareMinSampleNote": "Nur Eröffnungen mit mindestens 5 Partien auf beiden Seiten.",
+  "statsCompareOwnWeaknessTitle": "Eigene Schwachstellen",
+  "statsCompareOwnWeakness": "Schwachstelle mit {color}: {opening} — nur {rate} Siegquote (aus {games} Partien).",
+  "statsCompareNoOwnWeakness": "Keine klaren eigenen Schwächen bei mindestens 5 Partien pro Eröffnung.",
+  "statsCompareOpenWhite": "Eröffne mit {opening} — dein Gegner erzielt als Schwarz dagegen nur {rate} (aus {games} Partien).",
+  "statsCompareAnswerBlack": "Als Schwarz: Wähle {opening} — dein Gegner erzielt als Weiß dagegen nur {rate} (aus {games} Partien)."
 }

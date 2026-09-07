@@ -1095,17 +1095,50 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String statsCompareLeakSentence(
-    String opening,
-    String userColor,
-    String oppRate,
-    String oppColor,
-  ) {
-    return 'Play $opening as $userColor — the opponent wins only $oppRate as $oppColor.';
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'Most common ending: $label — $share% of all games, $lossPercent% of them losses.';
   }
 
   @override
-  String statsTerminationSpotlight(String label, int share, int lossPercent) {
-    return 'Most common ending: $label — $share% of all games, $lossPercent% of them losses.';
+  String get statsCompareSelfBadge => 'Self-comparison (mirror)';
+
+  @override
+  String get statsCompareSelfH2H =>
+      'No games against yourself · This is a self-analysis of your own profile.';
+
+  @override
+  String statsCompareScopeNote(int games) {
+    return 'Comparison based on the last $games loaded games.';
+  }
+
+  @override
+  String get statsCompareMinSampleNote =>
+      'Only openings with at least 5 games on both sides.';
+
+  @override
+  String get statsCompareOwnWeaknessTitle => 'Your own weak spots';
+
+  @override
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  ) {
+    return 'Weak spot as $color: $opening — only $rate win rate (from $games games).';
+  }
+
+  @override
+  String get statsCompareNoOwnWeakness =>
+      'No clear weak spots with at least 5 games per opening.';
+
+  @override
+  String statsCompareOpenWhite(String opening, String rate, int games) {
+    return 'Open with $opening — your opponent scores only $rate against it as Black (from $games games).';
+  }
+
+  @override
+  String statsCompareAnswerBlack(String opening, String rate, int games) {
+    return 'As Black: choose $opening — your opponent scores only $rate against it as White (from $games games).';
   }
 }

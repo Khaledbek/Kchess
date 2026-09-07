@@ -24,7 +24,17 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
   OpeningsStats? _userOpenings;
   TerminationStats? _userTerminations;
   StatTally? _h2h; // from the active profile's perspective
+  bool _isSelf = false;
   int _generation = 0;
+
+  /// The handle the active profile plays under. Comparing it with the searched
+  /// handle is what separates a self-audit from a real opponent.
+  String get _userHandle {
+    final profile = widget.controller.activeProfile;
+    if (profile == null) return '';
+    final provider = profile.providerUsername?.trim() ?? '';
+    return provider.isNotEmpty ? provider : profile.displayName.trim();
+  }
 
   @override
   void dispose() {
@@ -49,9 +59,14 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
       final userOverview = await gateway.statisticsOverview();
       final userOpenings = await gateway.openingsStats();
       final userTerminations = await gateway.terminationStats();
-      final h2h = await _headToHead(report.profile.providerUsername ?? username);
+      final opponentHandle = report.profile.providerUsername ?? username;
+      final userHandle = _userHandle;
+      final isSelf = userHandle.isNotEmpty &&
+          opponentHandle.trim().toLowerCase() == userHandle.toLowerCase();
+      final h2h = await _headToHead(opponentHandle, userHandle);
       if (!mounted || generation != _generation) return;
       setState(() {
+        _isSelf = isSelf;
         _report = report;
         _userOverview = userOverview;
         _userOpenings = userOpenings;
@@ -72,10 +87,17 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
     }
   }
 
-  /// Head-to-head from the active profile's own stored games: any game where the
-  /// target handle is the other player, tallied from the profile's perspective.
-  Future<StatTally> _headToHead(String handle) async {
-    final target = handle.trim().toLowerCase();
+  /// Head-to-head from the active profile's own stored games, tallied from the
+  /// profile's perspective. A direct game needs the two sides to be *different*
+  /// handles: matching on "is this handle present" matched every game in the
+  /// library when the searched handle was the profile's own, inventing hundreds
+  /// of phantom meetings with itself.
+  Future<StatTally> _headToHead(String opponentHandle, String userHandle) async {
+    final opponent = opponentHandle.trim().toLowerCase();
+    final user = userHandle.trim().toLowerCase();
+    if (user.isEmpty || opponent.isEmpty || user == opponent) {
+      return const StatTally();
+    }
     final games = await widget.controller.queryGames(
       const GameQuery(sort: 'newest'),
     );
@@ -83,10 +105,11 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
     var draws = 0;
     var losses = 0;
     for (final game in games) {
-      final isOpponent =
-          game.whiteName.trim().toLowerCase() == target ||
-          game.blackName.trim().toLowerCase() == target;
-      if (!isOpponent) continue;
+      final white = game.whiteName.trim().toLowerCase();
+      final black = game.blackName.trim().toLowerCase();
+      final isDirect = (white == user && black == opponent) ||
+          (black == user && white == opponent);
+      if (!isDirect) continue;
       switch (_statGameOutcome(game)) {
         case 'win':
           wins += 1;
@@ -191,6 +214,7 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
       userOpenings: _userOpenings,
       userTerminations: _userTerminations,
       h2h: _h2h,
+      isSelf: _isSelf,
       labels: labels,
     );
   }
@@ -232,6 +256,7 @@ class _ComparisonResult extends StatelessWidget {
     required this.userOpenings,
     required this.userTerminations,
     required this.h2h,
+    required this.isSelf,
     required this.labels,
   });
 
@@ -241,6 +266,7 @@ class _ComparisonResult extends StatelessWidget {
   final OpeningsStats? userOpenings;
   final TerminationStats? userTerminations;
   final StatTally? h2h;
+  final bool isSelf;
   final _ComparisonText labels;
 
   @override
@@ -273,7 +299,12 @@ class _ComparisonResult extends StatelessWidget {
             ],
           ),
         ),
-        if (h2h != null && h2h!.games > 0) ...[
+        if (isSelf) ...[
+          const SizedBox(height: 12),
+          Align(child: _SelfComparisonBadge(labels: labels)),
+          const SizedBox(height: 16),
+          _SelfComparisonH2HCard(labels: labels),
+        ] else if (h2h != null && h2h!.games > 0) ...[
           const SizedBox(height: 16),
           _H2HBanner(tally: h2h!, labels: labels),
         ],
@@ -288,6 +319,7 @@ class _ComparisonResult extends StatelessWidget {
         _OpeningMatchupCard(
           userOpenings: userOpenings,
           report: report,
+          isSelf: isSelf,
           labels: labels,
         ),
         const SizedBox(height: 12),
@@ -653,15 +685,27 @@ class _OpeningMatchupCard extends StatelessWidget {
   const _OpeningMatchupCard({
     required this.userOpenings,
     required this.report,
+    required this.isSelf,
     required this.labels,
   });
 
   final OpeningsStats? userOpenings;
   final ScoutReport report;
+  final bool isSelf;
   final _ComparisonText labels;
 
-  static const _minOppGames = 2;
-  static const _leakThreshold = 0.45;
+  /// Games needed on *each* side before an opening may say anything at all.
+  /// Without this a single 1/1 line reads as a 100% edge.
+  static const _minGames = 5;
+
+  /// A 20-point gap counts on its own; smaller gaps must clear the z-test.
+  static const _minRateGap = 0.20;
+
+  /// One-sided 95% critical value.
+  static const _zThreshold = 1.645;
+
+  /// Where one of your own lines counts as a weakness in a self-audit.
+  static const _weakRate = 0.45;
   static const _maxRows = 12;
 
   String _opposite(String color) => switch (color) {
@@ -670,31 +714,90 @@ class _OpeningMatchupCard extends StatelessWidget {
     _ => 'unknown',
   };
 
-  List<({OpeningFamily family, ScoutOpening opp, bool exploitable})> _matchups() {
+  /// Sum every scouted line sharing an ECO and colour, so a family and its
+  /// sub-variations ("Blackmar-Diemer", "BDG Accepted", "BDG Declined") count
+  /// once against the parent. The previous putIfAbsent kept only the first and
+  /// discarded the rest, which both duplicated recommendations and understated
+  /// the opponent's sample.
+  Map<String, StatTally> _opponentByEcoColor() {
+    final merged = <String, StatTally>{};
+    for (final opening in report.openings) {
+      if (opening.eco.isEmpty) continue;
+      final key = '${opening.eco}|${opening.color}';
+      final current = merged[key];
+      final tally = opening.tally;
+      merged[key] = current == null
+          ? tally
+          : StatTally(
+              games: current.games + tally.games,
+              wins: current.wins + tally.wins,
+              draws: current.draws + tally.draws,
+              losses: current.losses + tally.losses,
+            );
+    }
+    return merged;
+  }
+
+  /// Whether the user really scores better here than the opponent does with the
+  /// other colour. Needs a usable sample on both sides, then either a 20-point
+  /// gap or a significant two-proportion z-test. Compared squared, so no square
+  /// root is needed.
+  static bool _isEdge(StatTally user, StatTally opponent) {
+    final userDecided = user.wins + user.draws + user.losses;
+    final oppDecided = opponent.wins + opponent.draws + opponent.losses;
+    if (userDecided < _minGames || oppDecided < _minGames) return false;
+    final gap = user.wins / userDecided - opponent.wins / oppDecided;
+    if (gap <= 0) return false;
+    if (gap >= _minRateGap) return true;
+    final pooled = (user.wins + opponent.wins) / (userDecided + oppDecided);
+    final variance = pooled * (1 - pooled) * (1 / userDecided + 1 / oppDecided);
+    if (variance <= 0) return false;
+    return gap * gap >= _zThreshold * _zThreshold * variance;
+  }
+
+  List<_Matchup> _matchups() {
     final openings = userOpenings;
     if (openings == null) return const [];
-    final oppByKey = <String, ScoutOpening>{};
-    for (final o in report.openings) {
-      if (o.eco.isEmpty) continue;
-      oppByKey.putIfAbsent('${o.eco}|${o.color}', () => o);
-    }
+    final opponentByKey = _opponentByEcoColor();
     final families = [...openings.families]
       ..sort((a, b) => b.tally.games.compareTo(a.tally.games));
-    final matchups =
-        <({OpeningFamily family, ScoutOpening opp, bool exploitable})>[];
+    final matchups = <_Matchup>[];
     for (final family in families) {
       if (family.baseEco.isEmpty) continue;
-      final opp = oppByKey['${family.baseEco}|${_opposite(family.color)}'];
-      if (opp == null || opp.tally.games < _minOppGames) continue;
-      final rate = opp.tally.winRate;
-      matchups.add((
-        family: family,
-        opp: opp,
-        exploitable: rate != null && rate < _leakThreshold,
-      ));
+      final opponentColor = _opposite(family.color);
+      final opponent = opponentByKey['${family.baseEco}|$opponentColor'];
+      if (opponent == null) continue;
+      // Both sides need a real sample before the row means anything.
+      if (family.tally.games < _minGames || opponent.games < _minGames) {
+        continue;
+      }
+      matchups.add(
+        _Matchup(
+          family: family,
+          opponent: opponent,
+          opponentColor: opponentColor,
+          // Mirroring yourself gives identical rates, so no edge can exist.
+          exploitable: !isSelf && _isEdge(family.tally, opponent),
+        ),
+      );
       if (matchups.length >= _maxRows) break;
     }
     return matchups;
+  }
+
+  /// Self-audit view: your own lines that score badly on a usable sample.
+  List<OpeningFamily> _ownWeaknesses() {
+    final openings = userOpenings;
+    if (openings == null) return const [];
+    final weak = [
+      for (final family in openings.families)
+        if (family.tally.games >= _minGames &&
+            (_tallyRate(family.tally) ?? 1) < _weakRate)
+          family,
+    ]..sort(
+      (a, b) => (_tallyRate(a.tally) ?? 1).compareTo(_tallyRate(b.tally) ?? 1),
+    );
+    return weak.take(5).toList();
   }
 
   @override
@@ -723,6 +826,12 @@ class _OpeningMatchupCard extends StatelessWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              '${labels.scopeNote(report.gamesAnalyzed)} '
+              '${labels.minSampleNote}',
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
+            ),
             const SizedBox(height: 14),
             if (matchups.isEmpty)
               Padding(
@@ -744,9 +853,15 @@ class _OpeningMatchupCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               for (final m in matchups)
-                _MatchupRow(matchup: m, labels: labels),
+                _MatchupRow(matchup: m, isSelf: isSelf, labels: labels),
             ],
-            if (leaks.isNotEmpty) ...[
+            if (isSelf) ...[
+              const SizedBox(height: 18),
+              _OwnWeaknessSection(
+                weaknesses: _ownWeaknesses(),
+                labels: labels,
+              ),
+            ] else if (leaks.isNotEmpty) ...[
               const SizedBox(height: 18),
               _StrategySection(leaks: leaks, labels: labels),
             ] else if (matchups.isNotEmpty) ...[
@@ -770,10 +885,38 @@ class _OpeningMatchupCard extends StatelessWidget {
   );
 }
 
-class _MatchupRow extends StatelessWidget {
-  const _MatchupRow({required this.matchup, required this.labels});
+/// One row of the matchup table: the user's opening family against the
+/// opponent's merged record in the same ECO with the opposite colour.
+class _Matchup {
+  const _Matchup({
+    required this.family,
+    required this.opponent,
+    required this.opponentColor,
+    required this.exploitable,
+  });
 
-  final ({OpeningFamily family, ScoutOpening opp, bool exploitable}) matchup;
+  final OpeningFamily family;
+  final StatTally opponent;
+  final String opponentColor;
+  final bool exploitable;
+}
+
+/// Win rate computed from the tally itself. Merged opponent tallies carry no
+/// pre-computed rate, so deriving it here keeps both sides comparable.
+double? _tallyRate(StatTally tally) {
+  final decided = tally.wins + tally.draws + tally.losses;
+  return decided == 0 ? null : tally.wins / decided;
+}
+
+class _MatchupRow extends StatelessWidget {
+  const _MatchupRow({
+    required this.matchup,
+    required this.isSelf,
+    required this.labels,
+  });
+
+  final _Matchup matchup;
+  final bool isSelf;
   final _ComparisonText labels;
 
   @override
@@ -781,7 +924,11 @@ class _MatchupRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final family = matchup.family;
-    final opp = matchup.opp;
+    final opponent = matchup.opponent;
+    // Naming the mirrored side keeps a self-audit from reading as a real
+    // opponent with coincidentally identical numbers.
+    final opponentLabel =
+        isSelf ? '${labels.opponent} (${labels.you})' : labels.opponent;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -810,11 +957,18 @@ class _MatchupRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
+                // Both sample sizes, so a 54%-from-34 row is never mistaken for
+                // a 33%-from-3 row.
                 Text(
                   [
                     if (family.baseEco.isNotEmpty) family.baseEco,
-                    '${family.tally.games} ${labels.gamesShort}',
-                  ].join(' · '),
+                    '${labels.you}: ${family.tally.games} '
+                        '${labels.gamesShort} '
+                        '(${_formatPercent(_tallyRate(family.tally))})',
+                    '$opponentLabel: ${opponent.games} '
+                        '${labels.gamesShort} '
+                        '(${_formatPercent(_tallyRate(opponent))})',
+                  ].join('  ·  '),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -825,7 +979,7 @@ class _MatchupRow extends StatelessWidget {
           SizedBox(
             width: 52,
             child: Text(
-              _formatPercent(family.tally.winRate),
+              _formatPercent(_tallyRate(family.tally)),
               textAlign: TextAlign.end,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
@@ -833,7 +987,7 @@ class _MatchupRow extends StatelessWidget {
           SizedBox(
             width: 52,
             child: Text(
-              _formatPercent(opp.tally.winRate),
+              _formatPercent(_tallyRate(opponent)),
               textAlign: TextAlign.end,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
@@ -847,11 +1001,24 @@ class _MatchupRow extends StatelessWidget {
   }
 }
 
+/// Recommendations, phrased so the side that actually chooses the opening is
+/// the one being told to play it: White picks the opening, Black picks the
+/// answer to it. The old wording ("play `<line>` with `<colour>`") could tell
+/// you to open with a black defence.
 class _StrategySection extends StatelessWidget {
   const _StrategySection({required this.leaks, required this.labels});
 
-  final List<({OpeningFamily family, ScoutOpening opp, bool exploitable})> leaks;
+  final List<_Matchup> leaks;
   final _ComparisonText labels;
+
+  String _sentence(_Matchup leak) {
+    final opening = leak.family.familyName;
+    final rate = _formatPercent(_tallyRate(leak.opponent));
+    final games = leak.opponent.games;
+    return leak.family.color == 'white'
+        ? labels.openWhite(opening, rate, games)
+        : labels.answerBlack(opening, rate, games);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -862,7 +1029,11 @@ class _StrategySection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.tips_and_updates_outlined, color: AppTheme.success, size: 20),
+            Icon(
+              Icons.tips_and_updates_outlined,
+              color: AppTheme.success,
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Text(
               labels.strategyTitle,
@@ -879,15 +1050,14 @@ class _StrategySection extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.arrow_right, size: 18, color: scheme.onSurfaceVariant),
+                Icon(
+                  Icons.arrow_right,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
                 Expanded(
                   child: Text(
-                    labels.leakSentence(
-                      leak.family.familyName,
-                      _colorLabel(labels, leak.family.color),
-                      _formatPercent(leak.opp.tally.winRate),
-                      _colorLabel(labels, leak.opp.color),
-                    ),
+                    _sentence(leak),
                     style: theme.textTheme.bodyMedium,
                   ),
                 ),
@@ -895,6 +1065,157 @@ class _StrategySection extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Self-audit replacement for the strategy card: against yourself both sides
+/// score identically, so there is no edge to exploit — the useful question is
+/// which of your own lines score badly.
+class _OwnWeaknessSection extends StatelessWidget {
+  const _OwnWeaknessSection({required this.weaknesses, required this.labels});
+
+  final List<OpeningFamily> weaknesses;
+  final _ComparisonText labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.self_improvement, color: scheme.error, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              labels.ownWeaknessTitle,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (weaknesses.isEmpty)
+          Text(
+            labels.noOwnWeakness,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          )
+        else
+          for (final family in weaknesses)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.arrow_right,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  Expanded(
+                    child: Text(
+                      labels.ownWeakness(
+                        _colorLabel(labels, family.color),
+                        family.familyName,
+                        _formatPercent(_tallyRate(family.tally)),
+                        family.tally.games,
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// Chip marking that the profile is being compared with itself.
+class _SelfComparisonBadge extends StatelessWidget {
+  const _SelfComparisonBadge({required this.labels});
+
+  final _ComparisonText labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('🔍', style: TextStyle(fontSize: 13)),
+          const SizedBox(width: 6),
+          Text(
+            labels.selfBadge,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: scheme.onSecondaryContainer,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Stands in for the head-to-head banner during a self-comparison, where a
+/// 0-0-0 progress bar would imply a played-and-lost record that cannot exist.
+class _SelfComparisonH2HCard extends StatelessWidget {
+  const _SelfComparisonH2HCard({required this.labels});
+
+  final _ComparisonText labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.person_search_outlined, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  labels.h2hTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  labels.selfH2H,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -974,7 +1295,15 @@ class _ComparisonText {
     required this.colorBlack,
     required this.errorPrefix,
     required this.gamesAnalyzed,
-    required this.leakSentence,
+    required this.selfBadge,
+    required this.selfH2H,
+    required this.scopeNote,
+    required this.minSampleNote,
+    required this.ownWeaknessTitle,
+    required this.ownWeakness,
+    required this.noOwnWeakness,
+    required this.openWhite,
+    required this.answerBlack,
   });
 
   final String title;
@@ -1005,13 +1334,16 @@ class _ComparisonText {
   final String colorBlack;
   final String errorPrefix;
   final String Function(int games, int months) gamesAnalyzed;
-  final String Function(
-    String opening,
-    String userColor,
-    String oppRate,
-    String oppColor,
-  )
-  leakSentence;
+  final String selfBadge;
+  final String selfH2H;
+  final String Function(int games) scopeNote;
+  final String minSampleNote;
+  final String ownWeaknessTitle;
+  final String Function(String color, String opening, String rate, int games)
+  ownWeakness;
+  final String noOwnWeakness;
+  final String Function(String opening, String rate, int games) openWhite;
+  final String Function(String opening, String rate, int games) answerBlack;
 }
 
 _ComparisonText _comparisonText(BuildContext context) {
@@ -1045,6 +1377,14 @@ _ComparisonText _comparisonText(BuildContext context) {
     colorBlack: strings.statsCompareColorBlack,
     errorPrefix: strings.statsCompareErrorPrefix,
     gamesAnalyzed: strings.statsCompareGamesAnalyzed,
-    leakSentence: strings.statsCompareLeakSentence,
+    selfBadge: strings.statsCompareSelfBadge,
+    selfH2H: strings.statsCompareSelfH2H,
+    scopeNote: strings.statsCompareScopeNote,
+    minSampleNote: strings.statsCompareMinSampleNote,
+    ownWeaknessTitle: strings.statsCompareOwnWeaknessTitle,
+    ownWeakness: strings.statsCompareOwnWeakness,
+    noOwnWeakness: strings.statsCompareNoOwnWeakness,
+    openWhite: strings.statsCompareOpenWhite,
+    answerBlack: strings.statsCompareAnswerBlack,
   );
 }

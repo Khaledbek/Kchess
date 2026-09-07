@@ -2116,22 +2116,70 @@ abstract class AppLocalizations {
   /// **'{games} games analysed across {months} months'**
   String statsCompareGamesAnalyzed(int games, int months);
 
-  /// No description provided for @statsCompareLeakSentence.
-  ///
-  /// In en, this message translates to:
-  /// **'Play {opening} as {userColor} — the opponent wins only {oppRate} as {oppColor}.'**
-  String statsCompareLeakSentence(
-    String opening,
-    String userColor,
-    String oppRate,
-    String oppColor,
-  );
-
   /// No description provided for @statsTerminationSpotlight.
   ///
   /// In en, this message translates to:
   /// **'Most common ending: {label} — {share}% of all games, {lossPercent}% of them losses.'**
   String statsTerminationSpotlight(String label, int share, int lossPercent);
+
+  /// No description provided for @statsCompareSelfBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Self-comparison (mirror)'**
+  String get statsCompareSelfBadge;
+
+  /// No description provided for @statsCompareSelfH2H.
+  ///
+  /// In en, this message translates to:
+  /// **'No games against yourself · This is a self-analysis of your own profile.'**
+  String get statsCompareSelfH2H;
+
+  /// No description provided for @statsCompareScopeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Comparison based on the last {games} loaded games.'**
+  String statsCompareScopeNote(int games);
+
+  /// No description provided for @statsCompareMinSampleNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Only openings with at least 5 games on both sides.'**
+  String get statsCompareMinSampleNote;
+
+  /// No description provided for @statsCompareOwnWeaknessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own weak spots'**
+  String get statsCompareOwnWeaknessTitle;
+
+  /// No description provided for @statsCompareOwnWeakness.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot as {color}: {opening} — only {rate} win rate (from {games} games).'**
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  );
+
+  /// No description provided for @statsCompareNoOwnWeakness.
+  ///
+  /// In en, this message translates to:
+  /// **'No clear weak spots with at least 5 games per opening.'**
+  String get statsCompareNoOwnWeakness;
+
+  /// No description provided for @statsCompareOpenWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'Open with {opening} — your opponent scores only {rate} against it as Black (from {games} games).'**
+  String statsCompareOpenWhite(String opening, String rate, int games);
+
+  /// No description provided for @statsCompareAnswerBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'As Black: choose {opening} — your opponent scores only {rate} against it as White (from {games} games).'**
+  String statsCompareAnswerBlack(String opening, String rate, int games);
 }
 
 class _AppLocalizationsDelegate

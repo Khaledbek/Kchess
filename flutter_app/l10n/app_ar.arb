@@ -411,6 +411,14 @@
   "statsCompareColorBlack": "الأسود",
   "statsCompareErrorPrefix": "خطأ",
   "statsCompareGamesAnalyzed": "تم تحليل {games} مباراة من {months} أشهر",
-  "statsCompareLeakSentence": "العب {opening} بالـ{userColor} — يفوز الخصم بنسبة {oppRate} فقط بالـ{oppColor}.",
-  "statsTerminationSpotlight": "أكثر نهاية شيوعًا: {label} — {share}% من كل المباريات، منها {lossPercent}% خسائر."
+  "statsTerminationSpotlight": "أكثر نهاية شيوعًا: {label} — {share}% من كل المباريات، منها {lossPercent}% خسائر.",
+  "statsCompareSelfBadge": "مقارنة ذاتية (انعكاس)",
+  "statsCompareSelfH2H": "لا توجد مباريات ضد نفسك · هذا تحليل ذاتي لملفك الشخصي.",
+  "statsCompareScopeNote": "تعتمد المقارنة على آخر {games} مباراة تم تحميلها.",
+  "statsCompareMinSampleNote": "فقط الافتتاحيات بخمس مباريات على الأقل لكل طرف.",
+  "statsCompareOwnWeaknessTitle": "نقاط ضعفك",
+  "statsCompareOwnWeakness": "نقطة ضعف بالـ{color}: {opening} — نسبة فوز {rate} فقط (من {games} مباراة).",
+  "statsCompareNoOwnWeakness": "لا توجد نقاط ضعف واضحة بخمس مباريات على الأقل لكل افتتاحية.",
+  "statsCompareOpenWhite": "افتتح بـ{opening} — يحقق خصمك بالأسود ضدها {rate} فقط (من {games} مباراة).",
+  "statsCompareAnswerBlack": "بالأسود: اختر {opening} — يحقق خصمك بالأبيض ضدها {rate} فقط (من {games} مباراة)."
 }

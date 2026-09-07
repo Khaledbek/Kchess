@@ -1089,17 +1089,50 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String statsCompareLeakSentence(
-    String opening,
-    String userColor,
-    String oppRate,
-    String oppColor,
-  ) {
-    return 'العب $opening بالـ$userColor — يفوز الخصم بنسبة $oppRate فقط بالـ$oppColor.';
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'أكثر نهاية شيوعًا: $label — $share% من كل المباريات، منها $lossPercent% خسائر.';
   }
 
   @override
-  String statsTerminationSpotlight(String label, int share, int lossPercent) {
-    return 'أكثر نهاية شيوعًا: $label — $share% من كل المباريات، منها $lossPercent% خسائر.';
+  String get statsCompareSelfBadge => 'مقارنة ذاتية (انعكاس)';
+
+  @override
+  String get statsCompareSelfH2H =>
+      'لا توجد مباريات ضد نفسك · هذا تحليل ذاتي لملفك الشخصي.';
+
+  @override
+  String statsCompareScopeNote(int games) {
+    return 'تعتمد المقارنة على آخر $games مباراة تم تحميلها.';
+  }
+
+  @override
+  String get statsCompareMinSampleNote =>
+      'فقط الافتتاحيات بخمس مباريات على الأقل لكل طرف.';
+
+  @override
+  String get statsCompareOwnWeaknessTitle => 'نقاط ضعفك';
+
+  @override
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  ) {
+    return 'نقطة ضعف بالـ$color: $opening — نسبة فوز $rate فقط (من $games مباراة).';
+  }
+
+  @override
+  String get statsCompareNoOwnWeakness =>
+      'لا توجد نقاط ضعف واضحة بخمس مباريات على الأقل لكل افتتاحية.';
+
+  @override
+  String statsCompareOpenWhite(String opening, String rate, int games) {
+    return 'افتتح بـ$opening — يحقق خصمك بالأسود ضدها $rate فقط (من $games مباراة).';
+  }
+
+  @override
+  String statsCompareAnswerBlack(String opening, String rate, int games) {
+    return 'بالأسود: اختر $opening — يحقق خصمك بالأبيض ضدها $rate فقط (من $games مباراة).';
   }
 }

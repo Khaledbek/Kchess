@@ -1099,17 +1099,50 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String statsCompareLeakSentence(
-    String opening,
-    String userColor,
-    String oppRate,
-    String oppColor,
-  ) {
-    return 'Spiele $opening mit $userColor — der Gegner gewinnt dort nur $oppRate mit $oppColor.';
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'Häufigstes Partie-Ende: $label — $share% aller Partien, davon $lossPercent% Niederlagen.';
   }
 
   @override
-  String statsTerminationSpotlight(String label, int share, int lossPercent) {
-    return 'Häufigstes Partie-Ende: $label — $share% aller Partien, davon $lossPercent% Niederlagen.';
+  String get statsCompareSelfBadge => 'Selbstvergleich (Spiegelung)';
+
+  @override
+  String get statsCompareSelfH2H =>
+      'Keine Partien gegen dich selbst · Dies ist eine Selbstanalyse deines eigenen Profils.';
+
+  @override
+  String statsCompareScopeNote(int games) {
+    return 'Vergleich basiert auf den letzten $games geladenen Partien.';
+  }
+
+  @override
+  String get statsCompareMinSampleNote =>
+      'Nur Eröffnungen mit mindestens 5 Partien auf beiden Seiten.';
+
+  @override
+  String get statsCompareOwnWeaknessTitle => 'Eigene Schwachstellen';
+
+  @override
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  ) {
+    return 'Schwachstelle mit $color: $opening — nur $rate Siegquote (aus $games Partien).';
+  }
+
+  @override
+  String get statsCompareNoOwnWeakness =>
+      'Keine klaren eigenen Schwächen bei mindestens 5 Partien pro Eröffnung.';
+
+  @override
+  String statsCompareOpenWhite(String opening, String rate, int games) {
+    return 'Eröffne mit $opening — dein Gegner erzielt als Schwarz dagegen nur $rate (aus $games Partien).';
+  }
+
+  @override
+  String statsCompareAnswerBlack(String opening, String rate, int games) {
+    return 'Als Schwarz: Wähle $opening — dein Gegner erzielt als Weiß dagegen nur $rate (aus $games Partien).';
   }
 }

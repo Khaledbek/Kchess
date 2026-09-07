@@ -431,23 +431,6 @@
       }
     }
   },
-  "statsCompareLeakSentence": "Play {opening} as {userColor} — the opponent wins only {oppRate} as {oppColor}.",
-  "@statsCompareLeakSentence": {
-    "placeholders": {
-      "opening": {
-        "type": "String"
-      },
-      "userColor": {
-        "type": "String"
-      },
-      "oppRate": {
-        "type": "String"
-      },
-      "oppColor": {
-        "type": "String"
-      }
-    }
-  },
   "statsTerminationSpotlight": "Most common ending: {label} — {share}% of all games, {lossPercent}% of them losses.",
   "@statsTerminationSpotlight": {
     "placeholders": {
@@ -458,6 +441,64 @@
         "type": "int"
       },
       "lossPercent": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareSelfBadge": "Self-comparison (mirror)",
+  "statsCompareSelfH2H": "No games against yourself · This is a self-analysis of your own profile.",
+  "statsCompareScopeNote": "Comparison based on the last {games} loaded games.",
+  "@statsCompareScopeNote": {
+    "placeholders": {
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareMinSampleNote": "Only openings with at least 5 games on both sides.",
+  "statsCompareOwnWeaknessTitle": "Your own weak spots",
+  "statsCompareOwnWeakness": "Weak spot as {color}: {opening} — only {rate} win rate (from {games} games).",
+  "@statsCompareOwnWeakness": {
+    "placeholders": {
+      "color": {
+        "type": "String"
+      },
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareNoOwnWeakness": "No clear weak spots with at least 5 games per opening.",
+  "statsCompareOpenWhite": "Open with {opening} — your opponent scores only {rate} against it as Black (from {games} games).",
+  "@statsCompareOpenWhite": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareAnswerBlack": "As Black: choose {opening} — your opponent scores only {rate} against it as White (from {games} games).",
+  "@statsCompareAnswerBlack": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "games": {
         "type": "int"
       }
     }
