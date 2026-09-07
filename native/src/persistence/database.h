@@ -73,6 +73,9 @@ struct GameRecord {
   std::optional<double> local_accuracy_black;
   std::string provider_outcome{"unknown"};
   std::string time_control_type{"unknown"};
+  std::optional<std::string> opening_eco;
+  std::optional<std::string> opening_name;
+  std::optional<int> opening_ply;
   std::int64_t ended_at{0};
   bool favorite{false};
   std::optional<std::string> favorite_collection_id;
@@ -91,6 +94,17 @@ struct GameStatRow {
   std::string time_control_type;  // bullet | blitz | rapid | classical | daily | ...
   std::string opening_eco;        // empty when the game has no named opening
   std::string opening_name;       // empty when unclassified or no named opening
+};
+
+// Minimal per-game fields for the game-phase ("phase of death") breakdown:
+// outcome plus the last recorded ply, from which the ending move number (and
+// thus the phase) is derived. max_ply is -1 when the game has no stored moves.
+struct GamePhaseRow {
+  std::string provider_outcome;
+  std::string result;
+  std::string white_name;
+  std::string black_name;
+  int max_ply{-1};
 };
 
 struct FavoriteCollectionRecord {
@@ -204,6 +218,9 @@ class Database {
   // Lightweight rows for statistics, newest game first (by end/creation time).
   std::vector<GameStatRow> games_for_statistics(const std::string& profile_id) const;
 
+  // Outcome + final ply per game, for the game-phase breakdown.
+  std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;
+
   // Opening classification. games_needing_opening returns (game_id, pgn) for
   // games not yet classified (opening_ply IS NULL); limit <= 0 returns all.
   // set_game_opening records the result: pass eco/name empty and ply 0 when no
@@ -222,7 +239,8 @@ class Database {
       int total_plies,
       int depth,
       int multi_pv,
-      int time_limit_seconds = 0);
+      int time_limit_seconds = 0,
+      bool adaptive_early_stop = true);
   void persist_engine_result(
       const std::string& game_id,
       const std::string& config_hash,
@@ -263,6 +281,12 @@ class Database {
       const std::string& engine_version,
       const AppSettings& requested,
       int requested_ply = -1) const;
+
+  // Keep only the authoritative saved analysis for a game.  Position-cache
+  // entries are intentionally independent and survive this pruning.
+  void prune_game_analyses_except(
+      const std::string& game_id, const std::string& keep_config_hash);
+  void delete_game_analyses(const std::string& game_id);
 
   std::optional<AnalysisResult> compatible_position_analysis(
       const std::string& position_fen,

@@ -44,6 +44,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get games => 'Partien';
 
   @override
+  String get gameSection => 'Partie';
+
+  @override
+  String get play => 'Spielen';
+
+  @override
+  String get playPlaceholder =>
+      'Dieser Bereich ist als Platzhalter für zukünftige Spielmodi vorbereitet, z. B. Partien gegen Bots.';
+
+  @override
   String get downloads => 'Downloads';
 
   @override
@@ -173,6 +183,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cancelAnalysis => 'Analyse abbrechen';
+
+  @override
+  String get deleteAnalysis => 'Gespeicherte Analyse löschen';
+
+  @override
+  String get deleteAnalysisQuestion => 'Gespeicherte Analyse löschen?';
+
+  @override
+  String get deleteAnalysisBody =>
+      'Die lokal gespeicherte Analyse und Accuracy dieser Partie werden gelöscht. PGN/FEN und globaler Engine-Cache bleiben erhalten.';
+
+  @override
+  String get analysisDeleted => 'Gespeicherte Analyse wurde gelöscht.';
 
   @override
   String get classificationPending =>
@@ -315,6 +338,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get showTheorySettingHelp =>
       'Zeigt Eröffnungsbuch-Informationen und Theorie-Zähler.';
+
+  @override
+  String get showResultSymbolsSetting => 'Ergebnissymbole anzeigen';
+
+  @override
+  String get showResultSymbolsSettingHelp =>
+      'Zeigt bei beendeten Partien Win-, Loss- oder Draw-Symbole über den Königen.';
 
   @override
   String get designSettingsTitle => 'Design';
@@ -531,7 +561,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get depthHelp =>
-      'Maximale Suchtiefe pro Stellung. Höhere Werte dauern in der Regel länger.';
+      'Min = Tiefe der Voranalyse. Max = maximale Tiefe der Liveanalyse. Höhere Werte dauern in der Regel länger.';
+
+  @override
+  String get adaptiveEarlyStop => 'Adaptive Analyse';
+
+  @override
+  String get adaptiveEarlyStopHelp =>
+      'Beendet ruhige Vor- und Liveanalysen früher, wenn Bewertung und Hauptvarianten stabil sind. Kritische Verifikationen rechnen weiterhin bis zum eingestellten Limit.';
 
   @override
   String get numberOfLinesHelp =>
@@ -557,6 +594,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get boardDisplayTitle => 'Brettdarstellung';
+
+  @override
+  String get rotateBoard => 'Brett drehen';
 
   @override
   String get showBoardCoordinates => 'Brettkoordinaten';
@@ -675,4 +715,434 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ratingFide => 'FIDE';
+
+  @override
+  String get statsWins => 'Siege';
+
+  @override
+  String get statsDraws => 'Remis';
+
+  @override
+  String get statsLosses => 'Niederlagen';
+
+  @override
+  String get statsAll => 'Alle';
+
+  @override
+  String get statsAllTimeControlsNote => 'Alle Zeitkontrollen';
+
+  @override
+  String get statsPhaseTitle => 'Nach Spielphase';
+
+  @override
+  String get statsPhaseSubtitle =>
+      'In welcher Phase deine Partien enden und wie du abschneidest.';
+
+  @override
+  String get statsPhaseOpening => 'Eröffnung (1–12)';
+
+  @override
+  String get statsPhaseMiddlegame => 'Mittelspiel (13–30)';
+
+  @override
+  String get statsPhaseEndgame => 'Endspiel (31+)';
+
+  @override
+  String get statsPhaseOpeningShort => 'Eröffnung';
+
+  @override
+  String get statsPhaseMiddlegameShort => 'Mittelspiel';
+
+  @override
+  String get statsPhaseEndgameShort => 'Endspiel';
+
+  @override
+  String get statsPhaseGames => 'Partien';
+
+  @override
+  String get statsPhaseWinWord => 'Sieg';
+
+  @override
+  String get statsPhaseEmpty => 'Nicht genügend Daten zu Spielphasen.';
+
+  @override
+  String get statsPhaseNoProfile =>
+      'Erstelle oder wähle ein Profil, um Statistiken zu sehen.';
+
+  @override
+  String get statsPhaseError => 'Spielphasen konnten nicht geladen werden.';
+
+  @override
+  String get statsPhaseRetry => 'Erneut versuchen';
+
+  @override
+  String statsPhaseClassifiedNote(int classified, int total) {
+    return '$classified von $total Partien';
+  }
+
+  @override
+  String get statsTitle => 'Statistiken';
+
+  @override
+  String get statsIntroTitle => 'Deine Schachleistung';
+
+  @override
+  String get statsIntroBody =>
+      'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.';
+
+  @override
+  String get statsFormTitle => 'Aktuelle Form';
+
+  @override
+  String get statsFormHint =>
+      'Tippe auf ein Ergebnis, um die Partie zu öffnen.';
+
+  @override
+  String get statsFormVersus => 'gegen';
+
+  @override
+  String get statsFormEmpty => 'Keine aktuellen Partien vorhanden.';
+
+  @override
+  String get statsFormError => 'Aktuelle Partien konnten nicht geladen werden.';
+
+  @override
+  String get statsFormRetry => 'Erneut versuchen';
+
+  @override
+  String get statsOverviewTitle => 'Übersicht';
+
+  @override
+  String get statsOverviewGames => 'Partien';
+
+  @override
+  String get statsOverviewWinRate => 'Siegquote';
+
+  @override
+  String get statsOverviewScore => 'Score';
+
+  @override
+  String get statsOverviewRecord => 'Bilanz';
+
+  @override
+  String get statsOverviewByColor => 'Nach Farbe';
+
+  @override
+  String get statsOverviewByTimeControl => 'Nach Zeitkontrolle';
+
+  @override
+  String get statsOverviewWhite => 'Weiß';
+
+  @override
+  String get statsOverviewBlack => 'Schwarz';
+
+  @override
+  String get statsOverviewEmpty =>
+      'Noch keine Partien. Synchronisiere ein Online-Profil oder importiere Partien, um deine Statistik zu sehen.';
+
+  @override
+  String get statsOverviewNoProfile =>
+      'Erstelle oder wähle ein Profil, um Statistiken zu sehen.';
+
+  @override
+  String get statsOverviewNoGamesForFilter =>
+      'Keine Partien für die gewählte Zeitkontrolle.';
+
+  @override
+  String get statsOverviewError => 'Statistik konnte nicht geladen werden.';
+
+  @override
+  String get statsOverviewRetry => 'Erneut versuchen';
+
+  @override
+  String get statsTerminationTitle => 'Partie-Ende Statistik';
+
+  @override
+  String get statsTerminationCheckmate => 'Matt';
+
+  @override
+  String get statsTerminationResignation => 'Aufgabe';
+
+  @override
+  String get statsTerminationTimeout => 'Zeit';
+
+  @override
+  String get statsTerminationDraw => 'Remis';
+
+  @override
+  String get statsTerminationOther => 'Andere';
+
+  @override
+  String get statsTerminationWonByCheckmate => 'Gewonnen durch Matt';
+
+  @override
+  String get statsTerminationLostByCheckmate => 'Verloren durch Matt';
+
+  @override
+  String get statsTerminationOpponentResigned => 'Gegner gab auf';
+
+  @override
+  String get statsTerminationSelfResigned => 'Selbst aufgegeben';
+
+  @override
+  String get statsTerminationOpponentFlagged => 'Gegner-Zeit abgelaufen';
+
+  @override
+  String get statsTerminationSelfFlagged => 'Eigene Zeit abgelaufen';
+
+  @override
+  String get statsTerminationWonGeneric => 'Gewonnen';
+
+  @override
+  String get statsTerminationLostGeneric => 'Verloren';
+
+  @override
+  String get statsTerminationEmpty => 'Nicht genügend Daten zum Partie-Ende.';
+
+  @override
+  String get statsTerminationNoProfile =>
+      'Erstelle oder wähle ein Profil, um Statistiken zu sehen.';
+
+  @override
+  String get statsTerminationError =>
+      'Partie-Enden konnten nicht geladen werden.';
+
+  @override
+  String get statsTerminationRetry => 'Erneut versuchen';
+
+  @override
+  String get statsRatingTitle => 'Rating-Verlauf';
+
+  @override
+  String get statsRatingEmpty =>
+      'Nicht genügend Rating-Daten für einen Verlauf.';
+
+  @override
+  String get statsRatingError => 'Rating-Daten konnten nicht geladen werden.';
+
+  @override
+  String get statsRatingRetry => 'Erneut versuchen';
+
+  @override
+  String get statsOpeningGamesAll => 'Alle';
+
+  @override
+  String get statsOpeningGamesWon => 'Gewonnen';
+
+  @override
+  String get statsOpeningGamesLost => 'Verloren';
+
+  @override
+  String get statsOpeningGamesByCheckmate => 'durch Matt';
+
+  @override
+  String get statsOpeningGamesByResignation => 'durch Aufgabe';
+
+  @override
+  String get statsOpeningGamesByTimeout => 'durch Zeit';
+
+  @override
+  String get statsOpeningGamesByDraw => 'Remis';
+
+  @override
+  String get statsOpeningGamesEmpty => 'Keine Partien für diese Auswahl.';
+
+  @override
+  String get statsOpeningGamesError => 'Partien konnten nicht geladen werden.';
+
+  @override
+  String get statsOpeningsTitle => 'Erfolgreichste Eröffnungen';
+
+  @override
+  String get statsOpeningsMostPlayed => 'Meistgespielt';
+
+  @override
+  String get statsOpeningsBestWinRate => 'Beste Siegquote';
+
+  @override
+  String get statsOpeningsMinGamesHint => 'Mindestens 3 Partien pro Eröffnung.';
+
+  @override
+  String get statsOpeningsClassifiedGames => 'Partien mit benannter Eröffnung';
+
+  @override
+  String get statsOpeningsGames => 'Partien';
+
+  @override
+  String get statsOpeningsVariations => 'Varianten';
+
+  @override
+  String get statsOpeningsBaseLine => 'Grundform';
+
+  @override
+  String get statsOpeningsWhite => 'Weiß';
+
+  @override
+  String get statsOpeningsBlack => 'Schwarz';
+
+  @override
+  String get statsOpeningsUnknownColor => 'Andere';
+
+  @override
+  String get statsOpeningsWinRateShort => 'Sieg';
+
+  @override
+  String get statsOpeningsNoOpeningsForColor =>
+      'Noch keine Eröffnungen für diese Farbe.';
+
+  @override
+  String get statsOpeningsNoOpeningsForWinRate =>
+      'Keine Eröffnung mit mindestens 3 Partien.';
+
+  @override
+  String get statsOpeningsEmpty =>
+      'Noch keine benannten Eröffnungen. Synchronisierte und importierte Partien werden automatisch klassifiziert.';
+
+  @override
+  String get statsOpeningsNoProfile =>
+      'Erstelle oder wähle ein Profil, um Eröffnungen zu sehen.';
+
+  @override
+  String get statsOpeningsError => 'Eröffnungen konnten nicht geladen werden.';
+
+  @override
+  String get statsOpeningsRetry => 'Erneut versuchen';
+
+  @override
+  String get statsCompareTitle => 'Spielervergleich';
+
+  @override
+  String get statsCompareUsernameLabel => 'Chess.com-Benutzername';
+
+  @override
+  String get statsCompareUsernameHint => 'z. B. hikaru';
+
+  @override
+  String get statsCompareCompare => 'Vergleichen';
+
+  @override
+  String get statsCompareLoadingHint =>
+      'Partien des Gegners werden geladen und ausgewertet…';
+
+  @override
+  String get statsComparePrompt =>
+      'Gib einen Chess.com-Benutzernamen ein, um Statistiken zu vergleichen.';
+
+  @override
+  String get statsCompareYou => 'Du';
+
+  @override
+  String get statsCompareOpponent => 'Gegner';
+
+  @override
+  String get statsCompareH2hTitle => 'Direktvergleich';
+
+  @override
+  String get statsCompareDirectGames => 'direkte Partien';
+
+  @override
+  String get statsCompareWins => 'Siege';
+
+  @override
+  String get statsCompareDraws => 'Remis';
+
+  @override
+  String get statsCompareLosses => 'Niederlagen';
+
+  @override
+  String get statsComparePerformanceCompare => 'Leistungsvergleich';
+
+  @override
+  String get statsCompareWinRateWhite => 'Siegquote mit Weiß';
+
+  @override
+  String get statsCompareWinRateBlack => 'Siegquote mit Schwarz';
+
+  @override
+  String get statsCompareFlagging => 'Niederlagen auf Zeit';
+
+  @override
+  String get statsCompareOpeningMatchup => 'Eröffnungs-Duelle';
+
+  @override
+  String get statsCompareMatchupSubtitle =>
+      'Deine Eröffnungen gegen die Siegquote des Gegners mit der Gegenfarbe.';
+
+  @override
+  String get statsCompareOpeningColumn => 'Eröffnung';
+
+  @override
+  String get statsCompareGamesShort => 'Partien';
+
+  @override
+  String get statsCompareNoMatchups =>
+      'Keine gemeinsamen Eröffnungen gefunden.';
+
+  @override
+  String get statsCompareNoLeaks => 'Keine klaren Schwächen gefunden.';
+
+  @override
+  String get statsCompareStrategyTitle => 'Empfohlene Strategie';
+
+  @override
+  String get statsCompareColorWhite => 'Weiß';
+
+  @override
+  String get statsCompareColorBlack => 'Schwarz';
+
+  @override
+  String get statsCompareErrorPrefix => 'Fehler';
+
+  @override
+  String statsCompareGamesAnalyzed(int games, int months) {
+    return '$games Partien aus $months Monaten ausgewertet';
+  }
+
+  @override
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'Häufigstes Partie-Ende: $label — $share% aller Partien, davon $lossPercent% Niederlagen.';
+  }
+
+  @override
+  String get statsCompareSelfBadge => 'Selbstvergleich (Spiegelung)';
+
+  @override
+  String get statsCompareSelfH2H =>
+      'Keine Partien gegen dich selbst · Dies ist eine Selbstanalyse deines eigenen Profils.';
+
+  @override
+  String statsCompareScopeNote(int games) {
+    return 'Vergleich basiert auf den letzten $games geladenen Partien.';
+  }
+
+  @override
+  String get statsCompareMinSampleNote =>
+      'Nur Eröffnungen mit mindestens 5 Partien auf beiden Seiten.';
+
+  @override
+  String get statsCompareOwnWeaknessTitle => 'Eigene Schwachstellen';
+
+  @override
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  ) {
+    return 'Schwachstelle mit $color: $opening — nur $rate Siegquote (aus $games Partien).';
+  }
+
+  @override
+  String get statsCompareNoOwnWeakness =>
+      'Keine klaren eigenen Schwächen bei mindestens 5 Partien pro Eröffnung.';
+
+  @override
+  String statsCompareOpenWhite(String opening, String rate, int games) {
+    return 'Eröffne mit $opening — dein Gegner erzielt als Schwarz dagegen nur $rate (aus $games Partien).';
+  }
+
+  @override
+  String statsCompareAnswerBlack(String opening, String rate, int games) {
+    return 'Als Schwarz: Wähle $opening — dein Gegner erzielt als Weiß dagegen nur $rate (aus $games Partien).';
+  }
 }

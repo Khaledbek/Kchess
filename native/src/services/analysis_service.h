@@ -33,6 +33,7 @@ class AnalysisService {
   std::string move_analysis_status_json(const std::string& game_id, int ply);
   std::string start_move_refinement_json(const std::string& game_id, int ply);
   void cancel_analysis(const std::string& game_id);
+  void delete_analysis(const std::string& game_id);
   void clear_engine_cache();
   void cancel_jobs_for_games(const std::vector<std::string>& game_ids);
 
@@ -68,6 +69,10 @@ class AnalysisService {
     std::atomic_int completed_moves{0};
     std::shared_ptr<StockfishEngine> engine;
     std::string config_hash;
+    // Classifications shown while maximum-depth refinement is running come
+    // from the last fully published pre-analysis run.  This keeps the UI
+    // stable until the entire live queue can publish one atomic reclassification.
+    std::string published_classification_config_hash;
     std::thread worker;
   };
 
@@ -75,6 +80,7 @@ class AnalysisService {
     std::string id;
     std::string played_move;
     std::string played_san;
+    std::string fen_before;
     std::string fen;
     std::atomic_bool finished{false};
     std::atomic_bool cancel_requested{false};
@@ -82,6 +88,8 @@ class AnalysisService {
     std::string status{"running"};
     std::string error;
     AnalysisResult result;
+    std::optional<MoveCategory> classification;
+    std::atomic_bool expose_live_result{true};
     std::shared_ptr<StockfishEngine> engine;
     std::thread worker;
   };
@@ -103,6 +111,11 @@ class AnalysisService {
   std::string analysis_json(
       const std::string& game_id, const PersistedAnalysis& analysis,
       const AnalysisJob* live_job = nullptr) const;
+  PersistedAnalysis stable_live_classification_snapshot(
+      const std::string& game_id,
+      int ply,
+      PersistedAnalysis analysis,
+      const AnalysisJob* live_job) const;
   static const char* job_state_name(AnalysisJobState state) noexcept;
   static AnalysisJobState persisted_job_state(const PersistedAnalysis& analysis) noexcept;
   void rebuild_classification(
@@ -126,7 +139,7 @@ class AnalysisService {
       std::vector<int> completed_position_slots,
       const std::shared_ptr<AnalysisJob>& job) noexcept;
   void reap_finished_variation_jobs();
-  void stop_all_variation_jobs() noexcept;
+  void stop_all_variation_jobs(bool stop_engine) noexcept;
   void stop_all_mainline_analysis_jobs() noexcept;
   std::string start_variation_job_json(
       const std::string& fen,
@@ -144,6 +157,10 @@ class AnalysisService {
 
   mutable std::mutex variation_jobs_mutex_;
   std::unordered_map<std::string, std::shared_ptr<VariationJob>> variation_jobs_;
+  // Ephemeral sideline-only position cache. It is never persisted into a game
+  // analysis row and is cleared when the user leaves variation mode.
+  std::unordered_map<std::string, AnalysisResult> variation_position_results_;
+  std::shared_ptr<StockfishEngine> variation_engine_;
   std::atomic_uint64_t next_variation_job_id_{1};
 };
 

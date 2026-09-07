@@ -172,6 +172,8 @@ class StockfishEngine::Impl {
   std::map<int, EngineLine> live_lines;
   std::string live_best_move;
   bool ready{false};
+  std::optional<int> configured_threads;
+  std::optional<int> configured_hash_mb;
   std::filesystem::path asset_directory;
 };
 
@@ -215,6 +217,10 @@ void StockfishEngine::start() {
   // makes upstream CommandLine call _get_pgmptr(), whose EXE-only UCRT state is
   // not initialized in this DLL and asserts in Windows debug builds.
   impl_->engine = std::make_unique<Stockfish::Engine>(std::nullopt);
+  // A restarted adapter owns a fresh Stockfish instance with default options.
+  // Forget the cached values so the first analysis configures that instance.
+  impl_->configured_threads.reset();
+  impl_->configured_hash_mb.reset();
 #if defined(_WIN32)
   set_option(
       *impl_->engine, "EvalFile", utf8_path(impl_->asset_directory / kBigNetwork));
@@ -247,7 +253,11 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
       || request.early_stop_stable_iterations < 1
       || request.early_stop_stable_iterations > 16
       || request.early_stop_eval_tolerance_cp < 0
-      || request.early_stop_eval_tolerance_cp > 500) {
+      || request.early_stop_eval_tolerance_cp > 500
+      || request.search_moves.size() > 64
+      || std::any_of(
+          request.search_moves.begin(), request.search_moves.end(),
+          [](const std::string& move) { return move.empty(); })) {
     throw std::invalid_argument("Invalid Stockfish analysis settings");
   }
 
@@ -270,8 +280,22 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
     return *terminal;
   }
 
-  set_option(*impl_->engine, "Threads", std::to_string(request.threads));
-  set_option(*impl_->engine, "Hash", std::to_string(request.hash_mb));
+  // Stockfish's Threads callback rebuilds the thread pool and reallocates the
+  // transposition table. Its Hash callback reallocates the table again. Sending
+  // identical values for every position therefore destroys useful TT contents
+  // and adds substantial allocation overhead. Keep these expensive options
+  // stable across consecutive positions and only touch them when the requested
+  // configuration actually changes.
+  if (!impl_->configured_threads.has_value()
+      || *impl_->configured_threads != request.threads) {
+    set_option(*impl_->engine, "Threads", std::to_string(request.threads));
+    impl_->configured_threads = request.threads;
+  }
+  if (!impl_->configured_hash_mb.has_value()
+      || *impl_->configured_hash_mb != request.hash_mb) {
+    set_option(*impl_->engine, "Hash", std::to_string(request.hash_mb));
+    impl_->configured_hash_mb = request.hash_mb;
+  }
   set_option(*impl_->engine, "MultiPV", std::to_string(request.multi_pv));
   set_option(*impl_->engine, "Ponder", "false");
   set_option(*impl_->engine, "UCI_ShowWDL", "true");
@@ -359,6 +383,7 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   }
   Stockfish::Search::LimitsType limits;
   limits.depth = request.depth;
+  limits.searchmoves = request.search_moves;
   if (request.time_limit_seconds > 0) {
     limits.movetime = static_cast<Stockfish::TimePoint>(request.time_limit_seconds) * 1000;
   }
@@ -427,6 +452,8 @@ void StockfishEngine::stop() noexcept {
     std::lock_guard pointer_lock(impl_->engine_pointer_mutex);
     if (impl_->engine) impl_->engine->wait_for_search_finished();
     impl_->engine.reset();
+    impl_->configured_threads.reset();
+    impl_->configured_hash_mb.reset();
     impl_->ready = false;
   } catch (...) {
   }

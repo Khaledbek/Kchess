@@ -17,6 +17,10 @@ struct AnalysisRequest {
   int threads{2};
   int hash_mb{128};
   int time_limit_seconds{0};
+  // Optional UCI root restriction. Preparation analysis uses this to evaluate
+  // the actually played move directly instead of expanding a costly MultiPV
+  // search merely to discover that move's score. Empty means all legal moves.
+  std::vector<std::string> search_moves;
   // Live refinement may stop before the hard depth target once consecutive
   // iterations are stable. Normal/minimum analysis leaves this disabled.
   bool dynamic_early_stop{false};

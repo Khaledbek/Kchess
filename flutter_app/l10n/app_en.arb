@@ -11,6 +11,9 @@
   "continueLabel": "Continue",
   "requiredField": "Please enter a value.",
   "games": "Games",
+  "gameSection": "Game",
+  "play": "Play",
+  "playPlaceholder": "This section is reserved for future play modes, such as games against bots.",
   "downloads": "Downloads",
   "favorites": "Favorites",
   "favoriteCollectionsTitle": "Collections",
@@ -52,6 +55,10 @@
   "analysisComplete": "Full analysis complete",
   "analysisCancelled": "Analysis cancelled — existing results remain saved.",
   "cancelAnalysis": "Cancel analysis",
+  "deleteAnalysis": "Delete saved analysis",
+  "deleteAnalysisQuestion": "Delete saved analysis?",
+  "deleteAnalysisBody": "The locally saved analysis and accuracy for this game will be removed. The PGN/FEN and global engine cache remain.",
+  "analysisDeleted": "Saved analysis deleted.",
   "classificationPending": "Classification is not available for this move yet.",
   "bestMove": "Best move",
   "evaluation": "Evaluation",
@@ -96,6 +103,8 @@
   "showAccuracySettingHelp": "Shows the locally calculated accuracy values.",
   "showTheorySetting": "Show theory information",
   "showTheorySettingHelp": "Shows opening-book information and theory counts.",
+  "showResultSymbolsSetting": "Show result symbols",
+  "showResultSymbolsSettingHelp": "Shows Win, Loss or Draw symbols above the kings when a game has ended.",
   "designSettingsTitle": "Design",
   "designSettingsSubtitle": "Appearance, theme, board and pieces",
   "generalSettingsTitle": "General",
@@ -235,7 +244,9 @@
   "variationStart": "Start of variation",
   "engineQualityTitle": "Analysis quality",
   "engineResourcesTitle": "Resources",
-  "depthHelp": "Maximum search depth per position. Higher values usually take longer.",
+  "depthHelp": "Min = pre-analysis depth. Max = maximum live-analysis depth. Higher values usually take longer.",
+  "adaptiveEarlyStop": "Adaptive analysis",
+  "adaptiveEarlyStopHelp": "Ends quiet pre-analysis and live searches early when the evaluation and principal variations are stable. Critical verification searches still use the configured limit.",
   "numberOfLinesHelp": "How many top engine variations Stockfish calculates at the same time.",
   "timeLimitHelp": "Optional limit per position. Off uses depth only; otherwise the search stops when depth or time is reached first.",
   "threads": "Threads",
@@ -243,6 +254,7 @@
   "hashMemory": "Hash memory",
   "hashMemoryHelp": "RAM for Stockfish’s transposition table. More memory can improve repeated-position search.",
   "boardDisplayTitle": "Board display",
+  "rotateBoard": "Rotate board",
   "showBoardCoordinates": "Board coordinates",
   "showBoardCoordinatesHelp": "Shows file and rank labels (a–h / 1–8) on the board.",
   "highlightLastMove": "Highlight last move",
@@ -278,5 +290,217 @@
   "ratingDaily": "Daily",
   "ratingClassical": "Classical",
   "ratingChess960": "Chess960",
-  "ratingFide": "FIDE"
+  "ratingFide": "FIDE",
+  "statsWins": "Wins",
+  "statsDraws": "Draws",
+  "statsLosses": "Losses",
+  "statsAll": "All",
+  "statsAllTimeControlsNote": "All time controls",
+  "statsPhaseTitle": "By game phase",
+  "statsPhaseSubtitle": "Where your games end and how you score there.",
+  "statsPhaseOpening": "Opening (1–12)",
+  "statsPhaseMiddlegame": "Middlegame (13–30)",
+  "statsPhaseEndgame": "Endgame (31+)",
+  "statsPhaseOpeningShort": "Opening",
+  "statsPhaseMiddlegameShort": "Middlegame",
+  "statsPhaseEndgameShort": "Endgame",
+  "statsPhaseGames": "games",
+  "statsPhaseWinWord": "win",
+  "statsPhaseEmpty": "Not enough data on game phases.",
+  "statsPhaseNoProfile": "Create or select a profile to see statistics.",
+  "statsPhaseError": "Could not load game phases.",
+  "statsPhaseRetry": "Retry",
+  "statsPhaseClassifiedNote": "{classified} of {total} games",
+  "@statsPhaseClassifiedNote": {
+    "placeholders": {
+      "classified": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "statsTitle": "Statistics",
+  "statsIntroTitle": "Your chess performance",
+  "statsIntroBody": "See your results, recent form and opening record separated by color.",
+  "statsFormTitle": "Recent form",
+  "statsFormHint": "Tap a result to open the game.",
+  "statsFormVersus": "vs",
+  "statsFormEmpty": "No recent games to show.",
+  "statsFormError": "Could not load recent games.",
+  "statsFormRetry": "Retry",
+  "statsOverviewTitle": "Overview",
+  "statsOverviewGames": "Games",
+  "statsOverviewWinRate": "Win rate",
+  "statsOverviewScore": "Score",
+  "statsOverviewRecord": "Record",
+  "statsOverviewByColor": "By color",
+  "statsOverviewByTimeControl": "By time control",
+  "statsOverviewWhite": "White",
+  "statsOverviewBlack": "Black",
+  "statsOverviewEmpty": "No games yet. Sync an online profile or import games to see your statistics.",
+  "statsOverviewNoProfile": "Create or select a profile to see statistics.",
+  "statsOverviewNoGamesForFilter": "No games for the selected time control.",
+  "statsOverviewError": "Could not load statistics.",
+  "statsOverviewRetry": "Retry",
+  "statsTerminationTitle": "How games end",
+  "statsTerminationCheckmate": "Checkmate",
+  "statsTerminationResignation": "Resignation",
+  "statsTerminationTimeout": "On time",
+  "statsTerminationDraw": "Draw",
+  "statsTerminationOther": "Other",
+  "statsTerminationWonByCheckmate": "Won by checkmate",
+  "statsTerminationLostByCheckmate": "Lost by checkmate",
+  "statsTerminationOpponentResigned": "Opponent resigned",
+  "statsTerminationSelfResigned": "Resigned",
+  "statsTerminationOpponentFlagged": "Opponent ran out of time",
+  "statsTerminationSelfFlagged": "Ran out of time",
+  "statsTerminationWonGeneric": "Won",
+  "statsTerminationLostGeneric": "Lost",
+  "statsTerminationEmpty": "Not enough data on how games ended.",
+  "statsTerminationNoProfile": "Create or select a profile to see statistics.",
+  "statsTerminationError": "Could not load game endings.",
+  "statsTerminationRetry": "Retry",
+  "statsRatingTitle": "Rating trend",
+  "statsRatingEmpty": "Not enough rating data to draw a trend.",
+  "statsRatingError": "Could not load rating data.",
+  "statsRatingRetry": "Retry",
+  "statsOpeningGamesAll": "All",
+  "statsOpeningGamesWon": "Won",
+  "statsOpeningGamesLost": "Lost",
+  "statsOpeningGamesByCheckmate": "by checkmate",
+  "statsOpeningGamesByResignation": "by resignation",
+  "statsOpeningGamesByTimeout": "on time",
+  "statsOpeningGamesByDraw": "draw",
+  "statsOpeningGamesEmpty": "No games for this selection.",
+  "statsOpeningGamesError": "Could not load games.",
+  "statsOpeningsTitle": "Top openings",
+  "statsOpeningsMostPlayed": "Most played",
+  "statsOpeningsBestWinRate": "Best win rate",
+  "statsOpeningsMinGamesHint": "At least 3 games per opening.",
+  "statsOpeningsClassifiedGames": "games with a named opening",
+  "statsOpeningsGames": "games",
+  "statsOpeningsVariations": "variations",
+  "statsOpeningsBaseLine": "Base line",
+  "statsOpeningsWhite": "White",
+  "statsOpeningsBlack": "Black",
+  "statsOpeningsUnknownColor": "Other",
+  "statsOpeningsWinRateShort": "win",
+  "statsOpeningsNoOpeningsForColor": "No openings for this color yet.",
+  "statsOpeningsNoOpeningsForWinRate": "No opening with at least 3 games.",
+  "statsOpeningsEmpty": "No named openings yet. Synced and imported games are classified automatically.",
+  "statsOpeningsNoProfile": "Create or select a profile to see openings.",
+  "statsOpeningsError": "Could not load openings.",
+  "statsOpeningsRetry": "Retry",
+  "statsCompareTitle": "Player comparison",
+  "statsCompareUsernameLabel": "Chess.com username",
+  "statsCompareUsernameHint": "e.g. hikaru",
+  "statsCompareCompare": "Compare",
+  "statsCompareLoadingHint": "Fetching and analysing the opponent's games…",
+  "statsComparePrompt": "Enter a Chess.com username to compare stats.",
+  "statsCompareYou": "You",
+  "statsCompareOpponent": "Opponent",
+  "statsCompareH2hTitle": "Head-to-head",
+  "statsCompareDirectGames": "direct games",
+  "statsCompareWins": "Wins",
+  "statsCompareDraws": "Draws",
+  "statsCompareLosses": "Losses",
+  "statsComparePerformanceCompare": "Performance comparison",
+  "statsCompareWinRateWhite": "Win rate as White",
+  "statsCompareWinRateBlack": "Win rate as Black",
+  "statsCompareFlagging": "Losses on time",
+  "statsCompareOpeningMatchup": "Opening matchup",
+  "statsCompareMatchupSubtitle": "Your openings vs. the opponent's win rate with the opposite colour.",
+  "statsCompareOpeningColumn": "Opening",
+  "statsCompareGamesShort": "games",
+  "statsCompareNoMatchups": "No shared openings found.",
+  "statsCompareNoLeaks": "No clear weaknesses found.",
+  "statsCompareStrategyTitle": "Recommended strategy",
+  "statsCompareColorWhite": "White",
+  "statsCompareColorBlack": "Black",
+  "statsCompareErrorPrefix": "Error",
+  "statsCompareGamesAnalyzed": "{games} games analysed across {months} months",
+  "@statsCompareGamesAnalyzed": {
+    "placeholders": {
+      "games": {
+        "type": "int"
+      },
+      "months": {
+        "type": "int"
+      }
+    }
+  },
+  "statsTerminationSpotlight": "Most common ending: {label} — {share}% of all games, {lossPercent}% of them losses.",
+  "@statsTerminationSpotlight": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "share": {
+        "type": "int"
+      },
+      "lossPercent": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareSelfBadge": "Self-comparison (mirror)",
+  "statsCompareSelfH2H": "No games against yourself · This is a self-analysis of your own profile.",
+  "statsCompareScopeNote": "Comparison based on the last {games} loaded games.",
+  "@statsCompareScopeNote": {
+    "placeholders": {
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareMinSampleNote": "Only openings with at least 5 games on both sides.",
+  "statsCompareOwnWeaknessTitle": "Your own weak spots",
+  "statsCompareOwnWeakness": "Weak spot as {color}: {opening} — only {rate} win rate (from {games} games).",
+  "@statsCompareOwnWeakness": {
+    "placeholders": {
+      "color": {
+        "type": "String"
+      },
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareNoOwnWeakness": "No clear weak spots with at least 5 games per opening.",
+  "statsCompareOpenWhite": "Open with {opening} — your opponent scores only {rate} against it as Black (from {games} games).",
+  "@statsCompareOpenWhite": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "statsCompareAnswerBlack": "As Black: choose {opening} — your opponent scores only {rate} against it as White (from {games} games).",
+  "@statsCompareAnswerBlack": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  }
 }
