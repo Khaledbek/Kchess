@@ -1135,4 +1135,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String statsCompareAnswerBlack(String opening, String rate, int games) {
     return 'بالأسود: اختر $opening — يحقق خصمك بالأبيض ضدها $rate فقط (من $games مباراة).';
   }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'أنت: مكتبتك المحلية بالكامل · الخصم: آخر $months أشهر ($games مباراة). الجانبان عيّنتان مختلفتان، لذا قد تختلف القيم حتى عند مقارنة الملف بنفسه.';
+  }
 }

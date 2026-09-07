@@ -551,6 +551,15 @@ class _PerformanceComparisonCard extends StatelessWidget {
                 _legendDot(context, scheme.tertiary, labels.opponent),
               ],
             ),
+            const SizedBox(height: 6),
+            // The two columns are not the same sample: the user's side is the
+            // whole local library, the opponent's is a live 6-month window. Say
+            // so, otherwise a self-comparison looks broken when the mirrored
+            // rates fail to match.
+            Text(
+              labels.sampleScope(report.monthsFetched, report.gamesAnalyzed),
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
+            ),
             const SizedBox(height: 12),
             _CompareMetric(
               label: labels.winRateWhite,
@@ -1304,6 +1313,7 @@ class _ComparisonText {
     required this.noOwnWeakness,
     required this.openWhite,
     required this.answerBlack,
+    required this.sampleScope,
   });
 
   final String title;
@@ -1344,6 +1354,7 @@ class _ComparisonText {
   final String noOwnWeakness;
   final String Function(String opening, String rate, int games) openWhite;
   final String Function(String opening, String rate, int games) answerBlack;
+  final String Function(int months, int games) sampleScope;
 }
 
 _ComparisonText _comparisonText(BuildContext context) {
@@ -1386,5 +1397,6 @@ _ComparisonText _comparisonText(BuildContext context) {
     noOwnWeakness: strings.statsCompareNoOwnWeakness,
     openWhite: strings.statsCompareOpenWhite,
     answerBlack: strings.statsCompareAnswerBlack,
+    sampleScope: strings.statsCompareSampleScope,
   );
 }

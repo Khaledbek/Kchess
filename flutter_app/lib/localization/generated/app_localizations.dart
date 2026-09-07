@@ -2180,6 +2180,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'As Black: choose {opening} — your opponent scores only {rate} against it as White (from {games} games).'**
   String statsCompareAnswerBlack(String opening, String rate, int games);
+
+  /// No description provided for @statsCompareSampleScope.
+  ///
+  /// In en, this message translates to:
+  /// **'You: your entire local library · Opponent: the last {months} months ({games} games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.'**
+  String statsCompareSampleScope(int months, int games);
 }
 
 class _AppLocalizationsDelegate

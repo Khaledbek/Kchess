@@ -1145,4 +1145,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String statsCompareAnswerBlack(String opening, String rate, int games) {
     return 'Als Schwarz: Wähle $opening — dein Gegner erzielt als Weiß dagegen nur $rate (aus $games Partien).';
   }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'Du: deine gesamte lokale Bibliothek · Gegner: die letzten $months Monate ($games Partien). Beide Seiten sind unterschiedliche Stichproben — die Werte können sich daher auch beim Selbstvergleich unterscheiden.';
+  }
 }

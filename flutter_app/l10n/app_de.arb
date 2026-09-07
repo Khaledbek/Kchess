@@ -420,5 +420,6 @@
   "statsCompareOwnWeakness": "Schwachstelle mit {color}: {opening} — nur {rate} Siegquote (aus {games} Partien).",
   "statsCompareNoOwnWeakness": "Keine klaren eigenen Schwächen bei mindestens 5 Partien pro Eröffnung.",
   "statsCompareOpenWhite": "Eröffne mit {opening} — dein Gegner erzielt als Schwarz dagegen nur {rate} (aus {games} Partien).",
-  "statsCompareAnswerBlack": "Als Schwarz: Wähle {opening} — dein Gegner erzielt als Weiß dagegen nur {rate} (aus {games} Partien)."
+  "statsCompareAnswerBlack": "Als Schwarz: Wähle {opening} — dein Gegner erzielt als Weiß dagegen nur {rate} (aus {games} Partien).",
+  "statsCompareSampleScope": "Du: deine gesamte lokale Bibliothek · Gegner: die letzten {months} Monate ({games} Partien). Beide Seiten sind unterschiedliche Stichproben — die Werte können sich daher auch beim Selbstvergleich unterscheiden."
 }

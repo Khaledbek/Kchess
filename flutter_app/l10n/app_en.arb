@@ -502,5 +502,16 @@
         "type": "int"
       }
     }
+  },
+  "statsCompareSampleScope": "You: your entire local library · Opponent: the last {months} months ({games} games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.",
+  "@statsCompareSampleScope": {
+    "placeholders": {
+      "months": {
+        "type": "int"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
   }
 }

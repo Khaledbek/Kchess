@@ -1141,4 +1141,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String statsCompareAnswerBlack(String opening, String rate, int games) {
     return 'As Black: choose $opening — your opponent scores only $rate against it as White (from $games games).';
   }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'You: your entire local library · Opponent: the last $months months ($games games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.';
+  }
 }
