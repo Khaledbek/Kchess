@@ -29,6 +29,7 @@ flutter:
   assets:
     - assets/
     - assets/analysis_img/
+    - assets/icons/
     - ../img/
     - assets/opening_book.kcb
     - assets/opening_names.kco

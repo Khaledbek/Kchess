@@ -41,19 +41,20 @@ String? _analysisClassificationAsset(MoveClassification classification) =>
 
 bool _isDrawResult(String result) => result == '1/2-1/2' || result == '½-½';
 
+/// Game-over result icon for one side, from that colour's perspective.
+///
+/// The toppled king covers both ways of losing: it is literally the resignation
+/// gesture and reads correctly for a checkmate too, so [checkmate] no longer
+/// selects a separate asset. It stays in the signature as the hook if a
+/// distinct "resigned" icon is wanted back.
 String? _resultAssetForColor(String color, String? result, bool checkmate) {
   if (result == null) return null;
-  if (_isDrawResult(result)) {
-    return 'assets/analysis_img/result_draw.png';
-  }
+  if (_isDrawResult(result)) return 'assets/icons/king_draw.svg';
   final whiteWon = result == '1-0';
   final colorIsWhite = color == 'white';
-  if (whiteWon == colorIsWhite) {
-    return 'assets/analysis_img/result_win.png';
-  }
-  return checkmate
-      ? 'assets/analysis_img/result_loss.png'
-      : 'assets/analysis_img/result_giveup.png';
+  return whiteWon == colorIsWhite
+      ? 'assets/icons/king_won.svg'
+      : 'assets/icons/king_lost.svg';
 }
 
 Color _classificationColor(
@@ -2109,11 +2110,10 @@ class _BoardResultAnimationState extends State<_BoardResultAnimation>
       height: size,
       child: Opacity(
         opacity: opacity,
-        child: Image.asset(
+        child: SvgPicture.asset(
           asset,
           key: Key('board-result-animation-${top ? 'top' : 'bottom'}'),
           fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
       ),
     );
@@ -2234,11 +2234,10 @@ class _BoardPlayerStrip extends StatelessWidget {
                   const SizedBox(width: 6),
                   SizedBox.square(
                     dimension: 28,
-                    child: Image.asset(
+                    child: SvgPicture.asset(
                       resultAsset!,
                       key: Key('player-result-$color'),
                       fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
                 ],
