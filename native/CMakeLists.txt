@@ -191,6 +191,14 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   )
   add_test(NAME kchess_provider_tests COMMAND kchess_provider_tests)
 
+  # Header-only classifier, so this needs no sources beyond the test itself.
+  add_executable(kchess_termination_tests tests/termination_tests.cpp)
+  target_compile_features(kchess_termination_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_termination_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_termination_tests COMMAND kchess_termination_tests)
+
   add_executable(kchess_provider_persistence_tests
     tests/provider_persistence_tests.cpp
     src/persistence/database.cpp

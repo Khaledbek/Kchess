@@ -89,7 +89,9 @@ std::string effective_outcome(
     return provider_outcome;
   }
   if (color != "white" && color != "black") return "unknown";
-  if (result == "1/2-1/2") return "draw";
+  // Providers write either spelling; missing the second one silently
+  // dropped draws into "unknown" for every tally on the tab.
+  if (result == "1/2-1/2" || result == "\xc2\xbd-\xc2\xbd") return "draw";
   if (result == "1-0") return color == "white" ? "win" : "loss";
   if (result == "0-1") return color == "white" ? "loss" : "win";
   return "unknown";

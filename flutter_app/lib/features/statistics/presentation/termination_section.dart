@@ -279,8 +279,11 @@ class _DivergingAxisKey extends StatelessWidget {
 
 /// Win/loss balance for one ending, drawn either side of a shared centre axis:
 /// losses run left, wins run right, and draws straddle the axis as a neutral
-/// core. Every row uses the same [maxUnits] scale, so the bars are comparable
-/// down the card — the point being to see at a glance which endings pay.
+/// grey core. Every row uses the same [maxUnits] scale, so the bars are
+/// comparable down the card — the point being to see at a glance which endings
+/// pay. Segments are laid out in pixels rather than flex so a single game can be
+/// given a visible floor: against a 280-game category one draw is otherwise a
+/// sub-pixel sliver and reads as nothing at all.
 class _TerminationDivergingBar extends StatelessWidget {
   const _TerminationDivergingBar({
     required this.tally,
@@ -291,6 +294,11 @@ class _TerminationDivergingBar extends StatelessWidget {
   final int maxUnits;
 
   static const _height = 10.0;
+  static const _axisWidth = 1.0;
+
+  /// Smallest width a non-empty segment may take, so one draw or one loss stays
+  /// legible next to a category hundreds of games wide.
+  static const _minSegment = 3.0;
 
   @override
   Widget build(BuildContext context) {
@@ -308,8 +316,6 @@ class _TerminationDivergingBar extends StatelessWidget {
     final lossUnits = tally.losses * 2;
     final winUnits = tally.wins * 2;
     final drawUnits = tally.draws;
-    final leftPad = maxUnits - lossUnits - drawUnits;
-    final rightPad = maxUnits - winUnits - drawUnits;
 
     final message = [
       if (tally.wins > 0) '${tally.wins} ${labels.wins}',
@@ -317,43 +323,77 @@ class _TerminationDivergingBar extends StatelessWidget {
       if (tally.losses > 0) '${tally.losses} ${labels.losses}',
     ].join(', ');
 
-    Widget segment(int flex, Color color) =>
-        Expanded(flex: flex, child: ColoredBox(color: color));
-
     return Tooltip(
       message: message,
-      // Every Row here needs `stretch`: the segments are childless ColoredBoxes,
-      // which collapse to zero height under loose cross-axis constraints.
       child: SizedBox(
         height: _height,
         width: double.infinity,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (leftPad > 0)
-                    Expanded(flex: leftPad, child: const SizedBox()),
-                  if (lossUnits > 0) segment(lossUnits, _kLossColor),
-                  if (drawUnits > 0) segment(drawUnits, _kDrawColor),
-                ],
-              ),
-            ),
-            SizedBox(width: 1, child: ColoredBox(color: scheme.outline)),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (drawUnits > 0) segment(drawUnits, _kDrawColor),
-                  if (winUnits > 0) segment(winUnits, _kWinColor),
-                  if (rightPad > 0)
-                    Expanded(flex: rightPad, child: const SizedBox()),
-                ],
-              ),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final half = (constraints.maxWidth - _axisWidth) / 2;
+            if (!half.isFinite || half <= 0) return const SizedBox.shrink();
+
+            double widthFor(int units) {
+              if (units <= 0) return 0;
+              final raw = units / maxUnits * half;
+              return raw < _minSegment ? _minSegment : raw;
+            }
+
+            var loss = widthFor(lossUnits);
+            var win = widthFor(winUnits);
+            var drawLeft = widthFor(drawUnits);
+            var drawRight = drawLeft;
+            // The floor can push a side past its half; scale that side back so
+            // the axis stays exactly in the middle.
+            if (loss + drawLeft > half) {
+              final scale = half / (loss + drawLeft);
+              loss *= scale;
+              drawLeft *= scale;
+            }
+            if (win + drawRight > half) {
+              final scale = half / (win + drawRight);
+              win *= scale;
+              drawRight *= scale;
+            }
+
+            Widget segment(double width, Color color) => width <= 0
+                ? const SizedBox.shrink()
+                : SizedBox(width: width, child: ColoredBox(color: color));
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Losses grow leftward from the axis, draws hug it.
+                SizedBox(
+                  width: half,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      segment(loss, _kLossColor),
+                      segment(drawLeft, _kDrawColor),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: _axisWidth,
+                  child: ColoredBox(color: scheme.outline),
+                ),
+                // Draws hug the axis, wins grow rightward.
+                SizedBox(
+                  width: half,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      segment(drawRight, _kDrawColor),
+                      segment(win, _kWinColor),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

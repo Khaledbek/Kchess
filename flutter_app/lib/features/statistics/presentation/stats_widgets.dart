@@ -337,7 +337,7 @@ String _statGameOutcome(GameSummary game) {
   final color = game.profileColor;
   if (color != 'white' && color != 'black') return 'unknown';
   return switch (game.result) {
-    '1/2-1/2' => 'draw',
+    '1/2-1/2' || '½-½' => 'draw',
     '1-0' => color == 'white' ? 'win' : 'loss',
     '0-1' => color == 'white' ? 'loss' : 'win',
     _ => 'unknown',
