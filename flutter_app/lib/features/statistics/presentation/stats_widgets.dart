@@ -84,13 +84,19 @@ class _WinLossDrawRatioBar extends StatelessWidget {
     final message = _breakdown(labels, total);
     return ClipRRect(
       borderRadius: BorderRadius.circular(3),
+      // A childless ColoredBox is a proxy box, so it takes constraints.smallest
+      // — zero height under a Row's default (loose) cross-axis constraints, and
+      // zero width under a loose parent. The explicit width plus `stretch` keep
+      // every segment tight in both axes; without them the bar is invisible.
       child: SizedBox(
         height: height,
+        width: double.infinity,
         child: total == 0
             // A theme token, so the empty track stays visible on light surfaces
             // too (a translucent white track vanishes there).
             ? ColoredBox(color: Theme.of(context).colorScheme.outlineVariant)
             : Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _segment(wins, _kWinColor, message),
                   _segment(draws, _kDrawColor, message),

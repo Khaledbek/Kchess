@@ -259,7 +259,14 @@ class _PhaseDistributionStrip extends StatelessWidget {
         }
         return ClipRRect(
           borderRadius: BorderRadius.circular(6),
-          child: SizedBox(height: 22, child: Row(children: children)),
+          child: SizedBox(
+            height: 22,
+            width: double.infinity,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
         );
       },
     );
@@ -387,11 +394,15 @@ class _PhaseOutcomeBar extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(5),
+      // `stretch` + an explicit width: a childless ColoredBox otherwise
+      // collapses to constraints.smallest and the bar renders zero-height.
       child: SizedBox(
         height: 10,
+        width: double.infinity,
         child: total == 0
             ? ColoredBox(color: trackColor)
             : Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (tally.wins > 0) segment(tally.wins, _kWinColor),
                   if (tally.draws > 0) segment(tally.draws, _kDrawColor),

@@ -111,7 +111,9 @@ class _TerminationContent extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           child: SizedBox(
             height: 14,
+            width: double.infinity,
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final entry in entries)
                   Expanded(
@@ -297,6 +299,7 @@ class _TerminationDivergingBar extends StatelessWidget {
     if (maxUnits <= 0) {
       return SizedBox(
         height: _height,
+        width: double.infinity,
         child: ColoredBox(color: scheme.outlineVariant),
       );
     }
@@ -319,12 +322,17 @@ class _TerminationDivergingBar extends StatelessWidget {
 
     return Tooltip(
       message: message,
+      // Every Row here needs `stretch`: the segments are childless ColoredBoxes,
+      // which collapse to zero height under loose cross-axis constraints.
       child: SizedBox(
         height: _height,
+        width: double.infinity,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (leftPad > 0)
                     Expanded(flex: leftPad, child: const SizedBox()),
@@ -333,12 +341,10 @@ class _TerminationDivergingBar extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(
-              width: 1,
-              child: ColoredBox(color: scheme.outline),
-            ),
+            SizedBox(width: 1, child: ColoredBox(color: scheme.outline)),
             Expanded(
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (drawUnits > 0) segment(drawUnits, _kDrawColor),
                   if (winUnits > 0) segment(winUnits, _kWinColor),
