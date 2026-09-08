@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -14,10 +15,12 @@ String _classificationLabel(
   MoveClassification classification,
 ) => switch (classification) {
   MoveClassification.theory => strings.theory,
+  MoveClassification.forced => strings.forced,
   MoveClassification.brilliant => strings.brilliant,
   MoveClassification.critical => strings.critical,
   MoveClassification.best => strings.best,
   MoveClassification.excellent => strings.excellent,
+  MoveClassification.good => strings.good,
   MoveClassification.okay => strings.okay,
   MoveClassification.miss => strings.miss,
   MoveClassification.mistake => strings.mistake,
@@ -28,9 +31,11 @@ String _classificationLabel(
 String? _analysisClassificationAsset(MoveClassification classification) =>
     switch (classification) {
       MoveClassification.theory => 'assets/analysis_img/move_book.png',
+      MoveClassification.forced => 'assets/analysis_img/move_force.png',
       MoveClassification.brilliant => 'assets/analysis_img/move_brilliant.png',
       MoveClassification.best => 'assets/analysis_img/move_best.png',
       MoveClassification.excellent => 'assets/analysis_img/move_excellent.png',
+      MoveClassification.good => 'assets/analysis_img/move_okay.png',
       MoveClassification.okay => 'assets/analysis_img/move_okay.png',
       MoveClassification.miss => 'assets/analysis_img/move_miss.png',
       MoveClassification.mistake => 'assets/analysis_img/move_mistake.png',
@@ -56,6 +61,39 @@ String? _resultAssetForColor(String color, String? result, bool checkmate) {
       : 'assets/analysis_img/result_giveup.png';
 }
 
+
+int? _latestClockMillis(
+  List<ParsedMove> moves,
+  int moveIndex,
+  String color,
+) {
+  if (moveIndex < 0 || moves.isEmpty) return null;
+  final cappedIndex = math.min(moveIndex, moves.length - 1);
+  for (var index = cappedIndex; index >= 0; index--) {
+    final move = moves[index];
+    if (move.sideToMove == color && move.clockMillis != null) {
+      return move.clockMillis;
+    }
+  }
+  return null;
+}
+
+String _formatClockMillis(int millis) {
+  final clamped = math.max(0, millis);
+  final totalTenths = (clamped + 50) ~/ 100;
+  final hours = totalTenths ~/ 36000;
+  final minutes = (totalTenths ~/ 600) % 60;
+  final seconds = (totalTenths ~/ 10) % 60;
+  final tenths = totalTenths % 10;
+  final secondsText = tenths == 0
+      ? seconds.toString().padLeft(2, '0')
+      : '${seconds.toString().padLeft(2, '0')}.$tenths';
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:$secondsText';
+  }
+  return '$minutes:$secondsText';
+}
+
 Color _classificationColor(
   BuildContext context,
   MoveClassification classification,
@@ -63,10 +101,12 @@ Color _classificationColor(
   final scheme = Theme.of(context).colorScheme;
   return switch (classification) {
     MoveClassification.theory => const Color(0xCCC9A26A),
+    MoveClassification.forced => const Color(0xB35C6BC0),
     MoveClassification.brilliant => const Color(0xCC1565C0),
     MoveClassification.critical => const Color(0xB364B5F6),
     MoveClassification.best => const Color(0xB343A047),
     MoveClassification.excellent => const Color(0x9966BB6A),
+    MoveClassification.good => const Color(0x8A81C784),
     MoveClassification.okay => const Color(0x80A5D6A7),
     MoveClassification.miss => const Color(0x80FFB74D),
     MoveClassification.mistake => const Color(0x99EF5350),
@@ -1339,8 +1379,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final openingLabel = openingName.isEmpty
         ? null
         : (openingEco.isEmpty ? openingName : '$openingEco · $openingName');
-    final hasKnownProfileColor =
-        profileSide == 'white' || profileSide == 'black';
+    final whiteClockMillis = detail == null
+        ? null
+        : _latestClockMillis(detail.moves, moveIndex, 'white');
+    final blackClockMillis = detail == null
+        ? null
+        : _latestClockMillis(detail.moves, moveIndex, 'black');
+    final playerClock = playerIsBlack ? blackClockMillis : whiteClockMillis;
+    final opponentClock = playerIsBlack ? whiteClockMillis : blackClockMillis;
     final playerColor = playerIsBlack ? 'black' : 'white';
     final opponentColor = playerIsBlack ? 'white' : 'black';
     // By default the account/profile player is always at the bottom.
@@ -1520,7 +1566,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   playerName: playerName,
                   playerRating: playerRating,
                   playerColor: playerColor,
-                  playerOpening: hasKnownProfileColor ? openingLabel : null,
+                  gameOpening: openingLabel,
+                  playerClock: playerClock == null
+                      ? null
+                      : _formatClockMillis(playerClock),
+                  opponentClock: opponentClock == null
+                      ? null
+                      : _formatClockMillis(opponentClock),
                   blackAtBottom: blackAtBottom,
                   evaluationLine: lines.isEmpty ? null : lines.first,
                   showEvaluationBar: _settings.showEvaluationBar,
@@ -1656,7 +1708,9 @@ class _Board extends StatelessWidget {
     required this.playerName,
     required this.playerRating,
     required this.playerColor,
-    required this.playerOpening,
+    required this.gameOpening,
+    required this.playerClock,
+    required this.opponentClock,
     required this.blackAtBottom,
     required this.evaluationLine,
     required this.showEvaluationBar,
@@ -1694,7 +1748,9 @@ class _Board extends StatelessWidget {
   final String playerName;
   final int? playerRating;
   final String playerColor;
-  final String? playerOpening;
+  final String? gameOpening;
+  final String? playerClock;
+  final String? opponentClock;
   final bool blackAtBottom;
   final EngineLine? evaluationLine;
   final bool showEvaluationBar;
@@ -2010,11 +2066,13 @@ class _Board extends StatelessWidget {
           final topName = playerOnTop ? playerName : opponentName;
           final topRating = playerOnTop ? playerRating : opponentRating;
           final topColor = playerOnTop ? playerColor : opponentColor;
-          final topOpening = playerOnTop ? playerOpening : null;
+          final topOpening = gameOpening;
+          final topClock = playerOnTop ? playerClock : opponentClock;
           final bottomName = playerOnTop ? opponentName : playerName;
           final bottomRating = playerOnTop ? opponentRating : playerRating;
           final bottomColor = playerOnTop ? opponentColor : playerColor;
-          final bottomOpening = playerOnTop ? null : playerOpening;
+          final bottomOpening = gameOpening;
+          final bottomClock = playerOnTop ? opponentClock : playerClock;
 
           final dockedResultVisible =
               showResultSymbols && resultPresentationDocked;
@@ -2058,6 +2116,7 @@ class _Board extends StatelessWidget {
                           rating: topRating,
                           color: topColor,
                           opening: topOpening,
+                          clock: topClock,
                           resultAsset: topResultAsset,
                           emphasize: playerOnTop,
                         ),
@@ -2073,6 +2132,7 @@ class _Board extends StatelessWidget {
                           rating: bottomRating,
                           color: bottomColor,
                           opening: bottomOpening,
+                          clock: bottomClock,
                           resultAsset: bottomResultAsset,
                           emphasize: !playerOnTop,
                         ),
@@ -2319,6 +2379,7 @@ class _BoardPlayerStrip extends StatelessWidget {
     required this.rating,
     required this.color,
     required this.opening,
+    required this.clock,
     this.resultAsset,
     this.emphasize = false,
   });
@@ -2327,6 +2388,7 @@ class _BoardPlayerStrip extends StatelessWidget {
   final int? rating;
   final String color;
   final String? opening;
+  final String? clock;
   final String? resultAsset;
   final bool emphasize;
 
@@ -2360,8 +2422,7 @@ class _BoardPlayerStrip extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 7),
-                Flexible(
-                  fit: FlexFit.loose,
+                Expanded(
                   child: Text(
                     label,
                     maxLines: 1,
@@ -2380,6 +2441,24 @@ class _BoardPlayerStrip extends StatelessWidget {
                       key: Key('player-result-$color'),
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
+                if (clock != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 15,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    clock!,
+                    key: Key('player-clock-$color'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -3642,10 +3721,12 @@ class _PlayerSummaryBlock extends StatelessWidget {
     final accuracy = summary.localAccuracy;
     final counts = <(MoveClassification, int)>[
       (MoveClassification.theory, summary.theory),
+      (MoveClassification.forced, summary.forced),
       (MoveClassification.brilliant, summary.brilliant),
       (MoveClassification.critical, summary.critical),
       (MoveClassification.best, summary.best),
       (MoveClassification.excellent, summary.excellent),
+      (MoveClassification.good, summary.good),
       (MoveClassification.okay, summary.okay),
       (MoveClassification.miss, summary.miss),
       (MoveClassification.mistake, summary.mistake),

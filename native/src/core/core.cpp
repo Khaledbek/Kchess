@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Native service orchestration
+// -----------------------------------------------------------------------------
+
 #include "core/core.h"
 
 #include <algorithm>
@@ -258,6 +262,16 @@ std::string Core::start_provider_profile_json(
   return provider_service_.start_provider_profile_json(type, username);
 }
 
+std::string Core::start_scout_json(
+    const ProfileType type, const std::string& username) {
+  return provider_service_.start_scout_json(type, username);
+}
+
+std::string Core::start_scout_report_json(
+    const ProfileType type, const std::string& username) {
+  return provider_service_.start_scout_report_json(type, username);
+}
+
 std::string Core::start_provider_sync_json(
     const std::string& profile_id, const int year, const int month) {
   return provider_service_.start_provider_sync_json(profile_id, year, month);
@@ -284,6 +298,18 @@ std::string Core::statistics_openings_json() {
   // remaining local backfill now instead of waiting for another app launch.
   classify_pending_openings(0);
   return statistics_service_.openings_json();
+}
+
+std::string Core::statistics_terminations_json() {
+  return statistics_service_.terminations_json();
+}
+
+std::string Core::statistics_phases_json() {
+  return statistics_service_.phases_json();
+}
+
+std::string Core::statistics_timeline_json(const std::string& query_json) {
+  return statistics_service_.timeline_json(game_library_service_.query_games_json(query_json));
 }
 
 void Core::set_favorite(const std::string& game_id, const bool value) {

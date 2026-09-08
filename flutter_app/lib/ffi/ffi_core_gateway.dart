@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Native bindings and DTO transport
+// -----------------------------------------------------------------------------
+
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
@@ -105,13 +109,7 @@ typedef _StatusFourIntsNative = Int32 Function(
   Int32,
   Int32,
 );
-typedef _StatusFourIntsDart = int Function(
-  Pointer<Void>,
-  int,
-  int,
-  int,
-  int,
-);
+typedef _StatusFourIntsDart = int Function(Pointer<Void>, int, int, int, int);
 typedef _StartProviderProfileNative = Pointer<Utf8> Function(
   Pointer<Void>,
   Int32,
@@ -255,6 +253,18 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_openings_json',
         );
+    _statisticsTerminations = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_terminations_json',
+        );
+    _statisticsPhases = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_statistics_phases_json',
+        );
+    _statisticsTimeline = _library
+        .lookupFunction<_StringArgNative, _StringArgDart>(
+          'kc_statistics_timeline_json',
+        );
     _games = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_games_json',
     );
@@ -325,6 +335,14 @@ class FfiCoreGateway implements CoreGateway {
     _startProviderProfile = _library
         .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
           'kc_start_provider_profile_json',
+        );
+    _startScout = _library
+        .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
+          'kc_start_scout_json',
+        );
+    _startScoutReport = _library
+        .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
+          'kc_start_scout_report_json',
         );
     _startProviderSync = _library
         .lookupFunction<_StartProviderSyncNative, _StartProviderSyncDart>(
@@ -471,12 +489,17 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _variationAnalysisStatus;
   late final _StatusStringDart _cancelVariationAnalysis;
   late final _StartProviderProfileDart _startProviderProfile;
+  late final _StartProviderProfileDart _startScout;
+  late final _StartProviderProfileDart _startScoutReport;
   late final _StartProviderSyncDart _startProviderSync;
   late final _StringArgDart _providerJobStatus;
   late final _StatusStringDart _cancelProviderJob;
   late final _StringArgDart _providerOverview;
   late final _StringNoArgsDart _statisticsOverview;
   late final _StringNoArgsDart _statisticsOpenings;
+  late final _StringNoArgsDart _statisticsTerminations;
+  late final _StringNoArgsDart _statisticsPhases;
+  late final _StringArgDart _statisticsTimeline;
   late final _StatusStringIntDart _setGameFavorite;
   late final _StringNoArgsDart _favoriteCollections;
   late final _StringArgDart _createFavoriteCollection;
@@ -594,6 +617,44 @@ class FfiCoreGateway implements CoreGateway {
       });
 
   @override
+  Future<ProviderOverview> scoutPlayer(String username) async {
+    final native = username.toNativeUtf8();
+    late final String jobId;
+    try {
+      final started =
+          _readJson(
+                _startScout(_handle, ProfileType.chessCom.nativeValue, native),
+              )!
+              as Map<String, Object?>;
+      jobId = started['jobId']! as String;
+    } finally {
+      malloc.free(native);
+    }
+    return _waitProviderJob(jobId);
+  }
+
+  @override
+  Future<ScoutReport> scoutReport(String username) async {
+    final native = username.toNativeUtf8();
+    late final String jobId;
+    try {
+      final started =
+          _readJson(
+                _startScoutReport(
+                  _handle,
+                  ProfileType.chessCom.nativeValue,
+                  native,
+                ),
+              )!
+              as Map<String, Object?>;
+      jobId = started['jobId']! as String;
+    } finally {
+      malloc.free(native);
+    }
+    return ScoutReport.fromJson(await _waitJobResult(jobId));
+  }
+
+  @override
   Future<ProviderOverview> syncProvider(
     String profileId, {
     int year = 0,
@@ -688,6 +749,30 @@ class FfiCoreGateway implements CoreGateway {
   Future<OpeningsStats> openingsStats() async => OpeningsStats.fromJson(
     _readJson(_statisticsOpenings(_handle))! as Map<String, Object?>,
   );
+
+  @override
+  Future<TerminationStats> terminationStats() async =>
+      TerminationStats.fromJson(
+        _readJson(_statisticsTerminations(_handle))! as Map<String, Object?>,
+      );
+
+  @override
+  Future<PhaseStats> phaseStats() async => PhaseStats.fromJson(
+    _readJson(_statisticsPhases(_handle))! as Map<String, Object?>,
+  );
+
+  @override
+  Future<StatisticsTimeline> statisticsTimeline(GameQuery query) async {
+    final native = jsonEncode(query.toJson()).toNativeUtf8();
+    try {
+      return StatisticsTimeline.fromJson(
+        _readJson(_statisticsTimeline(_handle, native))!
+            as Map<String, Object?>,
+      );
+    } finally {
+      malloc.free(native);
+    }
+  }
 
   @override
   Future<List<GameSummary>> games() async =>
@@ -957,7 +1042,12 @@ class FfiCoreGateway implements CoreGateway {
     }
   }
 
-  Future<ProviderOverview> _waitProviderJob(String jobId) async {
+  Future<ProviderOverview> _waitProviderJob(String jobId) async =>
+      ProviderOverview.fromJson(await _waitJobResult(jobId));
+
+  /// Polls a provider/scout job to completion and returns its raw result map,
+  /// translating provider errors into a [CoreGatewayException].
+  Future<Map<String, Object?>> _waitJobResult(String jobId) async {
     _activeProviderJobId = jobId;
     try {
       while (true) {
@@ -975,7 +1065,7 @@ class FfiCoreGateway implements CoreGateway {
               ),
             );
           }
-          return ProviderOverview.fromJson(result);
+          return result;
         }
         await Future<void>.delayed(const Duration(milliseconds: 120));
       }

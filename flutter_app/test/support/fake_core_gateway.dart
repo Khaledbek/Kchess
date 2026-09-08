@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Native gateway fixtures
+// -----------------------------------------------------------------------------
+
 import 'package:kchess/ffi/core_gateway.dart';
 import 'package:kchess/models/models.dart';
 
@@ -55,6 +59,7 @@ class FakeCoreGateway implements CoreGateway {
     providerGameId: 'online-fixture-1',
     providerUrl: 'https://example.invalid/game/1',
     providerOutcome: 'win',
+    statisticsOutcome: 'win',
     timeControlType: 'rapid',
     providerAccuracy: 81.2,
     localAccuracy: 92.4,
@@ -239,11 +244,11 @@ class FakeCoreGateway implements CoreGateway {
     hasProfile: true,
     gamesWithOpening: 3,
     gamesWithoutOpening: 0,
-    distinctOpenings: 2,
-    openings: [
-      OpeningStat(
-        eco: 'C65',
-        name: 'Ruy Lopez: Berlin Defense',
+    distinctFamilies: 2,
+    families: [
+      OpeningFamily(
+        familyName: 'Ruy Lopez',
+        baseEco: 'C65',
         color: 'white',
         tally: StatTally(
           games: 2,
@@ -252,11 +257,71 @@ class FakeCoreGateway implements CoreGateway {
           winRate: 0.5,
           scorePercent: 0.5,
         ),
+        variations: [
+          OpeningVariation(
+            eco: 'C65',
+            name: 'Ruy Lopez: Berlin Defense',
+            tally: StatTally(
+              games: 2,
+              wins: 1,
+              losses: 1,
+              winRate: 0.5,
+              scorePercent: 0.5,
+            ),
+          ),
+        ],
       ),
-      OpeningStat(
-        eco: 'B10',
-        name: 'Caro-Kann Defense',
+      OpeningFamily(
+        familyName: 'Caro-Kann Defense',
+        baseEco: 'B10',
         color: 'black',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+        variations: [
+          OpeningVariation(
+            eco: 'B10',
+            name: 'Caro-Kann Defense',
+            tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  @override
+  Future<TerminationStats> terminationStats() async => const TerminationStats(
+    hasProfile: true,
+    totalGames: 3,
+    terminations: [
+      GameTermination(
+        type: 'resignation',
+        tally: StatTally(
+          games: 2,
+          wins: 1,
+          losses: 1,
+          winRate: 0.5,
+          scorePercent: 0.5,
+        ),
+      ),
+      GameTermination(
+        type: 'checkmate',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+      ),
+    ],
+  );
+
+  @override
+  Future<PhaseStats> phaseStats() async => const PhaseStats(
+    hasProfile: true,
+    totalGames: 3,
+    classified: 3,
+    phases: [
+      GamePhase(phase: 'opening', tally: StatTally(games: 1, losses: 1)),
+      GamePhase(
+        phase: 'middlegame',
+        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
+      ),
+      GamePhase(
+        phase: 'endgame',
         tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
       ),
     ],
@@ -281,6 +346,112 @@ class FakeCoreGateway implements CoreGateway {
         offlineReady: true,
         retryAfterSeconds: 0,
       );
+
+  @override
+  Future<ProviderOverview> scoutPlayer(String username) async =>
+      ProviderOverview(
+        profile: AppProfile(
+          id: 'scout:$username',
+          type: ProfileType.chessCom,
+          displayName: username,
+          providerUsername: username,
+          avatarAsset: 'profile_unknown.png',
+        ),
+        stats: const [
+          ProviderPerformance(
+            key: 'blitz',
+            currentRating: 1500,
+            bestRating: 1600,
+            games: 100,
+            wins: 45,
+            losses: 45,
+            draws: 10,
+          ),
+        ],
+        availableMonths: const [],
+        offlineReady: false,
+        retryAfterSeconds: 0,
+      );
+
+  @override
+  Future<StatisticsTimeline> statisticsTimeline(GameQuery query) async =>
+      const StatisticsTimeline(
+        recentGames: [fixtureGame],
+        ratingSeries: [
+          StatisticsRatingSeries(
+            timeControl: 'rapid',
+            currentRating: 1840,
+            points: [StatisticsRatingPoint(endedAt: 1786363200, rating: 1840)],
+          ),
+        ],
+      );
+
+  @override
+  Future<ScoutReport> scoutReport(String username) async => ScoutReport(
+    hasProfile: true,
+    comparison: PlayerComparison(
+      profileId: active?.id ?? '',
+      isSelf: username == 'Ada',
+      userOverview: await statisticsOverview(),
+      userOpenings: await openingsStats(),
+      userTerminations: await terminationStats(),
+    ),
+    profile: AppProfile(
+      id: 'scout:$username',
+      type: ProfileType.chessCom,
+      displayName: username,
+      providerUsername: username,
+      avatarAsset: 'profile_unknown.png',
+    ),
+    stats: const [ProviderPerformance(key: 'blitz', currentRating: 1500)],
+    gamesAnalyzed: 40,
+    monthsFetched: 2,
+    overall: const StatTally(
+      games: 40,
+      wins: 18,
+      draws: 4,
+      losses: 18,
+      winRate: 0.45,
+      scorePercent: 0.5,
+    ),
+    white: const StatTally(
+      games: 20,
+      wins: 11,
+      draws: 2,
+      losses: 7,
+      winRate: 0.55,
+      scorePercent: 0.6,
+    ),
+    black: const StatTally(
+      games: 20,
+      wins: 7,
+      draws: 2,
+      losses: 11,
+      winRate: 0.35,
+      scorePercent: 0.4,
+    ),
+    byTimeControl: const [],
+    terminations: const [
+      GameTermination(
+        type: 'timeout',
+        tally: StatTally(games: 8, wins: 3, losses: 5),
+      ),
+    ],
+    openings: const [
+      ScoutOpening(
+        eco: 'B01',
+        name: 'Scandinavian Defense',
+        color: 'black',
+        tally: StatTally(
+          games: 6,
+          wins: 2,
+          losses: 4,
+          winRate: 0.333,
+          scorePercent: 0.333,
+        ),
+      ),
+    ],
+  );
 
   @override
   Future<ProviderOverview> syncProvider(

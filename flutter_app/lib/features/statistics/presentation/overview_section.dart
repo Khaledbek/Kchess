@@ -1,9 +1,18 @@
+// -----------------------------------------------------------------------------
+// Section: overview section presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 class _OverviewCard extends StatelessWidget {
-  const _OverviewCard({required this.future, required this.onRetry});
+  const _OverviewCard({
+    required this.future,
+    required this.timeControl,
+    required this.onRetry,
+  });
 
   final Future<StatisticsOverview> future;
+  final String timeControl;
   final VoidCallback onRetry;
 
   @override
@@ -17,7 +26,7 @@ class _OverviewCard extends StatelessWidget {
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const SizedBox(
-                height: 140,
+                height: 180,
                 child: Center(child: CircularProgressIndicator()),
               );
             }
@@ -44,7 +53,11 @@ class _OverviewCard extends StatelessWidget {
                 text: labels.empty,
               );
             }
-            return _OverviewContent(overview: overview, labels: labels);
+            return _OverviewContent(
+              overview: overview,
+              timeControl: timeControl,
+              labels: labels,
+            );
           },
         ),
       ),
@@ -83,15 +96,32 @@ class _OverviewMessage extends StatelessWidget {
 }
 
 class _OverviewContent extends StatelessWidget {
-  const _OverviewContent({required this.overview, required this.labels});
+  const _OverviewContent({
+    required this.overview,
+    required this.timeControl,
+    required this.labels,
+  });
 
   final StatisticsOverview overview;
+  final String timeControl;
   final _OverviewText labels;
+
+  /// The tally the headline reflects: overall for "all", otherwise the matching
+  /// pre-aggregated time-control bucket (null when that bucket has no games).
+  StatTally? get _activeTally {
+    if (timeControl == 'all') return overview.overall;
+    for (final control in overview.byTimeControl) {
+      if (control.type == timeControl) return control.tally;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final overall = overview.overall;
+    final isAll = timeControl == 'all';
+    final tally = _activeTally;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -99,132 +129,86 @@ class _OverviewContent extends StatelessWidget {
           children: [
             Icon(Icons.dashboard_outlined, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
-            Text(
-              labels.title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+            Expanded(
+              child: Text(
+                labels.title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
+            if (!isAll)
+              _FilterPill(
+                label: _statsLabels(context).timeControl(timeControl),
+              ),
           ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 28,
-          runSpacing: 12,
-          children: [
-            _StatBig(value: '${overview.totalGames}', label: labels.games),
-            _StatBig(
-              value: _formatPercent(overall.winRate),
-              label: labels.winRate,
-            ),
-            _StatBig(
-              value: _formatPercent(overall.scorePercent),
-              label: labels.score,
-            ),
-            _StatBig(value: _formatRecord(overall), label: labels.record),
-          ],
-        ),
-        if (overview.recentForm.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          Text(labels.recentForm, style: _overviewSectionLabel(theme)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [
-              for (final outcome in overview.recentForm)
-                _ResultIcon(outcome: outcome, size: 30),
+        if (tally == null || tally.games == 0)
+          _OverviewMessage(
+            icon: Icons.filter_alt_off_outlined,
+            text: labels.noGamesForFilter,
+          )
+        else ...[
+          _StatTileGrid(
+            tiles: [
+              _StatTile(
+                value: '${tally.games}',
+                label: labels.games,
+                icon: Icons.tag,
+              ),
+              _StatTile(
+                value: _formatPercent(tally.winRate),
+                label: labels.winRate,
+                icon: Icons.emoji_events_outlined,
+                accent: AppTheme.success,
+              ),
+              _StatTile(
+                value: _formatPercent(tally.scorePercent),
+                label: labels.score,
+                icon: Icons.speed_outlined,
+              ),
+              _StatTile(
+                value: _formatRecord(tally),
+                label: labels.record,
+                icon: Icons.military_tech_outlined,
+              ),
             ],
           ),
-        ],
-        if (overview.white.games > 0 || overview.black.games > 0) ...[
           const SizedBox(height: 18),
-          Text(labels.byColor, style: _overviewSectionLabel(theme)),
-          const SizedBox(height: 8),
-          if (overview.white.games > 0)
-            _TallyLine(label: labels.white, tally: overview.white),
-          if (overview.black.games > 0)
-            _TallyLine(label: labels.black, tally: overview.black),
-        ],
-        if (overview.byTimeControl.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          Text(labels.byTimeControl, style: _overviewSectionLabel(theme)),
-          const SizedBox(height: 8),
-          for (final control in overview.byTimeControl)
-            _TallyLine(
-              label: _timeControlLabel(control.type),
-              tally: control.tally,
-            ),
+          _WinLossDrawBar(tally: tally, height: 14),
+          const SizedBox(height: 10),
+          _WdlLegend(tally: tally),
+          if (isAll &&
+              (overview.white.games > 0 || overview.black.games > 0)) ...[
+            const SizedBox(height: 22),
+            Text(labels.byColor, style: _overviewSectionLabel(theme)),
+            const SizedBox(height: 10),
+            if (overview.white.games > 0)
+              _TallyRow(label: labels.white, tally: overview.white),
+            if (overview.black.games > 0)
+              _TallyRow(label: labels.black, tally: overview.black),
+          ],
+          if (isAll && overview.byTimeControl.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            Text(labels.byTimeControl, style: _overviewSectionLabel(theme)),
+            const SizedBox(height: 10),
+            for (final control in overview.byTimeControl)
+              _TallyRow(
+                label: _timeControlLabel(context, control.type),
+                tally: control.tally,
+              ),
+          ],
         ],
       ],
     );
   }
 }
 
-class _StatBig extends StatelessWidget {
-  const _StatBig({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ResultIcon extends StatelessWidget {
-  const _ResultIcon({required this.outcome, this.size = 30});
-
-  final String outcome; // win | loss | draw
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = switch (outcome) {
-      'win' => 'assets/analysis_img/result_win.svg',
-      'loss' => 'assets/analysis_img/result_loss.svg',
-      'draw' => 'assets/analysis_img/result_draw.svg',
-      _ => null,
-    };
-    if (asset == null) return SizedBox(width: size, height: size);
-    final label = switch (outcome) {
-      'win' => 'Win',
-      'loss' => 'Loss',
-      _ => 'Draw',
-    };
-    return SizedBox(
-      width: size,
-      height: size,
-      child: SvgPicture.asset(
-        asset,
-        fit: BoxFit.contain,
-        semanticsLabel: label,
-      ),
-    );
-  }
-}
-
-class _TallyLine extends StatelessWidget {
-  const _TallyLine({required this.label, required this.tally});
+/// Compact label + win/draw/loss bar + "games · score" row used for the
+/// by-colour and by-time-control breakdowns.
+class _TallyRow extends StatelessWidget {
+  const _TallyRow({required this.label, required this.tally});
 
   final String label;
   final StatTally tally;
@@ -233,23 +217,32 @@ class _TallyLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 92,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '${tally.games} · ${_formatPercent(tally.winRate)}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-          Expanded(child: _WdlBar(tally: tally)),
-          const SizedBox(width: 12),
-          Text(
-            '${tally.games} · ${_formatPercent(tally.scorePercent)}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          const SizedBox(height: 6),
+          _WinLossDrawRatioBar(
+            wins: tally.wins,
+            draws: tally.draws,
+            losses: tally.losses,
+            height: 4,
           ),
         ],
       ),
@@ -257,38 +250,26 @@ class _TallyLine extends StatelessWidget {
   }
 }
 
-class _WdlBar extends StatelessWidget {
-  const _WdlBar({required this.tally});
+/// Small rounded chip that echoes the active time-control filter on a card.
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({required this.label});
 
-  final StatTally tally;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    if (tally.decided == 0) {
-      return Text('—', style: Theme.of(context).textTheme.bodySmall);
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: SizedBox(
-        height: 10,
-        child: Row(
-          children: [
-            if (tally.wins > 0)
-              Expanded(
-                flex: tally.wins,
-                child: const ColoredBox(color: Color(0xFF2E7D32)),
-              ),
-            if (tally.draws > 0)
-              Expanded(
-                flex: tally.draws,
-                child: const ColoredBox(color: Color(0xFF757575)),
-              ),
-            if (tally.losses > 0)
-              Expanded(
-                flex: tally.losses,
-                child: const ColoredBox(color: Color(0xFFC62828)),
-              ),
-          ],
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: scheme.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -307,15 +288,18 @@ TextStyle? _overviewSectionLabel(ThemeData theme) =>
       color: theme.colorScheme.onSurfaceVariant,
     );
 
-String _timeControlLabel(String type) => switch (type) {
-  'bullet' => 'Bullet',
-  'blitz' => 'Blitz',
-  'rapid' => 'Rapid',
-  'classical' => 'Classical',
-  'daily' => 'Daily',
-  'correspondence' => 'Correspondence',
-  _ => 'Other',
-};
+String _timeControlLabel(BuildContext context, String type) {
+  final strings = AppLocalizations.of(context);
+  return switch (type) {
+    'bullet' => strings.ratingBullet,
+    'blitz' => strings.ratingBlitz,
+    'rapid' => strings.ratingRapid,
+    'classical' => strings.ratingClassical,
+    'daily' => strings.ratingDaily,
+    'correspondence' => strings.statsTimeControlCorrespondence,
+    _ => strings.statsTimeControlOther,
+  };
+}
 
 class _OverviewText {
   const _OverviewText({
@@ -324,13 +308,13 @@ class _OverviewText {
     required this.winRate,
     required this.score,
     required this.record,
-    required this.recentForm,
     required this.byColor,
     required this.byTimeControl,
     required this.white,
     required this.black,
     required this.empty,
     required this.noProfile,
+    required this.noGamesForFilter,
     required this.error,
     required this.retry,
   });
@@ -340,70 +324,33 @@ class _OverviewText {
   final String winRate;
   final String score;
   final String record;
-  final String recentForm;
   final String byColor;
   final String byTimeControl;
   final String white;
   final String black;
   final String empty;
   final String noProfile;
+  final String noGamesForFilter;
   final String error;
   final String retry;
 }
 
 _OverviewText _overviewText(BuildContext context) {
-  switch (Localizations.localeOf(context).languageCode) {
-    case 'ar':
-      return const _OverviewText(
-        title: 'نظرة عامة',
-        games: 'المباريات',
-        winRate: 'نسبة الفوز',
-        score: 'النتيجة',
-        record: 'السجل',
-        recentForm: 'الأداء الأخير',
-        byColor: 'حسب اللون',
-        byTimeControl: 'حسب نوع الوقت',
-        white: 'أبيض',
-        black: 'أسود',
-        empty: 'لا توجد مباريات بعد. زامِن حسابًا على الإنترنت أو استورد مباريات لعرض إحصاءاتك.',
-        noProfile: 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.',
-        error: 'تعذّر تحميل الإحصاءات.',
-        retry: 'إعادة المحاولة',
-      );
-    case 'en':
-      return const _OverviewText(
-        title: 'Overview',
-        games: 'Games',
-        winRate: 'Win rate',
-        score: 'Score',
-        record: 'Record',
-        recentForm: 'Recent form',
-        byColor: 'By color',
-        byTimeControl: 'By time control',
-        white: 'White',
-        black: 'Black',
-        empty: 'No games yet. Sync an online profile or import games to see your statistics.',
-        noProfile: 'Create or select a profile to see statistics.',
-        error: 'Could not load statistics.',
-        retry: 'Retry',
-      );
-    default:
-      return const _OverviewText(
-        title: 'Übersicht',
-        games: 'Partien',
-        winRate: 'Siegquote',
-        score: 'Score',
-        record: 'Bilanz',
-        recentForm: 'Aktuelle Form',
-        byColor: 'Nach Farbe',
-        byTimeControl: 'Nach Zeitkontrolle',
-        white: 'Weiß',
-        black: 'Schwarz',
-        empty: 'Noch keine Partien. Synchronisiere ein Online-Profil oder importiere Partien, um deine Statistik zu sehen.',
-        noProfile: 'Erstelle oder wähle ein Profil, um Statistiken zu sehen.',
-        error: 'Statistik konnte nicht geladen werden.',
-        retry: 'Erneut versuchen',
-      );
-  }
+  final strings = AppLocalizations.of(context);
+  return _OverviewText(
+    title: strings.statsOverviewTitle,
+    games: strings.statsOverviewGames,
+    winRate: strings.statsOverviewWinRate,
+    score: strings.statsOverviewScore,
+    record: strings.statsOverviewRecord,
+    byColor: strings.statsOverviewByColor,
+    byTimeControl: strings.statsOverviewByTimeControl,
+    white: strings.statsOverviewWhite,
+    black: strings.statsOverviewBlack,
+    empty: strings.statsOverviewEmpty,
+    noProfile: strings.statsOverviewNoProfile,
+    noGamesForFilter: strings.statsOverviewNoGamesForFilter,
+    error: strings.statsOverviewError,
+    retry: strings.statsOverviewRetry,
+  );
 }
-

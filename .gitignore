@@ -49,6 +49,9 @@ flutter_app/android/captures/
 native/build/
 native/out/
 native/.cache/
+# Persistent local Stockfish libraries/build metadata survive `flutter clean`.
+native/.stockfish_build_cache/
+native/prebuilt/windows/
 
 **/CMakeFiles/
 **/CMakeCache.txt

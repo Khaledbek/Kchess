@@ -403,6 +403,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get localProfile => 'ملف محلي';
 
   @override
+  String get forced => 'إجباري';
+
+  @override
   String get theory => 'النظرية';
 
   @override
@@ -416,6 +419,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get excellent => 'ممتازة';
+
+  @override
+  String get good => 'جيدة';
 
   @override
   String get okay => 'جيدة';
@@ -736,4 +742,439 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get ratingFide => 'FIDE';
+
+  @override
+  String get statsWins => 'انتصارات';
+
+  @override
+  String get statsDraws => 'تعادلات';
+
+  @override
+  String get statsLosses => 'هزائم';
+
+  @override
+  String get statsAll => 'الكل';
+
+  @override
+  String get statsAllTimeControlsNote => 'كل أنواع الوقت';
+
+  @override
+  String get statsPhaseTitle => 'حسب مرحلة اللعب';
+
+  @override
+  String get statsPhaseSubtitle =>
+      'في أي مرحلة تنتهي مبارياتك وكيف تكون نتيجتك.';
+
+  @override
+  String get statsPhaseOpening => 'الافتتاح (1–12)';
+
+  @override
+  String get statsPhaseMiddlegame => 'وسط اللعب (13–30)';
+
+  @override
+  String get statsPhaseEndgame => 'النهاية (+31)';
+
+  @override
+  String get statsPhaseOpeningShort => 'الافتتاح';
+
+  @override
+  String get statsPhaseMiddlegameShort => 'وسط اللعب';
+
+  @override
+  String get statsPhaseEndgameShort => 'النهاية';
+
+  @override
+  String get statsPhaseGames => 'مباراة';
+
+  @override
+  String get statsPhaseWinWord => 'فوز';
+
+  @override
+  String get statsPhaseEmpty => 'لا توجد بيانات كافية عن مراحل اللعب.';
+
+  @override
+  String get statsPhaseNoProfile => 'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.';
+
+  @override
+  String get statsPhaseError => 'تعذّر تحميل مراحل اللعب.';
+
+  @override
+  String get statsPhaseRetry => 'إعادة المحاولة';
+
+  @override
+  String statsPhaseClassifiedNote(int classified, int total) {
+    return '$classified من $total مباراة';
+  }
+
+  @override
+  String get statsTitle => 'الإحصائيات';
+
+  @override
+  String get statsIntroTitle => 'أداؤك في الشطرنج';
+
+  @override
+  String get statsIntroBody =>
+      'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.';
+
+  @override
+  String get statsFormTitle => 'الأداء الأخير';
+
+  @override
+  String get statsFormHint => 'اضغط على نتيجة لفتح المباراة.';
+
+  @override
+  String get statsFormVersus => 'ضد';
+
+  @override
+  String get statsFormEmpty => 'لا توجد مباريات حديثة لعرضها.';
+
+  @override
+  String get statsFormError => 'تعذّر تحميل المباريات الأخيرة.';
+
+  @override
+  String get statsFormRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsOverviewTitle => 'نظرة عامة';
+
+  @override
+  String get statsOverviewGames => 'المباريات';
+
+  @override
+  String get statsOverviewWinRate => 'نسبة الفوز';
+
+  @override
+  String get statsOverviewScore => 'النتيجة';
+
+  @override
+  String get statsOverviewRecord => 'السجل';
+
+  @override
+  String get statsOverviewByColor => 'حسب اللون';
+
+  @override
+  String get statsOverviewByTimeControl => 'حسب نوع الوقت';
+
+  @override
+  String get statsOverviewWhite => 'أبيض';
+
+  @override
+  String get statsOverviewBlack => 'أسود';
+
+  @override
+  String get statsOverviewEmpty =>
+      'لا توجد مباريات بعد. زامِن حسابًا على الإنترنت أو استورد مباريات لعرض إحصاءاتك.';
+
+  @override
+  String get statsOverviewNoProfile =>
+      'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.';
+
+  @override
+  String get statsOverviewNoGamesForFilter =>
+      'لا توجد مباريات لنوع الوقت المحدد.';
+
+  @override
+  String get statsOverviewError => 'تعذّر تحميل الإحصاءات.';
+
+  @override
+  String get statsOverviewRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsTerminationTitle => 'طريقة انتهاء المباريات';
+
+  @override
+  String get statsTerminationCheckmate => 'كش ملك';
+
+  @override
+  String get statsTerminationResignation => 'استسلام';
+
+  @override
+  String get statsTerminationTimeout => 'انتهاء الوقت';
+
+  @override
+  String get statsTerminationDraw => 'تعادل';
+
+  @override
+  String get statsTerminationOther => 'أخرى';
+
+  @override
+  String get statsTerminationWonByCheckmate => 'فوز بكش ملك';
+
+  @override
+  String get statsTerminationLostByCheckmate => 'خسارة بكش ملك';
+
+  @override
+  String get statsTerminationOpponentResigned => 'استسلم الخصم';
+
+  @override
+  String get statsTerminationSelfResigned => 'استسلمت';
+
+  @override
+  String get statsTerminationOpponentFlagged => 'نفد وقت الخصم';
+
+  @override
+  String get statsTerminationSelfFlagged => 'نفد وقتك';
+
+  @override
+  String get statsTerminationWonGeneric => 'فوز';
+
+  @override
+  String get statsTerminationLostGeneric => 'خسارة';
+
+  @override
+  String get statsTerminationEmpty =>
+      'لا توجد بيانات كافية عن نهايات المباريات.';
+
+  @override
+  String get statsTerminationNoProfile =>
+      'أنشئ أو اختر ملفًا شخصيًا لعرض الإحصاءات.';
+
+  @override
+  String get statsTerminationError => 'تعذّر تحميل نهايات المباريات.';
+
+  @override
+  String get statsTerminationRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsRatingTitle => 'تطوّر التصنيف';
+
+  @override
+  String get statsRatingEmpty => 'لا توجد بيانات تصنيف كافية لرسم منحنى.';
+
+  @override
+  String get statsRatingError => 'تعذّر تحميل بيانات التصنيف.';
+
+  @override
+  String get statsRatingRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsOpeningGamesAll => 'الكل';
+
+  @override
+  String get statsOpeningGamesWon => 'فوز';
+
+  @override
+  String get statsOpeningGamesLost => 'خسارة';
+
+  @override
+  String get statsOpeningGamesByCheckmate => 'بكش ملك';
+
+  @override
+  String get statsOpeningGamesByResignation => 'بالاستسلام';
+
+  @override
+  String get statsOpeningGamesByTimeout => 'بانتهاء الوقت';
+
+  @override
+  String get statsOpeningGamesByDraw => 'تعادل';
+
+  @override
+  String get statsOpeningGamesEmpty => 'لا توجد مباريات لهذه الاختيار.';
+
+  @override
+  String get statsOpeningGamesError => 'تعذّر تحميل المباريات.';
+
+  @override
+  String get statsOpeningsTitle => 'أنجح الافتتاحيات';
+
+  @override
+  String get statsOpeningsMostPlayed => 'الأكثر لعبًا';
+
+  @override
+  String get statsOpeningsBestWinRate => 'أفضل نسبة فوز';
+
+  @override
+  String get statsOpeningsMinGamesHint => '3 مباريات على الأقل لكل افتتاحية.';
+
+  @override
+  String get statsOpeningsClassifiedGames => 'مباراة بافتتاحية معروفة';
+
+  @override
+  String get statsOpeningsGames => 'مباراة';
+
+  @override
+  String get statsOpeningsVariations => 'تنويعات';
+
+  @override
+  String get statsOpeningsBaseLine => 'الشكل الأساسي';
+
+  @override
+  String get statsOpeningsWhite => 'الأبيض';
+
+  @override
+  String get statsOpeningsBlack => 'الأسود';
+
+  @override
+  String get statsOpeningsUnknownColor => 'أخرى';
+
+  @override
+  String get statsOpeningsWinRateShort => 'فوز';
+
+  @override
+  String get statsOpeningsNoOpeningsForColor => 'لا توجد افتتاحيات لهذا اللون.';
+
+  @override
+  String get statsOpeningsNoOpeningsForWinRate =>
+      'لا توجد افتتاحية بثلاث مباريات على الأقل.';
+
+  @override
+  String get statsOpeningsEmpty =>
+      'لا توجد افتتاحيات مُصنّفة بعد. تُصنَّف المباريات المستوردة والمتزامنة تلقائيًا.';
+
+  @override
+  String get statsOpeningsNoProfile =>
+      'أنشئ أو اختر ملفًا شخصيًا لعرض الافتتاحيات.';
+
+  @override
+  String get statsOpeningsError => 'تعذّر تحميل الافتتاحيات.';
+
+  @override
+  String get statsOpeningsRetry => 'إعادة المحاولة';
+
+  @override
+  String get statsCompareTitle => 'مقارنة اللاعبين';
+
+  @override
+  String get statsCompareUsernameLabel => 'اسم مستخدم Chess.com';
+
+  @override
+  String get statsCompareUsernameHint => 'مثال: hikaru';
+
+  @override
+  String get statsCompareCompare => 'قارن';
+
+  @override
+  String get statsCompareLoadingHint => 'يتم جلب مباريات الخصم وتحليلها…';
+
+  @override
+  String get statsComparePrompt =>
+      'أدخل اسم مستخدم Chess.com لمقارنة الإحصاءات.';
+
+  @override
+  String get statsCompareYou => 'أنت';
+
+  @override
+  String get statsCompareOpponent => 'الخصم';
+
+  @override
+  String get statsCompareH2hTitle => 'المواجهات المباشرة';
+
+  @override
+  String get statsCompareDirectGames => 'مباريات مباشرة';
+
+  @override
+  String get statsCompareWins => 'فوز';
+
+  @override
+  String get statsCompareDraws => 'تعادل';
+
+  @override
+  String get statsCompareLosses => 'خسارة';
+
+  @override
+  String get statsComparePerformanceCompare => 'مقارنة الأداء';
+
+  @override
+  String get statsCompareWinRateWhite => 'نسبة الفوز بالأبيض';
+
+  @override
+  String get statsCompareWinRateBlack => 'نسبة الفوز بالأسود';
+
+  @override
+  String get statsCompareFlagging => 'الخسارة بانتهاء الوقت';
+
+  @override
+  String get statsCompareOpeningMatchup => 'مواجهات الافتتاحيات';
+
+  @override
+  String get statsCompareMatchupSubtitle =>
+      'افتتاحياتك مقابل نسبة فوز الخصم باللون المقابل.';
+
+  @override
+  String get statsCompareOpeningColumn => 'الافتتاحية';
+
+  @override
+  String get statsCompareGamesShort => 'مباراة';
+
+  @override
+  String get statsCompareNoMatchups => 'لا توجد افتتاحيات مشتركة.';
+
+  @override
+  String get statsCompareNoLeaks => 'لا توجد نقاط ضعف واضحة.';
+
+  @override
+  String get statsCompareStrategyTitle => 'الاستراتيجية المقترحة';
+
+  @override
+  String get statsCompareColorWhite => 'الأبيض';
+
+  @override
+  String get statsCompareColorBlack => 'الأسود';
+
+  @override
+  String get statsCompareErrorPrefix => 'خطأ';
+
+  @override
+  String statsCompareGamesAnalyzed(int games, int months) {
+    return 'تم تحليل $games مباراة من $months أشهر';
+  }
+
+  @override
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'أكثر نهاية شيوعًا: $label — $share% من كل المباريات، منها $lossPercent% خسائر.';
+  }
+
+  @override
+  String get statsCompareSelfBadge => 'مقارنة ذاتية (انعكاس)';
+
+  @override
+  String get statsCompareSelfH2H =>
+      'لا توجد مباريات ضد نفسك · هذا تحليل ذاتي لملفك الشخصي.';
+
+  @override
+  String statsCompareScopeNote(int games) {
+    return 'تعتمد المقارنة على آخر $games مباراة تم تحميلها.';
+  }
+
+  @override
+  String get statsCompareMinSampleNote =>
+      'فقط الافتتاحيات بخمس مباريات على الأقل لكل طرف.';
+
+  @override
+  String get statsCompareOwnWeaknessTitle => 'نقاط ضعفك';
+
+  @override
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  ) {
+    return 'نقطة ضعف بالـ$color: $opening — نسبة فوز $rate فقط (من $games مباراة).';
+  }
+
+  @override
+  String get statsCompareNoOwnWeakness =>
+      'لا توجد نقاط ضعف واضحة بخمس مباريات على الأقل لكل افتتاحية.';
+
+  @override
+  String statsCompareOpenWhite(String opening, String rate, int games) {
+    return 'افتتح بـ$opening — يحقق خصمك بالأسود ضدها $rate فقط (من $games مباراة).';
+  }
+
+  @override
+  String statsCompareAnswerBlack(String opening, String rate, int games) {
+    return 'بالأسود: اختر $opening — يحقق خصمك بالأبيض ضدها $rate فقط (من $games مباراة).';
+  }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'أنت: مكتبتك المحلية بالكامل · الخصم: آخر $months أشهر ($games مباراة). الجانبان عيّنتان مختلفتان، لذا قد تختلف القيم حتى عند مقارنة الملف بنفسه.';
+  }
+
+  @override
+  String get statsTimeControlCorrespondence => 'بالمراسلة';
+
+  @override
+  String get statsTimeControlOther => 'أخرى';
 }

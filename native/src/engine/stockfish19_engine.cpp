@@ -1,4 +1,5 @@
 #include "engine/chess_engine.h"
+#include "engine/stockfish19_result_coherence.h"
 
 #include <algorithm>
 #include <atomic>
@@ -173,6 +174,10 @@ class Stockfish19Engine::Impl {
   std::atomic_int current_depth{0};
   mutable std::mutex live_result_mutex;
   std::map<int, EngineLine> live_lines;
+  // Latest PV snapshot for each distinct root move. SF19 may move a root move
+  // between MultiPV ranks late in the search; retaining it lets current_result
+  // reconcile the final bestmove callback with the visible rank-1 line.
+  std::map<std::string, EngineLine> live_lines_by_move;
   std::string live_best_move;
   bool ready{false};
   std::optional<int> configured_threads;
@@ -277,6 +282,7 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
   {
     std::lock_guard live_lock(impl_->live_result_mutex);
     impl_->live_lines.clear();
+    impl_->live_lines_by_move.clear();
     impl_->live_best_move.clear();
   }
 
@@ -326,11 +332,16 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
       line.wdl = parse_wdl(info.wdl);
       line.moves = split_moves(info.pv);
       apply_score(line, info.score);
+      if (!line.best_move().empty()) {
+        impl_->live_lines_by_move[line.best_move()] = line;
+      }
 
-      // MultiPV callbacks arrive once per line. Evaluate convergence only when
-      // every requested line has reached this depth, then compare the two most
-      // important lines (best + runner-up). This keeps classification quality
-      // stable while allowing quiet positions to finish well before max depth.
+      // Keep the SF19 adapter behavior identical to the proven SF18 adapter:
+      // each MultiPV callback replaces only that rank's latest line. Stockfish
+      // 19 may intentionally report a previous PV with depth N-1 while another
+      // rank is already at N; that is valid upstream output and must not be
+      // filtered out of the final/live result. Equal-depth grouping is used
+      // only for KChess' optional convergence test, exactly as in SF18.
       const int depth = static_cast<int>(info.depth);
       if (request.dynamic_early_stop
           && depth >= request.early_stop_min_depth
@@ -430,14 +441,13 @@ AnalysisResult Stockfish19Engine::current_result() const {
   AnalysisResult result;
   std::lock_guard result_lock(impl_->live_result_mutex);
   result.best_move = impl_->live_best_move;
-  for (const auto& [rank, line] : impl_->live_lines) {
-    (void)rank;
+  result.lines = coherent_stockfish19_ranked_lines(
+      impl_->live_lines, impl_->live_lines_by_move, result.best_move);
+  for (const auto& line : result.lines) {
     result.reached_depth = std::max(result.reached_depth, line.depth);
     result.nodes = std::max(result.nodes, line.nodes);
-    result.lines.push_back(line);
   }
-  if ((result.best_move.empty() || result.best_move == "(none)"
-       || result.best_move == "0000")
+  if (!usable_stockfish19_engine_move(result.best_move)
       && !result.lines.empty() && !result.lines.front().moves.empty()) {
     result.best_move = result.lines.front().moves.front();
   }
@@ -471,7 +481,10 @@ void Stockfish19Engine::stop() noexcept {
 std::string Stockfish19Engine::id() const { return "stockfish19"; }
 
 std::string Stockfish19Engine::version() const {
-  return "Stockfish 19 (sf_19-edb0d9d)";
+  // Adapter revision is part of the persisted engine version on purpose.
+  // Analyses produced before coherent-best-v2 can contain a final bestmove that
+  // disagrees with the stored rank-1 PV, so they must be recomputed once.
+  return "Stockfish 19 (sf_19-edb0d9d; coherent-best-v2)";
 }
 
 std::string Stockfish19Engine::cache_identity() const {

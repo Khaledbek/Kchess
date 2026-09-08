@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Stable C ABI declarations
+// -----------------------------------------------------------------------------
+
 #ifndef KCHESS_CORE_API_H
 #define KCHESS_CORE_API_H
 
@@ -115,6 +119,14 @@ KCHESS_API char* kc_start_provider_profile_json(
     kc_core_handle handle,
     int32_t profile_type,
     const char* username_utf8);
+KCHESS_API char* kc_start_scout_json(
+    kc_core_handle handle,
+    int32_t profile_type,
+    const char* username_utf8);
+KCHESS_API char* kc_start_scout_report_json(
+    kc_core_handle handle,
+    int32_t profile_type,
+    const char* username_utf8);
 KCHESS_API char* kc_start_provider_sync_json(
     kc_core_handle handle,
     const char* profile_id_utf8,
@@ -131,6 +143,10 @@ KCHESS_API char* kc_provider_overview_json(
     const char* profile_id_utf8);
 KCHESS_API char* kc_statistics_overview_json(kc_core_handle handle);
 KCHESS_API char* kc_statistics_openings_json(kc_core_handle handle);
+KCHESS_API char* kc_statistics_terminations_json(kc_core_handle handle);
+KCHESS_API char* kc_statistics_phases_json(kc_core_handle handle);
+// Returns owned UTF-8 JSON; release with kc_string_free, as for other JSON calls.
+KCHESS_API char* kc_statistics_timeline_json(kc_core_handle handle, const char* query_utf8);
 KCHESS_API kc_status kc_set_game_favorite(
     kc_core_handle handle,
     const char* game_id_utf8,

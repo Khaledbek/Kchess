@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Persistence records and database interface
+// -----------------------------------------------------------------------------
+
 #pragma once
 
 #include <filesystem>
@@ -94,6 +98,17 @@ struct GameStatRow {
   std::string time_control_type;  // bullet | blitz | rapid | classical | daily | ...
   std::string opening_eco;        // empty when the game has no named opening
   std::string opening_name;       // empty when unclassified or no named opening
+};
+
+// Minimal per-game fields for the game-phase ("phase of death") breakdown:
+// outcome plus the last recorded ply, from which the ending move number (and
+// thus the phase) is derived. max_ply is -1 when the game has no stored moves.
+struct GamePhaseRow {
+  std::string provider_outcome;
+  std::string result;
+  std::string white_name;
+  std::string black_name;
+  int max_ply{-1};
 };
 
 struct FavoriteCollectionRecord {
@@ -206,6 +221,9 @@ class Database {
 
   // Lightweight rows for statistics, newest game first (by end/creation time).
   std::vector<GameStatRow> games_for_statistics(const std::string& profile_id) const;
+
+  // Outcome + final ply per game, for the game-phase breakdown.
+  std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;
 
   // Opening classification. games_needing_opening returns (game_id, pgn) for
   // games not yet classified (opening_ply IS NULL); limit <= 0 returns all.

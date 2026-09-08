@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Native application service interface
+// -----------------------------------------------------------------------------
+
 #pragma once
 
 #include <cstdint>
@@ -75,6 +79,8 @@ class Core {
   void clear_cached_month(const std::string& profile_id, const std::string& month);
 
   std::string start_provider_profile_json(ProfileType type, const std::string& username);
+  std::string start_scout_json(ProfileType type, const std::string& username);
+  std::string start_scout_report_json(ProfileType type, const std::string& username);
   std::string start_provider_sync_json(
       const std::string& profile_id, int year, int month);
   std::string provider_job_status_json(const std::string& job_id);
@@ -83,6 +89,9 @@ class Core {
 
   std::string statistics_overview_json();
   std::string statistics_openings_json();
+  std::string statistics_terminations_json();
+  std::string statistics_phases_json();
+  std::string statistics_timeline_json(const std::string& query_json);
 
   std::string start_analysis_json(const std::string& game_id);
   std::string analysis_status_json(const std::string& game_id);

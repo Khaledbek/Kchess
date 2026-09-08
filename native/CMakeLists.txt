@@ -5,8 +5,18 @@ project(kchess_core VERSION 0.1.0 LANGUAGES C CXX)
 option(KCHESS_BUILD_TESTS "Build native unit tests" ON)
 option(KCHESS_WITH_STOCKFISH "Build the official Stockfish engine" ON)
 
+# -----------------------------------------------------------------------------
+# Section: Stockfish source and runtime assets
+# -----------------------------------------------------------------------------
+
 set(STOCKFISH_SOURCE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stockfish/source/src"
+)
+set(STOCKFISH_BIG_NET
+  "${STOCKFISH_SOURCE_DIR}/nn-c288c895ea92.nnue"
+)
+set(STOCKFISH_SMALL_NET
+  "${STOCKFISH_SOURCE_DIR}/nn-37f18f62d772.nnue"
 )
 
 if(KCHESS_WITH_STOCKFISH)
@@ -14,43 +24,41 @@ if(KCHESS_WITH_STOCKFISH)
   set(STOCKFISH19_SOURCE_ROOT "${KCHESS_STOCKFISH19_SOURCE_ROOT}")
   set(STOCKFISH19_SOURCE_DIR "${KCHESS_STOCKFISH19_SOURCE_DIR}")
   set(STOCKFISH19_NET "${KCHESS_STOCKFISH19_NET}")
+endif()
+
+# -----------------------------------------------------------------------------
+# Section: Stockfish library build strategy
+# -----------------------------------------------------------------------------
+
+set(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE OFF)
+if(KCHESS_WITH_STOCKFISH AND WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+  # Windows Flutter clean removes flutter_app/build, but it does not touch the
+  # source-adjacent persistent cache. The official engines are therefore built
+  # once per configuration and then linked as stable prebuilt .lib files.
+  set(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE ON)
+  include(cmake/stockfish_windows_cache.cmake)
+elseif(KCHESS_WITH_STOCKFISH)
+  # Android and non-MSVC native builds keep the existing in-tree source build.
+  # This preserves the current Android ABI/toolchain behavior unchanged.
   file(GLOB_RECURSE STOCKFISH_SOURCES CONFIGURE_DEPENDS
     "${STOCKFISH_SOURCE_DIR}/*.cpp"
   )
   list(REMOVE_ITEM STOCKFISH_SOURCES "${STOCKFISH_SOURCE_DIR}/main.cpp")
 
-  set(STOCKFISH_BIG_NET
-    "${STOCKFISH_SOURCE_DIR}/nn-c288c895ea92.nnue"
-  )
-  set(STOCKFISH_SMALL_NET
-    "${STOCKFISH_SOURCE_DIR}/nn-37f18f62d772.nnue"
-  )
-
-  # Keep Stockfish in a small subdirectory so its MSVC Debug flags can be
-  # optimized independently from the rest of Kchess. Flutter Debug builds keep
-  # their normal debug/runtime-check settings; only the engine uses release-like
-  # code generation for search speed.
+  # Keep Stockfish in a small subdirectory so its Debug flags can be optimized
+  # independently from the rest of KChess.
   add_subdirectory(cmake/stockfish_target)
   target_compile_features(stockfish_official PUBLIC cxx_std_20)
   target_include_directories(stockfish_official PUBLIC ${STOCKFISH_SOURCE_DIR})
   set_target_properties(stockfish_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-  # Stockfish's Makefile normally selects the SIMD backend. Kchess builds the
-  # engine through CMake, so select the safe baseline explicitly instead of
-  # falling back to scalar NNUE code.
-  if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-    # SSE2 is part of the x86-64 baseline on Windows. Do not force AVX2 here:
-    # doing so would make the packaged DLL unusable on older x64 CPUs.
-    target_compile_definitions(stockfish_official PRIVATE USE_SSE2)
-  elseif(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-    # NEON/Advanced SIMD is mandatory for AArch64. Stockfish uses the numeric
-    # value to distinguish the ARM generation in a few NNUE code paths.
-    target_compile_definitions(stockfish_official PRIVATE USE_NEON=8 USE_POPCNT IS_64BIT)
+  if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    target_compile_definitions(stockfish_official PRIVATE
+      USE_NEON=8 USE_POPCNT IS_64BIT
+    )
   endif()
 
   if(MSVC)
-    # Stockfish has many translation units that MSBuild compiles in parallel.
-    # /FS serializes writes to the shared compiler PDB and prevents MSVC C1041.
     target_compile_options(stockfish_official PRIVATE /W3 /EHsc /bigobj /FS)
   else()
     target_compile_options(stockfish_official PRIVATE
@@ -61,11 +69,7 @@ if(KCHESS_WITH_STOCKFISH)
     )
   endif()
 
-  # Keep the Stockfish 19 source list aligned with the official sf_19
-  # Makefile. Do not recursively glob all .cpp files: sf_19 also ships
-  # universal/* implementation files that are only used by Stockfish's
-  # dedicated universal-binary build and must not enter KChess' normal
-  # Windows/Android library build.
+  # Keep the Stockfish 19 source list aligned with the official sf_19 Makefile.
   set(STOCKFISH19_SOURCES
     "${STOCKFISH19_SOURCE_DIR}/attacks.cpp"
     "${STOCKFISH19_SOURCE_DIR}/benchmark.cpp"
@@ -98,18 +102,16 @@ if(KCHESS_WITH_STOCKFISH)
       message(FATAL_ERROR "Stockfish 19 source file is missing: ${_sf19_source}")
     endif()
   endforeach()
+
   add_subdirectory(cmake/stockfish19_target)
   target_compile_features(stockfish19_official PUBLIC cxx_std_20)
-  # Keep the 19.x headers private. Stockfish 18 and 19 intentionally use the
-  # same upstream header names, so exporting both include directories would make
-  # adapter compilation depend on include-path ordering.
   target_include_directories(stockfish19_official PRIVATE ${STOCKFISH19_SOURCE_DIR})
   set_target_properties(stockfish19_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-  if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-    target_compile_definitions(stockfish19_official PRIVATE USE_SSE2)
-  elseif(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-    target_compile_definitions(stockfish19_official PRIVATE USE_NEON=8 USE_POPCNT IS_64BIT)
+  if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    target_compile_definitions(stockfish19_official PRIVATE
+      USE_NEON=8 USE_POPCNT IS_64BIT
+    )
   endif()
 
   if(MSVC)
@@ -143,6 +145,7 @@ add_library(kchess_core SHARED
   src/api/core_api.cpp
   src/analysis/accuracy.cpp
   src/analysis/move_classifier.cpp
+  src/analysis/move_classifier_sf19.cpp
   src/chess/fen.cpp
   src/chess/move.cpp
   src/chess/pgn.cpp
@@ -152,6 +155,7 @@ add_library(kchess_core SHARED
   src/engine/stockfish_runtime.cpp
   src/engine/stockfish_engine.cpp
   src/engine/stockfish19_engine.cpp
+  src/engine/stockfish19_result_coherence.cpp
   src/engine/stockfish_factory.cpp
   src/http/http_client.cpp
   src/http/android_http_client.cpp
@@ -169,6 +173,7 @@ add_library(kchess_core SHARED
   src/services/provider_service.cpp
   src/services/settings_service.cpp
   src/services/statistics_service.cpp
+  src/services/statistics_details.cpp
   src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
   src/theory/position_key.cpp
@@ -193,6 +198,10 @@ endif()
 if(KCHESS_WITH_STOCKFISH)
   target_compile_definitions(kchess_core PRIVATE KCHESS_WITH_STOCKFISH=1)
   target_link_libraries(kchess_core PRIVATE stockfish_official stockfish19_official)
+  if(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE)
+    # Ensure the one-time cache population completes before the DLL link step.
+    add_dependencies(kchess_core kchess_stockfish_windows_cache)
+  endif()
 endif()
 set_target_properties(kchess_core PROPERTIES
   CXX_VISIBILITY_PRESET hidden
@@ -216,6 +225,15 @@ endif()
 if(MSVC)
   target_compile_options(kchess_core PRIVATE /W4 /permissive- /EHsc)
   target_compile_options(kchess_sqlite PRIVATE /W3)
+
+  if(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE)
+    # KChess still includes the official engine headers while linking the
+    # persistent prebuilt libraries. Suppress only the known third-party
+    # alignment diagnostic and missing-library-PDB linker noise; keep all
+    # other KChess compiler/linker diagnostics visible.
+    target_compile_options(kchess_core PRIVATE /wd4324)
+    target_link_options(kchess_core PRIVATE /IGNORE:4099)
+  endif()
 else()
   target_compile_options(kchess_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -277,6 +295,14 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
   )
   add_test(NAME kchess_provider_tests COMMAND kchess_provider_tests)
+
+  # Header-only classifier, so this needs no sources beyond the test itself.
+  add_executable(kchess_termination_tests tests/termination_tests.cpp)
+  target_compile_features(kchess_termination_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_termination_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_termination_tests COMMAND kchess_termination_tests)
 
   add_executable(kchess_provider_persistence_tests
     tests/provider_persistence_tests.cpp
@@ -341,4 +367,25 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   )
   target_link_libraries(kchess_classifier_quality_tests PRIVATE stockfish_official)
   add_test(NAME kchess_classifier_quality_tests COMMAND kchess_classifier_quality_tests)
+
+  add_executable(kchess_classifier_sf19_tests
+    tests/classifier_sf19_tests.cpp
+    src/analysis/accuracy.cpp
+    src/analysis/move_classifier_sf19.cpp
+  )
+  target_compile_features(kchess_classifier_sf19_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_classifier_sf19_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_classifier_sf19_tests COMMAND kchess_classifier_sf19_tests)
+
+  add_executable(kchess_sf19_result_coherence_tests
+    tests/sf19_result_coherence_tests.cpp
+    src/engine/stockfish19_result_coherence.cpp
+  )
+  target_compile_features(kchess_sf19_result_coherence_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_sf19_result_coherence_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_sf19_result_coherence_tests COMMAND kchess_sf19_result_coherence_tests)
 endif()

@@ -188,6 +188,7 @@ std::string GameLibraryService::game_record_json(
             || game.result == "1/2-1/2" || game.result == "½-½")) {
       outcome = {{"result", game.result}, {"checkmate", false}};
     }
+    const auto move_clocks = extract_mainline_clock_millis(game.pgn, game.moves.size());
     json << ",\"startingPosition\":" << position_view_json(game.starting_fen)
          << ",\"outcome\":" << outcome.dump()
          << ",\"pgn\":\"" << escape_json(game.pgn) << "\",\"moves\":[";
@@ -201,7 +202,13 @@ std::string GameLibraryService::game_record_json(
            << "\",\"uci\":\"" << escape_json(move.uci)
            << "\",\"fenBefore\":\"" << escape_json(move.fen_before)
            << "\",\"fenAfter\":\"" << escape_json(move.fen_after)
-           << "\",\"positionBefore\":" << position_view_json(move.fen_before)
+           << "\",\"clockMillis\":";
+      if (index < move_clocks.size() && move_clocks[index].has_value()) {
+        json << *move_clocks[index];
+      } else {
+        json << "null";
+      }
+      json << ",\"positionBefore\":" << position_view_json(move.fen_before)
            << ",\"positionAfter\":" << position_view_json(move.fen_after) << "}";
     }
     json << ']';

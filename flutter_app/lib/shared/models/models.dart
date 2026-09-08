@@ -1,3 +1,9 @@
+// -----------------------------------------------------------------------------
+// Section: Application DTOs
+// -----------------------------------------------------------------------------
+
+part 'statistics_details.dart';
+
 enum ProfileType {
   chessCom,
   lichess,
@@ -175,6 +181,7 @@ class StatTally {
     this.losses = 0,
     this.undecided = 0,
     this.winRate,
+    this.winShare,
     this.scorePercent,
   });
 
@@ -185,6 +192,7 @@ class StatTally {
     losses: json['losses'] as int? ?? 0,
     undecided: json['undecided'] as int? ?? 0,
     winRate: (json['winRate'] as num?)?.toDouble(),
+    winShare: (json['winShare'] as num?)?.toDouble(),
     scorePercent: (json['scorePercent'] as num?)?.toDouble(),
   );
 
@@ -194,6 +202,7 @@ class StatTally {
   final int losses;
   final int undecided;
   final double? winRate;
+  final double? winShare;
   final double? scorePercent;
 
   int get decided => wins + draws + losses;
@@ -259,17 +268,209 @@ class StatisticsOverview {
   bool get isEmpty => totalGames == 0;
 }
 
-/// Performance in one named opening playing a given color, from the profile's
+/// One specific line within an opening family (e.g. "Scandinavian Defense:
+/// Mieses-Kotroc Variation"), with its win/draw/loss tally from the profile's
 /// perspective.
-class OpeningStat {
-  const OpeningStat({
+class OpeningVariation {
+  const OpeningVariation({
+    required this.eco,
+    required this.name,
+    required this.tally,
+  });
+
+  factory OpeningVariation.fromJson(Map<String, Object?> json) =>
+      OpeningVariation(
+        eco: json['eco'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        tally: StatTally.fromJson(json),
+      );
+
+  final String eco;
+  final String name; // full opening name, including the family prefix
+  final StatTally tally;
+}
+
+/// A base opening family (e.g. "Scandinavian Defense") aggregating every
+/// variation the profile played with a given color, most played first.
+class OpeningFamily {
+  const OpeningFamily({
+    required this.familyName,
+    required this.baseEco,
+    required this.color,
+    required this.tally,
+    required this.variations,
+    this.hasDistinctVariations = false,
+  });
+
+  factory OpeningFamily.fromJson(Map<String, Object?> json) => OpeningFamily(
+    familyName: json['family'] as String? ?? '',
+    hasDistinctVariations: json['hasDistinctVariations'] as bool? ?? false,
+    baseEco: json['eco'] as String? ?? '',
+    color: json['color'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+    variations: (json['variations'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(OpeningVariation.fromJson)
+        .toList(growable: false),
+  );
+
+  final String familyName;
+  final String baseEco;
+  final String color; // white | black | unknown
+  final StatTally tally;
+  final List<OpeningVariation> variations;
+
+  final bool hasDistinctVariations;
+}
+
+/// Opening families for the active profile, grouped and most played first.
+class OpeningsStats {
+  const OpeningsStats({
+    this.hasProfile = false,
+    this.gamesWithOpening = 0,
+    this.gamesWithoutOpening = 0,
+    this.distinctFamilies = 0,
+    this.bestWinRateFamilies = const [],
+    this.defaultColor = 'white',
+    this.families = const [],
+  });
+
+  factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
+    hasProfile: json['hasProfile'] as bool? ?? false,
+    gamesWithOpening: json['gamesWithOpening'] as int? ?? 0,
+    gamesWithoutOpening: json['gamesWithoutOpening'] as int? ?? 0,
+    distinctFamilies: json['distinctFamilies'] as int? ?? 0,
+    defaultColor: json['defaultColor'] as String? ?? 'white',
+    bestWinRateFamilies:
+        (json['bestWinRateFamilies'] as List<Object?>? ?? const [])
+            .cast<Map<String, Object?>>()
+            .map(OpeningFamily.fromJson)
+            .toList(growable: false),
+    families: (json['families'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(OpeningFamily.fromJson)
+        .toList(growable: false),
+  );
+
+  final bool hasProfile;
+  final int gamesWithOpening;
+  final int gamesWithoutOpening;
+  final int distinctFamilies;
+  final String defaultColor;
+  final List<OpeningFamily> bestWinRateFamilies;
+  final List<OpeningFamily> families;
+
+  bool get isEmpty => gamesWithOpening == 0;
+}
+
+/// One game-termination bucket (checkmate, resignation, timeout, draw, other)
+/// with the profile's win/draw/loss split among the games that ended that way.
+class GameTermination {
+  const GameTermination({required this.type, required this.tally});
+
+  factory GameTermination.fromJson(Map<String, Object?> json) =>
+      GameTermination(
+        type: json['type'] as String? ?? 'other',
+        tally: StatTally.fromJson(json),
+      );
+
+  final String type; // checkmate | resignation | timeout | draw | other
+  final StatTally tally;
+
+  int get count => tally.games;
+}
+
+/// How the active profile's games ended, aggregated in the native layer from
+/// the stored PGN Termination tags.
+class TerminationStats {
+  const TerminationStats({
+    this.hasProfile = false,
+    this.totalGames = 0,
+    this.terminations = const [],
+    this.spotlight,
+  });
+
+  factory TerminationStats.fromJson(Map<String, Object?> json) =>
+      TerminationStats(
+        hasProfile: json['hasProfile'] as bool? ?? false,
+        spotlight: json['spotlight'] == null
+            ? null
+            : TerminationSpotlight.fromJson(
+                json['spotlight']! as Map<String, Object?>,
+              ),
+        totalGames: json['totalGames'] as int? ?? 0,
+        terminations: (json['terminations'] as List<Object?>? ?? const [])
+            .cast<Map<String, Object?>>()
+            .map(GameTermination.fromJson)
+            .toList(growable: false),
+      );
+
+  final bool hasProfile;
+  final int totalGames;
+  final List<GameTermination> terminations;
+  final TerminationSpotlight? spotlight;
+
+  bool get isEmpty => terminations.isEmpty;
+}
+
+/// Win/draw/loss tally for the games that ended in one game phase (opening,
+/// middlegame, endgame), from the profile's perspective.
+class GamePhase {
+  const GamePhase({required this.phase, required this.tally});
+
+  factory GamePhase.fromJson(Map<String, Object?> json) => GamePhase(
+    phase: json['phase'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+  );
+
+  final String phase; // opening | middlegame | endgame
+  final StatTally tally;
+}
+
+/// Distribution of the active profile's games across the phase in which they
+/// ended, aggregated in the native layer from each game's final move number.
+class PhaseStats {
+  const PhaseStats({
+    this.hasProfile = false,
+    this.totalGames = 0,
+    this.classified = 0,
+    this.overall = const StatTally(),
+    this.phases = const [],
+  });
+
+  factory PhaseStats.fromJson(Map<String, Object?> json) => PhaseStats(
+    hasProfile: json['hasProfile'] as bool? ?? false,
+    totalGames: json['totalGames'] as int? ?? 0,
+    classified: json['classified'] as int? ?? 0,
+    overall: StatTally.fromJson(
+      json['overall'] as Map<String, Object?>? ?? const {},
+    ),
+    phases: (json['phases'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(GamePhase.fromJson)
+        .toList(growable: false),
+  );
+
+  final bool hasProfile;
+  final int totalGames;
+  final int classified;
+  final StatTally overall;
+  final List<GamePhase> phases;
+
+  bool get isEmpty => classified == 0;
+}
+
+/// One opening a scouted opponent played with a given colour, with their
+/// win/draw/loss tally. `eco` is the join key for the repertoire clash.
+class ScoutOpening {
+  const ScoutOpening({
     required this.eco,
     required this.name,
     required this.color,
     required this.tally,
   });
 
-  factory OpeningStat.fromJson(Map<String, Object?> json) => OpeningStat(
+  factory ScoutOpening.fromJson(Map<String, Object?> json) => ScoutOpening(
     eco: json['eco'] as String? ?? '',
     name: json['name'] as String? ?? '',
     color: json['color'] as String? ?? 'unknown',
@@ -282,34 +483,75 @@ class OpeningStat {
   final StatTally tally;
 }
 
-/// Win-rate-by-opening for the active profile, most played first.
-class OpeningsStats {
-  const OpeningsStats({
+/// A deep scouting report for a public opponent: profile, ratings and their
+/// win/draw/loss aggregated by colour, time control, termination and opening —
+/// computed in the native layer from recent archives, without persistence.
+class ScoutReport {
+  const ScoutReport({
     this.hasProfile = false,
-    this.gamesWithOpening = 0,
-    this.gamesWithoutOpening = 0,
-    this.distinctOpenings = 0,
+    required this.profile,
+    this.stats = const [],
+    this.gamesAnalyzed = 0,
+    this.monthsFetched = 0,
+    this.overall = const StatTally(),
+    this.white = const StatTally(),
+    this.black = const StatTally(),
+    this.byTimeControl = const [],
+    this.terminations = const [],
     this.openings = const [],
+    this.comparison = const PlayerComparison(),
   });
 
-  factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
-    hasProfile: json['hasProfile'] as bool? ?? false,
-    gamesWithOpening: json['gamesWithOpening'] as int? ?? 0,
-    gamesWithoutOpening: json['gamesWithoutOpening'] as int? ?? 0,
-    distinctOpenings: json['distinctOpenings'] as int? ?? 0,
-    openings: (json['openings'] as List<Object?>? ?? const [])
-        .cast<Map<String, Object?>>()
-        .map(OpeningStat.fromJson)
-        .toList(growable: false),
-  );
+  factory ScoutReport.fromJson(Map<String, Object?> json) {
+    final byColor = json['byColor'] as Map<String, Object?>? ?? const {};
+    return ScoutReport(
+      hasProfile: json['hasProfile'] as bool? ?? false,
+      comparison: PlayerComparison.fromJson(
+        json['comparison'] as Map<String, Object?>? ?? const {},
+      ),
+      profile: AppProfile.fromJson(json['profile']! as Map<String, Object?>),
+      stats: (json['stats'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(ProviderPerformance.fromJson)
+          .toList(growable: false),
+      gamesAnalyzed: json['gamesAnalyzed'] as int? ?? 0,
+      monthsFetched: json['monthsFetched'] as int? ?? 0,
+      overall: StatTally.fromJson(
+        json['overall'] as Map<String, Object?>? ?? const {},
+      ),
+      white: StatTally.fromJson(
+        byColor['white'] as Map<String, Object?>? ?? const {},
+      ),
+      black: StatTally.fromJson(
+        byColor['black'] as Map<String, Object?>? ?? const {},
+      ),
+      byTimeControl: (json['byTimeControl'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(StatTimeControl.fromJson)
+          .toList(growable: false),
+      terminations: (json['terminations'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(GameTermination.fromJson)
+          .toList(growable: false),
+      openings: (json['openings'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(ScoutOpening.fromJson)
+          .toList(growable: false),
+    );
+  }
 
   final bool hasProfile;
-  final int gamesWithOpening;
-  final int gamesWithoutOpening;
-  final int distinctOpenings;
-  final List<OpeningStat> openings;
-
-  bool get isEmpty => gamesWithOpening == 0;
+  final AppProfile profile;
+  final List<ProviderPerformance> stats;
+  final int gamesAnalyzed;
+  final int monthsFetched;
+  final StatTally overall;
+  final StatTally white;
+  final StatTally black;
+  final List<StatTimeControl> byTimeControl;
+  final List<GameTermination> terminations;
+  final List<ScoutOpening> openings;
+  final PlayerComparison comparison;
 }
 
 enum AppThemeMode {
@@ -366,11 +608,15 @@ class AppSettings {
     threads: json['threads'] as int? ?? 2,
     maxThreads: json['maxThreads'] as int? ?? json['threads'] as int? ?? 2,
     hashMb: json['hashMb'] as int? ?? 128,
-    sidelineDepth: json['sidelineDepth'] as int? ??
+    sidelineDepth:
+        json['sidelineDepth'] as int? ??
         ((json['maxAnalysisDepth'] as int?) ?? (json['depth'] as int?) ?? 18),
-    sidelineMultiPv: json['sidelineMultiPv'] as int? ?? json['multiPv'] as int? ?? 3,
-    sidelineThreads: json['sidelineThreads'] as int? ?? json['threads'] as int? ?? 2,
-    sidelineHashMb: json['sidelineHashMb'] as int? ?? json['hashMb'] as int? ?? 128,
+    sidelineMultiPv:
+        json['sidelineMultiPv'] as int? ?? json['multiPv'] as int? ?? 3,
+    sidelineThreads:
+        json['sidelineThreads'] as int? ?? json['threads'] as int? ?? 2,
+    sidelineHashMb:
+        json['sidelineHashMb'] as int? ?? json['hashMb'] as int? ?? 128,
     showBestMoveArrow:
         json['showBestMoveArrow'] as bool? ??
         json['showBoardArrows'] as bool? ??
@@ -551,6 +797,8 @@ class GameSummary {
     this.favoriteCollectionId,
     this.downloaded = false,
     this.analyzed = false,
+    this.termination = 'unknown',
+    this.statisticsOutcome = 'unknown',
     this.endedAt = 0,
   });
 
@@ -583,6 +831,8 @@ class GameSummary {
     favoriteCollectionId: json['favoriteCollectionId'] as String?,
     downloaded: json['downloaded'] as bool? ?? false,
     analyzed: json['analyzed'] as bool? ?? false,
+    termination: json['termination'] as String? ?? 'unknown',
+    statisticsOutcome: json['statisticsOutcome'] as String? ?? 'unknown',
     endedAt: json['endedAt'] as int? ?? 0,
   );
 
@@ -614,6 +864,9 @@ class GameSummary {
   final String? favoriteCollectionId;
   final bool downloaded;
   final bool analyzed;
+  final String statisticsOutcome;
+  final String
+  termination; // checkmate | resignation | timeout | draw | other | unknown
   final int endedAt;
 }
 
@@ -622,6 +875,8 @@ class GameQuery {
     this.search = '',
     this.outcome = 'all',
     this.color = 'all',
+    this.openingName,
+    this.statisticsOutcome = 'all',
     this.timeControls = const <String>[],
     this.sort = 'newest',
     this.month,
@@ -632,6 +887,8 @@ class GameQuery {
   final String search;
   final String outcome;
   final String color;
+  final String? openingName;
+  final String statisticsOutcome;
   final List<String> timeControls;
   final String sort;
   final String? month;
@@ -642,9 +899,14 @@ class GameQuery {
     'search': search,
     'outcome': outcome,
     'color': color,
+    if (openingName != null) 'openingName': openingName,
+    if (statisticsOutcome != 'all') 'statisticsOutcome': statisticsOutcome,
     'timeControls': timeControls,
     'sort': sort,
-    'month': month,
+    // Only send `month` when set: the native query reads it with a string
+    // default that is used solely when the key is absent, so a JSON `null`
+    // would throw there instead of falling back.
+    if (month != null) 'month': month,
     'favoriteOnly': favoriteOnly,
     'applyMonth': applyMonth,
   };
@@ -659,6 +921,7 @@ class ParsedMove {
     required this.uci,
     required this.fenBefore,
     required this.fenAfter,
+    this.clockMillis,
     this.positionBefore = BoardPosition.empty,
     this.positionAfter = BoardPosition.empty,
   });
@@ -671,6 +934,7 @@ class ParsedMove {
     uci: json['uci']! as String,
     fenBefore: json['fenBefore']! as String,
     fenAfter: json['fenAfter']! as String,
+    clockMillis: json['clockMillis'] as int?,
     positionBefore: BoardPosition.fromJson(
       json['positionBefore']! as Map<String, Object?>,
     ),
@@ -686,6 +950,7 @@ class ParsedMove {
   final String uci;
   final String fenBefore;
   final String fenAfter;
+  final int? clockMillis;
   final BoardPosition positionBefore;
   final BoardPosition positionAfter;
 }
@@ -859,10 +1124,12 @@ class GameOutcome {
 
 enum MoveClassification {
   theory,
+  forced,
   brilliant,
   critical,
   best,
   excellent,
+  good,
   okay,
   miss,
   mistake,
@@ -871,10 +1138,12 @@ enum MoveClassification {
 
   static MoveClassification? fromJson(String? value) => switch (value) {
     'theory' => theory,
+    'forced' => forced,
     'brilliant' => brilliant,
     'critical' => critical,
     'best' => best,
     'excellent' => excellent,
+    'good' => good,
     'okay' => okay,
     'miss' => miss,
     'mistake' => mistake,
@@ -885,10 +1154,12 @@ enum MoveClassification {
 
   String? get assetPath => switch (this) {
     theory => '../img/move_book.png',
+    forced => '../img/move_force.png',
     brilliant => '../img/move_brilliant.png',
     critical => null,
     best => '../img/move_best.png',
     excellent => '../img/move_excellent.png',
+    good => '../img/move_okay.png',
     okay => '../img/move_okay.png',
     miss => '../img/move_miss.png',
     mistake => '../img/move_mistake.png',
@@ -900,10 +1171,12 @@ enum MoveClassification {
 class PlayerAnalysisSummary {
   const PlayerAnalysisSummary({
     required this.theory,
+    this.forced = 0,
     required this.brilliant,
     required this.critical,
     required this.best,
     required this.excellent,
+    this.good = 0,
     required this.okay,
     required this.miss,
     required this.mistake,
@@ -916,10 +1189,12 @@ class PlayerAnalysisSummary {
   factory PlayerAnalysisSummary.fromJson(Map<String, Object?> json) =>
       PlayerAnalysisSummary(
         theory: json['theory']! as int,
+        forced: json['forced'] as int? ?? 0,
         brilliant: json['brilliant']! as int,
         critical: json['critical'] as int? ?? 0,
         best: json['best']! as int,
         excellent: json['excellent']! as int,
+        good: json['good'] as int? ?? 0,
         okay: json['okay']! as int,
         miss: json['miss']! as int,
         mistake: json['mistake']! as int,
@@ -930,10 +1205,12 @@ class PlayerAnalysisSummary {
       );
 
   final int theory;
+  final int forced;
   final int brilliant;
   final int critical;
   final int best;
   final int excellent;
+  final int good;
   final int okay;
   final int miss;
   final int mistake;

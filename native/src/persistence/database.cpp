@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Persistent application data
+// -----------------------------------------------------------------------------
+
 #include "persistence/database.h"
 
 #include <algorithm>
@@ -115,10 +119,12 @@ void bind_optional_double(
 
 MoveCategory parse_category(const std::string& value) {
   if (value == "theory") return MoveCategory::theory;
+  if (value == "forced") return MoveCategory::forced;
   if (value == "brilliant") return MoveCategory::brilliant;
   if (value == "critical") return MoveCategory::critical;
   if (value == "best") return MoveCategory::best;
   if (value == "excellent") return MoveCategory::excellent;
+  if (value == "good") return MoveCategory::good;
   if (value == "okay") return MoveCategory::okay;
   if (value == "miss") return MoveCategory::miss;
   if (value == "mistake") return MoveCategory::mistake;
@@ -129,10 +135,12 @@ MoveCategory parse_category(const std::string& value) {
 std::string category_name(const MoveCategory value) {
   switch (value) {
     case MoveCategory::theory: return "theory";
+    case MoveCategory::forced: return "forced";
     case MoveCategory::brilliant: return "brilliant";
     case MoveCategory::critical: return "critical";
     case MoveCategory::best: return "best";
     case MoveCategory::excellent: return "excellent";
+    case MoveCategory::good: return "good";
     case MoveCategory::okay: return "okay";
     case MoveCategory::miss: return "miss";
     case MoveCategory::mistake: return "mistake";
@@ -145,10 +153,12 @@ std::string category_name(const MoveCategory value) {
 void increment_category(PlayerAnalysisSummary& summary, const MoveCategory category, const int count) {
   switch (category) {
     case MoveCategory::theory: summary.theory += count; break;
+    case MoveCategory::forced: summary.forced += count; break;
     case MoveCategory::brilliant: summary.brilliant += count; break;
     case MoveCategory::critical: summary.critical += count; break;
     case MoveCategory::best: summary.best += count; break;
     case MoveCategory::excellent: summary.excellent += count; break;
+    case MoveCategory::good: summary.good += count; break;
     case MoveCategory::okay: summary.okay += count; break;
     case MoveCategory::miss: summary.miss += count; break;
     case MoveCategory::mistake: summary.mistake += count; break;
@@ -2148,6 +2158,30 @@ std::vector<GameStatRow> Database::games_for_statistics(
   return result;
 }
 
+std::vector<GamePhaseRow> Database::games_for_phases(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT provider_outcome,result,white_name,black_name,"
+      "(SELECT MAX(ply_index) FROM game_moves m WHERE m.game_id=games.id) "
+      "FROM games WHERE profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GamePhaseRow> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    const int max_ply = sqlite3_column_type(statement.get(), 4) == SQLITE_NULL
+        ? -1
+        : sqlite3_column_int(statement.get(), 4);
+    result.push_back(GamePhaseRow{
+        .provider_outcome = text_column(statement.get(), 0),
+        .result = text_column(statement.get(), 1),
+        .white_name = text_column(statement.get(), 2),
+        .black_name = text_column(statement.get(), 3),
+        .max_ply = max_ply,
+    });
+  }
+  return result;
+}
+
 void Database::delete_local_game(
     const std::string& profile_id, const std::string& game_id) {
   auto statement = prepare(
@@ -2500,18 +2534,20 @@ void Database::persist_classifications(
   if (sqlite3_step(run.get()) != SQLITE_ROW) throw std::runtime_error("Analysis run not found");
   const std::string run_id = text_column(run.get(), 0);
 
-  std::array<int, 9> counts{};
+  std::array<int, 11> counts{};
   auto count_index = [](const MoveCategory category) -> int {
     switch (category) {
       case MoveCategory::theory: return 0;
-      case MoveCategory::brilliant: return 1;
-      case MoveCategory::critical: return 2;
-      case MoveCategory::best: return 3;
-      case MoveCategory::excellent: return 4;
-      case MoveCategory::okay: return 5;
-      case MoveCategory::miss: return 6;
-      case MoveCategory::mistake: return 7;
-      case MoveCategory::blunder: return 8;
+      case MoveCategory::forced: return 1;
+      case MoveCategory::brilliant: return 2;
+      case MoveCategory::critical: return 3;
+      case MoveCategory::best: return 4;
+      case MoveCategory::excellent: return 5;
+      case MoveCategory::good: return 6;
+      case MoveCategory::okay: return 7;
+      case MoveCategory::miss: return 8;
+      case MoveCategory::mistake: return 9;
+      case MoveCategory::blunder: return 10;
       case MoveCategory::unknown: return -1;
     }
     return -1;
@@ -2575,17 +2611,17 @@ void Database::persist_classifications(
     bind_optional_double(summary.get(), 4, finalize ? white_accuracy : std::nullopt);
     bind_optional_double(summary.get(), 5, finalize ? black_accuracy : std::nullopt);
     bind_optional_double(summary.get(), 6, finalize ? combined_accuracy : std::nullopt);
-    // counts: theory, brilliant, critical, best, excellent, okay, miss, mistake, blunder.
-    // critical is intentionally not written to analysis_runs; analysis() derives all
-    // category totals from move_analysis, which is the authoritative source.
+    // Legacy aggregate columns do not have forced/good fields. move_analysis is
+    // authoritative, so fold Forced into Best and Good into Okay only for these
+    // compatibility counters. Read-time summaries keep all classifier categories apart.
     sqlite3_bind_int(summary.get(), 7, counts[0]);
-    sqlite3_bind_int(summary.get(), 8, counts[1]);
-    sqlite3_bind_int(summary.get(), 9, counts[3]);
-    sqlite3_bind_int(summary.get(), 10, counts[4]);
-    sqlite3_bind_int(summary.get(), 11, counts[5]);
-    sqlite3_bind_int(summary.get(), 12, counts[6]);
-    sqlite3_bind_int(summary.get(), 13, counts[7]);
-    sqlite3_bind_int(summary.get(), 14, counts[8]);
+    sqlite3_bind_int(summary.get(), 8, counts[2]);
+    sqlite3_bind_int(summary.get(), 9, counts[4] + counts[1]);
+    sqlite3_bind_int(summary.get(), 10, counts[5]);
+    sqlite3_bind_int(summary.get(), 11, counts[7] + counts[6]);
+    sqlite3_bind_int(summary.get(), 12, counts[8]);
+    sqlite3_bind_int(summary.get(), 13, counts[9]);
+    sqlite3_bind_int(summary.get(), 14, counts[10]);
     sqlite3_bind_text(summary.get(), 15, run_id.c_str(), -1, SQLITE_TRANSIENT);
     check(sqlite3_step(summary.get()), db_, "persist classification summary");
     if (finalize) {

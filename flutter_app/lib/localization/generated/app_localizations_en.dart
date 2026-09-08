@@ -407,6 +407,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get localProfile => 'Local profile';
 
   @override
+  String get forced => 'Forced';
+
+  @override
   String get theory => 'Theory';
 
   @override
@@ -420,6 +423,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get excellent => 'Excellent';
+
+  @override
+  String get good => 'Good';
 
   @override
   String get okay => 'Okay';
@@ -740,4 +746,441 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ratingFide => 'FIDE';
+
+  @override
+  String get statsWins => 'Wins';
+
+  @override
+  String get statsDraws => 'Draws';
+
+  @override
+  String get statsLosses => 'Losses';
+
+  @override
+  String get statsAll => 'All';
+
+  @override
+  String get statsAllTimeControlsNote => 'All time controls';
+
+  @override
+  String get statsPhaseTitle => 'By game phase';
+
+  @override
+  String get statsPhaseSubtitle =>
+      'Where your games end and how you score there.';
+
+  @override
+  String get statsPhaseOpening => 'Opening (1–12)';
+
+  @override
+  String get statsPhaseMiddlegame => 'Middlegame (13–30)';
+
+  @override
+  String get statsPhaseEndgame => 'Endgame (31+)';
+
+  @override
+  String get statsPhaseOpeningShort => 'Opening';
+
+  @override
+  String get statsPhaseMiddlegameShort => 'Middlegame';
+
+  @override
+  String get statsPhaseEndgameShort => 'Endgame';
+
+  @override
+  String get statsPhaseGames => 'games';
+
+  @override
+  String get statsPhaseWinWord => 'win';
+
+  @override
+  String get statsPhaseEmpty => 'Not enough data on game phases.';
+
+  @override
+  String get statsPhaseNoProfile =>
+      'Create or select a profile to see statistics.';
+
+  @override
+  String get statsPhaseError => 'Could not load game phases.';
+
+  @override
+  String get statsPhaseRetry => 'Retry';
+
+  @override
+  String statsPhaseClassifiedNote(int classified, int total) {
+    return '$classified of $total games';
+  }
+
+  @override
+  String get statsTitle => 'Statistics';
+
+  @override
+  String get statsIntroTitle => 'Your chess performance';
+
+  @override
+  String get statsIntroBody =>
+      'See your results, recent form and opening record separated by color.';
+
+  @override
+  String get statsFormTitle => 'Recent form';
+
+  @override
+  String get statsFormHint => 'Tap a result to open the game.';
+
+  @override
+  String get statsFormVersus => 'vs';
+
+  @override
+  String get statsFormEmpty => 'No recent games to show.';
+
+  @override
+  String get statsFormError => 'Could not load recent games.';
+
+  @override
+  String get statsFormRetry => 'Retry';
+
+  @override
+  String get statsOverviewTitle => 'Overview';
+
+  @override
+  String get statsOverviewGames => 'Games';
+
+  @override
+  String get statsOverviewWinRate => 'Win rate';
+
+  @override
+  String get statsOverviewScore => 'Score';
+
+  @override
+  String get statsOverviewRecord => 'Record';
+
+  @override
+  String get statsOverviewByColor => 'By color';
+
+  @override
+  String get statsOverviewByTimeControl => 'By time control';
+
+  @override
+  String get statsOverviewWhite => 'White';
+
+  @override
+  String get statsOverviewBlack => 'Black';
+
+  @override
+  String get statsOverviewEmpty =>
+      'No games yet. Sync an online profile or import games to see your statistics.';
+
+  @override
+  String get statsOverviewNoProfile =>
+      'Create or select a profile to see statistics.';
+
+  @override
+  String get statsOverviewNoGamesForFilter =>
+      'No games for the selected time control.';
+
+  @override
+  String get statsOverviewError => 'Could not load statistics.';
+
+  @override
+  String get statsOverviewRetry => 'Retry';
+
+  @override
+  String get statsTerminationTitle => 'How games end';
+
+  @override
+  String get statsTerminationCheckmate => 'Checkmate';
+
+  @override
+  String get statsTerminationResignation => 'Resignation';
+
+  @override
+  String get statsTerminationTimeout => 'On time';
+
+  @override
+  String get statsTerminationDraw => 'Draw';
+
+  @override
+  String get statsTerminationOther => 'Other';
+
+  @override
+  String get statsTerminationWonByCheckmate => 'Won by checkmate';
+
+  @override
+  String get statsTerminationLostByCheckmate => 'Lost by checkmate';
+
+  @override
+  String get statsTerminationOpponentResigned => 'Opponent resigned';
+
+  @override
+  String get statsTerminationSelfResigned => 'Resigned';
+
+  @override
+  String get statsTerminationOpponentFlagged => 'Opponent ran out of time';
+
+  @override
+  String get statsTerminationSelfFlagged => 'Ran out of time';
+
+  @override
+  String get statsTerminationWonGeneric => 'Won';
+
+  @override
+  String get statsTerminationLostGeneric => 'Lost';
+
+  @override
+  String get statsTerminationEmpty => 'Not enough data on how games ended.';
+
+  @override
+  String get statsTerminationNoProfile =>
+      'Create or select a profile to see statistics.';
+
+  @override
+  String get statsTerminationError => 'Could not load game endings.';
+
+  @override
+  String get statsTerminationRetry => 'Retry';
+
+  @override
+  String get statsRatingTitle => 'Rating trend';
+
+  @override
+  String get statsRatingEmpty => 'Not enough rating data to draw a trend.';
+
+  @override
+  String get statsRatingError => 'Could not load rating data.';
+
+  @override
+  String get statsRatingRetry => 'Retry';
+
+  @override
+  String get statsOpeningGamesAll => 'All';
+
+  @override
+  String get statsOpeningGamesWon => 'Won';
+
+  @override
+  String get statsOpeningGamesLost => 'Lost';
+
+  @override
+  String get statsOpeningGamesByCheckmate => 'by checkmate';
+
+  @override
+  String get statsOpeningGamesByResignation => 'by resignation';
+
+  @override
+  String get statsOpeningGamesByTimeout => 'on time';
+
+  @override
+  String get statsOpeningGamesByDraw => 'draw';
+
+  @override
+  String get statsOpeningGamesEmpty => 'No games for this selection.';
+
+  @override
+  String get statsOpeningGamesError => 'Could not load games.';
+
+  @override
+  String get statsOpeningsTitle => 'Top openings';
+
+  @override
+  String get statsOpeningsMostPlayed => 'Most played';
+
+  @override
+  String get statsOpeningsBestWinRate => 'Best win rate';
+
+  @override
+  String get statsOpeningsMinGamesHint => 'At least 3 games per opening.';
+
+  @override
+  String get statsOpeningsClassifiedGames => 'games with a named opening';
+
+  @override
+  String get statsOpeningsGames => 'games';
+
+  @override
+  String get statsOpeningsVariations => 'variations';
+
+  @override
+  String get statsOpeningsBaseLine => 'Base line';
+
+  @override
+  String get statsOpeningsWhite => 'White';
+
+  @override
+  String get statsOpeningsBlack => 'Black';
+
+  @override
+  String get statsOpeningsUnknownColor => 'Other';
+
+  @override
+  String get statsOpeningsWinRateShort => 'win';
+
+  @override
+  String get statsOpeningsNoOpeningsForColor =>
+      'No openings for this color yet.';
+
+  @override
+  String get statsOpeningsNoOpeningsForWinRate =>
+      'No opening with at least 3 games.';
+
+  @override
+  String get statsOpeningsEmpty =>
+      'No named openings yet. Synced and imported games are classified automatically.';
+
+  @override
+  String get statsOpeningsNoProfile =>
+      'Create or select a profile to see openings.';
+
+  @override
+  String get statsOpeningsError => 'Could not load openings.';
+
+  @override
+  String get statsOpeningsRetry => 'Retry';
+
+  @override
+  String get statsCompareTitle => 'Player comparison';
+
+  @override
+  String get statsCompareUsernameLabel => 'Chess.com username';
+
+  @override
+  String get statsCompareUsernameHint => 'e.g. hikaru';
+
+  @override
+  String get statsCompareCompare => 'Compare';
+
+  @override
+  String get statsCompareLoadingHint =>
+      'Fetching and analysing the opponent\'s games…';
+
+  @override
+  String get statsComparePrompt =>
+      'Enter a Chess.com username to compare stats.';
+
+  @override
+  String get statsCompareYou => 'You';
+
+  @override
+  String get statsCompareOpponent => 'Opponent';
+
+  @override
+  String get statsCompareH2hTitle => 'Head-to-head';
+
+  @override
+  String get statsCompareDirectGames => 'direct games';
+
+  @override
+  String get statsCompareWins => 'Wins';
+
+  @override
+  String get statsCompareDraws => 'Draws';
+
+  @override
+  String get statsCompareLosses => 'Losses';
+
+  @override
+  String get statsComparePerformanceCompare => 'Performance comparison';
+
+  @override
+  String get statsCompareWinRateWhite => 'Win rate as White';
+
+  @override
+  String get statsCompareWinRateBlack => 'Win rate as Black';
+
+  @override
+  String get statsCompareFlagging => 'Losses on time';
+
+  @override
+  String get statsCompareOpeningMatchup => 'Opening matchup';
+
+  @override
+  String get statsCompareMatchupSubtitle =>
+      'Your openings vs. the opponent\'s win rate with the opposite colour.';
+
+  @override
+  String get statsCompareOpeningColumn => 'Opening';
+
+  @override
+  String get statsCompareGamesShort => 'games';
+
+  @override
+  String get statsCompareNoMatchups => 'No shared openings found.';
+
+  @override
+  String get statsCompareNoLeaks => 'No clear weaknesses found.';
+
+  @override
+  String get statsCompareStrategyTitle => 'Recommended strategy';
+
+  @override
+  String get statsCompareColorWhite => 'White';
+
+  @override
+  String get statsCompareColorBlack => 'Black';
+
+  @override
+  String get statsCompareErrorPrefix => 'Error';
+
+  @override
+  String statsCompareGamesAnalyzed(int games, int months) {
+    return '$games games analysed across $months months';
+  }
+
+  @override
+  String statsTerminationSpotlight(String label, int share, int lossPercent) {
+    return 'Most common ending: $label — $share% of all games, $lossPercent% of them losses.';
+  }
+
+  @override
+  String get statsCompareSelfBadge => 'Self-comparison (mirror)';
+
+  @override
+  String get statsCompareSelfH2H =>
+      'No games against yourself · This is a self-analysis of your own profile.';
+
+  @override
+  String statsCompareScopeNote(int games) {
+    return 'Comparison based on the last $games loaded games.';
+  }
+
+  @override
+  String get statsCompareMinSampleNote =>
+      'Only openings with at least 5 games on both sides.';
+
+  @override
+  String get statsCompareOwnWeaknessTitle => 'Your own weak spots';
+
+  @override
+  String statsCompareOwnWeakness(
+    String color,
+    String opening,
+    String rate,
+    int games,
+  ) {
+    return 'Weak spot as $color: $opening — only $rate win rate (from $games games).';
+  }
+
+  @override
+  String get statsCompareNoOwnWeakness =>
+      'No clear weak spots with at least 5 games per opening.';
+
+  @override
+  String statsCompareOpenWhite(String opening, String rate, int games) {
+    return 'Open with $opening — your opponent scores only $rate against it as Black (from $games games).';
+  }
+
+  @override
+  String statsCompareAnswerBlack(String opening, String rate, int games) {
+    return 'As Black: choose $opening — your opponent scores only $rate against it as White (from $games games).';
+  }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'You: your entire local library · Opponent: the last $months months ($games games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.';
+  }
+
+  @override
+  String get statsTimeControlCorrespondence => 'Correspondence';
+
+  @override
+  String get statsTimeControlOther => 'Other';
 }

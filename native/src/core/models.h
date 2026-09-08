@@ -92,10 +92,12 @@ struct AppSettings {
 
 enum class MoveCategory {
   theory,
+  forced,
   brilliant,
   critical,
   best,
   excellent,
+  good,
   okay,
   miss,
   mistake,
@@ -105,10 +107,12 @@ enum class MoveCategory {
 
 struct PlayerAnalysisSummary {
   int theory{0};
+  int forced{0};
   int brilliant{0};
   int critical{0};
   int best{0};
   int excellent{0};
+  int good{0};
   int okay{0};
   int miss{0};
   int mistake{0};

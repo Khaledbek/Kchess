@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Stable C ABI entry points
+// -----------------------------------------------------------------------------
+
 #include "kchess/core_api.h"
 
 #include <cstdlib>
@@ -329,6 +333,30 @@ char* kc_start_provider_profile_json(
   });
 }
 
+char* kc_start_scout_json(
+    const kc_core_handle handle,
+    const int32_t profile_type,
+    const char* username_utf8) {
+  if (username_utf8 == nullptr)
+    return invalid_string_argument(core_from(handle), "Provider username is required");
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_scout_json(
+        static_cast<kchess::ProfileType>(profile_type), username_utf8);
+  });
+}
+
+char* kc_start_scout_report_json(
+    const kc_core_handle handle,
+    const int32_t profile_type,
+    const char* username_utf8) {
+  if (username_utf8 == nullptr)
+    return invalid_string_argument(core_from(handle), "Provider username is required");
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_scout_report_json(
+        static_cast<kchess::ProfileType>(profile_type), username_utf8);
+  });
+}
+
 char* kc_start_provider_sync_json(
     const kc_core_handle handle,
     const char* profile_id_utf8,
@@ -376,6 +404,24 @@ char* kc_statistics_overview_json(const kc_core_handle handle) {
 char* kc_statistics_openings_json(const kc_core_handle handle) {
   return string_call(
       core_from(handle), [handle] { return core_from(handle)->statistics_openings_json(); });
+}
+
+char* kc_statistics_terminations_json(const kc_core_handle handle) {
+  return string_call(
+      core_from(handle), [handle] { return core_from(handle)->statistics_terminations_json(); });
+}
+
+char* kc_statistics_phases_json(const kc_core_handle handle) {
+  return string_call(
+      core_from(handle), [handle] { return core_from(handle)->statistics_phases_json(); });
+}
+
+char* kc_statistics_timeline_json(const kc_core_handle handle, const char* query_utf8) {
+  if (query_utf8 == nullptr)
+    return invalid_string_argument(core_from(handle), "Statistics query is required");
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->statistics_timeline_json(query_utf8);
+  });
 }
 
 kc_status kc_set_game_favorite(
