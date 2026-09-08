@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "diagnostics/logger.h"
+#include "engine/stockfish_factory.h"
 #include "theory/opening_name_index.h"
 
 namespace kchess {
@@ -164,6 +165,11 @@ void Core::set_engine_resources(const int threads, const int hash_mb) {
   settings_service_.set_engine_resources(threads, hash_mb);
 }
 
+void Core::set_sideline_engine_settings(
+    const int depth, const int multi_pv, const int threads, const int hash_mb) {
+  settings_service_.set_sideline_engine_settings(depth, multi_pv, threads, hash_mb);
+}
+
 void Core::set_show_board_arrows(const bool enabled) {
   settings_service_.set_show_board_arrows(enabled);
 }
@@ -178,6 +184,30 @@ void Core::set_theme_mode(const std::string& mode) {
 
 void Core::set_locale(const std::string& locale) {
   settings_service_.set_locale(locale);
+}
+
+void Core::set_engine_id(const std::string& engine_id) {
+  if (engine_id != "stockfish18" && engine_id != "stockfish19") {
+    throw std::invalid_argument("invalid engine id");
+  }
+  const auto current_engine_id = database_.settings().engine_id;
+  if (current_engine_id == engine_id) return;
+
+  // Prove that the candidate engine can initialize with its expected NNUE
+  // before stopping any live work or persisting the new selection. A missing
+  // or invalid Stockfish 19 runtime asset therefore leaves Stockfish 18 (and
+  // vice versa) fully selected and usable instead of creating a half-switched
+  // application state.
+  const auto candidate = create_stockfish_engine(engine_id);
+  candidate->validate_available();
+  candidate->start();
+  candidate->stop();
+
+  // Stop only live engine work after the candidate has passed its runtime
+  // probe. Existing Stockfish 18/19 analysis rows remain untouched and
+  // continue to be separated by their engine version/config hash.
+  analysis_service_.prepare_for_engine_change();
+  settings_service_.set_engine_id(engine_id);
 }
 
 std::string Core::games_json() {

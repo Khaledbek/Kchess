@@ -210,6 +210,10 @@ void main() {
     }
 
     await play('g1', 'f3');
+    expect(
+      find.byKey(const Key('board-classification-excellent')),
+      findsOneWidget,
+    );
     await play('b8', 'c6');
     await play('f1', 'b5');
     await play('a7', 'a6');

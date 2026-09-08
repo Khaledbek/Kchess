@@ -71,6 +71,8 @@ std::optional<double> expected_score_loss(
   return std::clamp(*best - *played, 0.0, 1.0);
 }
 
+// --- Move classification -----------------------------------------------------
+
 MoveCategory classify_move(
     const MoveClassifierInput& input, const MoveClassifierConfig& config) {
   if (input.theory) return MoveCategory::theory;
@@ -97,41 +99,56 @@ MoveCategory classify_move(
   const auto second_cp_gap = nonnegative_cp_difference(
       input.best_evaluation_cp, input.second_best_evaluation_cp);
 
-  // Best is intentionally rank-strict. WDL can saturate at 1000/0/0 or
-  // 0/0/1000 in clearly decided positions, making objectively different root
-  // moves appear to have exactly the same expected score. Such alternatives
-  // are Excellent at most; only Stockfish's actual rank-1 move is Best.
+  const bool best_forces_mate = input.best_mate_in.has_value() && *input.best_mate_in > 0;
+  const bool played_forces_mate = input.played_mate_in.has_value() && *input.played_mate_in > 0;
+  const bool second_forces_mate =
+      input.second_best_mate_in.has_value() && *input.second_best_mate_in > 0;
+  const bool unique_forced_mate = best_forces_mate && !second_forces_mate;
 
-  // Brilliant is exceptional, but it must not depend on a fragile exact-rank
-  // match from one particular search depth. A verified sacrifice that is
-  // objectively near-best can still be Brilliant when it preserves a strong
-  // result and has concrete tactical justification. A centipawn guard prevents
-  // saturated WDL from making a materially worse sacrifice look near-best.
-  const bool cp_near_best = !played_cp_loss.has_value() || *played_cp_loss <= 35;
-  const bool near_best = input.played_is_best
-      || (*loss <= config.excellent_loss && cp_near_best);
-  const bool uniquely_strong_best = has_real_alternative
-      && (gap >= config.brilliant_gap
-          || (second_cp_gap.has_value() && *second_cp_gap >= config.critical_cp_gap));
-  const bool brilliant_eligible = near_best
+  // Treat a move as uniquely important only if the runner-up crosses a
+  // practical result boundary or is substantially worse while the position is
+  // still decision-sensitive. A +10.0 versus +8.4 choice is not a Great move.
+  const bool result_band_drop = has_real_alternative
+      && ((best >= 0.70 && second < 0.60)
+          || (best >= 0.45 && second < 0.30));
+  const bool brilliant_cp_unique = has_real_alternative
+      && second_cp_gap.has_value()
+      && *second_cp_gap >= config.brilliant_cp_gap
+      && (best < 0.95 || second < 0.80);
+  const bool critical_cp_unique = has_real_alternative
+      && second_cp_gap.has_value()
+      && *second_cp_gap >= config.critical_cp_gap
+      && (best < 0.92 || second < 0.72);
+  const bool brilliant_unique = unique_forced_mate
+      || result_band_drop
+      || gap >= config.brilliant_gap
+      || brilliant_cp_unique;
+  const bool critical_unique = unique_forced_mate
+      || result_band_drop
+      || gap >= config.critical_gap
+      || critical_cp_unique;
+
+  // Best is rank-strict. More importantly, Brilliant is now also rank-strict:
+  // the actual move must be Stockfish's root #1 move. It cannot become
+  // Brilliant because the opponent later chose a weak reply. The sacrifice
+  // flag itself is verified only against the opponent's best reply in the root
+  // PV and therefore describes this move, not a sacrifice several plies later.
+  const bool brilliant_eligible = input.played_is_best
       && !input.was_in_check_before_move
       && input.legal_move_count > 1
-      && best >= config.brilliant_min_best_score
-      && played >= config.brilliant_min_best_score
-      && input.material_sacrifice
-      && (input.forces_nontrivial_mate || uniquely_strong_best);
+      && input.sacrifice_against_best_defense
+      && (best >= config.brilliant_min_best_score || played_forces_mate)
+      && brilliant_unique;
   if (brilliant_eligible) return MoveCategory::brilliant;
 
-  // "Critical" is the app's Great-move bucket. It is reserved for the exact
-  // engine move when the runner-up is materially worse in expected-score
-  // terms. The old classifier additionally required coarse result-band
-  // crossings, which caused clear only-move / great-move situations to be
-  // labelled plain Best.
+  // "Critical" is Kchess' Great-move bucket. It is the exact engine move in a
+  // genuinely narrow decision: the alternatives lose a practical result,
+  // forced mate, or a substantial amount of evaluation. It deliberately does
+  // not reward a large CP gap in an already trivially won position.
   const bool critical_eligible = input.played_is_best
       && has_real_alternative
       && best >= config.critical_min_best_score
-      && (gap >= config.critical_gap
-          || (second_cp_gap.has_value() && *second_cp_gap >= config.critical_cp_gap));
+      && critical_unique;
   if (critical_eligible) return MoveCategory::critical;
 
   if (input.played_is_best) return MoveCategory::best;
@@ -160,9 +177,6 @@ MoveCategory classify_move(
   if (had_meaningful_chances && (severe_blunder || outcome_blunder || newly_allowed_mate)) {
     return MoveCategory::blunder;
   }
-  // Even in an already lost position, voluntarily allowing a new forced mate
-  // is not an Excellent move. Keep the old anti-inflation rule (no automatic
-  // Blunder without meaningful chances), but floor the verdict at Mistake.
   if (input.allowed_forced_mate) return MoveCategory::mistake;
 
   // WDL alone becomes too coarse once a position is strongly won/lost. Use
@@ -192,6 +206,58 @@ std::string move_category_name(const MoveCategory category) {
     case MoveCategory::unknown: return "unknown";
   }
   return "unknown";
+}
+
+// --- Sacrifice verification -------------------------------------------------
+
+bool root_move_sacrifice_against_best_defense(
+    const std::string& fen_before,
+    const std::vector<std::string>& principal_variation,
+    const int minimum_material_loss_cp) {
+  if (principal_variation.size() < 2 || minimum_material_loss_cp <= 0) return false;
+
+  initialize_stockfish_runtime();
+  std::deque<Stockfish::StateInfo> states(1);
+  Stockfish::Position position;
+  position.set(fen_before, false, &states.back());
+  const auto mover = position.side_to_move();
+  const int before = material_balance(position, mover);
+
+  const auto played_move = find_uci_move(position, principal_variation[0]);
+  if (played_move == Stockfish::Move::none()) return false;
+  states.emplace_back();
+  position.do_move(played_move, states.back(), nullptr);
+  const int after_played_move = material_balance(position, mover);
+
+  // PV ply 2 is Stockfish's best defensive reply to this root move. Brilliant
+  // must survive that reply; the real opponent's later game move is irrelevant.
+  // More importantly, the reply must capture the piece that THIS root move
+  // actually offered. Without this guard, an unrelated quiet move (for example
+  // a pawn move) can be mislabeled Brilliant merely because the opponent then
+  // captures a bishop/rook/queen that was already hanging before the root move.
+  const auto offered_square = played_move.to_sq();
+  const auto offered_piece = position.piece_on(offered_square);
+  if (offered_piece == Stockfish::NO_PIECE
+      || Stockfish::color_of(offered_piece) != mover) {
+    return false;
+  }
+
+  const auto best_reply = find_uci_move(position, principal_variation[1]);
+  if (best_reply == Stockfish::Move::none()
+      || !position.capture(best_reply)
+      || best_reply.type_of() == Stockfish::EN_PASSANT
+      || best_reply.to_sq() != offered_square) {
+    return false;
+  }
+
+  states.emplace_back();
+  position.do_move(best_reply, states.back(), nullptr);
+  const int after_best_reply = material_balance(position, mover);
+
+  const int net_material_given = before - after_best_reply;
+  const int material_taken_on_reply = after_played_move - after_best_reply;
+  return net_material_given >= minimum_material_loss_cp
+      && material_taken_on_reply >= minimum_material_loss_cp;
 }
 
 bool material_sacrifice_in_pv(

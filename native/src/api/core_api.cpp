@@ -209,6 +209,14 @@ kc_status kc_set_engine_resources(const kc_core_handle handle, const int32_t thr
   return status_call(core_from(handle), [=] { core_from(handle)->set_engine_resources(threads, hash_mb); });
 }
 
+kc_status kc_set_sideline_engine_settings(
+    const kc_core_handle handle, const int32_t depth, const int32_t multi_pv,
+    const int32_t threads, const int32_t hash_mb) {
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->set_sideline_engine_settings(depth, multi_pv, threads, hash_mb);
+  });
+}
+
 kc_status kc_set_show_board_arrows(const kc_core_handle handle, const int32_t enabled) {
   return status_call(
       core_from(handle), [=] { core_from(handle)->set_show_board_arrows(enabled != 0); });
@@ -237,6 +245,13 @@ kc_status kc_set_locale(const kc_core_handle handle, const char* locale_utf8) {
     return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Locale is required");
   }
   return status_call(core_from(handle), [=] { core_from(handle)->set_locale(locale_utf8); });
+}
+
+kc_status kc_set_engine_id(const kc_core_handle handle, const char* engine_id_utf8) {
+  if (engine_id_utf8 == nullptr || engine_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Engine id is required");
+  }
+  return status_call(core_from(handle), [=] { core_from(handle)->set_engine_id(engine_id_utf8); });
 }
 
 char* kc_games_json(const kc_core_handle handle) {

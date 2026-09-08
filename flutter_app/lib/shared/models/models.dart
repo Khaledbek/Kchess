@@ -333,6 +333,10 @@ class AppSettings {
     this.threads = 2,
     this.maxThreads = 2,
     this.hashMb = 128,
+    this.sidelineDepth = 18,
+    this.sidelineMultiPv = 3,
+    this.sidelineThreads = 2,
+    this.sidelineHashMb = 128,
     this.showBestMoveArrow = true,
     this.showThreatArrow = true,
     this.showEvaluationBar = true,
@@ -351,6 +355,7 @@ class AppSettings {
     this.diagnosticLogging = true,
     this.themeMode = AppThemeMode.system,
     this.locale = 'de',
+    this.engineId = 'stockfish18',
   });
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
@@ -361,6 +366,11 @@ class AppSettings {
     threads: json['threads'] as int? ?? 2,
     maxThreads: json['maxThreads'] as int? ?? json['threads'] as int? ?? 2,
     hashMb: json['hashMb'] as int? ?? 128,
+    sidelineDepth: json['sidelineDepth'] as int? ??
+        ((json['maxAnalysisDepth'] as int?) ?? (json['depth'] as int?) ?? 18),
+    sidelineMultiPv: json['sidelineMultiPv'] as int? ?? json['multiPv'] as int? ?? 3,
+    sidelineThreads: json['sidelineThreads'] as int? ?? json['threads'] as int? ?? 2,
+    sidelineHashMb: json['sidelineHashMb'] as int? ?? json['hashMb'] as int? ?? 128,
     showBestMoveArrow:
         json['showBestMoveArrow'] as bool? ??
         json['showBoardArrows'] as bool? ??
@@ -382,6 +392,7 @@ class AppSettings {
     diagnosticLogging: json['diagnosticLogging'] as bool? ?? true,
     themeMode: AppThemeMode.fromJson(json['themeMode'] as String? ?? 'system'),
     locale: json['locale'] as String? ?? 'de',
+    engineId: json['engineId'] == 'stockfish19' ? 'stockfish19' : 'stockfish18',
   );
 
   final int minAnalysisDepth;
@@ -391,6 +402,10 @@ class AppSettings {
   final int threads;
   final int maxThreads;
   final int hashMb;
+  final int sidelineDepth;
+  final int sidelineMultiPv;
+  final int sidelineThreads;
+  final int sidelineHashMb;
   final bool showBestMoveArrow;
   final bool showThreatArrow;
   final bool showEvaluationBar;
@@ -409,6 +424,7 @@ class AppSettings {
   final bool diagnosticLogging;
   final AppThemeMode themeMode;
   final String locale;
+  final String engineId;
 
   // Compatibility alias for older widgets/tests while the setting is now
   // presented to users as the Best Move Arrow.
@@ -422,6 +438,10 @@ class AppSettings {
     int? threads,
     int? maxThreads,
     int? hashMb,
+    int? sidelineDepth,
+    int? sidelineMultiPv,
+    int? sidelineThreads,
+    int? sidelineHashMb,
     bool? showBestMoveArrow,
     bool? showBoardArrows,
     bool? showThreatArrow,
@@ -441,6 +461,7 @@ class AppSettings {
     bool? diagnosticLogging,
     AppThemeMode? themeMode,
     String? locale,
+    String? engineId,
   }) => AppSettings(
     minAnalysisDepth: minAnalysisDepth ?? this.minAnalysisDepth,
     depth: depth ?? this.depth,
@@ -449,6 +470,10 @@ class AppSettings {
     threads: threads ?? this.threads,
     maxThreads: maxThreads ?? this.maxThreads,
     hashMb: hashMb ?? this.hashMb,
+    sidelineDepth: sidelineDepth ?? this.sidelineDepth,
+    sidelineMultiPv: sidelineMultiPv ?? this.sidelineMultiPv,
+    sidelineThreads: sidelineThreads ?? this.sidelineThreads,
+    sidelineHashMb: sidelineHashMb ?? this.sidelineHashMb,
     showBestMoveArrow:
         showBestMoveArrow ?? showBoardArrows ?? this.showBestMoveArrow,
     showThreatArrow: showThreatArrow ?? this.showThreatArrow,
@@ -470,6 +495,7 @@ class AppSettings {
     diagnosticLogging: diagnosticLogging ?? this.diagnosticLogging,
     themeMode: themeMode ?? this.themeMode,
     locale: locale ?? this.locale,
+    engineId: engineId ?? this.engineId,
   );
 }
 

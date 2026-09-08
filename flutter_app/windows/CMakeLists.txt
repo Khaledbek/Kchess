@@ -86,6 +86,7 @@ install(TARGETS kchess_core RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
 install(FILES
   "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/stockfish/source/src/nn-c288c895ea92.nnue"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/stockfish/source/src/nn-37f18f62d772.nnue"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/stockfish19/source/src/nn-1a298aa575a0.nnue"
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 

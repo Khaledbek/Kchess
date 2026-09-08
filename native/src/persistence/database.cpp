@@ -11,10 +11,36 @@
 
 #include "sqlite3.h"
 
+#include "engine/stockfish_factory.h"
+
 namespace kchess {
 namespace {
 
 using Statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
+
+// A single SQLite connection is shared by UI, analysis, cache and provider
+// worker threads. SQLITE_OPEN_FULLMUTEX serializes individual SQLite API
+// calls, but it does not make a multi-call BEGIN...COMMIT sequence atomic with
+// respect to another thread using the same connection. Hold SQLite's own
+// recursive connection mutex for the complete explicit transaction so another
+// worker cannot start a nested BEGIN or accidentally join the transaction.
+class SqliteConnectionTransactionLock {
+ public:
+  explicit SqliteConnectionTransactionLock(sqlite3* db) noexcept
+      : mutex_(db == nullptr ? nullptr : sqlite3_db_mutex(db)) {
+    if (mutex_ != nullptr) sqlite3_mutex_enter(mutex_);
+  }
+
+  ~SqliteConnectionTransactionLock() {
+    if (mutex_ != nullptr) sqlite3_mutex_leave(mutex_);
+  }
+
+  SqliteConnectionTransactionLock(const SqliteConnectionTransactionLock&) = delete;
+  SqliteConnectionTransactionLock& operator=(const SqliteConnectionTransactionLock&) = delete;
+
+ private:
+  sqlite3_mutex* mutex_{nullptr};
+};
 
 void check(const int result, sqlite3* db, const char* operation) {
   if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
@@ -410,7 +436,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
 INSERT OR IGNORE INTO app_settings(key, value) VALUES
   ('showBoardArrows', 'true'),
   ('themeMode', 'system'),
-  ('locale', 'de');
+  ('locale', 'de'),
+  ('engineId', 'stockfish18');
 )sql";
 
 constexpr const char* kMigration2 = R"sql(
@@ -806,6 +833,7 @@ void Database::open_and_migrate() {
   execute("PRAGMA synchronous = NORMAL;");
   execute("PRAGMA busy_timeout = 5000;");
   const int version = schema_version();
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     execute(kSchema);
@@ -1007,6 +1035,7 @@ void Database::set_active_profile(const std::string& profile_id) {
 std::optional<Profile> Database::delete_profile(const std::string& profile_id) {
   if (!profile(profile_id).has_value()) throw std::runtime_error("Profile not found");
   const auto active_id = setting("activeProfileId");
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto remove = prepare(db_, "DELETE FROM profiles WHERE id=?;");
@@ -1100,6 +1129,7 @@ void Database::merge_local_profile(
 
   const auto source_game_ids = profile_game_ids(source_profile_id);
 
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     for (const auto& source_game_id : source_game_ids) {
@@ -1457,6 +1487,8 @@ AppSettings Database::settings() const {
   result.diagnostic_logging = setting("diagnosticLogging").value_or("true") == "true";
   result.theme_mode = setting("themeMode").value_or("system");
   result.locale = setting("locale").value_or("de");
+  result.engine_id = std::string(normalize_stockfish_engine_id(
+      setting("engineId").value_or(std::string(kStockfish18Id))));
   try {
     result.min_analysis_depth = std::clamp(
         std::stoi(setting("minAnalysisDepth").value_or("12")),
@@ -1485,6 +1517,26 @@ AppSettings Database::settings() const {
       result.min_analysis_depth = std::min(result.min_analysis_depth, result.depth);
     }
   }
+  // Side-line settings are app-level "last used" values.  On older
+  // databases where these keys do not exist yet, start from the current main
+  // engine settings instead of a hard-coded side-line preset.
+  auto read_sideline_int = [this](const char* key, const int fallback,
+                                  const int minimum, const int maximum) {
+    try {
+      return std::clamp(std::stoi(setting(key).value_or(std::to_string(fallback))),
+                        minimum, maximum);
+    } catch (...) {
+      return fallback;
+    }
+  };
+  result.sideline_depth = read_sideline_int(
+      "sidelineDepth", result.depth, kDepthSetting.min_int, kDepthSetting.max_int);
+  result.sideline_multi_pv = read_sideline_int(
+      "sidelineMultiPv", result.multi_pv, kMultiPvSetting.min_int, kMultiPvSetting.max_int);
+  result.sideline_threads = read_sideline_int(
+      "sidelineThreads", result.threads, kThreadsSetting.min_int, kThreadsSetting.max_int);
+  result.sideline_hash_mb = read_sideline_int(
+      "sidelineHashMb", result.hash_mb, kHashMbSetting.min_int, kHashMbSetting.max_int);
   return result;
 }
 
@@ -1631,6 +1683,7 @@ std::vector<std::string> Database::cached_months(const std::string& profile_id) 
 
 std::string Database::import_pgn(const std::string& profile_id, const ParsedGame& game) {
   const std::string id = make_uuid();
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto statement = prepare(
@@ -1719,6 +1772,7 @@ int Database::upsert_provider_games(
     const std::vector<ProviderStoredGame>& games_to_store,
     const ResponseCacheInfo& cache) {
   int inserted = 0;
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     for (const auto& stored : games_to_store) {
@@ -1971,6 +2025,7 @@ void Database::set_downloaded(
   sqlite3_bind_text(owned.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   if (sqlite3_step(owned.get()) != SQLITE_ROW) throw std::runtime_error("Game not found");
 
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto collection = prepare(
@@ -2108,6 +2163,7 @@ void Database::delete_local_game(
 
 int Database::clear_cached_month(
     const std::string& profile_id, const std::string& month) {
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto cache = prepare(
@@ -2276,6 +2332,7 @@ void Database::persist_engine_result(
   run.reset();
   const EngineLine* primary = result.lines.empty() ? nullptr : &result.lines.front();
 
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
 
@@ -2459,6 +2516,7 @@ void Database::persist_classifications(
     }
     return -1;
   };
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto update = prepare(
@@ -2693,6 +2751,7 @@ std::optional<PersistedAnalysis> Database::compatible_analysis(
 
 void Database::prune_game_analyses_except(
     const std::string& game_id, const std::string& keep_config_hash) {
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto prune = prepare(
@@ -2709,6 +2768,7 @@ void Database::prune_game_analyses_except(
 }
 
 void Database::delete_game_analyses(const std::string& game_id) {
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto remove = prepare(db_, "DELETE FROM analysis_runs WHERE game_id=?;");
@@ -2856,6 +2916,7 @@ void Database::persist_position_analysis(
     const AppSettings& settings,
     const AnalysisResult& result,
     const std::int64_t analysis_timestamp) {
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     auto cache = prepare(
@@ -2948,6 +3009,7 @@ void Database::run_maintenance() {
   constexpr std::int64_t kMaxPositionCacheEntries = 100000;
   constexpr std::int64_t kFailedRunRetentionSeconds = 30LL * 24LL * 60LL * 60LL;
 
+  SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
     // Failed/cancelled runs are resumable for a while, then become disposable

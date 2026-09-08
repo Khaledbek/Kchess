@@ -524,6 +524,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setEngineId(String engineId) async {
+    await gateway.setEngineId(engineId);
+    settings = await gateway.settings();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _providerSyncGeneration++;

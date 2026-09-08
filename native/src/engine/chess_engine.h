@@ -72,8 +72,16 @@ class ChessEngine {
   virtual void new_game() = 0;
   virtual void stop() noexcept = 0;
   virtual AnalysisResult analyze(const AnalysisRequest& request) = 0;
+  virtual AnalysisResult current_result() const = 0;
+  virtual int current_depth() const noexcept = 0;
   virtual void cancel() noexcept = 0;
+  virtual std::string id() const = 0;
   virtual std::string version() const = 0;
+  // Stable identity for persisted/in-memory engine results. It deliberately
+  // includes the NNUE network identity so replacing a network cannot reuse
+  // results produced by a different evaluator.
+  virtual std::string cache_identity() const = 0;
+  virtual void validate_available() const = 0;
 };
 
 class StockfishEngine final : public ChessEngine {
@@ -89,11 +97,39 @@ class StockfishEngine final : public ChessEngine {
   void new_game() override;
   void stop() noexcept override;
   AnalysisResult analyze(const AnalysisRequest& request) override;
-  AnalysisResult current_result() const;
-  int current_depth() const noexcept;
+  AnalysisResult current_result() const override;
+  int current_depth() const noexcept override;
   void cancel() noexcept override;
+  std::string id() const override;
   std::string version() const override;
-  void validate_available() const;
+  std::string cache_identity() const override;
+  void validate_available() const override;
+
+ private:
+  class Impl;
+  std::unique_ptr<Impl> impl_;
+};
+
+class Stockfish19Engine final : public ChessEngine {
+ public:
+  explicit Stockfish19Engine(std::filesystem::path asset_directory = {});
+  ~Stockfish19Engine() override;
+
+  Stockfish19Engine(const Stockfish19Engine&) = delete;
+  Stockfish19Engine& operator=(const Stockfish19Engine&) = delete;
+
+  void start() override;
+  bool is_ready() const noexcept override;
+  void new_game() override;
+  void stop() noexcept override;
+  AnalysisResult analyze(const AnalysisRequest& request) override;
+  AnalysisResult current_result() const override;
+  int current_depth() const noexcept override;
+  void cancel() noexcept override;
+  std::string id() const override;
+  std::string version() const override;
+  std::string cache_identity() const override;
+  void validate_available() const override;
 
  private:
   class Impl;

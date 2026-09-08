@@ -502,6 +502,48 @@ abstract class AppLocalizations {
   /// **'Engine'**
   String get engine;
 
+  /// No description provided for @engineSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine version'**
+  String get engineSelectionTitle;
+
+  /// No description provided for @engineVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Chess engine'**
+  String get engineVersion;
+
+  /// No description provided for @engineVersionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which Stockfish version KChess uses for analysis. All existing analysis settings remain unchanged.'**
+  String get engineVersionHelp;
+
+  /// No description provided for @engineActiveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Active: {engine}'**
+  String engineActiveLabel(String engine);
+
+  /// No description provided for @stockfish18.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish 18'**
+  String get stockfish18;
+
+  /// No description provided for @stockfish19.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish 19'**
+  String get stockfish19;
+
+  /// No description provided for @engineSelectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected engine could not be activated. The previous engine remains selected.'**
+  String get engineSelectionFailed;
+
   /// No description provided for @enginePreset.
   ///
   /// In en, this message translates to:
@@ -781,7 +823,7 @@ abstract class AppLocalizations {
   /// No description provided for @stockfishPending.
   ///
   /// In en, this message translates to:
-  /// **'Stockfish 18 · local · GPLv3'**
+  /// **'Stockfish · local · GPLv3'**
   String get stockfishPending;
 
   /// No description provided for @provider.

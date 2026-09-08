@@ -10,6 +10,10 @@ set(STOCKFISH_SOURCE_DIR
 )
 
 if(KCHESS_WITH_STOCKFISH)
+  include(cmake/fetch_stockfish19.cmake)
+  set(STOCKFISH19_SOURCE_ROOT "${KCHESS_STOCKFISH19_SOURCE_ROOT}")
+  set(STOCKFISH19_SOURCE_DIR "${KCHESS_STOCKFISH19_SOURCE_DIR}")
+  set(STOCKFISH19_NET "${KCHESS_STOCKFISH19_NET}")
   file(GLOB_RECURSE STOCKFISH_SOURCES CONFIGURE_DEPENDS
     "${STOCKFISH_SOURCE_DIR}/*.cpp"
   )
@@ -56,6 +60,68 @@ if(KCHESS_WITH_STOCKFISH)
       "-Wa,-I${STOCKFISH_SOURCE_DIR}"
     )
   endif()
+
+  # Keep the Stockfish 19 source list aligned with the official sf_19
+  # Makefile. Do not recursively glob all .cpp files: sf_19 also ships
+  # universal/* implementation files that are only used by Stockfish's
+  # dedicated universal-binary build and must not enter KChess' normal
+  # Windows/Android library build.
+  set(STOCKFISH19_SOURCES
+    "${STOCKFISH19_SOURCE_DIR}/attacks.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/benchmark.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/bitboard.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/engine.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/evaluate.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/memory.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/misc.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/movegen.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/movepick.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/position.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/score.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/search.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/thread.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/timeman.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/tt.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/uci.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/ucioption.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/tune.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/syzygy/tbprobe.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/nnue/nnue_accumulator.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/nnue/nnue_misc.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/nnue/network.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/nnue/features/half_ka_v2_hm.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/nnue/features/full_threats.cpp"
+    "${STOCKFISH19_SOURCE_DIR}/nnue/features/pp_3wide.cpp"
+  )
+  foreach(_sf19_source IN LISTS STOCKFISH19_SOURCES)
+    if(NOT EXISTS "${_sf19_source}")
+      message(FATAL_ERROR "Stockfish 19 source file is missing: ${_sf19_source}")
+    endif()
+  endforeach()
+  add_subdirectory(cmake/stockfish19_target)
+  target_compile_features(stockfish19_official PUBLIC cxx_std_20)
+  # Keep the 19.x headers private. Stockfish 18 and 19 intentionally use the
+  # same upstream header names, so exporting both include directories would make
+  # adapter compilation depend on include-path ordering.
+  target_include_directories(stockfish19_official PRIVATE ${STOCKFISH19_SOURCE_DIR})
+  set_target_properties(stockfish19_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+  if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    target_compile_definitions(stockfish19_official PRIVATE USE_SSE2)
+  elseif(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    target_compile_definitions(stockfish19_official PRIVATE USE_NEON=8 USE_POPCNT IS_64BIT)
+  endif()
+
+  if(MSVC)
+    target_compile_options(stockfish19_official PRIVATE /W3 /EHsc /bigobj /FS)
+  else()
+    target_compile_options(stockfish19_official PRIVATE
+      -O3
+      -fno-exceptions
+      -fno-rtti
+      "-Wa,-I${STOCKFISH19_SOURCE_DIR}"
+    )
+  endif()
 endif()
 
 add_library(kchess_sqlite STATIC
@@ -85,6 +151,8 @@ add_library(kchess_core SHARED
   src/diagnostics/logger.cpp
   src/engine/stockfish_runtime.cpp
   src/engine/stockfish_engine.cpp
+  src/engine/stockfish19_engine.cpp
+  src/engine/stockfish_factory.cpp
   src/http/http_client.cpp
   src/http/android_http_client.cpp
   src/http/platform_http_client.cpp
@@ -113,19 +181,37 @@ target_include_directories(kchess_core
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
 )
+if(KCHESS_WITH_STOCKFISH)
+  # stockfish19_engine.cpp includes headers as src/<name>.h through this root so
+  # it can never accidentally resolve the same-named Stockfish 18 headers.
+  target_include_directories(kchess_core PRIVATE ${STOCKFISH19_SOURCE_ROOT})
+endif()
 target_link_libraries(kchess_core PRIVATE kchess_sqlite)
 if(WIN32)
   target_link_libraries(kchess_core PRIVATE winhttp)
 endif()
 if(KCHESS_WITH_STOCKFISH)
   target_compile_definitions(kchess_core PRIVATE KCHESS_WITH_STOCKFISH=1)
-  target_link_libraries(kchess_core PRIVATE stockfish_official)
+  target_link_libraries(kchess_core PRIVATE stockfish_official stockfish19_official)
 endif()
 set_target_properties(kchess_core PROPERTIES
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN YES
   OUTPUT_NAME kchess_core
 )
+
+if(KCHESS_WITH_STOCKFISH AND WIN32)
+  # MSVC cannot use Stockfish's incbin-based NNUE embedding. Always place the
+  # verified SF19 network next to kchess_core.dll as part of a direct native
+  # build as well as Flutter's later install/package step. This is additive:
+  # the existing Stockfish 18 network handling is left unchanged.
+  add_custom_command(TARGET kchess_core POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${STOCKFISH19_NET}"
+      "$<TARGET_FILE_DIR:kchess_core>/nn-1a298aa575a0.nnue"
+    VERBATIM
+  )
+endif()
 
 if(MSVC)
   target_compile_options(kchess_core PRIVATE /W4 /permissive- /EHsc)
@@ -140,6 +226,7 @@ if(KCHESS_WITH_STOCKFISH AND WIN32)
   # next to kchess_core.dll, so packaged builds can remain self-contained.
   target_compile_definitions(kchess_core PRIVATE
     KCHESS_STOCKFISH_ASSET_DIR="${STOCKFISH_SOURCE_DIR}"
+    KCHESS_STOCKFISH19_ASSET_DIR="${STOCKFISH19_SOURCE_DIR}"
   )
 endif()
 

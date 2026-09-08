@@ -43,6 +43,14 @@ int main() {
     take_json(kc_create_profile_json(core, 2, "BlackSide", ""), core);
     expect(kc_set_engine_settings(core, 1, 2, 0) == KC_STATUS_OK,
            "short variation settings accepted");
+    expect(kc_set_sideline_engine_settings(core, 7, 4, 1, 64) == KC_STATUS_OK,
+           "sideline engine settings accepted");
+    const auto saved_settings = take_json(kc_app_settings_json(core), core);
+    expect(saved_settings.at("sidelineDepth") == 7
+               && saved_settings.at("sidelineMultiPv") == 4
+               && saved_settings.at("sidelineThreads") == 1
+               && saved_settings.at("sidelineHashMb") == 64,
+           "last sideline engine settings are persisted independently");
     const auto pgn_game = take_json(
         kc_import_pgn_json(
             core,
@@ -103,6 +111,8 @@ int main() {
            "temporary variation exposes a best move");
     expect(!variation.at("lines").empty() && variation.at("lines").size() <= 2,
            "temporary variation exposes configured MultiPV lines");
+    expect(!variation.at("classification").is_null(),
+           "completed variation exposes its move classification");
     expect(take_json(kc_game_json(core, pgn_game_id.c_str()), core) == original_detail,
            "temporary analysis leaves the original PGN and game moves unchanged");
 

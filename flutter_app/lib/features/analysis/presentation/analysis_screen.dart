@@ -66,7 +66,7 @@ Color _classificationColor(
     MoveClassification.brilliant => const Color(0xCC1565C0),
     MoveClassification.critical => const Color(0xB364B5F6),
     MoveClassification.best => const Color(0xB343A047),
-    MoveClassification.excellent => const Color(0x99BB6A),
+    MoveClassification.excellent => const Color(0x9966BB6A),
     MoveClassification.okay => const Color(0x80A5D6A7),
     MoveClassification.miss => const Color(0x80FFB74D),
     MoveClassification.mistake => const Color(0x99EF5350),
@@ -349,6 +349,72 @@ class AnalysisScreen extends StatefulWidget {
   State<AnalysisScreen> createState() => _AnalysisScreenState();
 }
 
+class _AnalysisFenImportDialog extends StatefulWidget {
+  const _AnalysisFenImportDialog();
+
+  @override
+  State<_AnalysisFenImportDialog> createState() =>
+      _AnalysisFenImportDialogState();
+}
+
+class _AnalysisFenImportDialogState extends State<_AnalysisFenImportDialog> {
+  final _nameController = TextEditingController();
+  final _fenController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _fenController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(strings.importFen),
+      content: SizedBox(
+        width: 620,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const Key('analysis-fen-name'),
+              controller: _nameController,
+              autofocus: true,
+              decoration: InputDecoration(labelText: strings.positionName),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: const Key('analysis-fen-text'),
+              controller: _fenController,
+              minLines: 2,
+              maxLines: 4,
+              textDirection: TextDirection.ltr,
+              decoration: InputDecoration(labelText: strings.fenText),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.close),
+        ),
+        FilledButton(
+          onPressed: () {
+            final name = _nameController.text.trim();
+            final fen = _fenController.text.trim();
+            if (name.isEmpty || fen.isEmpty) return;
+            Navigator.of(context).pop((fen: fen, name: name));
+          },
+          child: Text(strings.importAction),
+        ),
+      ],
+    );
+  }
+}
+
 class _VariationSession {
   _VariationSession({required this.parentPly, required this.startingPosition});
 
@@ -393,10 +459,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   void initState() {
     super.initState();
     _settings = widget.settings;
-    _sidelineDepth = _settings.depth;
-    _sidelineMultiPv = _settings.multiPv;
-    _sidelineThreads = _settings.threads;
-    _sidelineHashMb = _settings.hashMb;
+    _sidelineDepth = _settings.sidelineDepth;
+    _sidelineMultiPv = _settings.sidelineMultiPv;
+    _sidelineThreads = _settings.sidelineThreads;
+    _sidelineHashMb = _settings.sidelineHashMb;
     _controller = AnalysisController(widget.gateway, widget.game)
       ..addListener(_refresh);
     final prepared = widget.initialSnapshot;
@@ -419,6 +485,34 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       ..removeListener(_refresh)
       ..dispose();
     super.dispose();
+  }
+
+  Future<void> _importFenPosition() async {
+    final value = await showDialog<({String fen, String name})>(
+      context: context,
+      builder: (_) => const _AnalysisFenImportDialog(),
+    );
+    if (value == null || !mounted) return;
+
+    try {
+      // Validation, normalization and persistence stay in the native C++
+      // import path. Flutter only collects the two user-entered strings.
+      final imported = await widget.gateway.importFen(
+        fen: value.fen,
+        name: value.name,
+      );
+      if (!mounted) return;
+      await openAnalysisWorkflow(
+        context: context,
+        gateway: widget.gateway,
+        game: imported,
+        settings: _settings,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 
   Future<void> _deleteStoredAnalysis() async {
@@ -871,6 +965,30 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         },
       ),
     );
+
+    try {
+      await widget.gateway.setSidelineEngineSettings(
+        depth: _sidelineDepth,
+        multiPv: _sidelineMultiPv,
+        threads: _sidelineThreads,
+        hashMb: _sidelineHashMb,
+      );
+      if (mounted) {
+        setState(() {
+          _settings = _settings.copyWith(
+            sidelineDepth: _sidelineDepth,
+            sidelineMultiPv: _sidelineMultiPv,
+            sidelineThreads: _sidelineThreads,
+            sidelineHashMb: _sidelineHashMb,
+          );
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
   }
 
   Future<void> _onBoardSquare(String square) async {
@@ -1164,7 +1282,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final detail = _controller.detail;
     final gameSummary = detail?.summary ?? widget.game;
     final atInitialPosition =
-        detail != null && detail.moves.isNotEmpty && _currentPly < 0;
+        _variationSession == null &&
+        detail != null &&
+        detail.moves.isNotEmpty &&
+        _currentPly < 0;
     final moveIndex = detail == null || detail.moves.isEmpty
         ? -1
         : (atInitialPosition
@@ -1256,6 +1377,16 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             onPressed: () => setState(() => _boardRotated = !_boardRotated),
             tooltip: strings.rotateBoard,
             icon: const Icon(Icons.rotate_90_degrees_ccw_rounded),
+          ),
+          IconButton(
+            key: const Key('import-fen-from-analysis'),
+            onPressed: snapshot?.isRunning == true ||
+                    _activeVariationJobId != null ||
+                    _variationMovePending
+                ? null
+                : _importFenPosition,
+            tooltip: strings.importFen,
+            icon: const Icon(Icons.grid_on_outlined),
           ),
           IconButton(
             key: const Key('delete-saved-analysis'),
@@ -1408,15 +1539,25 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     if (!mounted || _resultPresentationDocked) return;
                     setState(() => _resultPresentationDocked = true);
                   },
+                  // A sideline owns its classification state completely. While
+                  // native analysis is still running, `variation.classification`
+                  // is null and the board must stay visually neutral. Never fall
+                  // back to the main-line classification here (often `theory`),
+                  // otherwise a temporary book icon/color flashes before the
+                  // sideline result is actually known.
                   currentMoveClassification:
                       _settings.showClassifications && !atInitialPosition
-                      ? (variation?.classification ?? displayed?.classification)
+                      ? (variation != null
+                            ? variation.classification
+                            : displayed?.classification)
                       : null,
                   suppressLastMoveFallback:
                       _settings.showClassifications && !atInitialPosition,
                   classificationMoveUci: atInitialPosition
                       ? ''
-                      : variation?.playedMove ?? (move?.uci ?? ''),
+                      : (variation != null
+                            ? variation.playedMove
+                            : (move?.uci ?? '')),
                   selectedSquare: _selectedSquare,
                   onSquareTap: _onBoardSquare,
                   onPieceDrop: _onBoardDrop,

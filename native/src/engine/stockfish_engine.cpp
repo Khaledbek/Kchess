@@ -459,8 +459,14 @@ void StockfishEngine::stop() noexcept {
   }
 }
 
+std::string StockfishEngine::id() const { return "stockfish18"; }
+
 std::string StockfishEngine::version() const {
   return "Stockfish 18 (cb3d4ee9b47d0c5aae855b12379378ea1439675c)";
+}
+
+std::string StockfishEngine::cache_identity() const {
+  return version() + "|nnue=" + std::string(kBigNetwork) + "+" + std::string(kSmallNetwork);
 }
 
 void StockfishEngine::validate_available() const {

@@ -70,6 +70,8 @@ KCHESS_API kc_status kc_set_analysis_depth_range(
     kc_core_handle handle, int32_t minimum_depth, int32_t maximum_depth);
 KCHESS_API kc_status kc_set_engine_resources(
     kc_core_handle handle, int32_t threads, int32_t hash_mb);
+KCHESS_API kc_status kc_set_sideline_engine_settings(
+    kc_core_handle handle, int32_t depth, int32_t multi_pv, int32_t threads, int32_t hash_mb);
 KCHESS_API kc_status kc_set_show_board_arrows(
     kc_core_handle handle,
     int32_t enabled);
@@ -83,6 +85,9 @@ KCHESS_API kc_status kc_set_theme_mode(
 KCHESS_API kc_status kc_set_locale(
     kc_core_handle handle,
     const char* locale_utf8);
+KCHESS_API kc_status kc_set_engine_id(
+    kc_core_handle handle,
+    const char* engine_id_utf8);
 
 KCHESS_API char* kc_games_json(kc_core_handle handle);
 KCHESS_API char* kc_games_query_json(

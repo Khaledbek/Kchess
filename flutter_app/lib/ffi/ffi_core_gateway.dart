@@ -98,6 +98,20 @@ typedef _StatusThreeIntsNative = Int32 Function(
   Int32,
 );
 typedef _StatusThreeIntsDart = int Function(Pointer<Void>, int, int, int);
+typedef _StatusFourIntsNative = Int32 Function(
+  Pointer<Void>,
+  Int32,
+  Int32,
+  Int32,
+  Int32,
+);
+typedef _StatusFourIntsDart = int Function(
+  Pointer<Void>,
+  int,
+  int,
+  int,
+  int,
+);
 typedef _StartProviderProfileNative = Pointer<Utf8> Function(
   Pointer<Void>,
   Int32,
@@ -218,12 +232,20 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StatusTwoIntsNative, _StatusTwoIntsDart>(
           'kc_set_engine_resources',
         );
+    _setSidelineEngineSettings = _library
+        .lookupFunction<_StatusFourIntsNative, _StatusFourIntsDart>(
+          'kc_set_sideline_engine_settings',
+        );
     _setTheme = _library.lookupFunction<_StatusStringNative, _StatusStringDart>(
       'kc_set_theme_mode',
     );
     _setLocale = _library
         .lookupFunction<_StatusStringNative, _StatusStringDart>(
           'kc_set_locale',
+        );
+    _setEngineId = _library
+        .lookupFunction<_StatusStringNative, _StatusStringDart>(
+          'kc_set_engine_id',
         );
     _statisticsOverview = _library
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
@@ -425,8 +447,10 @@ class FfiCoreGateway implements CoreGateway {
   late final _StatusTwoIntsDart _setAnalysisDepthRange;
   late final _StatusThreeIntsDart _setEngineSettings;
   late final _StatusTwoIntsDart _setEngineResources;
+  late final _StatusFourIntsDart _setSidelineEngineSettings;
   late final _StatusStringDart _setTheme;
   late final _StatusStringDart _setLocale;
+  late final _StatusStringDart _setEngineId;
   late final _StringNoArgsDart _games;
   late final _StringArgDart _queryGames;
   late final _StringNoArgsDart _favoriteGames;
@@ -616,6 +640,16 @@ class FfiCoreGateway implements CoreGateway {
   }) async => _checkStatus(_setEngineResources(_handle, threads, hashMb));
 
   @override
+  Future<void> setSidelineEngineSettings({
+    required int depth,
+    required int multiPv,
+    required int threads,
+    required int hashMb,
+  }) async => _checkStatus(
+    _setSidelineEngineSettings(_handle, depth, multiPv, threads, hashMb),
+  );
+
+  @override
   Future<void> setShowBoardArrows(bool enabled) async =>
       _checkStatus(_setArrows(_handle, enabled ? 1 : 0));
 
@@ -636,6 +670,12 @@ class FfiCoreGateway implements CoreGateway {
   Future<void> setLocale(String locale) => _withNativeString(
     locale,
     (value) => _checkStatus(_setLocale(_handle, value)),
+  );
+
+  @override
+  Future<void> setEngineId(String engineId) => _withNativeString(
+    engineId,
+    (value) => _checkStatus(_setEngineId(_handle, value)),
   );
 
   @override

@@ -29,7 +29,7 @@ int main() {
            "fixture has exactly one legal king reply to check");
     expect(kchess::classify_move({
                .played_is_best = true,
-               .material_sacrifice = true,
+               .sacrifice_against_best_defense = true,
                .only_move_tactical = true,
                .was_in_check_before_move = true,
                .legal_move_count = only_reply.legal_move_count,
@@ -55,7 +55,7 @@ int main() {
            "a decisive check response may be Critical but is never Brilliant");
     expect(kchess::classify_move({
                .played_is_best = true,
-               .material_sacrifice = true,
+               .sacrifice_against_best_defense = true,
                .was_in_check_before_move = true,
                .legal_move_count = multiple_replies.legal_move_count,
                .best_expected_score = .8,
@@ -64,18 +64,64 @@ int main() {
            }) != MoveCategory::brilliant,
            "even a sacrificial-looking reply to check is never Brilliant");
 
-    expect(kchess::material_sacrifice_in_pv(
+    expect(kchess::root_move_sacrifice_against_best_defense(
                "3rk3/8/8/8/8/8/8/3QK3 w - - 0 1", {"d1d8", "e8d8"}),
-           "queen-for-rook fixture is detected as a real material sacrifice");
+           "the root queen sacrifice is verified against the best defensive reply");
+    const std::string delayed_sacrifice_fen =
+        "3rk3/p7/8/8/8/8/8/K2Q4 w - - 0 1";
+    const std::vector<std::string> delayed_sacrifice_pv{
+        "a1b1", "a7a6", "d1d8", "e8d8"};
+    expect(kchess::material_sacrifice_in_pv(
+               delayed_sacrifice_fen, delayed_sacrifice_pv, 4),
+           "legacy deep-PV detector sees a later sacrifice in the line");
+    expect(!kchess::root_move_sacrifice_against_best_defense(
+               delayed_sacrifice_fen, delayed_sacrifice_pv),
+           "a sacrifice several plies later does not make the current move Brilliant");
+    expect(!kchess::root_move_sacrifice_against_best_defense(
+               "3rk3/8/8/8/8/8/P7/3QK3 w - - 0 1", {"a2a3", "d8d1"}),
+           "an unrelated quiet move is not a sacrifice when the reply captures a piece that was already hanging");
     expect(kchess::classify_move({
                .played_is_best = true,
-               .material_sacrifice = true,
+               .sacrifice_against_best_defense = true,
                .legal_move_count = 10,
                .best_expected_score = .85,
                .played_expected_score = .85,
                .second_best_expected_score = .55,
            }) == MoveCategory::brilliant,
-           "a best move with alternatives, a large gap and sacrifice may be Brilliant");
+           "a rank-1 sacrifice that survives best defence and is uniquely strong may be Brilliant");
+    expect(kchess::classify_move({
+               .played_is_best = false,
+               .sacrifice_against_best_defense = true,
+               .legal_move_count = 10,
+               .best_expected_score = .85,
+               .played_expected_score = .84,
+               .second_best_expected_score = .55,
+               .best_evaluation_cp = 180,
+               .played_evaluation_cp = 170,
+               .second_best_evaluation_cp = 20,
+           }) != MoveCategory::brilliant,
+           "a near-best sacrifice is never Brilliant; Brilliant is root-rank-1 strict");
+    expect(kchess::classify_move({
+               .played_is_best = true,
+               .sacrifice_against_best_defense = true,
+               .legal_move_count = 12,
+               .best_expected_score = 1.0,
+               .played_expected_score = 1.0,
+               .second_best_expected_score = .72,
+               .best_mate_in = 5,
+               .played_mate_in = 5,
+           }) == MoveCategory::brilliant,
+           "a rank-1 sacrifice that forces mate against best defence may be Brilliant");
+    expect(kchess::classify_move({
+               .played_is_best = true,
+               .legal_move_count = 12,
+               .best_expected_score = 1.0,
+               .played_expected_score = 1.0,
+               .second_best_expected_score = .72,
+               .best_mate_in = 5,
+               .played_mate_in = 5,
+           }) == MoveCategory::critical,
+           "the same unique mating idea without a sacrifice is Great/Critical, not Brilliant");
 
     expect(kchess::classify_move({
                .played_is_best = true,
@@ -121,17 +167,28 @@ int main() {
     expect(kchess::classify_move({
                .played_is_best = true,
                .legal_move_count = 20,
+               .best_expected_score = .82,
+               .played_expected_score = .82,
+               .second_best_expected_score = .68,
+               .best_evaluation_cp = 180,
+               .played_evaluation_cp = 180,
+               .second_best_evaluation_cp = 10,
+           }) == MoveCategory::critical,
+           "a large CP gap can identify a genuinely narrow Great-move decision");
+    expect(kchess::classify_move({
+               .played_is_best = true,
+               .legal_move_count = 20,
                .best_expected_score = .99,
                .played_expected_score = .99,
-               .second_best_expected_score = .99,
-               .best_evaluation_cp = 430,
-               .played_evaluation_cp = 430,
-               .second_best_evaluation_cp = 260,
-           }) == MoveCategory::critical,
-           "centipawn gap can identify an only/critical best move when WDL is saturated");
+               .second_best_expected_score = .98,
+               .best_evaluation_cp = 1000,
+               .played_evaluation_cp = 1000,
+               .second_best_evaluation_cp = 800,
+           }) == MoveCategory::best,
+           "a large CP gap in an already trivial win is Best, not Great");
     expect(kchess::classify_move({
                .played_is_best = false,
-               .material_sacrifice = true,
+               .sacrifice_against_best_defense = true,
                .legal_move_count = 20,
                .best_expected_score = .99,
                .played_expected_score = .99,
@@ -146,9 +203,9 @@ int main() {
                .legal_move_count = 20,
                .best_expected_score = .74,
                .played_expected_score = .74,
-               .second_best_expected_score = .53,
+               .second_best_expected_score = .65,
            }) == MoveCategory::best,
-           "a sizeable gap alone does not make an otherwise stable best move Critical");
+           "a modest gap alone does not make an otherwise stable best move Critical");
     expect(kchess::classify_move({
                .played_is_best = true,
                .legal_move_count = 20,

@@ -339,6 +339,22 @@ class FakeCoreGateway implements CoreGateway {
   }
 
   @override
+  Future<void> setSidelineEngineSettings({
+    required int depth,
+    required int multiPv,
+    required int threads,
+    required int hashMb,
+  }) async {
+    settingWrites++;
+    currentSettings = currentSettings.copyWith(
+      sidelineDepth: depth,
+      sidelineMultiPv: multiPv,
+      sidelineThreads: threads,
+      sidelineHashMb: hashMb,
+    );
+  }
+
+  @override
   Future<void> setShowBoardArrows(bool enabled) async {
     settingWrites++;
     currentSettings = currentSettings.copyWith(showBoardArrows: enabled);
@@ -400,6 +416,12 @@ class FakeCoreGateway implements CoreGateway {
   Future<void> setLocale(String locale) async {
     settingWrites++;
     currentSettings = currentSettings.copyWith(locale: locale);
+  }
+
+  @override
+  Future<void> setEngineId(String engineId) async {
+    currentSettings = currentSettings.copyWith(engineId: engineId);
+    settingWrites++;
   }
 
   @override
@@ -564,6 +586,7 @@ class FakeCoreGateway implements CoreGateway {
       ),
       bestMove: fixture.best,
       moverEvaluationCp: 10 - variationAnalysisCalls,
+      classification: MoveClassification.excellent,
       lines: [
         EngineLine(
           rank: 1,

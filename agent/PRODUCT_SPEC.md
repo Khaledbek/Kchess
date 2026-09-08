@@ -288,7 +288,7 @@ Flutter ARB:
 - `app_en.arb`
 - `app_ar.arb`
 
-Arabisch = RTL.
+Arabische Texte werden über ARB lokalisiert. Die globale App-Geometrie bleibt LTR; Board, Navigation und Spielerorientierung werden beim Sprachwechsel nicht gespiegelt.
 
 ### Design
 V1:

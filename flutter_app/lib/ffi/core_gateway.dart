@@ -34,10 +34,17 @@ abstract interface class CoreGateway {
     required int timeLimitSeconds,
   });
   Future<void> setEngineResources({required int threads, required int hashMb});
+  Future<void> setSidelineEngineSettings({
+    required int depth,
+    required int multiPv,
+    required int threads,
+    required int hashMb,
+  });
   Future<void> setShowBoardArrows(bool enabled);
   Future<void> setBooleanSetting(String key, bool enabled);
   Future<void> setThemeMode(AppThemeMode mode);
   Future<void> setLocale(String locale);
+  Future<void> setEngineId(String engineId);
   Future<List<GameSummary>> games();
   Future<List<GameSummary>> queryGames(GameQuery query);
   Future<List<GameSummary>> favoriteGames();

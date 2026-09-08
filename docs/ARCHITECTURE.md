@@ -1,214 +1,101 @@
-# Architektur – Phase 4
+# KChess Architecture
 
-## Laufzeitschichten
+## 1. Architekturprinzip
+
+KChess trennt Darstellung und Fachlogik strikt:
 
 ```text
-Flutter Widgets, ARB, Theme und View-State
-                 |
-       dart:ffi / stabile C-ABI
-                 |
+Flutter / Dart UI
+        |
+        | dart:ffi / C-ABI
+        v
 C++20 Core
-  |-- GameProvider -> Chess.com PubAPI / Lichess API
-  |-- Plattform-HTTP: WinHTTP / Android HttpsURLConnection über JNI
-  |-- serieller ProviderRequestScheduler, Cache-Validatoren und CancelToken
-  |-- PGN-/SAN-Parser und vollständige FEN-Validierung
-  |-- regelkonformes Stellungsmodell pro Halbzug
-  |-- asynchroner Analyse-Job / Abbruch / Wiederaufnahme
-  |-- ChessEngine -> offizieller Stockfish-18-Enginekern
-  |-- KCB1 OpeningTheoryProvider (einmalig geladen, binäre Suche)
-  |-- versionierter MoveClassifier und Local Accuracy
-  `-- SQLite-Migrationen, getrennte Caches, MultiPV und Profile
+        |
+        +-- Stockfish
+        +-- SQLite
+        +-- Provider APIs
 ```
 
-Flutter zeigt native DTOs an und übernimmt keine Schachregeln. Die C-ABI
-verwendet opaque Handles, UTF-8, JSON-DTOs und `kc_string_free`; C++-Exceptions
-werden an der ABI-Grenze abgefangen.
+Flutter rendert und orchestriert UI-Zustände. C++ ist die einzige fachliche Wahrheit.
 
-Die UI erhält Brettstellungen als `BoardPosition` mit 64 bereits aufgelösten
-Feldern, Zugfarbe und erlaubter Figurenfarbe. Zugnormalisierung (einschließlich
-Standard-Promotion zur Dame), Legalitätsprüfung und Wiederanschluss einer
-Nebenvariante an die PGN-Hauptlinie erfolgen nativ. Ergebnisart sowie Engine-
-Scores/WDL werden vom Core bereits auf eine stabile Weiß-Perspektive abgebildet.
-Auch Suche, Filter, Monatsauswahl und Sortierung der Spieleliste laufen über
-eine native Query; Dart hält nur die aktuell ausgewählten UI-Filter.
+## 2. Flutter-Schicht
 
-## Import und Stellungsmodell
+Flutter besitzt:
 
-`native/src/chess/pgn.cpp` liest Tags, SAN, Kommentare, NAGs und geklammerte
-Varianten. Varianten bleiben im Parse-Ergebnis erhalten; die Analyse verarbeitet
-weiterhin nur die Hauptlinie. Jeder Hauptlinienzug wird gegen Stockfish-Move-Generation
-legal geprüft und als SAN, UCI, FEN davor und FEN danach gespeichert.
+- Home-/Navigation-Shell
+- Feature-Screens
+- Board-Darstellung
+- Animationen
+- Theme und Assets
+- View-State
+- dünne FFI-Gateways
 
-`native/src/chess/fen.cpp` prüft alle sechs FEN-Felder, Brettbelegung, Könige,
-Bauernränge, Zugrecht, Rochaderechte, En-passant-Feld und Zähler. Fehler werden
-als Importfehler zurückgegeben und verlassen niemals die C-ABI als Exception.
+`lib/ui/app_root.dart` enthält nur noch Home-/Shell-Code. Die Hauptbereiche liegen getrennt unter `lib/features/*/presentation/`.
 
-## Engine und Analyse
+## 3. Native Schicht
 
-`StockfishEngine` verwendet den offiziellen Enginekern direkt hinter der
-bestehenden `ChessEngine`-Abstraktion. Die semantischen UCI-Operationen werden
-auf die offizielle Engine-API abgebildet: Initialisierung/Ready, New Game,
-Position, Go, Stop und Shutdown. Optionen: Tiefe 18, MultiPV 3, Ponder aus,
-Windows 4 Threads/256 MB Hash, Android 2 Threads/128 MB Hash. Centipawn-,
-Mate-, WDL-, Knoten- und PV-Daten werden übernommen.
+Der C++20-Core besitzt:
 
-Der C-API-Start legt nur einen nativen Hintergrund-Thread an und kehrt sofort
-zurück. Der Worker analysiert die FEN nach jedem Halbzug nacheinander. Nach
-jedem Ergebnis schreibt SQLite den Zug, die primäre Bewertung und alle
-MultiPV-Linien. Abbruch behält fertige Zeilen; ein späterer Start setzt beim
-ersten fehlenden Halbzug fort.
+- PGN/FEN/SAN/Zugmodell und Legalität
+- Profile, Provider, Game Library und Statistik
+- Settings und Persistenz
+- Stockfish und Engine-Lifecycle
+- Voranalyse, Liveanalyse und Side-Line-Analyse
+- Cache/Wiederverwendung
+- Theory
+- Move-Klassifikation
+- Accuracy
 
-Der Engine-Cache-Schlüssel enthält Stockfish-Version, Tiefe, MultiPV und das
-optionale Zeitlimit pro Stellung.
-Threads und Hash beeinflussen nicht die semantische Cache-Kompatibilität.
-Klassifikation, Accuracy und Opening Book haben davon getrennte Versionen.
-Ändert sich nur eine dieser Versionen, verwendet KChess die vorhandenen
-Enginewerte und baut lediglich die Klassifikation neu auf.
+## 4. Analyse
 
-Eine vollständige Analyse mit mindestens gleicher Tiefe, mindestens gleicher
-Linienzahl und einem nicht kleineren Zeitbudget ist wiederverwendbar; ein
-unbegrenzter Lauf gilt als stärker als ein zeitbegrenzter. `Pfeile anzeigen`
-ist reine Flutter-Darstellung und gehört weder zum Engine-Hash noch zur
-Cache-Kompatibilität.
+Die Analyse verwendet den offiziellen Stockfish-Core hinter `ChessEngine`/`StockfishEngine`.
+Threads und Hash werden nur bei tatsächlicher Änderung neu konfiguriert, damit Threadpool und Transposition Table wiederverwendet werden können.
+Windows und Android verwenden plattformspezifische SIMD-Pfade.
 
-## Offline Opening Theory
+Voranalyse und Liveanalyse sind getrennte Qualitätsstufen. Ein vorhandener höherwertiger Analyse-Stand darf für niedrigere Anforderungen wiederverwendet werden. Pro Partie bleibt nur ein autoritativer persistierter Voranalyse-Stand; ein höherer erfolgreicher Lauf ersetzt den niedrigeren.
 
-`tools/opening_book/build_book.py` streamt eine oder mehrere `.pgn`-/`.pgn.zst`-
-Dateien, baut über einen schlanken Visitor nur die konfigurierten Opening-Plies
-auf und aggregiert alle Quellen gemeinsam in temporärem SQLite. `min_games`
-wird erst nach Abschluss sämtlicher Inputs angewandt. Wiederholtes `--input`
-und deterministisch sortiertes `--input-dir` werden unterstützt; doppelte
-aufgelöste Pfade werden abgelehnt. Das Ergebnis bleibt das dokumentierte
-Festformat KCB1. Sein `positionKey` entspricht Stockfish 18
-`Position::key()` ohne Zugzähler und berücksichtigt Figuren, Zugrecht,
-Rochaderechte sowie ein relevantes En-passant-Feld. Python- und C++-Fixtures
-sichern identische Keys ab. Die inkrementelle Key-Berechnung des Visitors wird
-für normale Züge, Rochade, En passant und Promotion gegen die vollständige
-Referenzberechnung getestet.
+Side-Line-Analyse verwendet einen separaten flüchtigen Variantenstatus und darf Hauptliniendaten nicht überschreiben. Ihre zuletzt angewendeten Engine-Einstellungen werden separat gespeichert.
 
-Flutter kopiert das gebündelte `assets/opening_book.kcb` beim Start atomar in
-das private App-Datenverzeichnis, bevor der Core initialisiert. Der native
-Provider validiert Header, Version, Dateigröße, Sortierung, Züge und Summen,
-lädt die 28-Byte-Einträge einmal und sucht danach binär. Eine fehlende oder
-beschädigte Datei deaktiviert Theory kontrolliert; Engine-Analyse und App
-bleiben funktionsfähig. Theory wird nur vergeben, wenn Stellung und tatsächlich
-gespielter Zug vorhanden sind und der bereits beim Build angewandte
-`min_games`-Filter erfüllt wurde.
+## 5. Klassifikation
 
-## Klassifikation und Perspektive
+Die Move-Klassifikation wird ausschließlich nativ berechnet.
+`Best` ist an den tatsächlichen Stockfish-Rang-1-Zug gebunden. Weitere Kategorien verwenden native Engine-Rohdaten und konservative CP-/Mate-/Positionsregeln.
+Flutter erhält nur das fertige Klassifikationsresultat und rendert Symbol/Farbe.
 
-Primär wird der Expected Score aus Stockfish-WDL berechnet:
-`(W + 0.5 * D) / (W + D + L)`. Mate wird zuerst behandelt; ohne WDL dient
-`1 / (1 + exp(-cp / 400))` als begrenzter Fallback. Da das gespeicherte
-Post-Move-Ergebnis aus Sicht der nun ziehenden Gegenseite gilt, wird es zentral
-mit `1 - score` in die Sicht des Spielers invertiert. Der Verlust ist
-`clamp(bestExpected - playedExpected, 0, 1)`.
+## 6. Accuracy
 
-`MoveClassifierConfig` Version 1 enthält alle Schwellen zentral. Die Priorität
-lautet Theory, Brilliant, Best, Blunder, Miss, Mistake, Excellent, Okay,
-Unknown. Die Grenzwerte sind:
+Accuracy wird ausschließlich nativ und unabhängig von Klassifikationslabels berechnet.
+Die aktuelle Logik verwendet CP-/Mate-Regret, Entscheidungsgewichtung und Stabilitätsinformationen statt einer reinen gesättigten WDL-Differenz.
+Triviale Entscheidungen in bereits klaren Stellungen erhalten geringes Gewicht; kritische/unique Entscheidungen höheres Gewicht.
 
-- Best: gespielter Stockfish-Bestzug oder Loss `<= 0.005`
-- Excellent: Loss `> 0.005` und `<= 0.03`
-- Okay: Loss `> 0.03` und `<= 0.08`
-- Mistake: Loss `> 0.08` und `<= 0.20`
-- Blunder: Loss `> 0.20` oder ein neu erlaubtes erzwungenes Matt
-- Miss: Best Expected Score `>= 0.75` und Loss `>= 0.15`, oder ein verpasstes
-  eigenes erzwungenes Matt; Blunder hat bei extremem Verlust Vorrang
+## 7. Persistenz und Versionierung
 
-Brilliant ist absichtlich konservativ: praktisch bester Nicht-Theorie-Zug,
-Abstand zum zweiten MultiPV-Zug mindestens `0.10` und zusätzlich entweder ein
-Materialopfer von mindestens 250 Centipawns nach gegnerischer Antwort innerhalb
-der ersten vier PV-Halbzüge oder ein einziger taktischer Zug mit Abstand
-mindestens `0.20`. Im Zweifel bleibt die Kategorie Best.
+SQLite speichert Profile, Games, Analyse, Settings, Provider-Caches und Statistiken.
+Analyse-, Classifier-, Accuracy- und Theory-Versionen werden getrennt behandelt, damit vorhandene Engine-Rohdaten nach Möglichkeit wiederverwendet werden können.
 
-## Local Accuracy
+## 8. FFI
 
-Accuracy-Algorithmus Version 1 berechnet pro messbarem Zug
-`100 * exp(-4.0 * loss)` und mittelt diese Werte pro Farbe. Theory-Züge werden
-ausgeschlossen, weil sie Eröffnungswissen statt Engine-Präzision messen. Eine
-Partie mit ausschließlich Theory-Zügen erhält als expliziten Fallback 100;
-ohne Theory und ohne messbaren Verlust bleibt Accuracy `null`. Alle Ergebnisse
-werden auf 0 bis 100 begrenzt.
+Die Grenze ist eine stabile C-ABI:
 
-## Persistenz und Summary
+- keine C++-Klassen direkt
+- UTF-8 und serialisierbare DTOs
+- explizite Speicherfreigabe
+- keine Exceptions über die ABI-Grenze
+- asynchrone native Jobs für Langläufer
 
-Migration 003 ergänzt getrennte Engine-/Classifier-/Accuracy-/Book-Versionen,
-Expected Scores, Loss, empfohlenen Zug, Theory-Statistiken sowie Accuracy und
-Counts pro Farbe. Phase-2-Daten bleiben lesbar. Nach vollständiger Analyse
-werden die Klassifikationen transaktional gespeichert; die Summary zeigt
-Spieler oder beide Farben, Accuracy, alle Kategorien, Zugzahlen, Tiefe und
-Versionen.
+## 9. Lokalisierung
 
-## UI
+Alle sichtbaren Flutter-Texte stammen ausschließlich aus:
 
-Die Analyseansicht öffnet vor dem Engine-Ergebnis, lädt Partie/Brett aus
-SQLite, pollt ausschließlich kurze Statusabfragen und kann jeden bereits
-analysierten Halbzug separat laden. Die ausgewählte MultiPV-Linie bestimmt den
-Brett-Pfeil. Kategorie, bestehendes lokales Symbol oder neutraler Fallback,
-Book-Partien, Expected-Score-Verlust und empfohlener Enginezug werden direkt am
-Zug angezeigt. `showBoardArrows` ist reine Darstellung und kein Cache-Parameter.
+```text
+flutter_app/l10n/app_en.arb
+flutter_app/l10n/app_de.arb
+flutter_app/l10n/app_ar.arb
+```
 
-## Öffentliche Online-Provider
+Die generierten Dateien unter `lib/localization/generated/` werden nicht manuell bearbeitet.
+Arabisch ändert die Sprache, nicht die globale Layout-Richtung: KChess bleibt layoutseitig LTR, damit Board, Navigation und Spielerorientierung nicht gespiegelt werden.
 
-`ChessComProvider` und `LichessProvider` implementieren dieselbe
-`GameProvider`-Schnittstelle. Provider-JSON bzw. Lichess-NDJSON endet im
-C++-Core; Flutter erhält ausschließlich normalisierte KChess-DTOs. Die
-HTTP-Abstraktion unterstützt HTTPS mit System-Zertifikatsprüfung, gzip,
-HTTPS-only-Weiterleitungen, Zeitlimits, Abbruch, Antwortgrößenlimits und
-optionales Chunk-Streaming. Windows verwendet WinHTTP. Android hängt native
-Worker über JNI an die VM und verwendet `HttpsURLConnection`; der
-Lichess-Export wird in beiden Fällen zeilenweise verarbeitet.
+## 10. Datei-Struktur und Sections
 
-Alle Requests eines Providers werden durch `ProviderRequestScheduler`
-serialisiert. Nach Chess.com-429 gilt wachsendes Backoff ab 30 Sekunden. Nach
-Lichess-429 blockiert der Scheduler mindestens 60 Sekunden und respektiert ein
-längeres numerisches `Retry-After`. Es gibt kein aggressives automatisches
-Retry. Die Job-C-ABI kehrt sofort mit einer ID zurück; Flutter pollt kompakte
-Statusobjekte. Profilwechsel und Core-Shutdown brechen nicht mehr benötigte
-Jobs ab.
-
-Online-Spiele werden nur übernommen, wenn sie abgeschlossen sind und eine
-gültige vollständige PGN-Hauptlinie enthalten. Danach liegen sie im selben
-`games`-/`game_moves`-Modell wie lokale Importe. Opening Book, Stockfish,
-Classifier und Local Accuracy verwenden unverändert diese gemeinsame Strecke.
-Es existiert keine Live-Analyse und keine Provider-Engineauswertung.
-
-## Provider-Persistenz und Offline-Modus
-
-Migration 004 ergänzt normalisierte öffentliche Profilfelder, getrennte
-Provider-Accuracy pro Farbe, Ergebnis aus Profilsicht, Time-Control-Typ,
-Provider-Endzeit sowie diese Caches:
-
-- `provider_profiles_cache`: normalisiertes Profil, ETag, Last-Modified,
-  `fetched_at`, Ablauf und Normalisierungsversion
-- `provider_stats_cache`: normalisierte Performancewerte und dieselben
-  Validatoren
-- `provider_month_cache`: Validatoren und Status pro `YYYY-MM`
-- `provider_sync_state`: Status- und Cooldown-Vorbereitung
-
-Spiele werden in Transaktionen anhand
-`profile_id + provider + provider_game_id` aktualisiert. Favorit und Download
-sind getrennte lokale Tabellen. Provider-Accuracy bleibt getrennt von der
-eigenen Accuracy; nach lokaler Analyse hat die Local Accuracy in DTO und UI
-Vorrang. Beim Öffnen erscheinen gespeicherte Profile, Stats und Spiele sofort;
-ein Hintergrundsync ergänzt sie. Netzwerkfehler löschen nie lokale Daten.
-Vollständige PGNs sind offline öffnbar, und die lokale Analyse benötigt danach
-keinen Provider.
-
-Chess.com-Avatare werden nur von validierten HTTPS-Hosts der Domains
-`chess.com`/`chesscomfiles.com` in einen UUID-basierten privaten Dateinamen
-geladen. Bei Fehlschlag bleibt das gebündelte Fallback. Lichess-Flair ist
-separates Metadatum; ein Avatar wird nicht erfunden.
-
-## Phase 5 library lifecycle
-
-The library remains a projection of the existing `games` table plus independent
-`favorites` and `downloads` flags. The normal provider Games screen may be
-month-scoped, but Favorites and Downloads deliberately ignore that UI month
-selection so saved games remain reachable across months.
-
-Provider cache cleanup is conservative: deleting a `provider_month_cache` row
-may prune only provider games from that UTC month that have no download flag,
-no favorite flag, and no persisted analysis run. Local PGN/FEN deletion is a
-separate explicit operation and is only accepted for the active local profile.
+Handgeschriebene Quell- und Dokumentationsdateien werden in klar benannte Sections gegliedert. Große Screens und Fachmodule bleiben in eigenen Dateien. Generierte und vendorte Dateien sind von Stil-Refactors ausgenommen.
