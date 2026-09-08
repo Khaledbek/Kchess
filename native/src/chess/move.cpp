@@ -3,6 +3,7 @@
 #include <deque>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "chess/fen.h"
 #include "engine/stockfish_runtime.h"
@@ -102,6 +103,42 @@ AppliedMove apply_legal_uci_move(const std::string& fen, const std::string& uci)
       .san = san,
       .fen_after = position.fen(),
   };
+}
+
+std::vector<AppliedMove> legal_moves(const std::string& fen) {
+  const auto validation = validate_fen(fen);
+  if (!validation.valid) throw std::invalid_argument(validation.error);
+  initialize_stockfish_runtime();
+  std::deque<Stockfish::StateInfo> states(1);
+  Stockfish::Position position;
+  position.set(validation.normalized, false, &states.back());
+
+  std::vector<AppliedMove> result;
+  for (const auto move : Stockfish::MoveList<Stockfish::LEGAL>(position)) {
+    // move_san() needs the position before the move, so play each candidate on
+    // its own board rather than mutating the shared one.
+    std::deque<Stockfish::StateInfo> after_states(1);
+    Stockfish::Position after;
+    after.set(validation.normalized, false, &after_states.back());
+    after_states.emplace_back();
+    after.do_move(move, after_states.back(), nullptr);
+    result.push_back({
+        .uci = Stockfish::UCIEngine::move(move, false),
+        .san = move_san(position, move),
+        .fen_after = after.fen(),
+    });
+  }
+  return result;
+}
+
+bool in_check(const std::string& fen) {
+  const auto validation = validate_fen(fen);
+  if (!validation.valid) throw std::invalid_argument(validation.error);
+  initialize_stockfish_runtime();
+  std::deque<Stockfish::StateInfo> states(1);
+  Stockfish::Position position;
+  position.set(validation.normalized, false, &states.back());
+  return static_cast<bool>(position.checkers());
 }
 
 }  // namespace kchess

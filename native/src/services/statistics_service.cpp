@@ -181,7 +181,8 @@ std::string StatisticsService::overview_json() const {
   return root.dump();
 }
 
-std::string StatisticsService::openings_json() const {
+std::string StatisticsService::openings_json(
+    const std::string& time_control) const {
   const auto profile = database_.active_profile();
   if (!profile.has_value()) {
     return nlohmann::json{{"hasProfile", false}, {"gamesWithOpening", 0}}.dump();
@@ -206,7 +207,13 @@ std::string StatisticsService::openings_json() const {
   int games_with_opening = 0;
   int games_without_opening = 0;
 
+  // "all" keeps every game; anything else must match the row's bucket exactly.
+  // Filtered-out games are skipped before the with/without-opening counters so
+  // the card's own totals describe the filtered set rather than the library.
+  const bool filtered = time_control != "all" && !time_control.empty();
+
   for (const auto& row : rows) {
+    if (filtered && row.time_control_type != time_control) continue;
     if (row.opening_name.empty()) {
       games_without_opening += 1;
       continue;

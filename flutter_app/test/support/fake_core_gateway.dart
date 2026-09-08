@@ -234,8 +234,53 @@ class FakeCoreGateway implements CoreGateway {
     recentForm: const ['win', 'loss', 'win'],
   );
 
+  /// Scripted board for the training tests: FEN -> the legal moves the core
+  /// would generate there. Empty unless a test seeds it, so no other test pays
+  /// for it.
+  final Map<String, List<BoardMoveOption>> boardScript = {};
+
+  /// Expands a FEN into the 64-entry piece list the real `position_view_json`
+  /// returns. Test-double only — production Dart never parses a FEN.
   @override
-  Future<OpeningsStats> openingsStats() async => const OpeningsStats(
+  Future<BoardPosition> boardPosition(String fen) async {
+    final fields = fen.split(' ');
+    final pieces = <String>[];
+    for (final token in fields.first.split('/').join().split('')) {
+      final empty = int.tryParse(token);
+      if (empty != null) {
+        pieces.addAll(List<String>.filled(empty, ''));
+      } else {
+        pieces.add(token);
+      }
+    }
+    if (pieces.length != 64) {
+      throw CoreGatewayException('Invalid FEN board layout: $fen');
+    }
+    final white = fields.length < 2 || fields[1] == 'w';
+    return BoardPosition(
+      fen: fen,
+      pieces: pieces,
+      sideToMove: white ? 'white' : 'black',
+      draggableColor: white ? 'white' : 'black',
+      fullmoveNumber: fields.length >= 6 ? int.tryParse(fields[5]) ?? 1 : 1,
+    );
+  }
+
+  @override
+  Future<List<BoardMoveOption>> boardLegalMoves(String fen) async =>
+      boardScript[fen] ?? const <BoardMoveOption>[];
+
+  @override
+  Future<OpeningsStats> openingsStats({String timeControl = 'all'}) async {
+    // The fixture library is blitz, so any other bucket is legitimately empty —
+    // which is what lets a test tell a filtered request from an unfiltered one.
+    if (timeControl != 'all' && timeControl != 'blitz') {
+      return const OpeningsStats(hasProfile: true);
+    }
+    return _allOpenings;
+  }
+
+  static const _allOpenings = OpeningsStats(
     hasProfile: true,
     gamesWithOpening: 3,
     gamesWithoutOpening: 0,

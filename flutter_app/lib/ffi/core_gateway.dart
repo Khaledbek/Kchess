@@ -24,7 +24,10 @@ abstract interface class CoreGateway {
   /// natively from recent archives without persistence.
   Future<ScoutReport> scoutReport(String username);
   Future<StatisticsOverview> statisticsOverview();
-  Future<OpeningsStats> openingsStats();
+  /// Openings for the active profile. [timeControl] is a native
+  /// `time_control_type` ("bullet", "blitz", "rapid", ...); "all" keeps
+  /// every game.
+  Future<OpeningsStats> openingsStats({String timeControl = 'all'});
   Future<TerminationStats> terminationStats();
   Future<PhaseStats> phaseStats();
   Future<ProviderOverview> syncProvider(
@@ -58,6 +61,12 @@ abstract interface class CoreGateway {
     required String target,
     required int firstCandidatePly,
   });
+  /// Board state for a bare FEN. Unlike [resolveBoardMove] this needs no stored
+  /// game, so training positions can be rendered from their starting FEN.
+  Future<BoardPosition> boardPosition(String fen);
+
+  /// Every legal move in [fen], each with its SAN and resulting FEN.
+  Future<List<BoardMoveOption>> boardLegalMoves(String fen);
   Future<GameSummary> importPgn(String pgn);
   Future<GameSummary> importFen({required String fen, required String name});
   Future<AnalysisSnapshot> startAnalysis(String gameId);

@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../ffi/core_gateway.dart';
 import '../../../localization/generated/app_localizations.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/widgets/chess_board_view.dart';
 import '../../app/application/app_controller.dart';
 
 String _classificationLabel(
@@ -1576,30 +1577,17 @@ class _Board extends StatelessWidget {
   final ValueChanged<String> onDragStarted;
   final VoidCallback onDragEnded;
 
-  static const _pieceAssets = <String, String>{
-    'K': 'assets/analysis_img/piece_white_king.svg',
-    'Q': 'assets/analysis_img/piece_white_queen.svg',
-    'R': 'assets/analysis_img/piece_white_rook.svg',
-    'B': 'assets/analysis_img/piece_white_bishop.svg',
-    'N': 'assets/analysis_img/piece_white_knight.svg',
-    'P': 'assets/analysis_img/piece_white_pawn.svg',
-    'k': 'assets/analysis_img/piece_black_king.svg',
-    'q': 'assets/analysis_img/piece_black_queen.svg',
-    'r': 'assets/analysis_img/piece_black_rook.svg',
-    'b': 'assets/analysis_img/piece_black_bishop.svg',
-    'n': 'assets/analysis_img/piece_black_knight.svg',
-    'p': 'assets/analysis_img/piece_black_pawn.svg',
-  };
-
-  bool _canDragPiece(String piece) {
-    if (piece.isEmpty) return false;
-    final whitePiece = piece == piece.toUpperCase();
-    return whitePiece == (position.draggableColor == 'white');
-  }
+  /// The classification badge and its square tint both key off the move that
+  /// produced the current position.
+  String get _classificationSource => classificationMoveUci.length >= 4
+      ? classificationMoveUci.substring(0, 2)
+      : '';
+  String get _classificationTarget => classificationMoveUci.length >= 4
+      ? classificationMoveUci.substring(2, 4)
+      : '';
 
   @override
   Widget build(BuildContext context) {
-    final pieces = position.pieces;
     return Padding(
       padding: const EdgeInsets.all(8),
       child: LayoutBuilder(
@@ -1629,23 +1617,16 @@ class _Board extends StatelessWidget {
               key: const Key('analysis-board'),
               fit: StackFit.expand,
               children: [
-                GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8,
-                  ),
-                  itemCount: 64,
-                  itemBuilder: (context, index) {
-                    final row = index ~/ 8;
-                    final column = index % 8;
-                    final fileIndex = blackAtBottom ? 7 - column : column;
-                    final rank = blackAtBottom ? row + 1 : 8 - row;
-                    final square =
-                        '${String.fromCharCode('a'.codeUnitAt(0) + fileIndex)}$rank';
-                    final lightSquare = (row + column).isEven;
-                    final baseColor = lightSquare
-                        ? const Color(0xFFE8E5DC)
-                        : const Color(0xFF71867D);
+                ChessBoardView(
+                  position: position,
+                  blackAtBottom: blackAtBottom,
+                  showCoordinates: showCoordinates,
+                  onSquareTap: onSquareTap,
+                  onPieceDrop: onPieceDrop,
+                  onDragStarted: onDragStarted,
+                  onDragEnded: onDragEnded,
+                  squareTint: (square, baseColor) {
+                    final scheme = Theme.of(context).colorScheme;
                     final lastMove =
                         highlightLastMove &&
                         lastMoveUci.length >= 4 &&
@@ -1653,21 +1634,12 @@ class _Board extends StatelessWidget {
                             lastMoveUci.substring(2, 4) == square);
                     final selected =
                         highlightSelectedSquare && selectedSquare == square;
-                    final scheme = Theme.of(context).colorScheme;
                     final classification = currentMoveClassification;
-                    final classificationSource =
-                        classificationMoveUci.length >= 4
-                        ? classificationMoveUci.substring(0, 2)
-                        : '';
-                    final classificationTarget =
-                        classificationMoveUci.length >= 4
-                        ? classificationMoveUci.substring(2, 4)
-                        : '';
                     final classificationSquare =
                         classification != null &&
                         classification != MoveClassification.unknown &&
-                        (classificationSource == square ||
-                            classificationTarget == square);
+                        (_classificationSource == square ||
+                            _classificationTarget == square);
                     final moveColor = classificationSquare
                         ? Color.alphaBlend(
                             _classificationColor(
@@ -1682,160 +1654,55 @@ class _Board extends StatelessWidget {
                             baseColor,
                           )
                         : baseColor;
-                    final squareColor = selected
+                    return selected
                         ? Color.alphaBlend(
                             scheme.tertiary.withValues(alpha: 0.40),
                             moveColor,
                           )
                         : moveColor;
-                    final coordinateColor = lightSquare
-                        ? const Color(0xFF53655E)
-                        : const Color(0xFFE8E5DC);
-                    final pieceIndex = (8 - rank) * 8 + fileIndex;
-                    final piece = pieces[pieceIndex];
-                    final pieceAsset = _pieceAssets[piece];
-                    final showClassificationBadge =
-                        classification != null &&
-                        classification != MoveClassification.unknown &&
-                        classificationTarget == square;
-                    final canDrag = pieceAsset != null && _canDragPiece(piece);
-                    final squareSide = boardSide / 8;
-                    final pieceInset = squareSide * 0.055;
-
-                    Widget pieceImage() => Padding(
-                      padding: EdgeInsets.all(pieceInset),
-                      child: SvgPicture.asset(
-                        pieceAsset!,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                      ),
+                  },
+                  squareOverlay: (square, squareSide) {
+                    final classification = currentMoveClassification;
+                    if (classification == null ||
+                        classification == MoveClassification.unknown ||
+                        _classificationTarget != square) {
+                      return null;
+                    }
+                    final badgeSize = math.max(
+                      18.0,
+                      math.min(36.0, squareSide * 0.46),
                     );
-
-                    return DragTarget<String>(
-                      onWillAcceptWithDetails: (details) =>
-                          details.data != square,
-                      onAcceptWithDetails: (details) =>
-                          onPieceDrop(details.data, square),
-                      builder: (context, candidateData, rejectedData) {
-                        final targetColor = candidateData.isNotEmpty
-                            ? Color.alphaBlend(
-                                scheme.secondary.withValues(alpha: 0.34),
-                                squareColor,
+                    final asset = _analysisClassificationAsset(classification);
+                    return Positioned(
+                      top: 2,
+                      right: 2,
+                      child: IgnorePointer(
+                        child: asset != null
+                            ? Image.asset(
+                                asset,
+                                key: Key(
+                                  'board-classification-${classification.name}',
+                                ),
+                                width: badgeSize,
+                                height: badgeSize,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, _, _) =>
+                                    const SizedBox.shrink(),
                               )
-                            : squareColor;
-                        return InkWell(
-                          key: Key('board-square-$square'),
-                          onTap: () => onSquareTap(square),
-                          child: ColoredBox(
-                            color: targetColor,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                if (pieceAsset != null)
-                                  Positioned.fill(
-                                    child: canDrag
-                                        ? Draggable<String>(
-                                            data: square,
-                                            onDragStarted: () =>
-                                                onDragStarted(square),
-                                            onDragEnd: (_) => onDragEnded(),
-                                            feedback: Material(
-                                              color: Colors.transparent,
-                                              child: SizedBox.square(
-                                                dimension: squareSide,
-                                                child: pieceImage(),
-                                              ),
-                                            ),
-                                            childWhenDragging:
-                                                const SizedBox.expand(),
-                                            child: pieceImage(),
-                                          )
-                                        : pieceImage(),
-                                  ),
-                                if (showClassificationBadge)
-                                  Positioned(
-                                    top: 2,
-                                    right: 2,
-                                    child: IgnorePointer(
-                                      child: Builder(
-                                        builder: (context) {
-                                          final badgeSize = math.max(
-                                            18.0,
-                                            math.min(
-                                              36.0,
-                                              boardSide / 8 * 0.46,
-                                            ),
-                                          );
-                                          final asset =
-                                              _analysisClassificationAsset(
-                                                classification,
-                                              );
-                                          if (asset != null) {
-                                            return Image.asset(
-                                              asset,
-                                              key: Key(
-                                                'board-classification-${classification.name}',
-                                              ),
-                                              width: badgeSize,
-                                              height: badgeSize,
-                                              fit: BoxFit.contain,
-                                              errorBuilder: (_, _, _) =>
-                                                  const SizedBox.shrink(),
-                                            );
-                                          }
-                                          return Icon(
-                                            classification ==
-                                                    MoveClassification.critical
-                                                ? Icons.bolt_rounded
-                                                : Icons.auto_awesome,
-                                            key: Key(
-                                              'board-classification-${classification.name}',
-                                            ),
-                                            size: badgeSize * 0.82,
-                                            color: _classificationColor(
-                                              context,
-                                              classification,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                if (showCoordinates && column == 0)
-                                  Positioned(
-                                    left: 3,
-                                    top: 2,
-                                    child: Text(
-                                      '$rank',
-                                      textDirection: TextDirection.ltr,
-                                      style: TextStyle(
-                                        color: coordinateColor,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                if (showCoordinates && row == 7)
-                                  Positioned(
-                                    right: 3,
-                                    bottom: 1,
-                                    child: Text(
-                                      String.fromCharCode(
-                                        'a'.codeUnitAt(0) + fileIndex,
-                                      ),
-                                      textDirection: TextDirection.ltr,
-                                      style: TextStyle(
-                                        color: coordinateColor,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                            : Icon(
+                                classification == MoveClassification.critical
+                                    ? Icons.bolt_rounded
+                                    : Icons.auto_awesome,
+                                key: Key(
+                                  'board-classification-${classification.name}',
+                                ),
+                                size: badgeSize * 0.82,
+                                color: _classificationColor(
+                                  context,
+                                  classification,
+                                ),
+                              ),
+                      ),
                     );
                   },
                 ),

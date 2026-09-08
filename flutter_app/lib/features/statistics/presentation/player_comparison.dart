@@ -1137,6 +1137,8 @@ class _OwnWeaknessSection extends StatelessWidget {
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
+                  // Straight from the weakest line into the opening lab.
+                  _TrainOpeningButton(family: family),
                 ],
               ),
             ),

@@ -22,7 +22,11 @@ class StatisticsService {
   // Openings grouped into base families with nested variations, each with
   // win/draw/loss and score, split by the color the profile played. Openings
   // come from the classified games.
-  std::string openings_json() const;
+  //
+  // [time_control] narrows the games to one `time_control_type` ("bullet",
+  // "blitz", "rapid", ...); "all" (the default) keeps every game, so the tab's
+  // filter reaches the openings card instead of it silently staying all-time.
+  std::string openings_json(const std::string& time_control = "all") const;
 
   // How the active profile's games ended (checkmate, resignation, timeout,
   // draw, other), aggregated from the stored PGN Termination tags.

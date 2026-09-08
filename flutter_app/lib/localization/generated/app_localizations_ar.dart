@@ -1140,4 +1140,152 @@ class AppLocalizationsAr extends AppLocalizations {
   String statsCompareSampleScope(int months, int games) {
     return 'أنت: مكتبتك المحلية بالكامل · الخصم: آخر $months أشهر ($games مباراة). الجانبان عيّنتان مختلفتان، لذا قد تختلف القيم حتى عند مقارنة الملف بنفسه.';
   }
+
+  @override
+  String get trainingSection => 'التدريب';
+
+  @override
+  String get trainingIntroTitle => 'ساحة التدريب';
+
+  @override
+  String get trainingIntroBody =>
+      'اختر مجال تدريب. يُحفظ تقدمك محليًا على هذا الجهاز.';
+
+  @override
+  String get trainingOpeningTitle => 'مختبر الافتتاحيات';
+
+  @override
+  String get trainingOpeningSubtitle => 'راجع خطوط ذخيرتك ونقاط ضعفك.';
+
+  @override
+  String get trainingOpeningAction => 'درّب الخطوط';
+
+  @override
+  String trainingNemesisBadge(String opening, String rate) {
+    return 'أصعب افتتاحية: $opening — نسبة فوز $rate فقط';
+  }
+
+  @override
+  String get trainingNemesisNone => 'لم يتم رصد نقطة ضعف في إحصاءاتك بعد.';
+
+  @override
+  String get trainingTacticsTitle => 'صائد الأخطاء';
+
+  @override
+  String get trainingTacticsSubtitle =>
+      'ابحث عن النقلة الأفضل في أوضاع وسط اللعب الحرجة.';
+
+  @override
+  String trainingTacticsSolved(int count) {
+    return '$count تكتيكًا تم حله';
+  }
+
+  @override
+  String get trainingTacticsAction => 'ابدأ التكتيك';
+
+  @override
+  String get trainingTacticsEmpty => 'لا توجد ألغاز تكتيكية في الفهرس بعد.';
+
+  @override
+  String get trainingEndgameTitle => 'أكاديمية النهايات';
+
+  @override
+  String get trainingEndgameSubtitle => 'أتقن النهايات النظرية خطوة بخطوة.';
+
+  @override
+  String trainingEndgameProgress(int mastered, int total, int percent) {
+    return '$mastered / $total وضعية تم إتقانها ($percent%)';
+  }
+
+  @override
+  String get trainingEndgameAction => 'افتح النهايات';
+
+  @override
+  String get trainingMastered => 'متقن';
+
+  @override
+  String trainingStreak(int done, int total) {
+    return '$done/$total تكرارات بلا خطأ';
+  }
+
+  @override
+  String trainingLastAttempt(String date) {
+    return 'آخر تدريب: $date';
+  }
+
+  @override
+  String get trainingNeverAttempted => 'لم يتم التدريب بعد';
+
+  @override
+  String get trainingHint => 'تلميح';
+
+  @override
+  String get trainingBoardPending =>
+      'سيتوفر التدريب على الرقعة بمجرد أن توفّر النواة التحقق من النقلات عبر الواجهة الأصلية.';
+
+  @override
+  String get trainingOpeningLabSelected => 'الخط المختار';
+
+  @override
+  String get trainingOpeningLabEmpty =>
+      'اختر افتتاحية من تبويب الإحصاءات واضغط «تدريب» لتحميلها هنا.';
+
+  @override
+  String get trainingOpeningLabPending =>
+      'سيتوفر مدرّب الخطوط بمجرد أن توفّر النواة نقلات الافتتاحية.';
+
+  @override
+  String get statsTrainOpening => 'تدريب';
+
+  @override
+  String trainingGoalWin(String side) {
+    return 'الدور على $side — اربح الوضعية';
+  }
+
+  @override
+  String trainingGoalDraw(String side) {
+    return 'الدور على $side — حافظ على التعادل';
+  }
+
+  @override
+  String get trainingWrongMove => 'ليست أفضل نقلة. حاول مرة أخرى.';
+
+  @override
+  String get trainingSolvedTitle => 'ممتاز! تم حل الوضعية.';
+
+  @override
+  String get trainingSolvedClean => 'حُلّت دون خطأ — تُحتسب ضمن الإتقان.';
+
+  @override
+  String get trainingSolvedWithErrors =>
+      'حُلّت لكن بتصحيحات. لا يُحتسب للإتقان إلا الأداء الخالي من الأخطاء.';
+
+  @override
+  String get trainingPracticeAgain => 'تدرّب مجددًا';
+
+  @override
+  String get trainingNextEndgame => 'النهاية التالية';
+
+  @override
+  String get trainingBackToList => 'إلى القائمة';
+
+  @override
+  String trainingMoveProgress(int done, int total) {
+    return 'النقلة $done من $total';
+  }
+
+  @override
+  String get trainingBoardError => 'تعذّر تحميل الوضعية.';
+
+  @override
+  String get trainingShowHint => 'أظهر التلميح';
+
+  @override
+  String get trainingYourMove => 'دورك';
+
+  @override
+  String get trainingOpponentThinking => 'الرد …';
+
+  @override
+  String get trainingRestart => 'إعادة البدء';
 }
