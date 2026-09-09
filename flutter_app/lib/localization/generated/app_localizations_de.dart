@@ -1145,4 +1145,162 @@ class AppLocalizationsDe extends AppLocalizations {
   String statsCompareAnswerBlack(String opening, String rate, int games) {
     return 'Als Schwarz: Wähle $opening — dein Gegner erzielt als Weiß dagegen nur $rate (aus $games Partien).';
   }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'Du: deine gesamte lokale Bibliothek · Gegner: die letzten $months Monate ($games Partien). Beide Seiten sind unterschiedliche Stichproben — die Werte können sich daher auch beim Selbstvergleich unterscheiden.';
+  }
+
+  @override
+  String get trainingSection => 'Training';
+
+  @override
+  String get trainingIntroTitle => 'Training Arena';
+
+  @override
+  String get trainingIntroBody =>
+      'Wähle einen Trainingsbereich. Dein Fortschritt wird lokal auf diesem Gerät gespeichert.';
+
+  @override
+  String get trainingOpeningTitle => 'Eröffnungs-Labor';
+
+  @override
+  String get trainingOpeningSubtitle =>
+      'Repetiere deine Repertoire-Linien und Schwachstellen.';
+
+  @override
+  String get trainingOpeningAction => 'Linien trainieren';
+
+  @override
+  String trainingNemesisBadge(String opening, String rate) {
+    return 'Angstgegner: $opening · nur $rate Siegquote';
+  }
+
+  @override
+  String get trainingNemesisNone =>
+      'Noch keine Schwachstelle in deiner Statistik erkannt.';
+
+  @override
+  String get trainingTacticsTitle => 'Blunder-Buster';
+
+  @override
+  String get trainingTacticsSubtitle =>
+      'Finde den besseren Zug in kritischen Mittelspiel-Stellungen.';
+
+  @override
+  String trainingTacticsSolved(int count) {
+    return '$count gelöste Taktiken';
+  }
+
+  @override
+  String get trainingTacticsAction => 'Taktik starten';
+
+  @override
+  String get trainingTacticsEmpty => 'Noch keine Taktik-Aufgaben im Katalog.';
+
+  @override
+  String get trainingEndgameTitle => 'Endspiel-Akademie';
+
+  @override
+  String get trainingEndgameSubtitle =>
+      'Theoretische Endspiele schrittweise meistern.';
+
+  @override
+  String trainingEndgameProgress(int mastered, int total, int percent) {
+    return '$mastered / $total Stellungen gemeistert ($percent%)';
+  }
+
+  @override
+  String get trainingEndgameAction => 'Endspiele öffnen';
+
+  @override
+  String get trainingMastered => 'Gemeistert';
+
+  @override
+  String trainingStreak(int done, int total) {
+    return '$done/$total fehlerfreie Wiederholungen';
+  }
+
+  @override
+  String trainingLastAttempt(String date) {
+    return 'Zuletzt geübt: $date';
+  }
+
+  @override
+  String get trainingNeverAttempted => 'Noch nicht geübt';
+
+  @override
+  String get trainingHint => 'Tipp';
+
+  @override
+  String get trainingBoardPending =>
+      'Das Brett-Training folgt, sobald der Core die Zugprüfung über die native Schnittstelle bereitstellt.';
+
+  @override
+  String get trainingOpeningLabSelected => 'Ausgewählte Linie';
+
+  @override
+  String get trainingOpeningLabEmpty =>
+      'Wähle in der Statistik eine Eröffnung und tippe auf „Trainieren“, um sie hier zu laden.';
+
+  @override
+  String get trainingOpeningLabPending =>
+      'Der Linien-Trainer folgt, sobald der Core die Eröffnungszüge liefert.';
+
+  @override
+  String get statsTrainOpening => 'Trainieren';
+
+  @override
+  String trainingGoalWin(String side) {
+    return '$side am Zug — Gewinne die Stellung';
+  }
+
+  @override
+  String trainingGoalDraw(String side) {
+    return '$side am Zug — Halte die Stellung remis';
+  }
+
+  @override
+  String get trainingWrongMove =>
+      'Nicht der beste Zug. Probiere es noch einmal.';
+
+  @override
+  String get trainingSolvedTitle => 'Ausgezeichnet! Stellung gelöst.';
+
+  @override
+  String get trainingSolvedClean =>
+      'Fehlerfrei gelöst — das zählt für die Meisterschaft.';
+
+  @override
+  String get trainingSolvedWithErrors =>
+      'Gelöst, aber mit Korrekturen. Für „gemeistert“ zählt nur ein fehlerfreier Durchgang.';
+
+  @override
+  String get trainingPracticeAgain => 'Nochmal üben';
+
+  @override
+  String get trainingNextEndgame => 'Nächstes Endspiel';
+
+  @override
+  String get trainingBackToList => 'Zur Übersicht';
+
+  @override
+  String trainingMoveProgress(int done, int total) {
+    return 'Zug $done von $total';
+  }
+
+  @override
+  String get trainingBoardError => 'Die Stellung konnte nicht geladen werden.';
+
+  @override
+  String get trainingShowHint => 'Tipp anzeigen';
+
+  @override
+  String get trainingYourMove => 'Du bist am Zug';
+
+  @override
+  String get trainingOpponentThinking => 'Gegenzug …';
+
+  @override
+  String get trainingRestart => 'Neu starten';
 }

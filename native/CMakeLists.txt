@@ -191,6 +191,27 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   )
   add_test(NAME kchess_provider_tests COMMAND kchess_provider_tests)
 
+  # Gameless board access for the training arena: the chess layer plus the two
+  # additive C exports it is reached through.
+  add_executable(kchess_training_board_tests
+    tests/training_board_tests.cpp
+    src/chess/fen.cpp
+    src/chess/move.cpp
+    src/chess/position_view.cpp
+    src/engine/stockfish_runtime.cpp
+  )
+  target_compile_features(kchess_training_board_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_training_board_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  target_link_libraries(kchess_training_board_tests PRIVATE
+    kchess_core
+    stockfish_official
+  )
+  add_test(NAME kchess_training_board_tests COMMAND kchess_training_board_tests)
+
   # Header-only classifier, so this needs no sources beyond the test itself.
   add_executable(kchess_termination_tests tests/termination_tests.cpp)
   target_compile_features(kchess_termination_tests PRIVATE cxx_std_20)

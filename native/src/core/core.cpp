@@ -6,6 +6,10 @@
 #include <stdexcept>
 #include <utility>
 
+#include <nlohmann/json.hpp>
+
+#include "chess/move.h"
+#include "chess/position_view.h"
 #include "diagnostics/logger.h"
 #include "theory/opening_name_index.h"
 
@@ -210,6 +214,31 @@ std::string Core::resolve_board_move_json(
       game_id, fen, source, target, first_candidate_ply);
 }
 
+std::string Core::board_position_json(const std::string& fen) {
+  auto json = nlohmann::json::parse(position_view_json(fen));
+  // A drill has to tell checkmate from stalemate after every move, and both
+  // look identical from Flutter without the check flag.
+  const auto moves = legal_moves(fen);
+  const bool check = in_check(fen);
+  json["inCheck"] = check;
+  json["legalMoveCount"] = static_cast<int>(moves.size());
+  json["status"] = moves.empty() ? (check ? "checkmate" : "stalemate")
+                                 : "playable";
+  return json.dump();
+}
+
+std::string Core::board_legal_moves_json(const std::string& fen) {
+  auto moves = nlohmann::json::array();
+  for (const auto& move : legal_moves(fen)) {
+    moves.push_back({
+        {"uci", move.uci},
+        {"san", move.san},
+        {"fenAfter", move.fen_after},
+    });
+  }
+  return moves.dump();
+}
+
 std::string Core::import_pgn_json(const std::string& pgn) {
   auto result = game_library_service_.import_pgn_json(pgn);
   classify_pending_openings(64);
@@ -259,11 +288,11 @@ std::string Core::statistics_overview_json() {
   return statistics_service_.overview_json();
 }
 
-std::string Core::statistics_openings_json() {
+std::string Core::statistics_openings_json(const std::string& time_control) {
   // This is an explicit user request for opening statistics, so finish the
   // remaining local backfill now instead of waiting for another app launch.
   classify_pending_openings(0);
-  return statistics_service_.openings_json();
+  return statistics_service_.openings_json(time_control);
 }
 
 std::string Core::statistics_terminations_json() {

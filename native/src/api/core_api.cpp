@@ -284,6 +284,18 @@ char* kc_resolve_board_move_json(
   });
 }
 
+char* kc_board_position_json(const kc_core_handle handle, const char* fen_utf8) {
+  auto* core = core_from(handle);
+  if (fen_utf8 == nullptr) return invalid_string_argument(core, "FEN is required");
+  return string_call(core, [&] { return core->board_position_json(fen_utf8); });
+}
+
+char* kc_board_legal_moves_json(const kc_core_handle handle, const char* fen_utf8) {
+  auto* core = core_from(handle);
+  if (fen_utf8 == nullptr) return invalid_string_argument(core, "FEN is required");
+  return string_call(core, [&] { return core->board_legal_moves_json(fen_utf8); });
+}
+
 char* kc_import_pgn_json(const kc_core_handle handle, const char* pgn_utf8) {
   if (pgn_utf8 == nullptr)
     return invalid_string_argument(core_from(handle), "PGN is required");
@@ -385,6 +397,15 @@ char* kc_statistics_overview_json(const kc_core_handle handle) {
 char* kc_statistics_openings_json(const kc_core_handle handle) {
   return string_call(
       core_from(handle), [handle] { return core_from(handle)->statistics_openings_json(); });
+}
+
+char* kc_statistics_openings_filtered_json(
+    const kc_core_handle handle, const char* time_control_utf8) {
+  const std::string time_control =
+      time_control_utf8 == nullptr ? std::string{"all"} : std::string{time_control_utf8};
+  return string_call(core_from(handle), [handle, time_control] {
+    return core_from(handle)->statistics_openings_json(time_control);
+  });
 }
 
 char* kc_statistics_terminations_json(const kc_core_handle handle) {

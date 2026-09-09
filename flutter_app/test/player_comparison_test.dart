@@ -53,7 +53,7 @@ void main() {
     await _openComparisonFor(tester, 'Ada');
 
     // The self-audit is announced rather than shown as a 0-0-0 record.
-    expect(find.textContaining('Selbstvergleich'), findsWidgets);
+    expect(find.text('Selbstvergleich (Spiegelung)'), findsOneWidget);
     expect(find.textContaining('Keine Partien gegen dich selbst'), findsOneWidget);
 
     // The head-to-head banner must not appear at all: its footer is the only
@@ -70,7 +70,7 @@ void main() {
 
     await _openComparisonFor(tester, 'Turing');
 
-    expect(find.textContaining('Selbstvergleich'), findsNothing);
+    expect(find.text('Selbstvergleich (Spiegelung)'), findsNothing);
     expect(find.textContaining('Keine Partien gegen dich selbst'), findsNothing);
   });
 }

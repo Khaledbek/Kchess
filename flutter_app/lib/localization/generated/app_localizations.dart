@@ -2180,6 +2180,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'As Black: choose {opening} — your opponent scores only {rate} against it as White (from {games} games).'**
   String statsCompareAnswerBlack(String opening, String rate, int games);
+
+  /// No description provided for @statsCompareSampleScope.
+  ///
+  /// In en, this message translates to:
+  /// **'You: your entire local library · Opponent: the last {months} months ({games} games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.'**
+  String statsCompareSampleScope(int months, int games);
+
+  /// No description provided for @trainingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Training'**
+  String get trainingSection;
+
+  /// No description provided for @trainingIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Training arena'**
+  String get trainingIntroTitle;
+
+  /// No description provided for @trainingIntroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a training area. Your progress is stored locally on this device.'**
+  String get trainingIntroBody;
+
+  /// No description provided for @trainingOpeningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening lab'**
+  String get trainingOpeningTitle;
+
+  /// No description provided for @trainingOpeningSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drill your repertoire lines and your weak spots.'**
+  String get trainingOpeningSubtitle;
+
+  /// No description provided for @trainingOpeningAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Train lines'**
+  String get trainingOpeningAction;
+
+  /// No description provided for @trainingNemesisBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Nemesis: {opening} — only {rate} win rate'**
+  String trainingNemesisBadge(String opening, String rate);
+
+  /// No description provided for @trainingNemesisNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No weak line found in your statistics yet.'**
+  String get trainingNemesisNone;
+
+  /// No description provided for @trainingTacticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blunder buster'**
+  String get trainingTacticsTitle;
+
+  /// No description provided for @trainingTacticsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the better move in critical middlegame positions.'**
+  String get trainingTacticsSubtitle;
+
+  /// No description provided for @trainingTacticsSolved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tactics solved'**
+  String trainingTacticsSolved(int count);
+
+  /// No description provided for @trainingTacticsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Start tactics'**
+  String get trainingTacticsAction;
+
+  /// No description provided for @trainingTacticsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No tactics puzzles in the catalogue yet.'**
+  String get trainingTacticsEmpty;
+
+  /// No description provided for @trainingEndgameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Endgame academy'**
+  String get trainingEndgameTitle;
+
+  /// No description provided for @trainingEndgameSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Master theoretical endgames step by step.'**
+  String get trainingEndgameSubtitle;
+
+  /// No description provided for @trainingEndgameProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{mastered} / {total} positions mastered ({percent}%)'**
+  String trainingEndgameProgress(int mastered, int total, int percent);
+
+  /// No description provided for @trainingEndgameAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open endgames'**
+  String get trainingEndgameAction;
+
+  /// No description provided for @trainingMastered.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastered'**
+  String get trainingMastered;
+
+  /// No description provided for @trainingStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'{done}/{total} clean repeats'**
+  String trainingStreak(int done, int total);
+
+  /// No description provided for @trainingLastAttempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last practised: {date}'**
+  String trainingLastAttempt(String date);
+
+  /// No description provided for @trainingNeverAttempted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not practised yet'**
+  String get trainingNeverAttempted;
+
+  /// No description provided for @trainingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint'**
+  String get trainingHint;
+
+  /// No description provided for @trainingBoardPending.
+  ///
+  /// In en, this message translates to:
+  /// **'The board trainer follows once the core exposes move validation over the native interface.'**
+  String get trainingBoardPending;
+
+  /// No description provided for @trainingOpeningLabSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected line'**
+  String get trainingOpeningLabSelected;
+
+  /// No description provided for @trainingOpeningLabEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an opening in the statistics tab and tap “Train” to load it here.'**
+  String get trainingOpeningLabEmpty;
+
+  /// No description provided for @trainingOpeningLabPending.
+  ///
+  /// In en, this message translates to:
+  /// **'The line trainer follows once the core supplies the opening moves.'**
+  String get trainingOpeningLabPending;
+
+  /// No description provided for @statsTrainOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Train'**
+  String get statsTrainOpening;
+
+  /// No description provided for @trainingGoalWin.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} to move — win the position'**
+  String trainingGoalWin(String side);
+
+  /// No description provided for @trainingGoalDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'{side} to move — hold the draw'**
+  String trainingGoalDraw(String side);
+
+  /// No description provided for @trainingWrongMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Not the best move. Give it another try.'**
+  String get trainingWrongMove;
+
+  /// No description provided for @trainingSolvedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Excellent! Position solved.'**
+  String get trainingSolvedTitle;
+
+  /// No description provided for @trainingSolvedClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Solved without a slip — this one counts towards mastery.'**
+  String get trainingSolvedClean;
+
+  /// No description provided for @trainingSolvedWithErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Solved, but with corrections. Only a clean run counts towards “mastered”.'**
+  String get trainingSolvedWithErrors;
+
+  /// No description provided for @trainingPracticeAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Practise again'**
+  String get trainingPracticeAgain;
+
+  /// No description provided for @trainingNextEndgame.
+  ///
+  /// In en, this message translates to:
+  /// **'Next endgame'**
+  String get trainingNextEndgame;
+
+  /// No description provided for @trainingBackToList.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the list'**
+  String get trainingBackToList;
+
+  /// No description provided for @trainingMoveProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Move {done} of {total}'**
+  String trainingMoveProgress(int done, int total);
+
+  /// No description provided for @trainingBoardError.
+  ///
+  /// In en, this message translates to:
+  /// **'The position could not be loaded.'**
+  String get trainingBoardError;
+
+  /// No description provided for @trainingShowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show hint'**
+  String get trainingShowHint;
+
+  /// No description provided for @trainingYourMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Your move'**
+  String get trainingYourMove;
+
+  /// No description provided for @trainingOpponentThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply …'**
+  String get trainingOpponentThinking;
+
+  /// No description provided for @trainingRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get trainingRestart;
 }
 
 class _AppLocalizationsDelegate

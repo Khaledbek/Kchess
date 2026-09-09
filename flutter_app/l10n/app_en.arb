@@ -502,5 +502,129 @@
         "type": "int"
       }
     }
-  }
+  },
+  "statsCompareSampleScope": "You: your entire local library · Opponent: the last {months} months ({games} games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.",
+  "@statsCompareSampleScope": {
+    "placeholders": {
+      "months": {
+        "type": "int"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingSection": "Training",
+  "trainingIntroTitle": "Training arena",
+  "trainingIntroBody": "Pick a training area. Your progress is stored locally on this device.",
+  "trainingOpeningTitle": "Opening lab",
+  "trainingOpeningSubtitle": "Drill your repertoire lines and your weak spots.",
+  "trainingOpeningAction": "Train lines",
+  "trainingNemesisBadge": "Nemesis: {opening} — only {rate} win rate",
+  "@trainingNemesisBadge": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingNemesisNone": "No weak line found in your statistics yet.",
+  "trainingTacticsTitle": "Blunder buster",
+  "trainingTacticsSubtitle": "Find the better move in critical middlegame positions.",
+  "trainingTacticsSolved": "{count} tactics solved",
+  "@trainingTacticsSolved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingTacticsAction": "Start tactics",
+  "trainingTacticsEmpty": "No tactics puzzles in the catalogue yet.",
+  "trainingEndgameTitle": "Endgame academy",
+  "trainingEndgameSubtitle": "Master theoretical endgames step by step.",
+  "trainingEndgameProgress": "{mastered} / {total} positions mastered ({percent}%)",
+  "@trainingEndgameProgress": {
+    "placeholders": {
+      "mastered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingEndgameAction": "Open endgames",
+  "trainingMastered": "Mastered",
+  "trainingStreak": "{done}/{total} clean repeats",
+  "@trainingStreak": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingLastAttempt": "Last practised: {date}",
+  "@trainingLastAttempt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingNeverAttempted": "Not practised yet",
+  "trainingHint": "Hint",
+  "trainingBoardPending": "The board trainer follows once the core exposes move validation over the native interface.",
+  "trainingOpeningLabSelected": "Selected line",
+  "trainingOpeningLabEmpty": "Pick an opening in the statistics tab and tap “Train” to load it here.",
+  "trainingOpeningLabPending": "The line trainer follows once the core supplies the opening moves.",
+  "statsTrainOpening": "Train",
+  "trainingGoalWin": "{side} to move — win the position",
+  "@trainingGoalWin": {
+    "placeholders": {
+      "side": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingGoalDraw": "{side} to move — hold the draw",
+  "@trainingGoalDraw": {
+    "placeholders": {
+      "side": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingWrongMove": "Not the best move. Give it another try.",
+  "trainingSolvedTitle": "Excellent! Position solved.",
+  "trainingSolvedClean": "Solved without a slip — this one counts towards mastery.",
+  "trainingSolvedWithErrors": "Solved, but with corrections. Only a clean run counts towards “mastered”.",
+  "trainingPracticeAgain": "Practise again",
+  "trainingNextEndgame": "Next endgame",
+  "trainingBackToList": "Back to the list",
+  "trainingMoveProgress": "Move {done} of {total}",
+  "@trainingMoveProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingBoardError": "The position could not be loaded.",
+  "trainingShowHint": "Show hint",
+  "trainingYourMove": "Your move",
+  "trainingOpponentThinking": "Reply …",
+  "trainingRestart": "Restart"
 }

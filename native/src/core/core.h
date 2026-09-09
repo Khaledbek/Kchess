@@ -58,6 +58,10 @@ class Core {
       const std::string& source,
       const std::string& target,
       int first_candidate_ply);
+  // Gameless board helpers. Unlike resolve_board_move_json these need no stored
+  // game, so a training position can be rendered and played from a bare FEN.
+  std::string board_position_json(const std::string& fen);
+  std::string board_legal_moves_json(const std::string& fen);
   std::string import_pgn_json(const std::string& pgn);
   std::string import_fen_json(const std::string& fen, const std::string& display_name);
   void set_favorite(const std::string& game_id, bool value);
@@ -82,7 +86,7 @@ class Core {
   std::string provider_overview_json(const std::string& profile_id);
 
   std::string statistics_overview_json();
-  std::string statistics_openings_json();
+  std::string statistics_openings_json(const std::string& time_control = "all");
   std::string statistics_terminations_json();
   std::string statistics_phases_json();
 

@@ -1141,4 +1141,161 @@ class AppLocalizationsEn extends AppLocalizations {
   String statsCompareAnswerBlack(String opening, String rate, int games) {
     return 'As Black: choose $opening — your opponent scores only $rate against it as White (from $games games).';
   }
+
+  @override
+  String statsCompareSampleScope(int months, int games) {
+    return 'You: your entire local library · Opponent: the last $months months ($games games). The two sides are different samples, so the numbers can differ even when you compare a profile with itself.';
+  }
+
+  @override
+  String get trainingSection => 'Training';
+
+  @override
+  String get trainingIntroTitle => 'Training arena';
+
+  @override
+  String get trainingIntroBody =>
+      'Pick a training area. Your progress is stored locally on this device.';
+
+  @override
+  String get trainingOpeningTitle => 'Opening lab';
+
+  @override
+  String get trainingOpeningSubtitle =>
+      'Drill your repertoire lines and your weak spots.';
+
+  @override
+  String get trainingOpeningAction => 'Train lines';
+
+  @override
+  String trainingNemesisBadge(String opening, String rate) {
+    return 'Nemesis: $opening — only $rate win rate';
+  }
+
+  @override
+  String get trainingNemesisNone =>
+      'No weak line found in your statistics yet.';
+
+  @override
+  String get trainingTacticsTitle => 'Blunder buster';
+
+  @override
+  String get trainingTacticsSubtitle =>
+      'Find the better move in critical middlegame positions.';
+
+  @override
+  String trainingTacticsSolved(int count) {
+    return '$count tactics solved';
+  }
+
+  @override
+  String get trainingTacticsAction => 'Start tactics';
+
+  @override
+  String get trainingTacticsEmpty => 'No tactics puzzles in the catalogue yet.';
+
+  @override
+  String get trainingEndgameTitle => 'Endgame academy';
+
+  @override
+  String get trainingEndgameSubtitle =>
+      'Master theoretical endgames step by step.';
+
+  @override
+  String trainingEndgameProgress(int mastered, int total, int percent) {
+    return '$mastered / $total positions mastered ($percent%)';
+  }
+
+  @override
+  String get trainingEndgameAction => 'Open endgames';
+
+  @override
+  String get trainingMastered => 'Mastered';
+
+  @override
+  String trainingStreak(int done, int total) {
+    return '$done/$total clean repeats';
+  }
+
+  @override
+  String trainingLastAttempt(String date) {
+    return 'Last practised: $date';
+  }
+
+  @override
+  String get trainingNeverAttempted => 'Not practised yet';
+
+  @override
+  String get trainingHint => 'Hint';
+
+  @override
+  String get trainingBoardPending =>
+      'The board trainer follows once the core exposes move validation over the native interface.';
+
+  @override
+  String get trainingOpeningLabSelected => 'Selected line';
+
+  @override
+  String get trainingOpeningLabEmpty =>
+      'Pick an opening in the statistics tab and tap “Train” to load it here.';
+
+  @override
+  String get trainingOpeningLabPending =>
+      'The line trainer follows once the core supplies the opening moves.';
+
+  @override
+  String get statsTrainOpening => 'Train';
+
+  @override
+  String trainingGoalWin(String side) {
+    return '$side to move — win the position';
+  }
+
+  @override
+  String trainingGoalDraw(String side) {
+    return '$side to move — hold the draw';
+  }
+
+  @override
+  String get trainingWrongMove => 'Not the best move. Give it another try.';
+
+  @override
+  String get trainingSolvedTitle => 'Excellent! Position solved.';
+
+  @override
+  String get trainingSolvedClean =>
+      'Solved without a slip — this one counts towards mastery.';
+
+  @override
+  String get trainingSolvedWithErrors =>
+      'Solved, but with corrections. Only a clean run counts towards “mastered”.';
+
+  @override
+  String get trainingPracticeAgain => 'Practise again';
+
+  @override
+  String get trainingNextEndgame => 'Next endgame';
+
+  @override
+  String get trainingBackToList => 'Back to the list';
+
+  @override
+  String trainingMoveProgress(int done, int total) {
+    return 'Move $done of $total';
+  }
+
+  @override
+  String get trainingBoardError => 'The position could not be loaded.';
+
+  @override
+  String get trainingShowHint => 'Show hint';
+
+  @override
+  String get trainingYourMove => 'Your move';
+
+  @override
+  String get trainingOpponentThinking => 'Reply …';
+
+  @override
+  String get trainingRestart => 'Restart';
 }

@@ -99,6 +99,14 @@ KCHESS_API char* kc_resolve_board_move_json(
     const char* source_utf8,
     const char* target_utf8,
     int32_t first_candidate_ply);
+// Gameless board access for positions that are not stored games (training
+// exercises). Additive exports, so KCHESS_CORE_ABI_VERSION stays at 3.
+KCHESS_API char* kc_board_position_json(
+    kc_core_handle handle,
+    const char* fen_utf8);
+KCHESS_API char* kc_board_legal_moves_json(
+    kc_core_handle handle,
+    const char* fen_utf8);
 KCHESS_API char* kc_import_pgn_json(
     kc_core_handle handle,
     const char* pgn_utf8);
@@ -134,6 +142,12 @@ KCHESS_API char* kc_provider_overview_json(
     const char* profile_id_utf8);
 KCHESS_API char* kc_statistics_overview_json(kc_core_handle handle);
 KCHESS_API char* kc_statistics_openings_json(kc_core_handle handle);
+// Openings restricted to one time-control bucket ("bullet", "blitz", "rapid",
+// ...); "all" or NULL behaves exactly like kc_statistics_openings_json.
+// Additive export, so KCHESS_CORE_ABI_VERSION stays at 3.
+KCHESS_API char* kc_statistics_openings_filtered_json(
+    kc_core_handle handle,
+    const char* time_control_utf8);
 KCHESS_API char* kc_statistics_terminations_json(kc_core_handle handle);
 KCHESS_API char* kc_statistics_phases_json(kc_core_handle handle);
 KCHESS_API kc_status kc_set_game_favorite(

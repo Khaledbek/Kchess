@@ -401,3 +401,68 @@ _StatsLabels _statsLabels(BuildContext context) {
     allTimeControlsNote: strings.statsAllTimeControlsNote,
   );
 }
+
+/// Deep link from the statistics tab into the training tab.
+///
+/// Switching tabs is the shell's job, so the request travels through
+/// [TrainingNavigator]. Pushed statistics routes (the player comparison) carry
+/// their own copy of the scope, hence the [popUntil]: the shell has to be the
+/// visible route again before the training tab can show.
+void _trainOpening(BuildContext context, OpeningTrainingRequest request) {
+  final navigator = TrainingNavigator.maybeOf(context);
+  if (navigator == null) return;
+  Navigator.of(context).popUntil((route) => route.isFirst);
+  navigator.openTraining(opening: request);
+}
+
+/// The training request for one opening family row.
+OpeningTrainingRequest _openingRequestFor(OpeningFamily family) =>
+    OpeningTrainingRequest(
+      openingName: family.familyName,
+      eco: family.baseEco,
+      color: family.color,
+    );
+
+/// `[Trainieren ➔]` action shown on opening rows. Renders icon-only below the
+/// tab's two-column breakpoint, where a labelled button would squeeze the
+/// opening name out of its row.
+class _TrainOpeningButton extends StatelessWidget {
+  const _TrainOpeningButton({required this.family});
+
+  final OpeningFamily family;
+
+  @override
+  Widget build(BuildContext context) {
+    // Null outside the home shell — a statistics screen pumped on its own in a
+    // test has nowhere to navigate to.
+    if (TrainingNavigator.maybeOf(context) == null) {
+      return const SizedBox.shrink();
+    }
+    final label = AppLocalizations.of(context).statsTrainOpening;
+    void onPressed() => _trainOpening(context, _openingRequestFor(family));
+
+    if (MediaQuery.sizeOf(context).width < 820) {
+      return IconButton(
+        onPressed: onPressed,
+        tooltip: label,
+        visualDensity: VisualDensity.compact,
+        icon: const Icon(Icons.school_rounded, size: 18),
+      );
+    }
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        visualDensity: VisualDensity.compact,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 6),
+          const Icon(Icons.arrow_forward_rounded, size: 16),
+        ],
+      ),
+    );
+  }
+}

@@ -233,6 +233,10 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_openings_json',
         );
+    _statisticsOpeningsFiltered = _library
+        .lookupFunction<_StringArgNative, _StringArgDart>(
+          'kc_statistics_openings_filtered_json',
+        );
     _statisticsTerminations = _library
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_terminations_json',
@@ -257,6 +261,13 @@ class FfiCoreGateway implements CoreGateway {
     _resolveBoardMove = _library
         .lookupFunction<_ResolveBoardMoveNative, _ResolveBoardMoveDart>(
           'kc_resolve_board_move_json',
+        );
+    _boardPosition = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_board_position_json',
+    );
+    _boardLegalMoves = _library
+        .lookupFunction<_StringArgNative, _StringArgDart>(
+          'kc_board_legal_moves_json',
         );
     _importPgn = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_import_pgn_json',
@@ -448,6 +459,8 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringNoArgsDart _favoriteGames;
   late final _StringArgDart _game;
   late final _ResolveBoardMoveDart _resolveBoardMove;
+  late final _StringArgDart _boardPosition;
+  late final _StringArgDart _boardLegalMoves;
   late final _StringArgDart _importPgn;
   late final _StringTwoArgsDart _importFen;
   late final _StringArgDart _startAnalysis;
@@ -471,6 +484,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _providerOverview;
   late final _StringNoArgsDart _statisticsOverview;
   late final _StringNoArgsDart _statisticsOpenings;
+  late final _StringArgDart _statisticsOpeningsFiltered;
   late final _StringNoArgsDart _statisticsTerminations;
   late final _StringNoArgsDart _statisticsPhases;
   late final _StatusStringIntDart _setGameFavorite;
@@ -703,9 +717,24 @@ class FfiCoreGateway implements CoreGateway {
       );
 
   @override
-  Future<OpeningsStats> openingsStats() async => OpeningsStats.fromJson(
-    _readJson(_statisticsOpenings(_handle))! as Map<String, Object?>,
-  );
+  Future<OpeningsStats> openingsStats({String timeControl = 'all'}) async {
+    // The unfiltered export stays the path for "all", so the common case does
+    // not pay for a native string round-trip.
+    if (timeControl == 'all') {
+      return OpeningsStats.fromJson(
+        _readJson(_statisticsOpenings(_handle))! as Map<String, Object?>,
+      );
+    }
+    final filter = timeControl.toNativeUtf8();
+    try {
+      return OpeningsStats.fromJson(
+        _readJson(_statisticsOpeningsFiltered(_handle, filter))!
+            as Map<String, Object?>,
+      );
+    } finally {
+      malloc.free(filter);
+    }
+  }
 
   @override
   Future<TerminationStats> terminationStats() async => TerminationStats.fromJson(
@@ -773,6 +802,25 @@ class FfiCoreGateway implements CoreGateway {
       malloc.free(nativeTarget);
     }
   }
+
+  @override
+  Future<BoardPosition> boardPosition(String fen) =>
+      _withNativeString(fen, (value) {
+        final json = _readJson(_boardPosition(_handle, value))!
+            as Map<String, Object?>;
+        return BoardPosition.fromJson(json);
+      });
+
+  @override
+  Future<List<BoardMoveOption>> boardLegalMoves(String fen) =>
+      _withNativeString(fen, (value) {
+        final json = _readJson(_boardLegalMoves(_handle, value))!
+            as List<Object?>;
+        return json
+            .cast<Map<String, Object?>>()
+            .map(BoardMoveOption.fromJson)
+            .toList(growable: false);
+      });
 
   @override
   Future<GameSummary> importPgn(String pgn) => _withNativeString(pgn, (value) {
