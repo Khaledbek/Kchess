@@ -817,6 +817,69 @@ SET local_accuracy=NULL,white_local_accuracy=NULL,black_local_accuracy=NULL,
 PRAGMA user_version = 16;
 )sql";
 
+// Local bot games are first-class persisted sessions. An active game survives
+// application/screen restarts; resigned games are retained for the later bot
+// history screen, while aborted games are deleted explicitly.
+constexpr const char* kMigration17 = R"sql(
+CREATE TABLE bot_games (
+  id TEXT PRIMARY KEY,
+  bot_elo INTEGER NOT NULL CHECK(bot_elo BETWEEN 100 AND 3200),
+  player_color TEXT NOT NULL CHECK(player_color IN ('white','black')),
+  bot_color TEXT NOT NULL CHECK(bot_color IN ('white','black')),
+  status TEXT NOT NULL CHECK(status IN ('active','resigned','complete')),
+  result TEXT NOT NULL DEFAULT '*',
+  starting_fen TEXT NOT NULL,
+  current_fen TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE bot_game_moves (
+  game_id TEXT NOT NULL REFERENCES bot_games(id) ON DELETE CASCADE,
+  ply INTEGER NOT NULL CHECK(ply > 0),
+  uci TEXT NOT NULL,
+  san TEXT NOT NULL,
+  fen_after TEXT NOT NULL,
+  PRIMARY KEY(game_id, ply)
+);
+CREATE UNIQUE INDEX bot_games_one_active_idx
+  ON bot_games((1)) WHERE status='active';
+CREATE INDEX bot_games_updated_idx ON bot_games(updated_at DESC);
+PRAGMA user_version = 17;
+)sql";
+
+
+// Bot-play display preferences belong to the persisted bot session rather than
+// the global application/analysis settings.
+constexpr const char* kMigration18 = R"sql(
+ALTER TABLE bot_games ADD COLUMN show_eval_bar INTEGER NOT NULL DEFAULT 0;
+PRAGMA user_version = 18;
+)sql";
+
+// A bot-history row may be materialized once into the normal local game
+// library so it can use the existing analysis pipeline without duplicate
+// imports on every visit. Deleting that local analysis game only clears the
+// link; the original bot history remains authoritative.
+constexpr const char* kMigration19 = R"sql(
+ALTER TABLE bot_games ADD COLUMN analysis_game_id TEXT REFERENCES games(id) ON DELETE SET NULL;
+CREATE INDEX bot_games_analysis_game_idx ON bot_games(analysis_game_id);
+PRAGMA user_version = 19;
+)sql";
+
+// Training progress is application-local and independent from the active
+// provider profile. One authoritative row is stored per stable exercise id.
+constexpr const char* kMigration20 = R"sql(
+CREATE TABLE training_progress (
+  exercise_id TEXT PRIMARY KEY,
+  mastered INTEGER NOT NULL DEFAULT 0,
+  success_streak INTEGER NOT NULL DEFAULT 0,
+  success_count INTEGER NOT NULL DEFAULT 0,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at INTEGER
+);
+PRAGMA user_version = 20;
+)sql";
+
+
 }  // namespace
 
 Database::Database(std::filesystem::path data_directory)
@@ -866,6 +929,10 @@ void Database::open_and_migrate() {
     if (version < 14) execute(kMigration14);
     if (version < 15) execute(kMigration15);
     if (version < 16) execute(kMigration16);
+    if (version < 17) execute(kMigration17);
+    if (version < 18) execute(kMigration18);
+    if (version < 19) execute(kMigration19);
+    if (version < 20) execute(kMigration20);
 
     // Older builds could leave several completed/cancelled analysis_runs for
     // the same game. At process startup there are no live workers, so collapse
@@ -2305,6 +2372,267 @@ std::optional<GameRecord> Database::game(const std::string& game_id) const {
     });
   }
   return result;
+}
+
+
+// -----------------------------------------------------------------------------
+// Section: Persisted local bot game sessions
+// -----------------------------------------------------------------------------
+
+BotGameRecord Database::create_bot_game(
+    const int bot_elo, const std::string& starting_fen) {
+  if (bot_elo < 100 || bot_elo > 3200) {
+    throw std::invalid_argument("Bot Elo must be between 100 and 3200");
+  }
+  if (active_bot_game().has_value()) {
+    throw std::runtime_error("An unfinished bot game already exists");
+  }
+  const auto id = make_uuid();
+  const auto now = unix_time_seconds();
+  auto statement = prepare(
+      db_,
+      "INSERT INTO bot_games(id,bot_elo,player_color,bot_color,status,result,"
+      "starting_fen,current_fen,created_at,updated_at) "
+      "VALUES(?,?,'white','black','active','*',?,?,?,?);");
+  sqlite3_bind_text(statement.get(), 1, id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(statement.get(), 2, bot_elo);
+  sqlite3_bind_text(statement.get(), 3, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 4, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 5, now);
+  sqlite3_bind_int64(statement.get(), 6, now);
+  check(sqlite3_step(statement.get()), db_, "create bot game");
+  return bot_game(id).value();
+}
+
+std::optional<BotGameRecord> Database::active_bot_game() const {
+  auto statement = prepare(
+      db_, "SELECT id FROM bot_games WHERE status='active' ORDER BY updated_at DESC LIMIT 1;");
+  if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
+  return bot_game(text_column(statement.get(), 0));
+}
+
+std::optional<BotGameRecord> Database::bot_game(const std::string& game_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT id,bot_elo,player_color,bot_color,status,result,starting_fen,current_fen,"
+      "created_at,updated_at,show_eval_bar,analysis_game_id FROM bot_games WHERE id=?;");
+  sqlite3_bind_text(statement.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
+
+  BotGameRecord game{
+      .id = text_column(statement.get(), 0),
+      .bot_elo = sqlite3_column_int(statement.get(), 1),
+      .player_color = text_column(statement.get(), 2),
+      .bot_color = text_column(statement.get(), 3),
+      .status = text_column(statement.get(), 4),
+      .result = text_column(statement.get(), 5),
+      .starting_fen = text_column(statement.get(), 6),
+      .current_fen = text_column(statement.get(), 7),
+      .created_at = sqlite3_column_int64(statement.get(), 8),
+      .updated_at = sqlite3_column_int64(statement.get(), 9),
+      .show_eval_bar = sqlite3_column_int(statement.get(), 10) != 0,
+      .analysis_game_id = optional_text_column(statement.get(), 11),
+  };
+
+  auto moves = prepare(
+      db_,
+      "SELECT ply,uci,san,fen_after FROM bot_game_moves WHERE game_id=? ORDER BY ply ASC;");
+  sqlite3_bind_text(moves.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  while (sqlite3_step(moves.get()) == SQLITE_ROW) {
+    game.moves.push_back({
+        .ply = sqlite3_column_int(moves.get(), 0),
+        .uci = text_column(moves.get(), 1),
+        .san = text_column(moves.get(), 2),
+        .fen_after = text_column(moves.get(), 3),
+    });
+  }
+  return game;
+}
+
+std::vector<BotGameSummaryRecord> Database::bot_games() const {
+  auto statement = prepare(
+      db_,
+      "SELECT g.id,g.bot_elo,g.player_color,g.bot_color,g.status,g.result,"
+      "g.created_at,g.updated_at,COUNT(m.ply),g.analysis_game_id "
+      "FROM bot_games g LEFT JOIN bot_game_moves m ON m.game_id=g.id "
+      "GROUP BY g.id ORDER BY g.updated_at DESC,g.created_at DESC;");
+  std::vector<BotGameSummaryRecord> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back({
+        .id = text_column(statement.get(), 0),
+        .bot_elo = sqlite3_column_int(statement.get(), 1),
+        .player_color = text_column(statement.get(), 2),
+        .bot_color = text_column(statement.get(), 3),
+        .status = text_column(statement.get(), 4),
+        .result = text_column(statement.get(), 5),
+        .created_at = sqlite3_column_int64(statement.get(), 6),
+        .updated_at = sqlite3_column_int64(statement.get(), 7),
+        .move_count = sqlite3_column_int(statement.get(), 8),
+        .analysis_game_id = optional_text_column(statement.get(), 9),
+    });
+  }
+  return result;
+}
+
+void Database::append_bot_game_move(
+    const std::string& game_id,
+    const int base_ply,
+    const std::string& expected_fen_before,
+    const BotGameMoveRecord& move) {
+  if (base_ply < 0) {
+    throw std::invalid_argument("Bot game branch ply must be non-negative");
+  }
+  if (move.uci.empty() || move.san.empty() || move.fen_after.empty()) {
+    throw std::invalid_argument("Bot game move is incomplete");
+  }
+  SqliteConnectionTransactionLock transaction_lock(db_);
+  execute("BEGIN IMMEDIATE;");
+  try {
+    auto game = prepare(
+        db_, "SELECT status,starting_fen FROM bot_games WHERE id=?;");
+    sqlite3_bind_text(game.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(game.get()) != SQLITE_ROW) {
+      throw std::invalid_argument("Bot game not found");
+    }
+    if (text_column(game.get(), 0) != "active") {
+      throw std::runtime_error("Bot game is no longer active");
+    }
+
+    std::string branch_fen;
+    if (base_ply == 0) {
+      branch_fen = text_column(game.get(), 1);
+    } else {
+      auto branch = prepare(
+          db_, "SELECT fen_after FROM bot_game_moves WHERE game_id=? AND ply=?;");
+      sqlite3_bind_text(branch.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_int(branch.get(), 2, base_ply);
+      if (sqlite3_step(branch.get()) != SQLITE_ROW) {
+        throw std::invalid_argument("Bot game branch ply does not exist");
+      }
+      branch_fen = text_column(branch.get(), 0);
+    }
+    if (branch_fen != expected_fen_before) {
+      throw std::runtime_error("Bot game branch position changed before move was saved");
+    }
+
+    auto erase_future = prepare(
+        db_, "DELETE FROM bot_game_moves WHERE game_id=? AND ply>?;");
+    sqlite3_bind_text(erase_future.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(erase_future.get(), 2, base_ply);
+    check(sqlite3_step(erase_future.get()), db_, "truncate bot game continuation");
+
+    const int next_ply = base_ply + 1;
+    auto insert = prepare(
+        db_, "INSERT INTO bot_game_moves(game_id,ply,uci,san,fen_after) VALUES(?,?,?,?,?);");
+    sqlite3_bind_text(insert.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(insert.get(), 2, next_ply);
+    sqlite3_bind_text(insert.get(), 3, move.uci.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert.get(), 4, move.san.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert.get(), 5, move.fen_after.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(insert.get()), db_, "append bot game branch move");
+
+    auto update = prepare(
+        db_, "UPDATE bot_games SET current_fen=?,updated_at=?,analysis_game_id=NULL WHERE id=?;");
+    sqlite3_bind_text(update.get(), 1, move.fen_after.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(update.get(), 2, unix_time_seconds());
+    sqlite3_bind_text(update.get(), 3, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(update.get()), db_, "update bot game branch position");
+    execute("COMMIT;");
+  } catch (...) {
+    sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+    throw;
+  }
+}
+
+void Database::finish_bot_game(
+    const std::string& game_id,
+    const std::string& status,
+    const std::string& result) {
+  if (status != "resigned" && status != "complete") {
+    throw std::invalid_argument("Unsupported bot game final status");
+  }
+  auto statement = prepare(
+      db_, "UPDATE bot_games SET status=?,result=?,updated_at=? WHERE id=? AND status='active';");
+  sqlite3_bind_text(statement.get(), 1, status.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, result.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 3, unix_time_seconds());
+  sqlite3_bind_text(statement.get(), 4, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "finish bot game");
+  if (sqlite3_changes(db_) == 0) throw std::runtime_error("Active bot game not found");
+}
+
+void Database::delete_bot_game(const std::string& game_id) {
+  auto statement = prepare(db_, "DELETE FROM bot_games WHERE id=?;");
+  sqlite3_bind_text(statement.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "delete bot game");
+  if (sqlite3_changes(db_) == 0) throw std::invalid_argument("Bot game not found");
+}
+
+void Database::set_bot_game_show_eval_bar(
+    const std::string& game_id, const bool enabled) {
+  auto statement = prepare(
+      db_, "UPDATE bot_games SET show_eval_bar=?,updated_at=? WHERE id=?;");
+  sqlite3_bind_int(statement.get(), 1, enabled ? 1 : 0);
+  sqlite3_bind_int64(statement.get(), 2, unix_time_seconds());
+  sqlite3_bind_text(statement.get(), 3, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "update bot game display settings");
+  if (sqlite3_changes(db_) == 0) throw std::invalid_argument("Bot game not found");
+}
+
+void Database::set_bot_game_analysis_game_id(
+    const std::string& game_id, const std::string& analysis_game_id) {
+  auto statement = prepare(
+      db_, "UPDATE bot_games SET analysis_game_id=? WHERE id=?;");
+  sqlite3_bind_text(
+      statement.get(), 1, analysis_game_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, game_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "link bot game analysis game");
+  if (sqlite3_changes(db_) == 0) throw std::invalid_argument("Bot game not found");
+}
+
+// -----------------------------------------------------------------------------
+// Section: Training progress persistence
+// -----------------------------------------------------------------------------
+
+std::vector<TrainingProgressRecord> Database::training_progress() const {
+  auto statement = prepare(
+      db_,
+      "SELECT exercise_id,mastered,success_streak,success_count,attempt_count,"
+      "last_attempt_at FROM training_progress ORDER BY exercise_id;");
+  std::vector<TrainingProgressRecord> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back(TrainingProgressRecord{
+        .exercise_id = text_column(statement.get(), 0),
+        .mastered = sqlite3_column_int(statement.get(), 1) != 0,
+        .success_streak = sqlite3_column_int(statement.get(), 2),
+        .success_count = sqlite3_column_int(statement.get(), 3),
+        .attempt_count = sqlite3_column_int(statement.get(), 4),
+        .last_attempt_at = optional_int64_column(statement.get(), 5),
+    });
+  }
+  return result;
+}
+
+void Database::put_training_progress(const TrainingProgressRecord& progress) {
+  auto statement = prepare(
+      db_,
+      "INSERT INTO training_progress(exercise_id,mastered,success_streak,"
+      "success_count,attempt_count,last_attempt_at) VALUES(?,?,?,?,?,?) "
+      "ON CONFLICT(exercise_id) DO UPDATE SET mastered=excluded.mastered,"
+      "success_streak=excluded.success_streak,success_count=excluded.success_count,"
+      "attempt_count=excluded.attempt_count,last_attempt_at=excluded.last_attempt_at;");
+  sqlite3_bind_text(
+      statement.get(), 1, progress.exercise_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(statement.get(), 2, progress.mastered ? 1 : 0);
+  sqlite3_bind_int(statement.get(), 3, progress.success_streak);
+  sqlite3_bind_int(statement.get(), 4, progress.success_count);
+  sqlite3_bind_int(statement.get(), 5, progress.attempt_count);
+  if (progress.last_attempt_at.has_value()) {
+    sqlite3_bind_int64(statement.get(), 6, *progress.last_attempt_at);
+  } else {
+    sqlite3_bind_null(statement.get(), 6);
+  }
+  check(sqlite3_step(statement.get()), db_, "persist training progress");
 }
 
 PersistedAnalysis Database::prepare_analysis(

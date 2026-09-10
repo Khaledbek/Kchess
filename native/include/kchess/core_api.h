@@ -25,7 +25,7 @@ typedef void* kc_core_handle;
 
 // Increment only when the C ABI changes incompatibly. Additive exports may
 // keep the same ABI version. Flutter validates this before creating Core.
-#define KCHESS_CORE_ABI_VERSION 3
+#define KCHESS_CORE_ABI_VERSION 7
 
 typedef enum kc_status {
   KC_STATUS_OK = 0,
@@ -108,6 +108,16 @@ KCHESS_API char* kc_resolve_board_move_json(
     const char* source_utf8,
     const char* target_utf8,
     int32_t first_candidate_ply);
+KCHESS_API char* kc_resolve_free_board_move_json(
+    kc_core_handle handle,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8);
+KCHESS_API char* kc_board_promotion_options_json(
+    kc_core_handle handle,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8);
 KCHESS_API char* kc_import_pgn_json(
     kc_core_handle handle,
     const char* pgn_utf8);
@@ -143,6 +153,9 @@ KCHESS_API char* kc_provider_overview_json(
     const char* profile_id_utf8);
 KCHESS_API char* kc_statistics_overview_json(kc_core_handle handle);
 KCHESS_API char* kc_statistics_openings_json(kc_core_handle handle);
+KCHESS_API char* kc_statistics_openings_filtered_json(
+    kc_core_handle handle,
+    const char* time_control_utf8);
 KCHESS_API char* kc_statistics_terminations_json(kc_core_handle handle);
 KCHESS_API char* kc_statistics_phases_json(kc_core_handle handle);
 // Returns owned UTF-8 JSON; release with kc_string_free, as for other JSON calls.
@@ -214,6 +227,57 @@ KCHESS_API char* kc_variation_analysis_status_json(
 KCHESS_API kc_status kc_cancel_variation_analysis(
     kc_core_handle handle,
     const char* job_id_utf8);
+
+KCHESS_API char* kc_create_bot_game_json(kc_core_handle handle, int32_t requested_elo);
+KCHESS_API char* kc_active_bot_game_json(kc_core_handle handle);
+KCHESS_API char* kc_bot_game_json(kc_core_handle handle, const char* game_id_utf8);
+KCHESS_API char* kc_bot_games_json(kc_core_handle handle);
+KCHESS_API char* kc_bot_game_analysis_game_json(
+    kc_core_handle handle, const char* game_id_utf8);
+KCHESS_API char* kc_record_bot_game_move_json(
+    kc_core_handle handle,
+    const char* game_id_utf8,
+    const char* expected_fen_before_utf8,
+    const char* uci_utf8);
+KCHESS_API char* kc_record_bot_game_move_from_ply_json(
+    kc_core_handle handle,
+    const char* game_id_utf8,
+    int32_t base_ply,
+    const char* expected_fen_before_utf8,
+    const char* uci_utf8);
+KCHESS_API kc_status kc_resign_bot_game(
+    kc_core_handle handle,
+    const char* game_id_utf8);
+KCHESS_API kc_status kc_abort_bot_game(
+    kc_core_handle handle,
+    const char* game_id_utf8);
+KCHESS_API kc_status kc_delete_bot_game(
+    kc_core_handle handle,
+    const char* game_id_utf8);
+KCHESS_API kc_status kc_set_bot_game_show_eval_bar(
+    kc_core_handle handle,
+    const char* game_id_utf8,
+    int32_t enabled);
+KCHESS_API char* kc_start_bot_move_json(
+    kc_core_handle handle,
+    const char* fen_utf8,
+    int32_t requested_elo);
+KCHESS_API char* kc_bot_move_status_json(
+    kc_core_handle handle,
+    const char* job_id_utf8);
+KCHESS_API kc_status kc_cancel_bot_move(
+    kc_core_handle handle,
+    const char* job_id_utf8);
+
+KCHESS_API char* kc_training_overview_json(kc_core_handle handle);
+KCHESS_API char* kc_start_training_attempt_json(
+    kc_core_handle handle,
+    const char* exercise_id_utf8);
+KCHESS_API char* kc_play_training_move_json(
+    kc_core_handle handle,
+    const char* attempt_id_utf8,
+    const char* source_utf8,
+    const char* target_utf8);
 
 KCHESS_API void kc_string_free(char* value);
 

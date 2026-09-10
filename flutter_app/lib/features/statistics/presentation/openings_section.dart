@@ -9,11 +9,13 @@ class _OpeningsCard extends StatelessWidget {
     required this.future,
     required this.onRetry,
     required this.controller,
+    required this.timeControl,
   });
 
   final Future<OpeningsStats> future;
   final VoidCallback onRetry;
   final AppController controller;
+  final String timeControl;
 
   @override
   Widget build(BuildContext context) {
@@ -48,15 +50,23 @@ class _OpeningsCard extends StatelessWidget {
               );
             }
             if (stats.isEmpty) {
-              return _OverviewMessage(
-                icon: Icons.account_tree_outlined,
-                text: labels.empty,
-              );
+              // "No classified openings yet" would be wrong here: the library
+              // may be full of them, just none in the selected bucket.
+              return timeControl == 'all'
+                  ? _OverviewMessage(
+                      icon: Icons.account_tree_outlined,
+                      text: labels.empty,
+                    )
+                  : _OverviewMessage(
+                      icon: Icons.filter_alt_off_outlined,
+                      text: _overviewText(context).noGamesForFilter,
+                    );
             }
             return _OpeningsContent(
               stats: stats,
               labels: labels,
               controller: controller,
+              timeControl: timeControl,
             );
           },
         ),
@@ -72,11 +82,13 @@ class _OpeningsContent extends StatefulWidget {
     required this.stats,
     required this.labels,
     required this.controller,
+    required this.timeControl,
   });
 
   final OpeningsStats stats;
   final _OpeningsText labels;
   final AppController controller;
+  final String timeControl;
 
   @override
   State<_OpeningsContent> createState() => _OpeningsContentState();
@@ -154,6 +166,10 @@ class _OpeningsContentState extends State<_OpeningsContent> {
                 ),
               ),
             ),
+            if (widget.timeControl != 'all')
+              _FilterPill(
+                label: _statsLabels(context).timeControl(widget.timeControl),
+              ),
           ],
         ),
         const SizedBox(height: 4),
@@ -349,6 +365,8 @@ class _OpeningFamilyTileState extends State<_OpeningFamilyTile> {
               ],
             ),
           ),
+          const SizedBox(width: 6),
+          _TrainOpeningButton(family: family),
           SizedBox(
             width: 28,
             child: expandable

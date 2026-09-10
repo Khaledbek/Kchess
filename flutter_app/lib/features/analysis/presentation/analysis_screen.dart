@@ -3,12 +3,22 @@ import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../ffi/core_gateway.dart';
 import '../../../localization/generated/app_localizations.dart';
 import '../../../shared/models/models.dart';
+import '../../../ui/shared/board_endgame_presentation.dart';
+import '../../../ui/shared/promotion_dialog.dart';
 import '../../app/application/app_controller.dart';
+import 'analysis_arrow_resolver.dart';
+import 'analysis_temporary_bot_game_screen.dart';
+import 'analysis_variation_graph.dart';
+
+// -----------------------------------------------------------------------------
+// Section: Analysis presentation helpers
+// -----------------------------------------------------------------------------
 
 String _classificationLabel(
   AppLocalizations strings,
@@ -45,22 +55,6 @@ String? _analysisClassificationAsset(MoveClassification classification) =>
     };
 
 bool _isDrawResult(String result) => result == '1/2-1/2' || result == '½-½';
-
-String? _resultAssetForColor(String color, String? result, bool checkmate) {
-  if (result == null) return null;
-  if (_isDrawResult(result)) {
-    return 'assets/analysis_img/result_draw.png';
-  }
-  final whiteWon = result == '1-0';
-  final colorIsWhite = color == 'white';
-  if (whiteWon == colorIsWhite) {
-    return 'assets/analysis_img/result_win.png';
-  }
-  return checkmate
-      ? 'assets/analysis_img/result_loss.png'
-      : 'assets/analysis_img/result_giveup.png';
-}
-
 
 int? _latestClockMillis(
   List<ParsedMove> moves,
@@ -371,6 +365,16 @@ class _LivePlayerSummary extends StatelessWidget {
   }
 }
 
+class _TemporaryBotLaunchConfig {
+  const _TemporaryBotLaunchConfig({
+    required this.playerColor,
+    required this.botElo,
+  });
+
+  final String playerColor;
+  final int botElo;
+}
+
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({
     required this.gateway,
@@ -389,94 +393,12 @@ class AnalysisScreen extends StatefulWidget {
   State<AnalysisScreen> createState() => _AnalysisScreenState();
 }
 
-class _AnalysisFenImportDialog extends StatefulWidget {
-  const _AnalysisFenImportDialog();
-
-  @override
-  State<_AnalysisFenImportDialog> createState() =>
-      _AnalysisFenImportDialogState();
-}
-
-class _AnalysisFenImportDialogState extends State<_AnalysisFenImportDialog> {
-  final _nameController = TextEditingController();
-  final _fenController = TextEditingController();
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _fenController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(strings.importFen),
-      content: SizedBox(
-        width: 620,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              key: const Key('analysis-fen-name'),
-              controller: _nameController,
-              autofocus: true,
-              decoration: InputDecoration(labelText: strings.positionName),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              key: const Key('analysis-fen-text'),
-              controller: _fenController,
-              minLines: 2,
-              maxLines: 4,
-              textDirection: TextDirection.ltr,
-              decoration: InputDecoration(labelText: strings.fenText),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(strings.close),
-        ),
-        FilledButton(
-          onPressed: () {
-            final name = _nameController.text.trim();
-            final fen = _fenController.text.trim();
-            if (name.isEmpty || fen.isEmpty) return;
-            Navigator.of(context).pop((fen: fen, name: name));
-          },
-          child: Text(strings.importAction),
-        ),
-      ],
-    );
-  }
-}
-
-class _VariationSession {
-  _VariationSession({required this.parentPly, required this.startingPosition});
-
-  final int parentPly;
-  final BoardPosition startingPosition;
-  final List<VariationAnalysisSnapshot> moves = [];
-  int currentIndex = -1;
-
-  VariationAnalysisSnapshot? get current =>
-      currentIndex >= 0 && currentIndex < moves.length
-      ? moves[currentIndex]
-      : null;
-}
-
 class _AnalysisScreenState extends State<AnalysisScreen> {
   late final AnalysisController _controller;
   late AppSettings _settings;
   bool _followLatest = false;
   bool _playing = false;
   bool _boardRotated = false;
-  bool _resultPresentationStarted = false;
-  bool _resultPresentationDocked = false;
   int _currentPly = -1;
   int _selectedLine = 0;
   String? _selectedSquare;
@@ -484,7 +406,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   int? _afterMoveSlot;
   int? _afterMoveLoadingSlot;
   int _afterMoveLoadGeneration = 0;
-  _VariationSession? _variationSession;
+  final AnalysisVariationGraph _variationGraph = AnalysisVariationGraph();
   Object? _variationError;
   Timer? _playTimer;
   Timer? _variationTimer;
@@ -527,32 +449,113 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.dispose();
   }
 
-  Future<void> _importFenPosition() async {
-    final value = await showDialog<({String fen, String name})>(
-      context: context,
-      builder: (_) => const _AnalysisFenImportDialog(),
-    );
-    if (value == null || !mounted) return;
+  Future<void> _exportCurrentFen() async {
+    final variationPosition = _variationGraph.current?.snapshot.position;
+    final fen = (variationPosition ?? _displayPosition).fen.trim();
+    if (fen.isEmpty) return;
 
-    try {
-      // Validation, normalization and persistence stay in the native C++
-      // import path. Flutter only collects the two user-entered strings.
-      final imported = await widget.gateway.importFen(
-        fen: value.fen,
-        name: value.name,
-      );
-      if (!mounted) return;
-      await openAnalysisWorkflow(
-        context: context,
-        gateway: widget.gateway,
-        game: imported,
-        settings: _settings,
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.toString())));
-    }
+    await Clipboard.setData(ClipboardData(text: fen));
+    if (!mounted) return;
+    final strings = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(strings.fenCopiedToClipboard)),
+    );
+  }
+
+  Future<void> _continueAgainstBot(BoardPosition position) async {
+    var playerColor = position.sideToMove;
+    var botElo = 1500;
+    final strings = AppLocalizations.of(context);
+    final config = await showDialog<_TemporaryBotLaunchConfig>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          key: const Key('analysis-continue-against-bot-dialog'),
+          title: Text(strings.continueAgainstBot),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(strings.botPlayerColor),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: [
+                    ButtonSegment<String>(
+                      value: 'white',
+                      icon: const Icon(Icons.circle_outlined),
+                      label: Text(strings.whitePlayer),
+                    ),
+                    ButtonSegment<String>(
+                      value: 'black',
+                      icon: const Icon(Icons.circle),
+                      label: Text(strings.blackPlayer),
+                    ),
+                  ],
+                  selected: {playerColor},
+                  onSelectionChanged: (selection) {
+                    if (selection.isEmpty) return;
+                    setDialogState(() => playerColor = selection.first);
+                  },
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '${strings.botElo}: $botElo',
+                  key: const Key('analysis-temporary-bot-elo-value'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Slider(
+                  key: const Key('analysis-temporary-bot-elo-slider'),
+                  min: 100,
+                  max: 3200,
+                  divisions: 31,
+                  value: botElo.toDouble(),
+                  label: '$botElo',
+                  onChanged: (value) {
+                    setDialogState(() => botElo = (value / 100).round() * 100);
+                  },
+                ),
+                Text(
+                  strings.temporaryBotGameNotSaved,
+                  style: Theme.of(dialogContext).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(strings.cancelAction),
+            ),
+            FilledButton(
+              key: const Key('analysis-start-temporary-bot-game'),
+              onPressed: () => Navigator.of(dialogContext).pop(
+                _TemporaryBotLaunchConfig(
+                  playerColor: playerColor,
+                  botElo: botElo,
+                ),
+              ),
+              child: Text(strings.continueLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (config == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AnalysisTemporaryBotGameScreen(
+          gateway: widget.gateway,
+          initialPosition: position,
+          playerColor: config.playerColor,
+          botElo: config.botElo,
+        ),
+      ),
+    );
   }
 
   Future<void> _deleteStoredAnalysis() async {
@@ -669,16 +672,38 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Future<void> _selectPly(int value) async {
-    if (_variationSession != null) _returnToMainLine();
     final selected = value < -1
         ? -1
         : (value > _maximumPly ? _maximumPly : value);
+    final wasOnVariation = _variationGraph.isOnVariation;
+    final activeJobId = _activeVariationJobId;
+    if (wasOnVariation) {
+      _variationTimer?.cancel();
+      _activeVariationJobId = null;
+      _variationGraph.pauseRunningSnapshots();
+      _variationGraph.selectMainLine();
+    }
     setState(() {
       _followLatest = false;
       _currentPly = selected;
       _selectedLine = 0;
       _selectedSquare = null;
+      _variationError = null;
+      _variationMovePending = false;
     });
+    if (wasOnVariation) {
+      if (activeJobId != null) {
+        try {
+          await widget.gateway.cancelVariationAnalysis(activeJobId);
+        } catch (_) {
+          // A just-finished sideline job may already have been reaped.
+        }
+      }
+      if (!mounted) return;
+      await _controller.resumeAfterVariation(math.max(0, selected));
+      await _loadAfterMoveSnapshot(selected);
+      return;
+    }
     if (selected < 0) {
       await _controller.selectPly(0);
       await _loadAfterMoveSnapshot(-1);
@@ -688,17 +713,74 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     await _loadAfterMoveSnapshot(selected);
   }
 
+  bool get _hasKnownNext {
+    if (_variationGraph.isOnVariation) {
+      return _variationGraph.preferredNext != null;
+    }
+    return _currentPly < _maximumPly;
+  }
+
+  Future<void> _navigatePrevious() async {
+    final currentVariation = _variationGraph.current;
+    if (currentVariation != null) {
+      final parent = _variationGraph.previous;
+      if (parent != null) {
+        await _selectVariationNode(parent.id, preservePlayback: _playing);
+      } else {
+        await _returnToMainLine();
+      }
+      return;
+    }
+    await _selectPly(_currentPly - 1);
+  }
+
+  Future<void> _navigateNext() async {
+    final currentVariation = _variationGraph.current;
+    if (currentVariation != null) {
+      final next = _variationGraph.preferredNext;
+      if (next != null) {
+        await _selectVariationNode(next.id, preservePlayback: _playing);
+      }
+      return;
+    }
+    if (_currentPly < _maximumPly) {
+      await _selectPly(_currentPly + 1);
+    }
+  }
+
+  Future<void> _navigateFirst() => _selectPly(-1);
+
+  Future<void> _navigateLast() async {
+    if (_variationGraph.isOnVariation) {
+      final last = _variationGraph.preferredLast;
+      if (last != null) {
+        await _selectVariationNode(last.id, preservePlayback: _playing);
+      }
+      return;
+    }
+    await _selectPly(_maximumPly);
+  }
+
   void _togglePlayback() {
     _playTimer?.cancel();
-    setState(() => _playing = !_playing);
-    if (!_playing) return;
-    _playTimer = Timer.periodic(const Duration(milliseconds: 850), (timer) {
-      if (_currentPly >= _maximumPly) {
-        timer.cancel();
-        if (mounted) setState(() => _playing = false);
-      } else {
-        _selectPly(_currentPly + 1);
+    if (_playing) {
+      setState(() => _playing = false);
+      return;
+    }
+    setState(() => _playing = true);
+    _schedulePlaybackTick();
+  }
+
+  void _schedulePlaybackTick() {
+    _playTimer?.cancel();
+    _playTimer = Timer(const Duration(milliseconds: 850), () async {
+      if (!mounted || !_playing) return;
+      if (!_hasKnownNext) {
+        setState(() => _playing = false);
+        return;
       }
+      await _navigateNext();
+      if (mounted && _playing) _schedulePlaybackTick();
     });
   }
 
@@ -1068,25 +1150,39 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   Future<void> _playBoardMove(String source, String target) async {
     if (_variationMovePending) return;
-    final session = _variationSession;
-    final activePosition = session == null
-        ? _displayPosition
-        : session.current?.position ?? session.startingPosition;
+    final parentNode = _variationGraph.current;
+    final activePosition = parentNode?.snapshot.position ?? _displayPosition;
 
-    // A move played on the board is only a sideline when it actually deviates
-    // from the recorded PGN. If this exact position + move occurs later in the
-    // main line (including a rejoin after a transposition), jump back onto the
-    // PGN instead of starting a variation engine job.
-    final firstCandidate = session == null
-        ? _currentPly + 1
-        : session.parentPly + 1;
+    // Native C++ remains the chess authority. It resolves legal moves and also
+    // detects whether an explored sideline transposes back into the recorded
+    // main line. The Flutter graph stores only the ephemeral navigation path.
+    final rootMainLinePly = parentNode?.rootMainLinePly ?? _currentPly;
+    final firstCandidate = rootMainLinePly + 1;
     late final BoardMoveResolution resolved;
     try {
+      final promotionOptions = await widget.gateway.boardPromotionOptions(
+        fen: activePosition.fen,
+        source: source,
+        target: target,
+      );
+      var resolvedTarget = target;
+      if (promotionOptions.isNotEmpty) {
+        final promotion = await showPromotionChoiceDialog(
+          context: context,
+          options: promotionOptions,
+          sideToMove: activePosition.sideToMove,
+        );
+        if (!mounted || promotion == null) {
+          if (mounted) setState(() => _selectedSquare = null);
+          return;
+        }
+        resolvedTarget = '$target$promotion';
+      }
       resolved = await widget.gateway.resolveBoardMove(
         gameId: widget.game.id,
         fen: activePosition.fen,
         source: source,
-        target: target,
+        target: resolvedTarget,
         firstCandidatePly: firstCandidate,
       );
     } catch (error) {
@@ -1100,18 +1196,26 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
     final mainLinePly = resolved.mainLinePly;
     if (mainLinePly != null) {
-      if (session == null) {
-        await _selectPly(mainLinePly);
-      } else {
-        await _rejoinMainLineAt(mainLinePly);
-      }
+      await _rejoinMainLineAt(mainLinePly);
       return;
     }
 
-    // Entering a sideline pauses every main-line poll immediately. Native code
-    // then transfers the single Stockfish slot to the sideline worker.
-    if (session == null) _controller.pauseForVariation();
+    // Only one Stockfish worker owns the live analysis slot. The already
+    // explored graph nodes remain as in-memory snapshots while the new child
+    // move is analyzed.
+    _controller.pauseForVariation();
     _variationTimer?.cancel();
+    final previousActiveJobId = _activeVariationJobId;
+    if (previousActiveJobId != null) {
+      _variationGraph.pauseRunningSnapshots();
+      try {
+        await widget.gateway.cancelVariationAnalysis(previousActiveJobId);
+      } catch (_) {
+        // The previous job may have completed just before this new move.
+      }
+      _activeVariationJobId = null;
+    }
+    if (!mounted) return;
     setState(() {
       _variationMovePending = true;
       _selectedSquare = null;
@@ -1133,38 +1237,26 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         }
         return;
       }
+      late final AnalysisVariationNode added;
       setState(() {
-        final activeSession = _variationSession ??= _VariationSession(
-          parentPly: _currentPly,
-          startingPosition: _displayPosition,
+        _variationGraph.pauseRunningSnapshots();
+        added = _variationGraph.addOrSelect(
+          rootMainLinePly: rootMainLinePly,
+          parentId: parentNode?.id,
+          snapshot: variation,
         );
-        if (activeSession.currentIndex + 1 < activeSession.moves.length) {
-          activeSession.moves.removeRange(
-            activeSession.currentIndex + 1,
-            activeSession.moves.length,
-          );
-        }
-        // Previous sideline positions are snapshots only. They must never keep
-        // a hidden engine alive after the user has played the next move.
-        for (var index = 0; index < activeSession.moves.length; index++) {
-          final old = activeSession.moves[index];
-          if (old.isRunning) {
-            activeSession.moves[index] = old.copyWith(status: 'paused');
-          }
-        }
-        activeSession.moves.add(variation);
-        activeSession.currentIndex = activeSession.moves.length - 1;
+        _currentPly = rootMainLinePly;
         _activeVariationJobId = variation.jobId;
         _variationMovePending = false;
       });
-      _pollVariation(variation.jobId, _variationSession!.currentIndex);
+      _pollVariation(variation.jobId, added.id);
     } catch (error) {
       if (mounted) {
         setState(() {
           _variationMovePending = false;
           _variationError = error;
         });
-        if (_variationSession == null) {
+        if (!_variationGraph.isOnVariation) {
           unawaited(_controller.resumeAfterVariation(math.max(0, _currentPly)));
         }
       }
@@ -1189,9 +1281,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     _variationTimer?.cancel();
     final activeJobId = _activeVariationJobId;
     _activeVariationJobId = null;
+    _variationGraph.pauseRunningSnapshots();
+    _variationGraph.selectMainLine();
     if (mounted) {
       setState(() {
-        _variationSession = null;
         _variationError = null;
         _variationMovePending = false;
         _selectedSquare = null;
@@ -1208,60 +1301,61 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       }
     }
     if (!mounted) return;
-    await _controller.resumeAfterVariation(ply);
+    await _controller.resumeAfterVariation(math.max(0, ply));
     await _loadAfterMoveSnapshot(ply);
   }
 
-  void _pollVariation(String jobId, int moveIndex) {
+  void _pollVariation(String jobId, int nodeId) {
     _variationTimer?.cancel();
-    final session = _variationSession;
-    final current =
-        session != null && moveIndex >= 0 && moveIndex < session.moves.length
-        ? session.moves[moveIndex]
-        : null;
-    if (current == null ||
-        current.jobId != jobId ||
+    final node = _variationGraph.node(nodeId);
+    if (node == null ||
+        node.snapshot.jobId != jobId ||
         _activeVariationJobId != jobId ||
-        !current.isRunning) {
+        !node.snapshot.isRunning) {
       return;
     }
     _variationTimer = Timer(const Duration(milliseconds: 300), () async {
       try {
         final updated = await widget.gateway.variationAnalysisStatus(jobId);
-        final session = _variationSession;
-        if (!mounted ||
-            session == null ||
-            moveIndex >= session.moves.length ||
-            session.moves[moveIndex].jobId != jobId) {
+        final target = _variationGraph.node(nodeId);
+        if (!mounted || target == null || target.snapshot.jobId != jobId) {
           return;
         }
         setState(() {
-          session.moves[moveIndex] = updated;
+          _variationGraph.updateSnapshot(nodeId, updated);
           if (!updated.isRunning && _activeVariationJobId == jobId) {
             _activeVariationJobId = null;
           }
         });
-        if (updated.isRunning) _pollVariation(jobId, moveIndex);
+        if (updated.isRunning) _pollVariation(jobId, nodeId);
       } catch (error) {
         if (mounted) setState(() => _variationError = error);
       }
     });
   }
 
-  void _returnToMainLine() {
+  Future<void> _returnToMainLine() async {
+    final rootPly = _variationGraph.current?.rootMainLinePly ?? _currentPly;
     _variationTimer?.cancel();
     final activeJobId = _activeVariationJobId;
     _activeVariationJobId = null;
+    _variationGraph.pauseRunningSnapshots();
+    _variationGraph.selectMainLine();
     setState(() {
-      _variationSession = null;
       _variationError = null;
       _selectedSquare = null;
       _variationMovePending = false;
+      _selectedLine = 0;
+      _followLatest = false;
+      _currentPly = rootPly;
     });
-    unawaited(_leaveVariationAndResume(activeJobId));
+    await _leaveVariationAndResume(activeJobId, rootPly);
   }
 
-  Future<void> _leaveVariationAndResume(String? activeJobId) async {
+  Future<void> _leaveVariationAndResume(
+    String? activeJobId,
+    int mainLinePly,
+  ) async {
     if (activeJobId != null) {
       try {
         await widget.gateway.cancelVariationAnalysis(activeJobId);
@@ -1270,36 +1364,67 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       }
     }
     if (mounted) {
-      await _controller.resumeAfterVariation(math.max(0, _currentPly));
+      await _controller.resumeAfterVariation(math.max(0, mainLinePly));
+      await _loadAfterMoveSnapshot(mainLinePly);
     }
   }
 
-  void _navigateVariation(int index) {
-    final session = _variationSession;
-    if (session == null) return;
-    final selected = index < -1
-        ? -1
-        : (index >= session.moves.length ? session.moves.length - 1 : index);
-    _variationTimer?.cancel();
+  Future<void> _selectVariationNode(
+    int nodeId, {
+    bool preservePlayback = false,
+  }) async {
+    final node = _variationGraph.node(nodeId);
+    if (node == null) return;
+    if (!preservePlayback) {
+      _playTimer?.cancel();
+      if (_playing) setState(() => _playing = false);
+    }
+
+    final activeJobId = _activeVariationJobId;
+    final selectingActiveJob = activeJobId != null &&
+        node.snapshot.jobId == activeJobId &&
+        node.snapshot.isRunning;
+    if (activeJobId != null && !selectingActiveJob) {
+      _variationTimer?.cancel();
+      _activeVariationJobId = null;
+      _variationGraph.pauseRunningSnapshots();
+      try {
+        await widget.gateway.cancelVariationAnalysis(activeJobId);
+      } catch (_) {
+        // The old sideline may already have completed.
+      }
+    }
+    if (!mounted) return;
+    _controller.pauseForVariation();
     setState(() {
-      session.currentIndex = selected;
+      _variationGraph.selectNode(nodeId);
+      _currentPly = node.rootMainLinePly;
       _selectedLine = 0;
       _selectedSquare = null;
+      _variationError = null;
+      _followLatest = false;
     });
-    final current = session.current;
-    if (current?.isRunning == true && current!.jobId == _activeVariationJobId) {
-      _pollVariation(current.jobId, selected);
+    if (selectingActiveJob && activeJobId != null) {
+      _pollVariation(activeJobId, nodeId);
     }
   }
 
-  String _variationPgn(ParsedMove? parent) {
-    final session = _variationSession;
-    if (session == null || session.moves.isEmpty) return '';
-    var whiteToMove = session.startingPosition.sideToMove == 'white';
-    var moveNumber = session.startingPosition.fullmoveNumber;
+  String _variationPgn() {
+    final path = _variationGraph.currentPath;
+    if (path.isEmpty) return '';
+    final detail = _controller.detail;
+    final rootPly = path.first.rootMainLinePly;
+    final parent = detail != null &&
+            rootPly >= 0 &&
+            rootPly < detail.moves.length
+        ? detail.moves[rootPly]
+        : null;
+    final startPosition = parent?.positionAfter ?? detail?.startingPosition;
+    var whiteToMove = startPosition?.sideToMove == 'white';
+    var moveNumber = startPosition?.fullmoveNumber ?? 1;
     final tokens = <String>[];
-    for (var index = 0; index < session.moves.length; index++) {
-      final san = session.moves[index].playedSan;
+    for (var index = 0; index < path.length; index++) {
+      final san = path[index].snapshot.playedSan;
       if (whiteToMove) {
         tokens.add('$moveNumber. $san');
       } else {
@@ -1322,7 +1447,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final detail = _controller.detail;
     final gameSummary = detail?.summary ?? widget.game;
     final atInitialPosition =
-        _variationSession == null &&
+        !_variationGraph.isOnVariation &&
         detail != null &&
         detail.moves.isNotEmpty &&
         _currentPly < 0;
@@ -1336,10 +1461,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final move = detail != null && moveIndex >= 0
         ? detail.moves[moveIndex]
         : null;
-    final variation = _variationSession?.current;
+    final variationNode = _variationGraph.current;
+    final variation = variationNode?.snapshot;
     final position =
         variation?.position ??
-        _variationSession?.startingPosition ??
         move?.positionAfter ??
         detail?.startingPosition ??
         _displayPosition;
@@ -1354,11 +1479,31 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ? 0
         : (_selectedLine >= lines.length ? lines.length - 1 : _selectedLine);
     final selectedLine = lines.isEmpty ? null : lines[lineIndex];
-    final arrowMove =
-        selectedLine?.bestMove ??
+    final resultBestMove =
         variation?.bestMove ??
         (move == null ? displayed?.bestMove : afterMoveSnapshot?.bestMove) ??
         '';
+    final arrowEngineVersion = variation != null
+        ? variation.engineVersion
+        : (move == null
+                  ? displayed?.engineVersion
+                  : afterMoveSnapshot?.engineVersion) ??
+              snapshot?.engineVersion ??
+              '';
+    final arrowAnalysisFen = variation != null
+        ? variation.fen
+        : (move == null
+              ? (displayed?.analyzedFen ?? '')
+              : (afterMoveSnapshot?.analyzedFen ?? ''));
+    final arrowMove = resolveAnalysisArrowMove(
+      engineVersion: arrowEngineVersion,
+      engineId: _settings.engineId,
+      selectedLine: selectedLine,
+      lines: lines,
+      resultBestMove: resultBestMove,
+      boardFen: position.fen,
+      analysisFen: arrowAnalysisFen,
+    );
     final profileSide =
         snapshot?.summary?.profileSide ?? gameSummary.profileColor;
     final playerIsBlack = profileSide == 'black';
@@ -1399,15 +1544,26 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final bestArrowMove = opponentToMove ? '' : arrowMove;
     final threatArrowMove = opponentToMove ? arrowMove : '';
     final atMainLineEnd =
-        _variationSession == null &&
+        !_variationGraph.isOnVariation &&
         detail != null &&
         detail.moves.isNotEmpty &&
         moveIndex == detail.moves.length - 1;
     final terminalOutcome = atMainLineEnd ? detail.outcome : null;
     final terminalResult = terminalOutcome?.result;
-    final gameOutcome = detail?.outcome;
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
+          unawaited(_navigatePrevious());
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () {
+          unawaited(_navigateNext());
+        },
+        const SingleActivator(LogicalKeyboardKey.space): _togglePlayback,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       appBar: AppBar(
         title: Text(strings.analysis),
         actions: [
@@ -1419,20 +1575,16 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               icon: const Icon(Icons.stop_circle_outlined),
             ),
           IconButton(
-            key: const Key('rotate-analysis-board'),
-            onPressed: () => setState(() => _boardRotated = !_boardRotated),
-            tooltip: strings.rotateBoard,
-            icon: const Icon(Icons.rotate_90_degrees_ccw_rounded),
+            key: const Key('export-fen-from-analysis'),
+            onPressed: _exportCurrentFen,
+            tooltip: strings.exportFen,
+            icon: const Icon(Icons.copy_all_outlined),
           ),
           IconButton(
-            key: const Key('import-fen-from-analysis'),
-            onPressed: snapshot?.isRunning == true ||
-                    _activeVariationJobId != null ||
-                    _variationMovePending
-                ? null
-                : _importFenPosition,
-            tooltip: strings.importFen,
-            icon: const Icon(Icons.grid_on_outlined),
+            key: const Key('continue-analysis-position-against-bot'),
+            onPressed: () => _continueAgainstBot(position),
+            tooltip: strings.continueAgainstBot,
+            icon: const Icon(Icons.smart_toy_outlined),
           ),
           IconButton(
             key: const Key('delete-saved-analysis'),
@@ -1548,8 +1700,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final lastMoveUci =
-                    variation?.playedMove ??
-                    (_variationSession == null ? move?.uci ?? '' : '');
+                    variation?.playedMove ?? (variation == null ? move?.uci ?? '' : '');
                 final board = _Board(
                   position: position,
                   bestArrowMove: bestArrowMove,
@@ -1579,18 +1730,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   showResultSymbols: _settings.showResultSymbols,
                   terminalResult: terminalResult,
                   terminalCheckmate: terminalOutcome?.checkmate ?? false,
-                  gameResult: gameOutcome?.result,
-                  gameCheckmate: gameOutcome?.checkmate ?? false,
-                  resultPresentationStarted: _resultPresentationStarted,
-                  resultPresentationDocked: _resultPresentationDocked,
-                  onResultPresentationStarted: () {
-                    if (!mounted || _resultPresentationStarted) return;
-                    setState(() => _resultPresentationStarted = true);
-                  },
-                  onResultPresentationDocked: () {
-                    if (!mounted || _resultPresentationDocked) return;
-                    setState(() => _resultPresentationDocked = true);
-                  },
                   // A sideline owns its classification state completely. While
                   // native analysis is still running, `variation.classification`
                   // is null and the board must stay visually neutral. Never fall
@@ -1626,23 +1765,15 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       setState(() => _selectedLine = index),
                   error: _controller.error,
                   variation: variation,
-                  variationActive: _variationSession != null,
-                  variationPgn: _variationPgn(move),
-                  variationIndex: _variationSession?.currentIndex ?? -1,
-                  variationLength: _variationSession?.moves.length ?? 0,
-                  onVariationFirst: () => _navigateVariation(-1),
-                  onVariationPrevious: () => _navigateVariation(
-                    (_variationSession?.currentIndex ?? 0) - 1,
-                  ),
-                  onVariationNext: () => _navigateVariation(
-                    (_variationSession?.currentIndex ?? -1) + 1,
-                  ),
-                  onVariationLast: () => _navigateVariation(
-                    (_variationSession?.moves.length ?? 1) - 1,
-                  ),
+                  variationActive: _variationGraph.isOnVariation,
+                  variationPgn: _variationPgn(),
+                  variationGraph: _variationGraph,
+                  onSelectVariationNode: (nodeId) =>
+                      unawaited(_selectVariationNode(nodeId)),
                   variationError: _variationError,
                   currentPositionLines: mainPositionLines,
-                  onReturnToMainLine: _returnToMainLine,
+                  currentMainLinePly: _currentPly,
+                  onSelectMainLinePly: (ply) => unawaited(_selectPly(ply)),
                   settings: _settings,
                 );
                 if (constraints.maxWidth >= 900) {
@@ -1677,15 +1808,18 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             top: false,
             child: _AnalysisControls(
               playing: _playing,
-              onFirst: () => _selectPly(-1),
-              onPrevious: () => _selectPly(_currentPly - 1),
+              onRotate: () => setState(() => _boardRotated = !_boardRotated),
+              onFirst: () => unawaited(_navigateFirst()),
+              onPrevious: () => unawaited(_navigatePrevious()),
               onPlayPause: _togglePlayback,
-              onNext: () => _selectPly(_currentPly + 1),
-              onLast: () => _selectPly(_maximumPly),
+              onNext: () => unawaited(_navigateNext()),
+              onLast: () => unawaited(_navigateLast()),
               onSettings: _showQuickAnalysisSettings,
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -1717,12 +1851,6 @@ class _Board extends StatelessWidget {
     required this.showResultSymbols,
     required this.terminalResult,
     required this.terminalCheckmate,
-    required this.gameResult,
-    required this.gameCheckmate,
-    required this.resultPresentationStarted,
-    required this.resultPresentationDocked,
-    required this.onResultPresentationStarted,
-    required this.onResultPresentationDocked,
     required this.currentMoveClassification,
     required this.suppressLastMoveFallback,
     required this.classificationMoveUci,
@@ -1757,12 +1885,6 @@ class _Board extends StatelessWidget {
   final bool showResultSymbols;
   final String? terminalResult;
   final bool terminalCheckmate;
-  final String? gameResult;
-  final bool gameCheckmate;
-  final bool resultPresentationStarted;
-  final bool resultPresentationDocked;
-  final VoidCallback onResultPresentationStarted;
-  final VoidCallback onResultPresentationDocked;
   final MoveClassification? currentMoveClassification;
   final bool suppressLastMoveFallback;
   final String classificationMoveUci;
@@ -1796,6 +1918,8 @@ class _Board extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pieces = position.pieces;
+    final whiteKingSquare = boardKingSquareForColor(pieces, 'white');
+    final blackKingSquare = boardKingSquareForColor(pieces, 'black');
     return Padding(
       padding: const EdgeInsets.all(8),
       child: LayoutBuilder(
@@ -1859,12 +1983,22 @@ class _Board extends StatelessWidget {
                         classificationMoveUci.length >= 4
                         ? classificationMoveUci.substring(2, 4)
                         : '';
+                    final endgameKingDestination =
+                        showResultSymbols &&
+                        terminalResult != null &&
+                        lastMoveUci.length >= 4 &&
+                        lastMoveUci.substring(2, 4) == square &&
+                        (square == whiteKingSquare ||
+                            square == blackKingSquare);
                     final classificationSquare =
+                        !endgameKingDestination &&
                         classification != null &&
                         classification != MoveClassification.unknown &&
                         (classificationSource == square ||
                             classificationTarget == square);
-                    final moveColor = classificationSquare
+                    final moveColor = endgameKingDestination
+                        ? baseColor
+                        : classificationSquare
                         ? Color.alphaBlend(
                             _classificationColor(
                               context,
@@ -1878,7 +2012,7 @@ class _Board extends StatelessWidget {
                             baseColor,
                           )
                         : baseColor;
-                    final squareColor = selected
+                    final squareColor = selected && !endgameKingDestination
                         ? Color.alphaBlend(
                             scheme.tertiary.withValues(alpha: 0.40),
                             moveColor,
@@ -1891,6 +2025,7 @@ class _Board extends StatelessWidget {
                     final piece = pieces[pieceIndex];
                     final pieceAsset = _pieceAssets[piece];
                     final showClassificationBadge =
+                        !endgameKingDestination &&
                         classification != null &&
                         classification != MoveClassification.unknown &&
                         classificationTarget == square;
@@ -2057,6 +2192,17 @@ class _Board extends StatelessWidget {
                       ),
                     ),
                   ),
+                Positioned.fill(
+                  child: BoardEndgameLayer(
+                    visible: showResultSymbols && terminalResult != null,
+                    result: terminalResult,
+                    checkmate: terminalCheckmate,
+                    pieces: pieces,
+                    boardSide: boardSide,
+                    blackAtBottom: blackAtBottom,
+                    showCheckmateBadge: false,
+                  ),
+                ),
               ],
             ),
           );
@@ -2074,17 +2220,8 @@ class _Board extends StatelessWidget {
           final bottomOpening = gameOpening;
           final bottomClock = playerOnTop ? opponentClock : playerClock;
 
-          final dockedResultVisible =
-              showResultSymbols && resultPresentationDocked;
-          final topResultAsset = dockedResultVisible
-              ? _resultAssetForColor(topColor, gameResult, gameCheckmate)
-              : null;
-          final bottomResultAsset = dockedResultVisible
-              ? _resultAssetForColor(bottomColor, gameResult, gameCheckmate)
-              : null;
           final totalHeight =
               evaluationSpace + stripHeight * 2 + stripGap * 2 + boardSide;
-          final boardTop = evaluationSpace + stripHeight + stripGap;
 
           return Align(
             alignment: Alignment.topCenter,
@@ -2117,7 +2254,7 @@ class _Board extends StatelessWidget {
                           color: topColor,
                           opening: topOpening,
                           clock: topClock,
-                          resultAsset: topResultAsset,
+                          resultAsset: null,
                           emphasize: playerOnTop,
                         ),
                       ),
@@ -2133,239 +2270,15 @@ class _Board extends StatelessWidget {
                           color: bottomColor,
                           opening: bottomOpening,
                           clock: bottomClock,
-                          resultAsset: bottomResultAsset,
+                          resultAsset: null,
                           emphasize: !playerOnTop,
                         ),
                       ),
                     ],
                   ),
-                  if (showResultSymbols &&
-                      terminalResult != null &&
-                      !resultPresentationDocked)
-                    Positioned.fill(
-                      child: _BoardResultAnimation(
-                        result: terminalResult!,
-                        checkmate: terminalCheckmate,
-                        topColor: topColor,
-                        bottomColor: bottomColor,
-                        topName: topName,
-                        topRating: topRating,
-                        bottomName: bottomName,
-                        bottomRating: bottomRating,
-                        boardSide: boardSide,
-                        boardTop: boardTop,
-                        stripHeight: stripHeight,
-                        bottomStripTop: boardTop + boardSide + stripGap,
-                        shouldAnimate: !resultPresentationStarted,
-                        onStarted: onResultPresentationStarted,
-                        onCompleted: onResultPresentationDocked,
-                      ),
-                    ),
                 ],
               ),
             ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _BoardResultAnimation extends StatefulWidget {
-  const _BoardResultAnimation({
-    required this.result,
-    required this.checkmate,
-    required this.topColor,
-    required this.bottomColor,
-    required this.topName,
-    required this.topRating,
-    required this.bottomName,
-    required this.bottomRating,
-    required this.boardSide,
-    required this.boardTop,
-    required this.stripHeight,
-    required this.bottomStripTop,
-    required this.shouldAnimate,
-    required this.onStarted,
-    required this.onCompleted,
-  });
-
-  final String result;
-  final bool checkmate;
-  final String topColor;
-  final String bottomColor;
-  final String topName;
-  final int? topRating;
-  final String bottomName;
-  final int? bottomRating;
-  final double boardSide;
-  final double boardTop;
-  final double stripHeight;
-  final double bottomStripTop;
-  final bool shouldAnimate;
-  final VoidCallback onStarted;
-  final VoidCallback onCompleted;
-
-  @override
-  State<_BoardResultAnimation> createState() => _BoardResultAnimationState();
-}
-
-class _BoardResultAnimationState extends State<_BoardResultAnimation>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final bool _animate;
-  bool _completed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animate = widget.shouldAnimate;
-    _controller =
-        AnimationController(
-          vsync: this,
-          duration: const Duration(milliseconds: 1450),
-        )..addStatusListener((status) {
-          if (status == AnimationStatus.completed) _finish();
-        });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!_animate) {
-        _finish();
-        return;
-      }
-      widget.onStarted();
-      _controller.forward();
-    });
-  }
-
-  void _finish() {
-    if (_completed) return;
-    _completed = true;
-    widget.onCompleted();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  double _labelTargetX(BuildContext context, String name, int? rating) {
-    final label = rating == null ? name : '$name ($rating)';
-    final style = Theme.of(context).textTheme.bodyMedium ?? const TextStyle();
-    final painter = TextPainter(
-      text: TextSpan(text: label, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout(maxWidth: widget.boardSide * 0.62);
-    // Strip padding (10) + color dot (11) + gap (7) + text + small gap.
-    return math.min(
-      widget.boardSide - 18,
-      10 + 11 + 7 + painter.width + 6 + 14,
-    );
-  }
-
-  Widget _animatedBadge({
-    required BuildContext context,
-    required String asset,
-    required bool top,
-    required String name,
-    required int? rating,
-    required double progress,
-  }) {
-    const split = 0.52;
-    final start = Offset(
-      widget.boardSide / 2,
-      widget.boardTop + widget.boardSide / 2,
-    );
-    final peak = Offset(
-      widget.boardSide / 2,
-      widget.boardTop + widget.boardSide * (top ? 0.25 : 0.75),
-    );
-    final end = Offset(
-      _labelTargetX(context, name, rating),
-      (top ? 0.0 : widget.bottomStripTop) + widget.stripHeight / 2,
-    );
-
-    late final Offset center;
-    late final double size;
-    if (progress <= split) {
-      final local = Curves.easeOutCubic.transform(progress / split);
-      center = Offset.lerp(start, peak, local)!;
-      final sizeProgress = Curves.easeOutBack.transform(progress / split);
-      size = 18 + (widget.boardSide * 0.50 - 18) * sizeProgress;
-    } else {
-      final local = Curves.easeInOutCubic.transform(
-        (progress - split) / (1 - split),
-      );
-      center = Offset.lerp(peak, end, local)!;
-      size = widget.boardSide * 0.50 + (28 - widget.boardSide * 0.50) * local;
-    }
-    final opacity = (progress / 0.12).clamp(0.0, 1.0);
-
-    return Positioned(
-      left: center.dx - size / 2,
-      top: center.dy - size / 2,
-      width: size,
-      height: size,
-      child: Opacity(
-        opacity: opacity,
-        child: Image.asset(
-          asset,
-          key: Key('board-result-animation-${top ? 'top' : 'bottom'}'),
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final topAsset = _resultAssetForColor(
-      widget.topColor,
-      widget.result,
-      widget.checkmate,
-    );
-    final bottomAsset = _resultAssetForColor(
-      widget.bottomColor,
-      widget.result,
-      widget.checkmate,
-    );
-    if (topAsset == null && bottomAsset == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _finish();
-      });
-      return const SizedBox.shrink();
-    }
-
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final progress = _animate ? _controller.value : 1.0;
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (topAsset != null)
-                _animatedBadge(
-                  context: context,
-                  asset: topAsset,
-                  top: true,
-                  name: widget.topName,
-                  rating: widget.topRating,
-                  progress: progress,
-                ),
-              if (bottomAsset != null)
-                _animatedBadge(
-                  context: context,
-                  asset: bottomAsset,
-                  top: false,
-                  name: widget.bottomName,
-                  rating: widget.bottomRating,
-                  progress: progress,
-                ),
-            ],
           );
         },
       ),
@@ -2671,9 +2584,12 @@ class _EvaluationBar extends StatelessWidget {
       return (whiteShare: 0.5, label: '0.0');
     }
 
-    final whiteShare = (0.5 + cp.clamp(-1000, 1000) / 2000)
-        .clamp(0.0, 1.0)
-        .toDouble();
+    final nativeWhitePermille = line?.evaluationBarWhitePermille;
+    final whiteShare = nativeWhitePermille != null
+        ? (nativeWhitePermille.clamp(0, 1000) / 1000.0)
+        : (0.5 + cp.clamp(-1000, 1000) / 2000)
+              .clamp(0.0, 1.0)
+              .toDouble();
     final pawns = cp / 100.0;
     final label = pawns.abs() < 0.05
         ? '0.0'
@@ -2762,15 +2678,12 @@ class _AnalysisDetails extends StatelessWidget {
     required this.variation,
     required this.variationActive,
     required this.variationPgn,
-    required this.variationIndex,
-    required this.variationLength,
-    required this.onVariationFirst,
-    required this.onVariationPrevious,
-    required this.onVariationNext,
-    required this.onVariationLast,
+    required this.variationGraph,
+    required this.onSelectVariationNode,
     required this.variationError,
     required this.currentPositionLines,
-    required this.onReturnToMainLine,
+    required this.currentMainLinePly,
+    required this.onSelectMainLinePly,
     required this.settings,
   });
 
@@ -2784,15 +2697,12 @@ class _AnalysisDetails extends StatelessWidget {
   final VariationAnalysisSnapshot? variation;
   final bool variationActive;
   final String variationPgn;
-  final int variationIndex;
-  final int variationLength;
-  final VoidCallback onVariationFirst;
-  final VoidCallback onVariationPrevious;
-  final VoidCallback onVariationNext;
-  final VoidCallback onVariationLast;
+  final AnalysisVariationGraph variationGraph;
+  final ValueChanged<int> onSelectVariationNode;
   final Object? variationError;
   final List<EngineLine> currentPositionLines;
-  final VoidCallback onReturnToMainLine;
+  final int currentMainLinePly;
+  final ValueChanged<int> onSelectMainLinePly;
   final AppSettings settings;
 
   String _score(EngineLine line) {
@@ -2998,15 +2908,6 @@ class _AnalysisDetails extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (variationLength > 0)
-                  Text(
-                    '${variationIndex + 1} / $variationLength',
-                    textDirection: TextDirection.ltr,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -3092,55 +2993,7 @@ class _AnalysisDetails extends StatelessWidget {
                     minHeight: 3,
                   ),
                 ],
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    IconButton(
-                      key: const Key('variation-first'),
-                      onPressed: variationIndex > -1 ? onVariationFirst : null,
-                      tooltip: strings.variationStart,
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.first_page, size: 20),
-                    ),
-                    IconButton(
-                      key: const Key('variation-previous'),
-                      onPressed: variationIndex > -1
-                          ? onVariationPrevious
-                          : null,
-                      tooltip: strings.previous,
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.chevron_left, size: 20),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      key: const Key('variation-next'),
-                      onPressed: variationIndex + 1 < variationLength
-                          ? onVariationNext
-                          : null,
-                      tooltip: strings.next,
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.chevron_right, size: 20),
-                    ),
-                    IconButton(
-                      key: const Key('variation-last'),
-                      onPressed: variationIndex + 1 < variationLength
-                          ? onVariationLast
-                          : null,
-                      tooltip: strings.last,
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.last_page, size: 20),
-                    ),
-                  ],
-                ),
-                SizedBox(
-                  height: 32,
-                  child: OutlinedButton.icon(
-                    key: const Key('return-main-line'),
-                    onPressed: onReturnToMainLine,
-                    icon: const Icon(Icons.undo, size: 16),
-                    label: Text(strings.returnToMainLine),
-                  ),
-                ),
+
               ],
             ),
           ),
@@ -3531,30 +3384,22 @@ class _AnalysisDetails extends StatelessWidget {
             variationMode: variationActive,
           ),
         ],
-        if (!variationActive && detail?.pgn.isNotEmpty == true) ...[
+        if (detail?.moves.isNotEmpty == true) ...[
           const SizedBox(height: 8),
-          Card(
-            margin: EdgeInsets.zero,
-            child: ExpansionTile(
-              dense: true,
-              tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-              childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-              title: Text(
-                strings.pgnLabel,
-                style: Theme.of(context).textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              children: [
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: SelectableText(
-                    detail!.pgn,
-                    textDirection: TextDirection.ltr,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
+          _AnalysisPgnCard(
+            moves: detail!.moves,
+            currentPly: currentMainLinePly,
+            variationActive: variationActive,
+            onSelectPly: onSelectMainLinePly,
+          ),
+        ],
+        if (!variationGraph.isEmpty) ...[
+          const SizedBox(height: 8),
+          _SidelineGraphCard(
+            graph: variationGraph,
+            mainLineMoves: detail?.moves ?? const <ParsedMove>[],
+            onSelectMainLinePly: onSelectMainLinePly,
+            onSelectVariationNode: onSelectVariationNode,
           ),
         ],
         const SizedBox(height: 10),
@@ -3564,9 +3409,342 @@ class _AnalysisDetails extends StatelessWidget {
   }
 }
 
+
+// -----------------------------------------------------------------------------
+// Section: Clickable main-line PGN presentation
+// -----------------------------------------------------------------------------
+
+class _AnalysisPgnCard extends StatelessWidget {
+  const _AnalysisPgnCard({
+    required this.moves,
+    required this.currentPly,
+    required this.variationActive,
+    required this.onSelectPly,
+  });
+
+  final List<ParsedMove> moves;
+  final int currentPly;
+  final bool variationActive;
+  final ValueChanged<int> onSelectPly;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      key: const Key('analysis-pgn-card'),
+      margin: EdgeInsets.zero,
+      child: ExpansionTile(
+        dense: true,
+        initiallyExpanded: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        title: Text(
+          strings.pgnLabel,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Wrap(
+              key: const Key('analysis-pgn-moves'),
+              spacing: 2,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (final move in moves) ...[
+                  if (move.sideToMove == 'white')
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, right: 1),
+                      child: Text(
+                        '${move.moveNumber}.',
+                        textDirection: TextDirection.ltr,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  Material(
+                    color: !variationActive && currentPly == move.plyIndex
+                        ? scheme.primaryContainer
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    child: InkWell(
+                      key: Key('analysis-pgn-ply-${move.plyIndex}'),
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => onSelectPly(move.plyIndex),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 3,
+                        ),
+                        child: Text(
+                          move.san,
+                          textDirection: TextDirection.ltr,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: !variationActive &&
+                                    currentPly == move.plyIndex
+                                ? scheme.onPrimaryContainer
+                                : null,
+                            fontWeight: currentPly == move.plyIndex
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// -----------------------------------------------------------------------------
+// Section: Ephemeral sideline graph presentation
+// -----------------------------------------------------------------------------
+
+class _SidelineGraphCard extends StatelessWidget {
+  const _SidelineGraphCard({
+    required this.graph,
+    required this.mainLineMoves,
+    required this.onSelectMainLinePly,
+    required this.onSelectVariationNode,
+  });
+
+  final AnalysisVariationGraph graph;
+  final List<ParsedMove> mainLineMoves;
+  final ValueChanged<int> onSelectMainLinePly;
+  final ValueChanged<int> onSelectVariationNode;
+
+  ParsedMove? _mainLineMove(int ply) {
+    if (ply < 0 || ply >= mainLineMoves.length) return null;
+    return mainLineMoves[ply];
+  }
+
+  String _score(VariationAnalysisSnapshot snapshot) {
+    final mate = snapshot.moverMateIn;
+    if (mate != null) {
+      return mate >= 0 ? 'M$mate' : '-M${mate.abs()}';
+    }
+    final cp = snapshot.moverEvaluationCp;
+    if (cp != null) {
+      final value = cp / 100;
+      return '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}';
+    }
+    return '';
+  }
+
+  Widget _nodeRow(
+    BuildContext context,
+    AnalysisVariationNode node,
+    int depth,
+  ) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final selected = graph.currentNodeId == node.id;
+    final score = _score(node.snapshot);
+    final classification = node.snapshot.classification;
+    final hasChildren = node.childIds.isNotEmpty;
+    final indent = 14.0 + depth * 22.0;
+    return Padding(
+      padding: EdgeInsets.only(left: indent, right: 8, top: 2, bottom: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 18,
+            height: 30,
+            child: CustomPaint(
+              painter: _SidelineConnectorPainter(
+                hasChildren: hasChildren,
+                color: scheme.outlineVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Material(
+              color: selected
+                  ? scheme.tertiaryContainer.withValues(alpha: 0.72)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                key: Key('sideline-graph-node-${node.id}'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => onSelectVariationNode(node.id),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        hasChildren ? Icons.account_tree : Icons.alt_route,
+                        size: 15,
+                        color: selected
+                            ? scheme.tertiary
+                            : scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          node.snapshot.playedSan,
+                          textDirection: TextDirection.ltr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (classification != null &&
+                          classification != MoveClassification.unknown) ...[
+                        if (_analysisClassificationAsset(classification)
+                            case final asset?)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 5),
+                            child: Image.asset(
+                              asset,
+                              width: 16,
+                              height: 16,
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                      ],
+                      if (score.isNotEmpty) ...[
+                        const SizedBox(width: 7),
+                        Text(
+                          score,
+                          textDirection: TextDirection.ltr,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _branchRows(
+    BuildContext context,
+    AnalysisVariationNode node,
+    int depth,
+  ) {
+    final rows = <Widget>[_nodeRow(context, node, depth)];
+    for (final childId in node.childIds) {
+      final child = graph.node(childId);
+      if (child != null) rows.addAll(_branchRows(context, child, depth + 1));
+    }
+    return rows;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      key: const Key('sideline-graph-card'),
+      margin: EdgeInsets.zero,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        dense: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+        leading: Icon(Icons.account_tree_outlined, color: scheme.tertiary),
+        title: Text(
+          strings.sidelineLabel,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        children: [
+          for (final rootPly in graph.rootMainLinePlies) ...[
+            Builder(
+              builder: (context) {
+                final anchor = _mainLineMove(rootPly);
+                final anchorText = anchor == null
+                    ? strings.mainLineLabel
+                    : '${anchor.moveNumber}${anchor.sideToMove == 'black' ? '…' : '.'} ${anchor.san}';
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: ActionChip(
+                      key: Key('sideline-graph-main-$rootPly'),
+                      avatar: const Icon(Icons.horizontal_rule, size: 15),
+                      label: Text(
+                        anchorText,
+                        textDirection: TextDirection.ltr,
+                      ),
+                      onPressed: () => onSelectMainLinePly(rootPly),
+                    ),
+                  ),
+                );
+              },
+            ),
+            for (final root in graph.rootsAt(rootPly))
+              ..._branchRows(context, root, 0),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SidelineConnectorPainter extends CustomPainter {
+  const _SidelineConnectorPainter({
+    required this.hasChildren,
+    required this.color,
+  });
+
+  final bool hasChildren;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+    final middleY = size.height / 2;
+    canvas.drawLine(Offset(0, middleY), Offset(size.width, middleY), paint);
+    canvas.drawLine(Offset(0, 0), Offset(0, middleY), paint);
+    if (hasChildren) {
+      canvas.drawLine(Offset(size.width, middleY), Offset(size.width, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SidelineConnectorPainter oldDelegate) =>
+      oldDelegate.hasChildren != hasChildren || oldDelegate.color != color;
+}
+
 class _AnalysisControls extends StatelessWidget {
   const _AnalysisControls({
     required this.playing,
+    required this.onRotate,
     required this.onFirst,
     required this.onPrevious,
     required this.onPlayPause,
@@ -3576,6 +3754,7 @@ class _AnalysisControls extends StatelessWidget {
   });
 
   final bool playing;
+  final VoidCallback onRotate;
   final VoidCallback onFirst;
   final VoidCallback onPrevious;
   final VoidCallback onPlayPause;
@@ -3595,7 +3774,17 @@ class _AnalysisControls extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             children: [
-              const SizedBox(width: 56),
+              SizedBox(
+                width: 56,
+                child: Center(
+                  child: IconButton(
+                    key: const Key('rotate-analysis-board'),
+                    onPressed: onRotate,
+                    tooltip: strings.rotateBoard,
+                    icon: const Icon(Icons.rotate_90_degrees_ccw_rounded, size: 26),
+                  ),
+                ),
+              ),
               Expanded(
                 child: Center(
                   child: FittedBox(
@@ -3606,16 +3795,19 @@ class _AnalysisControls extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           IconButton(
+                            key: const Key('analysis-first'),
                             onPressed: onFirst,
                             tooltip: strings.first,
                             icon: const Icon(Icons.first_page, size: 28),
                           ),
                           IconButton(
+                            key: const Key('analysis-previous'),
                             onPressed: onPrevious,
                             tooltip: strings.previous,
                             icon: const Icon(Icons.chevron_left, size: 30),
                           ),
                           IconButton.filled(
+                            key: const Key('analysis-play-pause'),
                             onPressed: onPlayPause,
                             tooltip: strings.playPause,
                             icon: Icon(
@@ -3624,11 +3816,13 @@ class _AnalysisControls extends StatelessWidget {
                             ),
                           ),
                           IconButton(
+                            key: const Key('analysis-next'),
                             onPressed: onNext,
                             tooltip: strings.next,
                             icon: const Icon(Icons.chevron_right, size: 30),
                           ),
                           IconButton(
+                            key: const Key('analysis-last'),
                             onPressed: onLast,
                             tooltip: strings.last,
                             icon: const Icon(Icons.last_page, size: 28),

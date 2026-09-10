@@ -71,6 +71,7 @@ C++20 ist zuständig für:
 - Move-Klassifikation
 - Accuracy
 - Theory / Opening Book
+- Training-Kataloge, Lösungsvarianten, Fortschritt und Meisterschaftsregeln
 - Ergebnis-/Termination-Domainstatus
 - Import/Export und Offline-Verhalten
 
@@ -90,7 +91,8 @@ flutter_app/lib/
 │  ├─ play/presentation/
 │  ├─ profile/presentation/
 │  ├─ settings/presentation/
-│  └─ statistics/presentation/
+│  ├─ statistics/presentation/
+│  └─ training/presentation/
 ├─ ffi/
 ├─ localization/generated/
 ├─ shared/
@@ -114,6 +116,7 @@ native/src/
 ├─ persistence/
 ├─ providers/
 ├─ services/       # Analysis, Library, Profiles, Settings, Statistics
+├─ training/       # Katalog, Versuche und Trainingsfortschritt
 └─ theory/
 ```
 
@@ -164,7 +167,16 @@ oder für C++:
 Regeln:
 
 - zusammengehörige Klassen/Funktionen unter derselben Section halten
-- große Dateien in mehrere sinnvolle Sections gliedern
+- Dateien nach einer klaren Verantwortung schneiden; neue Screens, Controller,
+  DTOs und Fachservices nicht in Sammeldateien anhäufen
+- als Richtwert möglichst unter 500 Zeilen pro handgeschriebener Datei bleiben
+- ab 1000 Zeilen muss vor der Erweiterung aufgeteilt werden; eine Ausnahme ist
+  nur zulässig, wenn eine Trennung technisch unzweckmäßig wäre, und muss in der
+  Datei kurz begründet werden
+- große bestehende Dateien bei jeder wesentlichen Änderung in kleinere,
+  fachlich benannte Einheiten zerlegen, soweit das ohne sachfremden Umbau geht
+- Sections verbessern die Lesbarkeit innerhalb einer Datei, ersetzen aber
+  keinen sinnvollen Dateischnitt
 - keine Section nur zum Selbstzweck; Namen müssen Inhalt beschreiben
 - kleine Forwarder/Exports dürfen eine einzige Section besitzen
 - generierte Dateien und vendorte Third-Party-Dateien nicht für diese Konvention verändern
@@ -262,6 +274,8 @@ Nach einer Änderung:
 
 - keine Fachlogik aus Bequemlichkeit in Flutter duplizieren
 - keine Übersetzungen direkt in Dart schreiben
+- keine sichtbaren Katalog-, Beispiel-, Trainings-, Fehler- oder Hinweistexte
+  außerhalb der drei ARB-Dateien ablegen
 - keine generierten Localization-Dateien manuell bearbeiten
 - keine bestehenden Caches/Persistenzregeln umgehen
 - keine Stockfish-Parameter im UI hart überschreiben, wenn Settings existieren

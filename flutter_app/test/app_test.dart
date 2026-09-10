@@ -10,6 +10,10 @@ import 'package:kchess/view_models/app_controller.dart';
 
 import 'support/fake_core_gateway.dart';
 
+// -----------------------------------------------------------------------------
+// Section: Widget regression coverage
+// -----------------------------------------------------------------------------
+
 const profile = AppProfile(
   id: 'profile-1',
   type: ProfileType.localPgnFen,
@@ -163,6 +167,63 @@ void main() {
     expect(gateway.startAnalysisCalls, 1);
   });
 
+  testWidgets('play section opens bot setup with 100-Elo strength steps', (
+    tester,
+  ) async {
+    final gateway = FakeCoreGateway(initialProfiles: const [profile]);
+    await tester.pumpWidget(_localized(PlayScreen(gateway: gateway)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('play-against-bot')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('play-against-bot')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bot-setup-icon')), findsOneWidget);
+    expect(find.text('Gegen einen Bot spielen'), findsWidgets);
+    expect(find.text('Elo: 1500'), findsOneWidget);
+    expect(find.text('Stockfish 18'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('bot-elo-increase')));
+    await tester.pump();
+    expect(find.text('Elo: 1600'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('bot-elo-decrease')));
+    await tester.pump();
+    expect(find.text('Elo: 1500'), findsOneWidget);
+
+    final slider = tester.widget<Slider>(
+      find.byKey(const Key('bot-elo-slider')),
+    );
+    expect(slider.min, 100);
+    expect(slider.max, 3200);
+    expect(slider.divisions, 31);
+
+    await tester.tap(find.byKey(const Key('start-bot-game')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bot-game-board')), findsOneWidget);
+    expect(find.byKey(const Key('bot-game-status')), findsOneWidget);
+    expect(find.text('Du bist am Zug.'), findsOneWidget);
+    expect(find.byKey(const Key('bot-game-back')), findsOneWidget);
+    expect(find.byKey(const Key('bot-game-forward')), findsOneWidget);
+  });
+
+  testWidgets('analysis board exports FEN instead of importing it', (tester) async {
+    final gateway = FakeCoreGateway(initialProfiles: const [profile]);
+    await tester.pumpWidget(
+      _localized(
+        AnalysisScreen(
+          gateway: gateway,
+          game: FakeCoreGateway.fixtureGame,
+          settings: const AppSettings(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('import-fen-from-analysis')), findsNothing);
+    expect(find.byKey(const Key('export-fen-from-analysis')), findsOneWidget);
+  });
+
   testWidgets('classified theory move uses the mapped icon and offline stats', (
     tester,
   ) async {
@@ -185,7 +246,7 @@ void main() {
     expect(find.text('e2e4'), findsWidgets);
   });
 
-  testWidgets('five-ply variation controls both colors and reuses navigation', (
+  testWidgets('sideline graph keeps nested branches and uses shared controls', (
     tester,
   ) async {
     final gateway = FakeCoreGateway(initialProfiles: const [profile]);
@@ -210,46 +271,57 @@ void main() {
     }
 
     await play('g1', 'f3');
-    expect(
-      find.byKey(const Key('board-classification-excellent')),
-      findsOneWidget,
-    );
     await play('b8', 'c6');
     await play('f1', 'b5');
-    await play('a7', 'a6');
-    await play('b5', 'a4');
 
-    expect(gateway.variationAnalysisCalls, 5);
-    expect(gateway.variationStatusCalls, 5);
-    expect(
-      find.textContaining('(2. Nf3 Nc6 3. Bb5 a6 4. Ba4)'),
-      findsOneWidget,
-    );
-    expect(find.text('Du hast Ba4 ausprobiert.'), findsOneWidget);
-    expect(find.byKey(const Key('variation-evaluation')), findsOneWidget);
+    expect(gateway.variationAnalysisCalls, 3);
+    expect(find.byKey(const Key('sideline-graph-card')), findsOneWidget);
+    expect(find.byKey(const Key('sideline-graph-node-1')), findsNothing);
+    expect(find.byKey(const Key('sideline-graph-node-2')), findsNothing);
+    expect(find.byKey(const Key('sideline-graph-node-3')), findsOneWidget);
+    expect(find.byKey(const Key('variation-first')), findsNothing);
+    expect(find.byKey(const Key('return-main-line')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('variation-first')));
+    await tester.tap(find.byKey(const Key('analysis-previous')));
     await tester.pumpAndSettle();
-    expect(find.text('0 / 5'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('variation-next')));
+    expect(find.textContaining('(2. Nf3 Nc6)'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('analysis-previous')));
     await tester.pumpAndSettle();
-    expect(find.text('Du hast Nf3 ausprobiert.'), findsOneWidget);
-    expect(gateway.variationAnalysisCalls, 5);
-    expect(gateway.variationStatusCalls, 5);
-    for (var index = 2; index <= 5; index++) {
-      await tester.tap(find.byKey(const Key('variation-next')));
-      await tester.pumpAndSettle();
-      expect(find.text('$index / 5'), findsOneWidget);
-      expect(find.byKey(const Key('variation-evaluation')), findsOneWidget);
-    }
+    expect(find.textContaining('(2. Nf3)'), findsOneWidget);
 
-    final returnButton = tester.widget<OutlinedButton>(
-      find.byKey(const Key('return-main-line')),
-    );
-    returnButton.onPressed!();
+    // Branch from an already explored sideline node. The old Nc6 -> Bb5 branch
+    // must stay in the graph instead of being truncated.
+    await play('d7', 'd6');
+    expect(gateway.variationAnalysisCalls, 4);
+    expect(find.byKey(const Key('sideline-graph-node-1')), findsNothing);
+    expect(find.byKey(const Key('sideline-graph-node-2')), findsNothing);
+    expect(find.byKey(const Key('sideline-graph-node-3')), findsOneWidget);
+    expect(find.byKey(const Key('sideline-graph-node-4')), findsOneWidget);
+    expect(find.textContaining('(2. Nf3 d6)'), findsOneWidget);
+
+    // Walk back to the main-line anchor with the same bottom controls. The
+    // graph remains available for the whole lifetime of this analysis screen.
+    await tester.tap(find.byKey(const Key('analysis-previous')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('analysis-previous')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('variation-analysis')), findsNothing);
-    expect(find.text('1… e5'), findsOneWidget);
+    expect(find.byKey(const Key('sideline-graph-card')), findsOneWidget);
+
+    final branch = find.byKey(const Key('sideline-graph-node-4'));
+    await tester.ensureVisible(branch);
+    await tester.tap(branch);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('variation-analysis')), findsOneWidget);
+    expect(find.textContaining('(2. Nf3 d6)'), findsOneWidget);
+
+    // The main-line PGN remains clickable even while a sideline is selected.
+    final firstPgnMove = find.byKey(const Key('analysis-pgn-ply-0'));
+    await tester.ensureVisible(firstPgnMove);
+    await tester.tap(firstPgnMove);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('variation-analysis')), findsNothing);
+    expect(find.byKey(const Key('sideline-graph-card')), findsOneWidget);
   });
 
   testWidgets('analysis modal keeps white and black live summaries separate', (

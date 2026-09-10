@@ -23,6 +23,8 @@ C++20 ist die einzige fachliche Wahrheit für:
 - Accuracy
 - Theory / Opening Book
 - Resultat-/Termination-Domainstatus
+- Training-Kataloge und Lösungsvarianten
+- Trainingsversuche, Erfolgs-/Meisterschaftsregeln und Fortschrittspersistenz
 
 ## 3. Analyse-Schichten
 
@@ -77,7 +79,10 @@ Beispiel:
 // -----------------------------------------------------------------------------
 ```
 
-Große Implementierungen in mehrere lesbare Sections gliedern.
+Neue Fachservices, DTOs und Adapter nach einer klaren Verantwortung schneiden
+und möglichst unter 500 Zeilen halten. Ab 1000 Zeilen ist vor einer Erweiterung
+eine Aufteilung erforderlich; nur eine technisch begründete Ausnahme darf
+größer bleiben. Sections ersetzen keinen Dateischnitt.
 Vendorte Third-Party-Dateien, insbesondere Stockfish, nicht nur für Stilregeln verändern.
 
 ## 8. Stockfish

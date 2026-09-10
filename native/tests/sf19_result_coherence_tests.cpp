@@ -8,6 +8,10 @@
 
 namespace {
 
+// -----------------------------------------------------------------------------
+// Section: Stockfish 19 result-coherence regressions
+// -----------------------------------------------------------------------------
+
 using kchess::EngineLine;
 
 int assertions = 0;
@@ -75,6 +79,45 @@ int main() {
       const auto result = kchess::coherent_stockfish19_ranked_lines(
           ranked, by_move, "a2a4");
       expect(result.front().best_move() == "e2e4", "unknown final callback never invents a score/PV");
+    }
+
+
+    {
+      kchess::Stockfish19ExactSnapshotAccumulator snapshots(2);
+      snapshots.observe(line(1, 16, 20, "e2e4"), true);
+      snapshots.observe(line(2, 16, 15, "d2d4"), true);
+      snapshots.observe(line(1, 17, 28, "d2d4"), true);
+
+      expect(snapshots.latest_depth() == 16,
+             "incomplete newer depth does not replace complete preparation snapshot");
+      expect(snapshots.latest_complete().front().best_move() == "e2e4",
+             "preparation snapshot keeps rank 1 from one complete iteration");
+
+      snapshots.observe(line(2, 17, 24, "e2e4"), true);
+      expect(snapshots.latest_depth() == 17,
+             "complete exact newer iteration replaces older preparation snapshot");
+      expect(snapshots.latest_complete().front().best_move() == "d2d4",
+             "new exact rank 1 becomes preparation best move");
+    }
+
+    {
+      kchess::Stockfish19ExactSnapshotAccumulator snapshots(2);
+      snapshots.observe(line(1, 18, 40, "c2c4"), true);
+      snapshots.observe(line(2, 18, 35, "g1f3"), true);
+      expect(snapshots.latest_depth() == 18, "exact iteration is accepted");
+
+      snapshots.observe(line(1, 19, 55, "d2d4"), false);
+      snapshots.observe(line(2, 19, 45, "c2c4"), true);
+      expect(snapshots.latest_depth() == 18,
+             "inexact newer MultiPV report cannot replace exact preparation snapshot");
+
+      snapshots.observe(line(1, 20, 60, "g1f3"), true);
+      snapshots.observe(line(1, 20, 62, "d2d4"), true);
+      snapshots.observe(line(2, 20, 52, "g1f3"), true);
+      expect(snapshots.latest_depth() == 20,
+             "a restarted same-depth report is captured as its own iteration");
+      expect(snapshots.latest_complete().front().best_move() == "d2d4",
+             "ranks from separate same-depth reports are never mixed");
     }
 
     std::cout << "SF19 result coherence tests passed (" << assertions

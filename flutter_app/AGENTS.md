@@ -31,6 +31,8 @@ Keine neue Domainlogik in Dart:
 - keine Theory-Entscheidung
 - keine Persistenz-/Cache-Regeln
 - keine effektiven Engine-Ressourcenregeln
+- keine Trainingskataloge, Lösungsvarianten, Erfolgs-/Meisterschaftsregeln oder
+  Fortschrittspersistenz
 
 Wenn Legacy-Code so etwas enthält und der Bereich bearbeitet wird, bevorzugt nach C++ migrieren.
 
@@ -53,6 +55,7 @@ Aktuelle Features:
 - `profile`
 - `settings`
 - `statistics`
+- `training`
 
 Keine neuen großen Screen-Klassen in `app_root.dart` einfügen.
 
@@ -67,6 +70,8 @@ l10n/app_ar.arb
 ```
 
 - keine sichtbaren Strings in Widgets hardcoden
+- auch sichtbare Katalogdaten, Übungstitel, Hinweise, Fehlermeldungen und
+  Platzhalter ausschließlich über ARB lokalisieren
 - immer DE/EN/AR gemeinsam ergänzen
 - `lib/localization/generated/*` niemals manuell ändern
 - generierte `AppLocalizations` verwenden
@@ -84,7 +89,10 @@ Beispiel:
 // -----------------------------------------------------------------------------
 ```
 
-Große Dateien in mehrere fachlich lesbare Sections aufteilen.
+Dateien nach einer klaren UI-Verantwortung schneiden und möglichst unter 500
+Zeilen halten. Ab 1000 Zeilen ist vor einer Erweiterung eine Aufteilung in
+Screens, Widgets, View-State oder DTO-Mapping erforderlich; nur eine technisch
+begründete Ausnahme darf größer bleiben. Sections ersetzen keinen Dateischnitt.
 Generierte Dateien sind ausgenommen.
 
 ## 7. Analysis UI

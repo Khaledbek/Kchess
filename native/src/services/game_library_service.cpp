@@ -334,8 +334,8 @@ std::string GameLibraryService::resolve_board_move_json(
     const std::string& target,
     const int first_candidate_ply) const {
   validate_token(game_id, "game id");
-  if (source.size() != 2 || target.size() != 2) {
-    throw std::invalid_argument("Board squares must use algebraic coordinates");
+  if (source.size() != 2 || (target.size() != 2 && target.size() != 3)) {
+    throw std::invalid_argument("Board move must use source, target and optional promotion suffix");
   }
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
@@ -360,6 +360,35 @@ std::string GameLibraryService::resolve_board_move_json(
           ? nlohmann::json(*main_line_ply) : nlohmann::json(nullptr)},
   };
   return json.dump();
+}
+
+std::string GameLibraryService::resolve_free_board_move_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) const {
+  if (source.size() != 2 || (target.size() != 2 && target.size() != 3)) {
+    throw std::invalid_argument("Board move must use source, target and optional promotion suffix");
+  }
+  const auto applied = apply_legal_uci_move(fen, source + target);
+  const auto outcome = position_outcome(applied.fen_after);
+  nlohmann::json json{
+      {"uci", applied.uci},
+      {"san", applied.san},
+      {"fenAfter", applied.fen_after},
+      {"positionAfter", nlohmann::json::parse(position_view_json(applied.fen_after))},
+      {"mainLinePly", nullptr},
+      {"terminal", outcome.terminal},
+      {"checkmate", outcome.checkmate},
+      {"result", outcome.result},
+  };
+  return json.dump();
+}
+
+std::string GameLibraryService::board_promotion_options_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) const {
+  return nlohmann::json(legal_promotion_choices(fen, source, target)).dump();
 }
 
 std::string GameLibraryService::import_pgn_json(const std::string& pgn) {

@@ -30,7 +30,7 @@ abstract interface class CoreGateway {
   /// natively from recent archives without persistence.
   Future<ScoutReport> scoutReport(String username);
   Future<StatisticsOverview> statisticsOverview();
-  Future<OpeningsStats> openingsStats();
+  Future<OpeningsStats> openingsStats({String timeControl = 'all'});
   Future<TerminationStats> terminationStats();
   Future<PhaseStats> phaseStats();
   Future<StatisticsTimeline> statisticsTimeline(GameQuery query);
@@ -65,6 +65,49 @@ abstract interface class CoreGateway {
   Future<List<GameSummary>> queryGames(GameQuery query);
   Future<List<GameSummary>> favoriteGames();
   Future<GameDetail> game(String gameId);
+  Future<BotGameSession> createBotGame(int requestedElo);
+  Future<BotGameSession?> activeBotGame();
+  Future<BotGameSession> botGame(String gameId);
+  Future<List<BotGameSummary>> botGames();
+  Future<GameSummary> botGameAnalysisGame(String gameId);
+  Future<BoardMoveResolution> recordBotGameMove({
+    required String gameId,
+    required String expectedFenBefore,
+    required String uci,
+  });
+  Future<BoardMoveResolution> replaceBotGameContinuation({
+    required String gameId,
+    required int basePly,
+    required String expectedFenBefore,
+    required String uci,
+  });
+  Future<void> resignBotGame(String gameId);
+  Future<void> abortBotGame(String gameId);
+  Future<void> deleteBotGame(String gameId);
+  Future<void> setBotGameShowEvaluationBar(String gameId, bool enabled);
+  Future<List<String>> boardPromotionOptions({
+    required String fen,
+    required String source,
+    required String target,
+  });
+  Future<BoardMoveResolution> resolveFreeBoardMove({
+    required String fen,
+    required String source,
+    required String target,
+  });
+  Future<BotMoveSnapshot> startBotMove({
+    required String fen,
+    required int requestedElo,
+  });
+  Future<BotMoveSnapshot> botMoveStatus(String jobId);
+  Future<void> cancelBotMove(String jobId);
+  Future<TrainingOverview> trainingOverview();
+  Future<TrainingAttempt> startTrainingAttempt(String exerciseId);
+  Future<TrainingMoveResult> playTrainingMove({
+    required String attemptId,
+    required String source,
+    required String target,
+  });
   Future<BoardMoveResolution> resolveBoardMove({
     required String gameId,
     required String fen,

@@ -12,14 +12,26 @@ namespace kchess {
 // differs enough from Stockfish 18 that KChess must not reuse V11's WDL-driven
 // severity gates verbatim.  SF19 classification therefore uses a stable
 // CP/mate decision-value scale plus board evidence, while SF18 keeps the
-// existing MoveClassifierConfig V11 unchanged.
+// shared rank-1 coherence rule while retaining its independent severity model.
 struct MoveClassifierSf19Config {
-  static constexpr int version = 1902;
+  static constexpr int version = 1904;
 
-  // Equivalent alternatives are also Best.  The final Stockfish bestmove is
-  // always authoritative; these limits only promote a non-rank-1 alternative.
+  // Equivalent alternatives are also Best. A final SF19 bestmove is trusted
+  // only while the independent post-move verification does not contradict it.
   double equivalent_value_loss{0.015};
   int equivalent_cp_loss{20};
+
+  // SF19 bestmove verification. At comparable depth, a moderate contradiction
+  // is enough to reject a stale/inconsistent root bestmove. A very large drop
+  // is accepted as counter-evidence even when the after-position search is a
+  // few plies shallower; this prevents objectively losing moves from receiving
+  // Best/Critical/Brilliant merely because a final callback matched the move.
+  int bestmove_verification_depth_slack{2};
+  int bestmove_hard_min_after_depth{6};
+  double bestmove_contradiction_value_loss{0.08};
+  int bestmove_contradiction_cp_loss{120};
+  double bestmove_hard_contradiction_value_loss{0.18};
+  int bestmove_hard_contradiction_cp_loss{250};
 
   // Rank-aware light-deviation bands. Rank 2/3/4 maps to
   // Excellent/Good/Okay only while the actual decision loss is small.
@@ -40,6 +52,9 @@ struct MoveClassifierSf19Config {
   int brilliant_net_sacrifice_min_cp{201};
   double brilliant_min_value{0.62};
   double brilliant_decided_ceiling{0.96};
+  int brilliant_confirmation_depth_slack{4};
+  double brilliant_confirmation_value_loss{0.055};
+  int brilliant_confirmation_cp_loss{90};
 
   // Miss: a concrete advantage/opportunity was available, but the played move
   // did not materially damage itself enough to be a Mistake/Blunder.
@@ -70,6 +85,12 @@ struct MoveClassifierSf19Config {
 
 struct MoveClassifierSf19Input {
   MoveClassifierInput common;
+
+  // Brilliant is intentionally stricter than plain Best. The independent
+  // resulting-position analysis must confirm that the claimed best sacrifice
+  // remains sound. Missing/unverified evidence therefore falls back to Best or
+  // Critical rather than inventing a Brilliant label.
+  bool best_move_verified_after{false};
 
   // Net material at the end of the analyzed PV, from the mover's perspective.
   // These are deliberately separate from V11's maximum transient PV loss: an

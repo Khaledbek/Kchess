@@ -54,6 +54,143 @@ class AppLocalizationsAr extends AppLocalizations {
       'هذا القسم محجوز كعنصر نائب لأنماط لعب مستقبلية، مثل اللعب ضد البوتات.';
 
   @override
+  String get playAgainstBot => 'اللعب ضد بوت';
+
+  @override
+  String get playAgainstBotSubtitle => 'ابدأ مباراة محلية ضد Stockfish.';
+
+  @override
+  String get continueAgainstBot => 'متابعة اللعب ضد البوت';
+
+  @override
+  String get botPlayerColor => 'لونك';
+
+  @override
+  String get temporaryBotGameNotSaved =>
+      'لن يتم حفظ هذه المباراة وسيتم حذفها بالكامل عند الإغلاق أو الإلغاء.';
+
+  @override
+  String get botGameLog => 'سجل مباريات البوت';
+
+  @override
+  String get botGameLogSubtitle =>
+      'افتح مبارياتك المحفوظة ضد البوت، وتابع المباراة الجارية أو حلّل المباريات المنتهية.';
+
+  @override
+  String get botGameLogEmpty => 'لا توجد مباريات بوت محفوظة بعد.';
+
+  @override
+  String get botGameLogLoadFailed => 'تعذر تحميل سجل مباريات البوت.';
+
+  @override
+  String get botGameHistoryActive => 'جارية';
+
+  @override
+  String get botGameHistoryWin => 'فوز';
+
+  @override
+  String get botGameHistoryLoss => 'خسارة';
+
+  @override
+  String get botGameHistoryDraw => 'تعادل';
+
+  @override
+  String get botStrength => 'قوة البوت';
+
+  @override
+  String get botStrengthDescription =>
+      'اختر قوة البوت بخطوات مقدارها 100 نقطة Elo. يمثل الإعداد الأقصى قوة Stockfish الكاملة.';
+
+  @override
+  String get botElo => 'Elo';
+
+  @override
+  String get botEngineLockedDescription =>
+      'تستخدم مباريات البوت دائمًا Stockfish 18 بشكل مستقل عن محرك التحليل المحدد.';
+
+  @override
+  String get botStartGame => 'بدء المباراة';
+
+  @override
+  String get botGameTitle => 'مباراة ضد البوت';
+
+  @override
+  String get botGameLoading => 'جارٍ تجهيز المباراة …';
+
+  @override
+  String get botGameLoadFailed => 'تعذر تجهيز مباراة البوت.';
+
+  @override
+  String get botMoveFailed => 'تعذر حساب نقلة البوت.';
+
+  @override
+  String get botYou => 'أنت';
+
+  @override
+  String get botYourTurn => 'دورك الآن.';
+
+  @override
+  String get botThinking => 'Stockfish يفكر …';
+
+  @override
+  String get botApplyingMove => 'جارٍ تنفيذ النقلة …';
+
+  @override
+  String get botWaiting => 'بانتظار النقلة التالية …';
+
+  @override
+  String get botViewingHistory => 'أنت تعرض وضعية سابقة.';
+
+  @override
+  String get botGameFinished => 'انتهت المباراة.';
+
+  @override
+  String get botMoveList => 'قائمة النقلات';
+
+  @override
+  String get botNoMovesYet => 'لم تُلعب أي نقلة بعد.';
+
+  @override
+  String get botPreviousMove => 'النقلة السابقة';
+
+  @override
+  String get botNextMove => 'النقلة التالية';
+
+  @override
+  String get botReturnToLive => 'العودة إلى الوضعية الحالية';
+
+  @override
+  String get botHintPiece => 'التلميح 1: إظهار القطعة';
+
+  @override
+  String get botHintTarget => 'التلميح 2: إظهار مربع الوصول';
+
+  @override
+  String get botHintsUsed => 'تم استخدام التلميحين';
+
+  @override
+  String get botHintThinking => 'جارٍ حساب التلميح …';
+
+  @override
+  String get botHintFailed => 'تعذر حساب التلميح.';
+
+  @override
+  String get botGameSettingsTitle => 'إعدادات المباراة';
+
+  @override
+  String get botGameSettingsDescription =>
+      'تنطبق هذه الإعدادات على مباراة البوت هذه فقط ولا تغيّر إعدادات التحليل العامة.';
+
+  @override
+  String get botGameEvaluationBarHelp =>
+      'يعرض تقييم Stockfish 18 الحالي أثناء مباراة البوت هذه. يُحفظ الإعداد مع المباراة.';
+
+  @override
+  String botHintCounter(int used) {
+    return '$used / 2 تلميحات لهذه النقلة';
+  }
+
+  @override
   String get downloads => 'التنزيلات';
 
   @override
@@ -135,6 +272,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get importFen => 'استيراد وضعية FEN';
+
+  @override
+  String get exportFen => 'تصدير FEN';
+
+  @override
+  String get fenCopiedToClipboard => 'تم نسخ FEN إلى الحافظة.';
 
   @override
   String get pgnText => 'نص PGN';
@@ -1177,4 +1320,189 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get statsTimeControlOther => 'أخرى';
+
+  @override
+  String get botGameDeleteQuestion => 'حذف مباراة البوت؟';
+
+  @override
+  String get botGameDeleteBody =>
+      'سيتم حذف هذا الإدخال من سجل مباريات البوت نهائيًا. ستبقى أي مباراة تحليل تم إنشاؤها منه في مكتبة الألعاب المحلية.';
+
+  @override
+  String get promotionTitle => 'ترقية البيدق';
+
+  @override
+  String get promotionChoosePiece =>
+      'اختر القطعة التي تريد ترقية البيدق إليها.';
+
+  @override
+  String get promotionQueen => 'وزير';
+
+  @override
+  String get promotionRook => 'قلعة';
+
+  @override
+  String get promotionBishop => 'فيل';
+
+  @override
+  String get promotionKnight => 'حصان';
+
+  @override
+  String get trainingSection => 'التدريب';
+
+  @override
+  String get trainingIntroTitle => 'ساحة التدريب';
+
+  @override
+  String get trainingIntroBody =>
+      'اختر مجال تدريب. يُحفظ تقدمك محليًا على هذا الجهاز.';
+
+  @override
+  String get trainingOpeningTitle => 'مختبر الافتتاحيات';
+
+  @override
+  String get trainingOpeningSubtitle => 'راجع خطوط ذخيرتك ونقاط ضعفك.';
+
+  @override
+  String get trainingOpeningAction => 'درّب الخطوط';
+
+  @override
+  String trainingNemesisBadge(String opening, String rate) {
+    return 'أصعب افتتاحية: $opening — نسبة فوز $rate فقط';
+  }
+
+  @override
+  String get trainingNemesisNone => 'لم يتم رصد نقطة ضعف في إحصاءاتك بعد.';
+
+  @override
+  String get trainingTacticsTitle => 'صائد الأخطاء';
+
+  @override
+  String get trainingTacticsSubtitle =>
+      'ابحث عن النقلة الأفضل في أوضاع وسط اللعب الحرجة.';
+
+  @override
+  String trainingTacticsSolved(int count) {
+    return '$count تكتيكًا تم حله';
+  }
+
+  @override
+  String get trainingTacticsAction => 'ابدأ التكتيك';
+
+  @override
+  String get trainingTacticsEmpty => 'لا توجد ألغاز تكتيكية في الفهرس بعد.';
+
+  @override
+  String get trainingEndgameTitle => 'أكاديمية النهايات';
+
+  @override
+  String get trainingEndgameSubtitle => 'أتقن النهايات النظرية خطوة بخطوة.';
+
+  @override
+  String trainingEndgameProgress(int mastered, int total, int percent) {
+    return '$mastered / $total وضعية تم إتقانها ($percent%)';
+  }
+
+  @override
+  String get trainingEndgameAction => 'افتح النهايات';
+
+  @override
+  String get trainingMastered => 'متقن';
+
+  @override
+  String trainingStreak(int done, int total) {
+    return '$done/$total تكرارات بلا خطأ';
+  }
+
+  @override
+  String trainingLastAttempt(String date) {
+    return 'آخر تدريب: $date';
+  }
+
+  @override
+  String get trainingNeverAttempted => 'لم يتم التدريب بعد';
+
+  @override
+  String get trainingOpeningLabSelected => 'الخط المختار';
+
+  @override
+  String get trainingOpeningLabEmpty =>
+      'اختر افتتاحية من تبويب الإحصاءات واضغط «تدريب» لتحميلها هنا.';
+
+  @override
+  String get trainingOpeningLabPending =>
+      'سيتوفر مدرّب الخطوط بمجرد أن توفّر النواة نقلات الافتتاحية.';
+
+  @override
+  String get statsTrainOpening => 'تدريب';
+
+  @override
+  String trainingGoalWin(String side) {
+    return 'الدور على $side — اربح الوضعية';
+  }
+
+  @override
+  String trainingGoalDraw(String side) {
+    return 'الدور على $side — حافظ على التعادل';
+  }
+
+  @override
+  String get trainingWrongMove => 'ليست أفضل نقلة. حاول مرة أخرى.';
+
+  @override
+  String get trainingSolvedTitle => 'ممتاز! تم حل الوضعية.';
+
+  @override
+  String get trainingSolvedClean => 'حُلّت دون خطأ — تُحتسب ضمن الإتقان.';
+
+  @override
+  String get trainingSolvedWithErrors =>
+      'حُلّت لكن بتصحيحات. لا يُحتسب للإتقان إلا الأداء الخالي من الأخطاء.';
+
+  @override
+  String get trainingPracticeAgain => 'تدرّب مجددًا';
+
+  @override
+  String get trainingNextEndgame => 'النهاية التالية';
+
+  @override
+  String get trainingBackToList => 'إلى القائمة';
+
+  @override
+  String trainingMoveProgress(int done, int total) {
+    return 'النقلة $done من $total';
+  }
+
+  @override
+  String get trainingBoardError => 'تعذّر تحميل الوضعية.';
+
+  @override
+  String get trainingShowHint => 'أظهر التلميح';
+
+  @override
+  String get trainingYourMove => 'دورك';
+
+  @override
+  String get trainingRestart => 'إعادة البدء';
+
+  @override
+  String get trainingOppositionTitle => 'تقابل الملكين مع بيدق';
+
+  @override
+  String get trainingOppositionHint =>
+      'احصل على التقابل أولًا ثم التف حول الملك. لا تحرك البيدق قبل أن يصبح ملكك أمامه.';
+
+  @override
+  String get trainingLucenaTitle => 'وضعية لوسينا';
+
+  @override
+  String get trainingLucenaHint =>
+      'ضع الرخ على الصف الرابع قبل إخراج الملك ليصبح جسرًا يحميه من الكشوف.';
+
+  @override
+  String get trainingPhilidorTitle => 'دفاع فيليدور';
+
+  @override
+  String get trainingPhilidorHint =>
+      'أبقِ الرخ على الصف السادس حتى يتقدم البيدق، ثم أعطِ الكش من الخلف.';
 }

@@ -90,6 +90,7 @@ class AnalysisService {
     std::string error;
     AnalysisResult result;
     std::optional<MoveCategory> classification;
+    int visible_multi_pv{1};
     std::atomic_bool expose_live_result{true};
     std::shared_ptr<ChessEngine> engine;
     std::thread worker;

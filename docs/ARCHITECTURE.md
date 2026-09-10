@@ -45,6 +45,8 @@ Der C++20-Core besitzt:
 - Theory
 - Move-Klassifikation
 - Accuracy
+- Training-Kataloge und validierte Lösungsvarianten
+- Trainingsversuche, Fortschritt, Erfolgsserien und Meisterschaft
 
 ## 4. Analyse
 
@@ -94,8 +96,25 @@ flutter_app/l10n/app_ar.arb
 ```
 
 Die generierten Dateien unter `lib/localization/generated/` werden nicht manuell bearbeitet.
+Das gilt auch für sichtbare Dateninhalte wie Übungstitel, Hinweise, leere
+Zustände und Fehlermeldungen: C++ liefert stabile semantische IDs und fachliche
+Werte, Flutter löst die zugehörigen Texte über ARB auf.
 Arabisch ändert die Sprache, nicht die globale Layout-Richtung: KChess bleibt layoutseitig LTR, damit Board, Navigation und Spielerorientierung nicht gespiegelt werden.
 
 ## 10. Datei-Struktur und Sections
 
-Handgeschriebene Quell- und Dokumentationsdateien werden in klar benannte Sections gegliedert. Große Screens und Fachmodule bleiben in eigenen Dateien. Generierte und vendorte Dateien sind von Stil-Refactors ausgenommen.
+Handgeschriebene Quell- und Dokumentationsdateien werden in klar benannte
+Sections gegliedert und nach einer Verantwortung geschnitten. Zielgröße sind
+höchstens ungefähr 500 Zeilen. Handgeschriebene Dateien ab 1000 Zeilen werden
+vor einer Erweiterung aufgeteilt; nur technisch begründete Ausnahmen dürfen
+größer bleiben. Große Screens werden in Screen, View-State und wiederverwendbare
+Widgets getrennt, native Fachbereiche in kleine Services, Modelle und Adapter.
+Generierte und vendorte Dateien sind von Stil-Refactors ausgenommen.
+
+## 11. Training
+
+Flutter zeigt Trainingsbereiche, Übungsfortschritt und Board-Interaktionen an.
+Der C++20-Core besitzt den Trainingskatalog, die Lösungszüge, Zugvalidierung,
+Versuchsstatus, Erfolgs-/Meisterschaftsregeln und SQLite-Persistenz. Die C-ABI
+liefert hierfür DTOs mit stabilen Übungs- und Textschlüsseln; Flutter darf daraus
+keine fachlichen Ergebnisse neu berechnen.

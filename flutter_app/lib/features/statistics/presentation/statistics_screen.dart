@@ -56,11 +56,19 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   void _loadStats() {
     _overview = widget.controller.gateway.statisticsOverview();
-    _openings = widget.controller.gateway.openingsStats();
+    _loadOpenings();
     // Termination and phase data span the whole library (stored PGNs / move
     // counts), so they are not affected by the time-control filter.
     _terminations = widget.controller.gateway.terminationStats();
     _phases = widget.controller.gateway.phaseStats();
+  }
+
+  /// Opening aggregation and filtering remain native; Flutter only selects the
+  /// requested time-control bucket and displays the returned DTO.
+  void _loadOpenings() {
+    _openings = widget.controller.gateway.openingsStats(
+      timeControl: _timeControl,
+    );
   }
 
   // Load native recent-form and rating summaries for the selected filter.
@@ -86,11 +94,31 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     setState(_loadGames);
   }
 
+  /// Pushes the player comparison, re-providing the shell's [TrainingNavigator]
+  /// inside the route: a pushed route sits above the shell, so the weakness rows
+  /// there would otherwise find no scope for their `[Trainieren ➔]` action.
+  void _openComparison(BuildContext context) {
+    final navigator = TrainingNavigator.maybeOf(context);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) {
+          final screen = _PlayerComparisonScreen(controller: widget.controller);
+          if (navigator == null) return screen;
+          return TrainingNavigator(
+            openTraining: navigator.openTraining,
+            child: screen,
+          );
+        },
+      ),
+    );
+  }
+
   void _onTimeControlChanged(String value) {
     if (value == _timeControl) return;
     setState(() {
       _timeControl = value;
       _loadGames();
+      _loadOpenings();
     });
   }
 
@@ -129,13 +157,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => _PlayerComparisonScreen(
-                            controller: widget.controller,
-                          ),
-                        ),
-                      ),
+                      onPressed: () => _openComparison(context),
                       icon: const Icon(Icons.compare_arrows),
                       label: Text(_comparisonText(context).title),
                     ),
@@ -182,6 +204,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       future: _openings,
       onRetry: _reloadAll,
       controller: widget.controller,
+      timeControl: _timeControl,
     );
 
     return LayoutBuilder(

@@ -1,9 +1,25 @@
-// -----------------------------------------------------------------------------
-// Section: Native gateway fixtures
-// -----------------------------------------------------------------------------
-
 import 'package:kchess/ffi/core_gateway.dart';
 import 'package:kchess/models/models.dart';
+
+// -----------------------------------------------------------------------------
+// Section: Test gateway fixtures
+// -----------------------------------------------------------------------------
+
+const _fixtureBotStartPosition = BoardPosition(
+  fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+  pieces: [
+    'r','n','b','q','k','b','n','r',
+    'p','p','p','p','p','p','p','p',
+    '','','','','','','','',
+    '','','','','','','','',
+    '','','','','','','','',
+    '','','','','','','','',
+    'P','P','P','P','P','P','P','P',
+    'R','N','B','Q','K','B','N','R',
+  ],
+  sideToMove: 'white',
+  draggableColor: 'white',
+);
 
 class FakeCoreGateway implements CoreGateway {
   FakeCoreGateway({
@@ -59,7 +75,6 @@ class FakeCoreGateway implements CoreGateway {
     providerGameId: 'online-fixture-1',
     providerUrl: 'https://example.invalid/game/1',
     providerOutcome: 'win',
-    statisticsOutcome: 'win',
     timeControlType: 'rapid',
     providerAccuracy: 81.2,
     localAccuracy: 92.4,
@@ -240,15 +255,16 @@ class FakeCoreGateway implements CoreGateway {
   );
 
   @override
-  Future<OpeningsStats> openingsStats() async => const OpeningsStats(
+  Future<OpeningsStats> openingsStats({String timeControl = 'all'}) async =>
+      const OpeningsStats(
     hasProfile: true,
     gamesWithOpening: 3,
     gamesWithoutOpening: 0,
-    distinctFamilies: 2,
-    families: [
-      OpeningFamily(
-        familyName: 'Ruy Lopez',
-        baseEco: 'C65',
+    distinctOpenings: 2,
+    openings: [
+      OpeningStat(
+        eco: 'C65',
+        name: 'Ruy Lopez: Berlin Defense',
         color: 'white',
         tally: StatTally(
           games: 2,
@@ -257,71 +273,11 @@ class FakeCoreGateway implements CoreGateway {
           winRate: 0.5,
           scorePercent: 0.5,
         ),
-        variations: [
-          OpeningVariation(
-            eco: 'C65',
-            name: 'Ruy Lopez: Berlin Defense',
-            tally: StatTally(
-              games: 2,
-              wins: 1,
-              losses: 1,
-              winRate: 0.5,
-              scorePercent: 0.5,
-            ),
-          ),
-        ],
       ),
-      OpeningFamily(
-        familyName: 'Caro-Kann Defense',
-        baseEco: 'B10',
+      OpeningStat(
+        eco: 'B10',
+        name: 'Caro-Kann Defense',
         color: 'black',
-        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
-        variations: [
-          OpeningVariation(
-            eco: 'B10',
-            name: 'Caro-Kann Defense',
-            tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
-          ),
-        ],
-      ),
-    ],
-  );
-
-  @override
-  Future<TerminationStats> terminationStats() async => const TerminationStats(
-    hasProfile: true,
-    totalGames: 3,
-    terminations: [
-      GameTermination(
-        type: 'resignation',
-        tally: StatTally(
-          games: 2,
-          wins: 1,
-          losses: 1,
-          winRate: 0.5,
-          scorePercent: 0.5,
-        ),
-      ),
-      GameTermination(
-        type: 'checkmate',
-        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
-      ),
-    ],
-  );
-
-  @override
-  Future<PhaseStats> phaseStats() async => const PhaseStats(
-    hasProfile: true,
-    totalGames: 3,
-    classified: 3,
-    phases: [
-      GamePhase(phase: 'opening', tally: StatTally(games: 1, losses: 1)),
-      GamePhase(
-        phase: 'middlegame',
-        tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
-      ),
-      GamePhase(
-        phase: 'endgame',
         tally: StatTally(games: 1, wins: 1, winRate: 1, scorePercent: 1),
       ),
     ],
@@ -346,112 +302,6 @@ class FakeCoreGateway implements CoreGateway {
         offlineReady: true,
         retryAfterSeconds: 0,
       );
-
-  @override
-  Future<ProviderOverview> scoutPlayer(String username) async =>
-      ProviderOverview(
-        profile: AppProfile(
-          id: 'scout:$username',
-          type: ProfileType.chessCom,
-          displayName: username,
-          providerUsername: username,
-          avatarAsset: 'profile_unknown.png',
-        ),
-        stats: const [
-          ProviderPerformance(
-            key: 'blitz',
-            currentRating: 1500,
-            bestRating: 1600,
-            games: 100,
-            wins: 45,
-            losses: 45,
-            draws: 10,
-          ),
-        ],
-        availableMonths: const [],
-        offlineReady: false,
-        retryAfterSeconds: 0,
-      );
-
-  @override
-  Future<StatisticsTimeline> statisticsTimeline(GameQuery query) async =>
-      const StatisticsTimeline(
-        recentGames: [fixtureGame],
-        ratingSeries: [
-          StatisticsRatingSeries(
-            timeControl: 'rapid',
-            currentRating: 1840,
-            points: [StatisticsRatingPoint(endedAt: 1786363200, rating: 1840)],
-          ),
-        ],
-      );
-
-  @override
-  Future<ScoutReport> scoutReport(String username) async => ScoutReport(
-    hasProfile: true,
-    comparison: PlayerComparison(
-      profileId: active?.id ?? '',
-      isSelf: username == 'Ada',
-      userOverview: await statisticsOverview(),
-      userOpenings: await openingsStats(),
-      userTerminations: await terminationStats(),
-    ),
-    profile: AppProfile(
-      id: 'scout:$username',
-      type: ProfileType.chessCom,
-      displayName: username,
-      providerUsername: username,
-      avatarAsset: 'profile_unknown.png',
-    ),
-    stats: const [ProviderPerformance(key: 'blitz', currentRating: 1500)],
-    gamesAnalyzed: 40,
-    monthsFetched: 2,
-    overall: const StatTally(
-      games: 40,
-      wins: 18,
-      draws: 4,
-      losses: 18,
-      winRate: 0.45,
-      scorePercent: 0.5,
-    ),
-    white: const StatTally(
-      games: 20,
-      wins: 11,
-      draws: 2,
-      losses: 7,
-      winRate: 0.55,
-      scorePercent: 0.6,
-    ),
-    black: const StatTally(
-      games: 20,
-      wins: 7,
-      draws: 2,
-      losses: 11,
-      winRate: 0.35,
-      scorePercent: 0.4,
-    ),
-    byTimeControl: const [],
-    terminations: const [
-      GameTermination(
-        type: 'timeout',
-        tally: StatTally(games: 8, wins: 3, losses: 5),
-      ),
-    ],
-    openings: const [
-      ScoutOpening(
-        eco: 'B01',
-        name: 'Scandinavian Defense',
-        color: 'black',
-        tally: StatTally(
-          games: 6,
-          wins: 2,
-          losses: 4,
-          winRate: 0.333,
-          scorePercent: 0.333,
-        ),
-      ),
-    ],
-  );
 
   @override
   Future<ProviderOverview> syncProvider(
@@ -648,6 +498,123 @@ class FakeCoreGateway implements CoreGateway {
   );
 
   @override
+  Future<BotGameSession> createBotGame(int requestedElo) async => BotGameSession(
+    gameId: 'bot-game-fixture',
+    botElo: requestedElo,
+    playerColor: 'white',
+    botColor: 'black',
+    status: 'active',
+    result: '*',
+    position: _fixtureBotStartPosition,
+    positions: const [_fixtureBotStartPosition],
+    moves: const [],
+    createdAt: 1,
+    updatedAt: 1,
+    showEvaluationBar: false,
+  );
+
+  @override
+  Future<BotGameSession?> activeBotGame() async => null;
+
+  @override
+  Future<BotGameSession> botGame(String gameId) => createBotGame(1500);
+
+  @override
+  Future<List<BotGameSummary>> botGames() async => const [];
+
+  @override
+  Future<GameSummary> botGameAnalysisGame(String gameId) async => fixtureGame;
+
+  @override
+  Future<BoardMoveResolution> recordBotGameMove({
+    required String gameId,
+    required String expectedFenBefore,
+    required String uci,
+  }) async => throw const CoreGatewayException('Not configured in fixture');
+
+  @override
+  Future<BoardMoveResolution> replaceBotGameContinuation({
+    required String gameId,
+    required int basePly,
+    required String expectedFenBefore,
+    required String uci,
+  }) async => throw const CoreGatewayException('Not configured in fixture');
+
+  @override
+  Future<void> resignBotGame(String gameId) async {}
+
+  @override
+  Future<void> abortBotGame(String gameId) async {}
+
+  @override
+  Future<void> deleteBotGame(String gameId) async {}
+
+  @override
+  Future<void> setBotGameShowEvaluationBar(
+    String gameId,
+    bool enabled,
+  ) async {}
+
+  @override
+  Future<List<String>> boardPromotionOptions({
+    required String fen,
+    required String source,
+    required String target,
+  }) async => const [];
+
+  @override
+  Future<BoardMoveResolution> resolveFreeBoardMove({
+    required String fen,
+    required String source,
+    required String target,
+  }) async => throw const CoreGatewayException('Not configured in fixture');
+
+  @override
+  Future<BotMoveSnapshot> startBotMove({
+    required String fen,
+    required int requestedElo,
+  }) async => BotMoveSnapshot(
+    jobId: 'bot-fixture',
+    status: 'complete',
+    engineId: 'stockfish18',
+    requestedElo: requestedElo,
+    move: '',
+    bestMove: '',
+  );
+
+  @override
+  Future<BotMoveSnapshot> botMoveStatus(String jobId) async =>
+      const BotMoveSnapshot(
+        jobId: 'bot-fixture',
+        status: 'complete',
+        engineId: 'stockfish18',
+        requestedElo: 1500,
+        move: '',
+        bestMove: '',
+      );
+
+  @override
+  Future<void> cancelBotMove(String jobId) async {}
+
+  @override
+  Future<TrainingOverview> trainingOverview() async => const TrainingOverview(
+    masteryThreshold: 3,
+    exercises: [],
+    categories: {},
+  );
+
+  @override
+  Future<TrainingAttempt> startTrainingAttempt(String exerciseId) =>
+      Future.error(UnsupportedError('No fake training attempt configured'));
+
+  @override
+  Future<TrainingMoveResult> playTrainingMove({
+    required String attemptId,
+    required String source,
+    required String target,
+  }) => Future.error(UnsupportedError('No fake training move configured'));
+
+  @override
   Future<BoardMoveResolution> resolveBoardMove({
     required String gameId,
     required String fen,
@@ -717,28 +684,39 @@ class FakeCoreGateway implements CoreGateway {
         san: 'Nf3',
         fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
         best: 'b8c6',
+        side: 'black',
       ),
       'b8c6' => (
         san: 'Nc6',
         fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3',
         best: 'f1b5',
+        side: 'white',
+      ),
+      'd7d6' => (
+        san: 'd6',
+        fen: 'rnbqkbnr/ppp2ppp/3p4/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3',
+        best: 'f1b5',
+        side: 'white',
       ),
       'f1b5' => (
         san: 'Bb5',
         fen:
             'r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
         best: 'a7a6',
+        side: 'black',
       ),
       'a7a6' => (
         san: 'a6',
         fen: 'r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4',
         best: 'b5a4',
+        side: 'white',
       ),
       'b5a4' => (
         san: 'Ba4',
         fen:
             'r1bqkbnr/1ppp1ppp/p1n5/4p3/B3P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4',
         best: 'g8f6',
+        side: 'black',
       ),
       _ => throw const CoreGatewayException('Illegal chess move'),
     };
@@ -752,8 +730,8 @@ class FakeCoreGateway implements CoreGateway {
       position: BoardPosition(
         fen: fixture.fen,
         pieces: BoardPosition.empty.pieces,
-        sideToMove: variationAnalysisCalls.isOdd ? 'black' : 'white',
-        draggableColor: variationAnalysisCalls.isOdd ? 'black' : 'white',
+        sideToMove: fixture.side,
+        draggableColor: fixture.side,
       ),
       bestMove: fixture.best,
       moverEvaluationCp: 10 - variationAnalysisCalls,
@@ -777,8 +755,8 @@ class FakeCoreGateway implements CoreGateway {
       position: BoardPosition(
         fen: fixture.fen,
         pieces: BoardPosition.empty.pieces,
-        sideToMove: variationAnalysisCalls.isOdd ? 'black' : 'white',
-        draggableColor: variationAnalysisCalls.isOdd ? 'black' : 'white',
+        sideToMove: fixture.side,
+        draggableColor: fixture.side,
       ),
       bestMove: '',
       lines: [],

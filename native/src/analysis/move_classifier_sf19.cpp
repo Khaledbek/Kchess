@@ -122,8 +122,19 @@ MoveCategory classify_move_sf19(
       && *input.second_best_mate_in > 0;
   const bool unique_forced_mate = best_forces_mate && !second_forces_mate;
 
-  // The final Stockfish bestmove can never receive a negative label merely
-  // because a separate resulting-position search differs numerically.
+  // A final SF19 bestmove is strong evidence, not permission to ignore an
+  // objective score contradiction. The service normally rejects such a stale
+  // callback before this point; this second gate keeps the classifier safe if
+  // a legacy/cache path still supplies played_is_best=true with a clearly
+  // inferior played score.
+  const bool bestmove_score_contradicted = input.played_is_best
+      && ((!same_mate_state(input.best_mate_in, input.played_mate_in))
+          || (value_loss.has_value()
+              && *value_loss >= config.bestmove_contradiction_value_loss)
+          || (!value_loss.has_value()
+              && cp_loss.has_value()
+              && *cp_loss >= config.bestmove_contradiction_cp_loss));
+
   bool equivalent_best = false;
   if (!input.played_is_best && same_mate_state(input.best_mate_in, input.played_mate_in)) {
     equivalent_best = within_value(value_loss, config.equivalent_value_loss)
@@ -131,7 +142,9 @@ MoveCategory classify_move_sf19(
         && (value_loss.has_value() || cp_loss.has_value()
             || (input.best_mate_in.has_value() && input.played_mate_in.has_value()));
   }
-  const bool candidate_best = input.played_is_best || equivalent_best;
+  const bool trusted_engine_best = input.played_is_best
+      && !bestmove_score_contradicted;
+  const bool candidate_best = trusted_engine_best || equivalent_best;
 
   bool second_equivalent = false;
   if (same_mate_state(input.best_mate_in, input.second_best_mate_in)) {
@@ -162,7 +175,8 @@ MoveCategory classify_move_sf19(
         && valid_value(best_value)
         && *best_value >= config.brilliant_decided_ceiling;
 
-    if (input.played_is_best
+    if (trusted_engine_best
+        && wrapped.best_move_verified_after
         && !input.was_in_check_before_move
         && input.legal_move_count > 1
         && verified_piece_sacrifice
@@ -171,7 +185,7 @@ MoveCategory classify_move_sf19(
       return MoveCategory::brilliant;
     }
 
-    if (input.played_is_best && second_clearly_worse) {
+    if (trusted_engine_best && second_clearly_worse) {
       return MoveCategory::critical;
     }
     return MoveCategory::best;

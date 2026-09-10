@@ -9,12 +9,19 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
+import '../ffi/core_gateway.dart';
 import '../localization/generated/app_localizations.dart';
 import '../shared/models/models.dart';
 import '../shared/theme/app_theme.dart';
+import 'shared/board_endgame_presentation.dart';
+import 'shared/promotion_dialog.dart';
 import '../features/app/application/app_controller.dart';
 import '../features/analysis/presentation/analysis_screen.dart';
+import '../features/training/models/opening_training_request.dart';
+import '../features/training/presentation/training_arena_screen.dart';
+import '../features/training/presentation/training_navigation.dart';
 
 part 'shared/brand_widgets.dart';
 part 'startup/splash_error_screens.dart';
@@ -46,6 +53,9 @@ part '../features/settings/presentation/general_settings_page.dart';
 part '../features/settings/presentation/data_storage_settings_page.dart';
 part '../features/settings/presentation/setting_controls.dart';
 part '../features/play/presentation/play_screen.dart';
+part '../features/play/presentation/bot_game_log_screen.dart';
+part '../features/play/presentation/bot_game_setup_screen.dart';
+part '../features/play/presentation/bot_game_screen.dart';
 part 'shared/game_widgets.dart';
 part '../features/settings/presentation/settings_section.dart';
 
@@ -73,7 +83,24 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  static const _trainingIndex = 2;
+
   int _selectedIndex = 0;
+  OpeningTrainingRequest? _openingRequest;
+
+  void _select(int index) {
+    setState(() {
+      if (index != _trainingIndex) _openingRequest = null;
+      _selectedIndex = index;
+    });
+  }
+
+  void _openTraining({OpeningTrainingRequest? opening}) {
+    setState(() {
+      _openingRequest = opening;
+      _selectedIndex = _trainingIndex;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +116,11 @@ class _HomeShellState extends State<HomeShell> {
         Icons.sports_esports_outlined,
         Icons.sports_esports,
       ),
+      _Destination(
+        strings.trainingSection,
+        Icons.school_outlined,
+        Icons.school_rounded,
+      ),
       _Destination(strings.favorites, Icons.favorite_border, Icons.favorite),
       _Destination(
         _statisticsText(context).title,
@@ -99,10 +131,14 @@ class _HomeShellState extends State<HomeShell> {
     ];
     final content = switch (_selectedIndex) {
       0 => GamesScreen(controller: widget.controller),
-      1 => _EmptySection(title: strings.play, message: strings.playPlaceholder),
-      2 => FavoritesScreen(controller: widget.controller),
-      3 => StatisticsScreen(controller: widget.controller),
-      4 => SettingsScreen(controller: widget.controller),
+      1 => PlayScreen(gateway: widget.controller.gateway),
+      2 => TrainingArenaScreen(
+        controller: widget.controller,
+        openingRequest: _openingRequest,
+      ),
+      3 => FavoritesScreen(controller: widget.controller),
+      4 => StatisticsScreen(controller: widget.controller),
+      5 => SettingsScreen(controller: widget.controller),
       _ => _EmptySection(title: destinations[_selectedIndex].label),
     };
 
@@ -114,8 +150,10 @@ class _HomeShellState extends State<HomeShell> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
+    return TrainingNavigator(
+      openTraining: _openTraining,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
         if (constraints.maxWidth >= 900) {
           return Scaffold(
             body: Row(
@@ -136,8 +174,7 @@ class _HomeShellState extends State<HomeShell> {
                             backgroundColor: Colors.transparent,
                             extended: true,
                             selectedIndex: _selectedIndex,
-                            onDestinationSelected: (value) =>
-                                setState(() => _selectedIndex = value),
+                            onDestinationSelected: _select,
                             destinations: [
                               for (final destination in destinations)
                                 NavigationRailDestination(
@@ -179,7 +216,7 @@ class _HomeShellState extends State<HomeShell> {
                         leading: Icon(destinations[index].icon),
                         title: Text(destinations[index].label),
                         onTap: () {
-                          setState(() => _selectedIndex = index);
+                          _select(index);
                           Navigator.pop(context);
                         },
                       ),
@@ -191,7 +228,8 @@ class _HomeShellState extends State<HomeShell> {
           ),
           body: content,
         );
-      },
+        },
+      ),
     );
   }
 }

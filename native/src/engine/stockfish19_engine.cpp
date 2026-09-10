@@ -32,6 +32,10 @@
 namespace kchess {
 namespace {
 
+// -----------------------------------------------------------------------------
+// Section: Stockfish 19 adapter helpers
+// -----------------------------------------------------------------------------
+
 constexpr std::string_view kNetwork = "nn-1a298aa575a0.nnue";
 
 std::string utf8_path(const std::filesystem::path& value) {
@@ -129,6 +133,23 @@ bool stable_engine_lines(
   return true;
 }
 
+int stockfish19_root_line_count(
+    const std::string& fen, const AnalysisRequest& request) {
+  if (!request.search_moves.empty()) {
+    return std::max(1, std::min(
+        request.multi_pv, static_cast<int>(request.search_moves.size())));
+  }
+
+  std::deque<Stockfish19::StateInfo> states(1);
+  Stockfish19::Position position;
+  if (position.set(fen, false, &states.back()).has_value()) {
+    throw std::invalid_argument("Stockfish 19 rejected the FEN");
+  }
+  const int legal_moves = static_cast<int>(
+      Stockfish19::MoveList<Stockfish19::LEGAL>(position).size());
+  return std::max(1, std::min(request.multi_pv, legal_moves));
+}
+
 std::optional<AnalysisResult> terminal_position_result(const std::string& fen) {
   // A terminal chess position legitimately has no best move / principal
   // variation.  Treat it as a valid analysis result instead of an engine
@@ -174,10 +195,12 @@ class Stockfish19Engine::Impl {
   std::atomic_int current_depth{0};
   mutable std::mutex live_result_mutex;
   std::map<int, EngineLine> live_lines;
-  // Latest PV snapshot for each distinct root move. SF19 may move a root move
-  // between MultiPV ranks late in the search; retaining it lets current_result
-  // reconcile the final bestmove callback with the visible rank-1 line.
+  // Raw callbacks remain available for diagnostics, but SF19 live consumers
+  // must never combine ranks from different search iterations. The published
+  // live snapshot below is replaced only by one complete exact MultiPV report.
   std::map<std::string, EngineLine> live_lines_by_move;
+  std::vector<EngineLine> live_complete_lines;
+  int live_complete_depth{0};
   std::string live_best_move;
   bool ready{false};
   std::optional<int> configured_threads;
@@ -283,6 +306,8 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
     std::lock_guard live_lock(impl_->live_result_mutex);
     impl_->live_lines.clear();
     impl_->live_lines_by_move.clear();
+    impl_->live_complete_lines.clear();
+    impl_->live_complete_depth = 0;
     impl_->live_best_move.clear();
   }
 
@@ -317,6 +342,9 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
   int stable_iterations = 0;
   std::vector<EngineLine> previous_stability_lines;
   bool converged_early = false;
+  const int expected_line_count = stockfish19_root_line_count(request.fen, request);
+  Stockfish19ExactSnapshotAccumulator exact_snapshot(
+      static_cast<std::size_t>(expected_line_count));
   impl_->engine->set_on_update_no_moves([](const Stockfish19::Engine::InfoShort&) {});
   impl_->engine->set_on_iter([](const Stockfish19::Engine::InfoIter&) {});
   impl_->engine->set_on_update_full([&](const Stockfish19::Engine::InfoFull& info) {
@@ -335,27 +363,31 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
       if (!line.best_move().empty()) {
         impl_->live_lines_by_move[line.best_move()] = line;
       }
+      // SF19 emits MultiPV as a rank sequence, and callbacks from a newer
+      // iteration can arrive while older rank slots are still present. Always
+      // build a complete exact snapshot, even for ordinary live refinement.
+      // This gives current_result() one coherent set of lines instead of a
+      // mixture such as rank 1 at depth N and rank 2 at depth N-1.
+      exact_snapshot.observe(line, info.bound.empty());
+      if (!exact_snapshot.latest_complete().empty()
+          && exact_snapshot.latest_depth() >= impl_->live_complete_depth) {
+        impl_->live_complete_lines = exact_snapshot.latest_complete();
+        impl_->live_complete_depth = exact_snapshot.latest_depth();
+      }
 
-      // Keep the SF19 adapter behavior identical to the proven SF18 adapter:
-      // each MultiPV callback replaces only that rank's latest line. Stockfish
-      // 19 may intentionally report a previous PV with depth N-1 while another
-      // rank is already at N; that is valid upstream output and must not be
-      // filtered out of the final/live result. Equal-depth grouping is used
-      // only for KChess' optional convergence test, exactly as in SF18.
+      // Raw rank slots are still retained for diagnostics and compatibility,
+      // but they are no longer the public SF19 live-analysis truth. Equal-depth
+      // grouping below remains only for the optional convergence test.
       const int depth = static_cast<int>(info.depth);
       if (request.dynamic_early_stop
           && depth >= request.early_stop_min_depth
           && depth > last_stability_depth) {
         std::vector<EngineLine> iteration;
-        iteration.reserve(static_cast<std::size_t>(request.multi_pv));
-        bool complete_iteration = true;
-        for (int rank = 1; rank <= request.multi_pv; ++rank) {
-          const auto found = impl_->live_lines.find(rank);
-          if (found == impl_->live_lines.end() || found->second.depth != depth) {
-            complete_iteration = false;
-            break;
-          }
-          iteration.push_back(found->second);
+        bool complete_iteration = false;
+        if (exact_snapshot.latest_depth() == depth) {
+          iteration = exact_snapshot.latest_complete();
+          complete_iteration =
+              iteration.size() == static_cast<std::size_t>(expected_line_count);
         }
         if (complete_iteration) {
           const bool ordinary_cp_iteration = std::all_of(
@@ -418,6 +450,27 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
   impl_->engine->set_on_bestmove([](const std::string_view, const std::string_view) {});
 
   AnalysisResult result = current_result();
+  if (request.require_exact_multipv_snapshot) {
+    const auto& snapshot = exact_snapshot.latest_complete();
+    if (snapshot.empty()) {
+      if (impl_->cancelled.load()) {
+        throw std::runtime_error("Stockfish 19 analysis cancelled");
+      }
+      throw std::runtime_error(
+          "Stockfish 19 analysis returned no complete exact MultiPV iteration");
+    }
+
+    // Preparation is persisted and later used as classification truth. Never
+    // combine ranks from different iterations, and never promote an older PV
+    // merely because a late bestmove callback disagrees with the exact snapshot.
+    result.lines = snapshot;
+    result.best_move = result.lines.front().best_move();
+    result.reached_depth = exact_snapshot.latest_depth();
+    result.nodes = 0;
+    for (const auto& line : result.lines) {
+      result.nodes = std::max(result.nodes, line.nodes);
+    }
+  }
   result.interrupted = impl_->cancelled.load();
   result.converged_early = converged_early;
   if (result.lines.empty()) {
@@ -440,22 +493,44 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
 AnalysisResult Stockfish19Engine::current_result() const {
   AnalysisResult result;
   std::lock_guard result_lock(impl_->live_result_mutex);
-  result.best_move = impl_->live_best_move;
-  result.lines = coherent_stockfish19_ranked_lines(
-      impl_->live_lines, impl_->live_lines_by_move, result.best_move);
-  for (const auto& line : result.lines) {
-    result.reached_depth = std::max(result.reached_depth, line.depth);
-    result.nodes = std::max(result.nodes, line.nodes);
+
+  // Live SF19 output must describe one real search iteration. Never promote a
+  // historical PV merely because the later bestmove callback disagrees with
+  // the most recent complete report; that recreates a synthetic position view
+  // whose score, depth and move did not exist together in Stockfish.
+  if (!impl_->live_complete_lines.empty()) {
+    result.lines = impl_->live_complete_lines;
+    result.reached_depth = impl_->live_complete_depth;
+    result.best_move = result.lines.front().best_move();
+  } else {
+    // Before the first complete MultiPV iteration exists, publish nothing. The
+    // caller can keep displaying its previous persisted checkpoint instead of
+    // flashing a partial/mixed SF19 result.
+    return result;
   }
-  if (!usable_stockfish19_engine_move(result.best_move)
-      && !result.lines.empty() && !result.lines.front().moves.empty()) {
-    result.best_move = result.lines.front().moves.front();
+
+  for (const auto& line : result.lines) {
+    result.nodes = std::max(result.nodes, line.nodes);
   }
   return result;
 }
 
 int Stockfish19Engine::current_depth() const noexcept {
   return impl_->current_depth.load();
+}
+
+void Stockfish19Engine::clear_live_result() noexcept {
+  // Sideline analysis deliberately reuses the SF19 instance so Hash/TT and the
+  // NNUE stay warm between consecutive moves. The published callback snapshot
+  // is position-specific, however, and must not survive into the next sideline
+  // request. Clearing it here leaves Stockfish's search state/TT untouched.
+  std::lock_guard result_lock(impl_->live_result_mutex);
+  impl_->live_lines.clear();
+  impl_->live_lines_by_move.clear();
+  impl_->live_complete_lines.clear();
+  impl_->live_complete_depth = 0;
+  impl_->live_best_move.clear();
+  impl_->current_depth = 0;
 }
 
 void Stockfish19Engine::cancel() noexcept {
@@ -482,9 +557,9 @@ std::string Stockfish19Engine::id() const { return "stockfish19"; }
 
 std::string Stockfish19Engine::version() const {
   // Adapter revision is part of the persisted engine version on purpose.
-  // Analyses produced before coherent-best-v2 can contain a final bestmove that
-  // disagrees with the stored rank-1 PV, so they must be recomputed once.
-  return "Stockfish 19 (sf_19-edb0d9d; coherent-best-v2)";
+  // live-exact-v1 invalidates SF19 rows produced before live refinement stopped
+  // publishing mixed-rank / historical-bestmove snapshots.
+  return "Stockfish 19 (sf_19-edb0d9d; coherent-best-v2; preanalysis-exact-v1; live-exact-v1)";
 }
 
 std::string Stockfish19Engine::cache_identity() const {

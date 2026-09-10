@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <nlohmann/json.hpp>
+
 #include "diagnostics/logger.h"
 #include "engine/stockfish_factory.h"
 #include "theory/opening_name_index.h"
@@ -40,7 +42,9 @@ Core::Core(std::filesystem::path data_directory)
       opening_theory_(std::make_unique<UnavailableOpeningTheoryProvider>()),
       opening_names_(std::make_unique<UnavailableOpeningNameIndex>()),
       analysis_service_(database_, *opening_theory_),
-      statistics_service_(database_) {
+      bot_service_(database_),
+      statistics_service_(database_),
+      training_service_(database_) {
   diagnostics::configure_logging(data_directory_);
   diagnostics::info("core", "Core created");
 }
@@ -244,6 +248,20 @@ std::string Core::resolve_board_move_json(
       game_id, fen, source, target, first_candidate_ply);
 }
 
+std::string Core::resolve_free_board_move_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) {
+  return game_library_service_.resolve_free_board_move_json(fen, source, target);
+}
+
+std::string Core::board_promotion_options_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) {
+  return game_library_service_.board_promotion_options_json(fen, source, target);
+}
+
 std::string Core::import_pgn_json(const std::string& pgn) {
   auto result = game_library_service_.import_pgn_json(pgn);
   classify_pending_openings(64);
@@ -293,11 +311,11 @@ std::string Core::statistics_overview_json() {
   return statistics_service_.overview_json();
 }
 
-std::string Core::statistics_openings_json() {
+std::string Core::statistics_openings_json(const std::string& time_control) {
   // This is an explicit user request for opening statistics, so finish the
   // remaining local backfill now instead of waiting for another app launch.
   classify_pending_openings(0);
-  return statistics_service_.openings_json();
+  return statistics_service_.openings_json(time_control);
 }
 
 std::string Core::statistics_terminations_json() {
@@ -404,6 +422,128 @@ std::string Core::variation_analysis_status_json(const std::string& job_id) {
 
 void Core::cancel_variation_analysis(const std::string& job_id) {
   analysis_service_.cancel_variation_analysis(job_id);
+}
+
+// -----------------------------------------------------------------------------
+// Section: Local bot play orchestration
+// -----------------------------------------------------------------------------
+
+std::string Core::create_bot_game_json(const int requested_elo) {
+  return bot_service_.create_game_json(requested_elo);
+}
+
+std::string Core::active_bot_game_json() const {
+  return bot_service_.active_game_json();
+}
+
+std::string Core::bot_game_json(const std::string& game_id) const {
+  validate_token(game_id, "bot game id");
+  return bot_service_.game_json(game_id);
+}
+
+std::string Core::bot_games_json() const {
+  return bot_service_.games_json();
+}
+
+std::string Core::bot_game_analysis_game_json(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  const auto bot_game = database_.bot_game(game_id);
+  if (!bot_game.has_value()) throw std::invalid_argument("Bot game not found");
+  if (bot_game->status == "active") {
+    throw std::runtime_error("Finish the bot game before opening analysis");
+  }
+  if (bot_game->moves.empty()) {
+    throw std::runtime_error("Bot game has no moves to analyse");
+  }
+
+  if (bot_game->analysis_game_id.has_value()) {
+    if (database_.game(*bot_game->analysis_game_id).has_value()) {
+      classify_game_opening(*bot_game->analysis_game_id);
+      return game_library_service_.game_json(*bot_game->analysis_game_id);
+    }
+  }
+
+  const auto imported = nlohmann::json::parse(
+      game_library_service_.import_pgn_json(bot_service_.analysis_pgn(game_id)));
+  const auto analysis_game_id = imported.at("id").get<std::string>();
+  database_.set_bot_game_analysis_game_id(game_id, analysis_game_id);
+  classify_game_opening(analysis_game_id);
+  return game_library_service_.game_json(analysis_game_id);
+}
+
+std::string Core::record_bot_game_move_json(
+    const std::string& game_id,
+    const std::string& expected_fen_before,
+    const std::string& uci) {
+  validate_token(game_id, "bot game id");
+  return bot_service_.record_game_move_json(game_id, expected_fen_before, uci);
+}
+
+std::string Core::record_bot_game_move_from_ply_json(
+    const std::string& game_id,
+    const int base_ply,
+    const std::string& expected_fen_before,
+    const std::string& uci) {
+  validate_token(game_id, "bot game id");
+  return bot_service_.record_game_move_from_ply_json(
+      game_id, base_ply, expected_fen_before, uci);
+}
+
+void Core::resign_bot_game(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  bot_service_.resign_game(game_id);
+}
+
+void Core::abort_bot_game(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  bot_service_.abort_game(game_id);
+}
+
+void Core::delete_bot_game(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  bot_service_.delete_game(game_id);
+}
+
+void Core::set_bot_game_show_eval_bar(
+    const std::string& game_id, const bool enabled) {
+  validate_token(game_id, "bot game id");
+  bot_service_.set_game_show_eval_bar(game_id, enabled);
+}
+
+std::string Core::start_bot_move_json(
+    const std::string& fen, const int requested_elo) {
+  return bot_service_.start_move_json(fen, requested_elo);
+}
+
+std::string Core::bot_move_status_json(const std::string& job_id) {
+  validate_token(job_id, "bot move job id");
+  return bot_service_.move_status_json(job_id);
+}
+
+void Core::cancel_bot_move(const std::string& job_id) {
+  validate_token(job_id, "bot move job id");
+  bot_service_.cancel_move(job_id);
+}
+
+// -----------------------------------------------------------------------------
+// Section: Native training facade
+// -----------------------------------------------------------------------------
+
+std::string Core::training_overview_json() const {
+  return training_service_.overview_json();
+}
+
+std::string Core::start_training_attempt_json(const std::string& exercise_id) {
+  validate_token(exercise_id, "training exercise id");
+  return training_service_.start_attempt_json(exercise_id);
+}
+
+std::string Core::play_training_move_json(
+    const std::string& attempt_id,
+    const std::string& source,
+    const std::string& target) {
+  validate_token(attempt_id, "training attempt id");
+  return training_service_.play_move_json(attempt_id, source, target);
 }
 
 }  // namespace kchess

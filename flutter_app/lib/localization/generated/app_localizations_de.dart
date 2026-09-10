@@ -54,6 +54,146 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieser Bereich ist als Platzhalter für zukünftige Spielmodi vorbereitet, z. B. Partien gegen Bots.';
 
   @override
+  String get playAgainstBot => 'Gegen einen Bot spielen';
+
+  @override
+  String get playAgainstBotSubtitle =>
+      'Starte eine lokale Partie gegen Stockfish.';
+
+  @override
+  String get continueAgainstBot => 'Gegen Bot weiterspielen';
+
+  @override
+  String get botPlayerColor => 'Deine Farbe';
+
+  @override
+  String get temporaryBotGameNotSaved =>
+      'Diese Partie wird nicht gespeichert und beim Schließen oder Abbrechen vollständig verworfen.';
+
+  @override
+  String get botGameLog => 'Bot-Spielverlauf';
+
+  @override
+  String get botGameLogSubtitle =>
+      'Öffne deine gespeicherten Partien gegen Bots, setze laufende Partien fort oder analysiere beendete Partien.';
+
+  @override
+  String get botGameLogEmpty => 'Noch keine gespeicherten Bot-Partien.';
+
+  @override
+  String get botGameLogLoadFailed =>
+      'Der Bot-Spielverlauf konnte nicht geladen werden.';
+
+  @override
+  String get botGameHistoryActive => 'Laufend';
+
+  @override
+  String get botGameHistoryWin => 'Gewonnen';
+
+  @override
+  String get botGameHistoryLoss => 'Verloren';
+
+  @override
+  String get botGameHistoryDraw => 'Remis';
+
+  @override
+  String get botStrength => 'Bot-Spielstärke';
+
+  @override
+  String get botStrengthDescription =>
+      'Wähle die Bot-Stärke in 100-Elo-Schritten. Die maximale Einstellung steht für die volle Stockfish-Spielstärke.';
+
+  @override
+  String get botElo => 'Elo';
+
+  @override
+  String get botEngineLockedDescription =>
+      'Bot-Partien verwenden immer Stockfish 18 und sind unabhängig von der Engine-Auswahl für die Analyse.';
+
+  @override
+  String get botStartGame => 'Partie starten';
+
+  @override
+  String get botGameTitle => 'Partie gegen Bot';
+
+  @override
+  String get botGameLoading => 'Partie wird vorbereitet …';
+
+  @override
+  String get botGameLoadFailed =>
+      'Die Bot-Partie konnte nicht vorbereitet werden.';
+
+  @override
+  String get botMoveFailed => 'Der Bot-Zug konnte nicht berechnet werden.';
+
+  @override
+  String get botYou => 'Du';
+
+  @override
+  String get botYourTurn => 'Du bist am Zug.';
+
+  @override
+  String get botThinking => 'Stockfish denkt …';
+
+  @override
+  String get botApplyingMove => 'Zug wird ausgeführt …';
+
+  @override
+  String get botWaiting => 'Warte auf den nächsten Zug …';
+
+  @override
+  String get botViewingHistory => 'Du siehst eine frühere Stellung.';
+
+  @override
+  String get botGameFinished => 'Partie beendet.';
+
+  @override
+  String get botMoveList => 'Zugliste';
+
+  @override
+  String get botNoMovesYet => 'Noch keine Züge gespielt.';
+
+  @override
+  String get botPreviousMove => 'Einen Zug zurück';
+
+  @override
+  String get botNextMove => 'Einen Zug vor';
+
+  @override
+  String get botReturnToLive => 'Zur aktuellen Stellung';
+
+  @override
+  String get botHintPiece => 'Hinweis 1: Figur anzeigen';
+
+  @override
+  String get botHintTarget => 'Hinweis 2: Zielfeld anzeigen';
+
+  @override
+  String get botHintsUsed => 'Beide Hinweise verwendet';
+
+  @override
+  String get botHintThinking => 'Hinweis wird berechnet …';
+
+  @override
+  String get botHintFailed => 'Der Hinweis konnte nicht berechnet werden.';
+
+  @override
+  String get botGameSettingsTitle => 'Spieleinstellungen';
+
+  @override
+  String get botGameSettingsDescription =>
+      'Diese Einstellungen gelten nur für diese Bot-Partie und ändern keine allgemeinen Analyse-Einstellungen.';
+
+  @override
+  String get botGameEvaluationBarHelp =>
+      'Zeigt während dieser Bot-Partie die aktuelle Stockfish-18-Bewertung. Die Einstellung wird mit der Partie gespeichert.';
+
+  @override
+  String botHintCounter(int used) {
+    return '$used / 2 Hinweise für diesen Zug';
+  }
+
+  @override
   String get downloads => 'Downloads';
 
   @override
@@ -135,6 +275,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get importFen => 'FEN-Stellung importieren';
+
+  @override
+  String get exportFen => 'FEN exportieren';
+
+  @override
+  String get fenCopiedToClipboard => 'FEN wurde in die Zwischenablage kopiert.';
 
   @override
   String get pgnText => 'PGN-Text';
@@ -1187,4 +1333,194 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get statsTimeControlOther => 'Sonstige';
+
+  @override
+  String get botGameDeleteQuestion => 'Bot-Partie löschen?';
+
+  @override
+  String get botGameDeleteBody =>
+      'Dieser Eintrag im Bot-Spielverlauf wird dauerhaft gelöscht. Eine daraus bereits erstellte Analyse-Partie bleibt in deiner lokalen Spielbibliothek erhalten.';
+
+  @override
+  String get promotionTitle => 'Bauernumwandlung';
+
+  @override
+  String get promotionChoosePiece =>
+      'Wähle die Figur, in die der Bauer umgewandelt werden soll.';
+
+  @override
+  String get promotionQueen => 'Dame';
+
+  @override
+  String get promotionRook => 'Turm';
+
+  @override
+  String get promotionBishop => 'Läufer';
+
+  @override
+  String get promotionKnight => 'Springer';
+
+  @override
+  String get trainingSection => 'Training';
+
+  @override
+  String get trainingIntroTitle => 'Training Arena';
+
+  @override
+  String get trainingIntroBody =>
+      'Wähle einen Trainingsbereich. Dein Fortschritt wird lokal auf diesem Gerät gespeichert.';
+
+  @override
+  String get trainingOpeningTitle => 'Eröffnungs-Labor';
+
+  @override
+  String get trainingOpeningSubtitle =>
+      'Repetiere deine Repertoire-Linien und Schwachstellen.';
+
+  @override
+  String get trainingOpeningAction => 'Linien trainieren';
+
+  @override
+  String trainingNemesisBadge(String opening, String rate) {
+    return 'Angstgegner: $opening · nur $rate Siegquote';
+  }
+
+  @override
+  String get trainingNemesisNone =>
+      'Noch keine Schwachstelle in deiner Statistik erkannt.';
+
+  @override
+  String get trainingTacticsTitle => 'Blunder-Buster';
+
+  @override
+  String get trainingTacticsSubtitle =>
+      'Finde den besseren Zug in kritischen Mittelspiel-Stellungen.';
+
+  @override
+  String trainingTacticsSolved(int count) {
+    return '$count gelöste Taktiken';
+  }
+
+  @override
+  String get trainingTacticsAction => 'Taktik starten';
+
+  @override
+  String get trainingTacticsEmpty => 'Noch keine Taktik-Aufgaben im Katalog.';
+
+  @override
+  String get trainingEndgameTitle => 'Endspiel-Akademie';
+
+  @override
+  String get trainingEndgameSubtitle =>
+      'Theoretische Endspiele schrittweise meistern.';
+
+  @override
+  String trainingEndgameProgress(int mastered, int total, int percent) {
+    return '$mastered / $total Stellungen gemeistert ($percent%)';
+  }
+
+  @override
+  String get trainingEndgameAction => 'Endspiele öffnen';
+
+  @override
+  String get trainingMastered => 'Gemeistert';
+
+  @override
+  String trainingStreak(int done, int total) {
+    return '$done/$total fehlerfreie Wiederholungen';
+  }
+
+  @override
+  String trainingLastAttempt(String date) {
+    return 'Zuletzt geübt: $date';
+  }
+
+  @override
+  String get trainingNeverAttempted => 'Noch nicht geübt';
+
+  @override
+  String get trainingOpeningLabSelected => 'Ausgewählte Linie';
+
+  @override
+  String get trainingOpeningLabEmpty =>
+      'Wähle in der Statistik eine Eröffnung und tippe auf „Trainieren“, um sie hier zu laden.';
+
+  @override
+  String get trainingOpeningLabPending =>
+      'Der Linien-Trainer folgt, sobald der Core die Eröffnungszüge liefert.';
+
+  @override
+  String get statsTrainOpening => 'Trainieren';
+
+  @override
+  String trainingGoalWin(String side) {
+    return '$side am Zug — Gewinne die Stellung';
+  }
+
+  @override
+  String trainingGoalDraw(String side) {
+    return '$side am Zug — Halte die Stellung remis';
+  }
+
+  @override
+  String get trainingWrongMove =>
+      'Nicht der beste Zug. Probiere es noch einmal.';
+
+  @override
+  String get trainingSolvedTitle => 'Ausgezeichnet! Stellung gelöst.';
+
+  @override
+  String get trainingSolvedClean =>
+      'Fehlerfrei gelöst — das zählt für die Meisterschaft.';
+
+  @override
+  String get trainingSolvedWithErrors =>
+      'Gelöst, aber mit Korrekturen. Für „gemeistert“ zählt nur ein fehlerfreier Durchgang.';
+
+  @override
+  String get trainingPracticeAgain => 'Nochmal üben';
+
+  @override
+  String get trainingNextEndgame => 'Nächstes Endspiel';
+
+  @override
+  String get trainingBackToList => 'Zur Übersicht';
+
+  @override
+  String trainingMoveProgress(int done, int total) {
+    return 'Zug $done von $total';
+  }
+
+  @override
+  String get trainingBoardError => 'Die Stellung konnte nicht geladen werden.';
+
+  @override
+  String get trainingShowHint => 'Tipp anzeigen';
+
+  @override
+  String get trainingYourMove => 'Du bist am Zug';
+
+  @override
+  String get trainingRestart => 'Neu starten';
+
+  @override
+  String get trainingOppositionTitle => 'Bauern-Opposition';
+
+  @override
+  String get trainingOppositionHint =>
+      'Nimm zuerst die Opposition, dann umgehe den König. Ziehe den Bauern erst, wenn dein König vor ihm steht.';
+
+  @override
+  String get trainingLucenaTitle => 'Lucena-Stellung';
+
+  @override
+  String get trainingLucenaHint =>
+      'Stelle den Turm auf die vierte Reihe, bevor der König herauskommt; später schützt er vor den Schachs.';
+
+  @override
+  String get trainingPhilidorTitle => 'Philidor-Verteidigung';
+
+  @override
+  String get trainingPhilidorHint =>
+      'Halte den Turm auf der sechsten Reihe, bis der Bauer vorzieht, und schache danach von hinten.';
 }

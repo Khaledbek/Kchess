@@ -66,14 +66,22 @@ int main() {
                       "final SF19 bestmove is Best");
     }
     {
-      // Regression for the supplied game/live-arrow mismatch: once the played
-      // move is the authoritative engine recommendation, a disagreeing stale
-      // score sample must never demote it to Excellent/Good/Okay or worse.
-      auto input = ranked(4, 420, -250);
+      auto input = ranked(1, 80, 70);
       input.common.played_is_best = true;
-      input.common.second_best_evaluation_cp = 410;
       expect_category(input, MoveCategory::best,
-                      "authoritative SF19 bestmove can never be demoted by stale score/rank data");
+                      "small independent SF19 score drift does not demote the bestmove");
+    }
+    {
+      // Regression for a stale/inconsistent SF19 final callback: a move cannot
+      // remain Best merely because the UCI move matched bestmove when the
+      // independently verified result is hundreds of centipawns worse.
+      auto input = ranked(1, 20, -400);
+      input.common.played_is_best = true;
+      input.common.sacrifice_against_best_defense = true;
+      input.common.sacrifice_piece_value_cp = 330;
+      input.common.sacrifice_net_material_loss_cp = 300;
+      expect_category(input, MoveCategory::blunder,
+                      "SF19 bestmove callback cannot override a catastrophic verified score drop");
     }
     {
       auto input = ranked(2, 80, 70);
@@ -113,8 +121,18 @@ int main() {
       input.common.sacrifice_against_best_defense = true;
       input.common.sacrifice_piece_value_cp = 320;
       input.common.sacrifice_net_material_loss_cp = 220;
+      input.best_move_verified_after = true;
       expect_category(input, MoveCategory::brilliant,
                       "sound best minor-piece sacrifice can be Brilliant");
+    }
+    {
+      auto input = ranked(1, 160, 160);
+      input.common.played_is_best = true;
+      input.common.sacrifice_against_best_defense = true;
+      input.common.sacrifice_piece_value_cp = 320;
+      input.common.sacrifice_net_material_loss_cp = 220;
+      expect_category(input, MoveCategory::best,
+                      "unconfirmed SF19 sacrifice is never labelled Brilliant");
     }
     {
       auto input = ranked(1, 160, 160);

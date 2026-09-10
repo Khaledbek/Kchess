@@ -152,6 +152,7 @@ add_library(kchess_core SHARED
   src/chess/position_view.cpp
   src/core/core.cpp
   src/diagnostics/logger.cpp
+  src/engine/bot_move_selector.cpp
   src/engine/stockfish_runtime.cpp
   src/engine/stockfish_engine.cpp
   src/engine/stockfish19_engine.cpp
@@ -168,12 +169,15 @@ add_library(kchess_core SHARED
   src/providers/provider_models.cpp
   src/providers/provider_request_scheduler.cpp
   src/services/analysis_service.cpp
+  src/services/bot_service.cpp
   src/services/game_library_service.cpp
   src/services/profile_service.cpp
   src/services/provider_service.cpp
   src/services/settings_service.cpp
   src/services/statistics_service.cpp
   src/services/statistics_details.cpp
+  src/training/training_catalog.cpp
+  src/training/training_service.cpp
   src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
   src/theory/position_key.cpp
@@ -378,6 +382,33 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
   add_test(NAME kchess_classifier_sf19_tests COMMAND kchess_classifier_sf19_tests)
+
+  add_executable(kchess_bot_workflow_tests tests/bot_workflow_tests.cpp)
+  target_compile_features(kchess_bot_workflow_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_bot_workflow_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  target_link_libraries(kchess_bot_workflow_tests PRIVATE kchess_core)
+  add_test(NAME kchess_bot_workflow_tests COMMAND kchess_bot_workflow_tests)
+
+  add_executable(kchess_training_tests tests/training_board_tests.cpp)
+  target_compile_features(kchess_training_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_training_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+  target_link_libraries(kchess_training_tests PRIVATE kchess_core)
+  add_test(NAME kchess_training_tests COMMAND kchess_training_tests)
+
+  add_executable(kchess_bot_move_selector_tests
+    tests/bot_move_selector_tests.cpp
+    src/engine/bot_move_selector.cpp
+  )
+  target_compile_features(kchess_bot_move_selector_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_bot_move_selector_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_bot_move_selector_tests COMMAND kchess_bot_move_selector_tests)
 
   add_executable(kchess_sf19_result_coherence_tests
     tests/sf19_result_coherence_tests.cpp

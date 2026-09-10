@@ -14,10 +14,10 @@ namespace kchess {
 // -----------------------------------------------------------------------------
 
 struct MoveClassifierConfig {
-  // V11 combines engine rank, mate state, material consequences, opportunity
-  // loss and practical expected-score loss. No severe label is produced from a
-  // single evaluation-bar threshold alone.
-  static constexpr int version = 11;
+  // V12 keeps the V11 severity model but binds Best/alternative comparisons to
+  // the same published rank-1 engine snapshot used by the board arrow. No
+  // severe label is produced from a single evaluation-bar threshold alone.
+  static constexpr int version = 12;
 
   // Engine-equivalent moves. Stockfish's final bestmove is always rank 1, but
   // an alternative with effectively the same score is also treated as Best.

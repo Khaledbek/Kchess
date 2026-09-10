@@ -33,6 +33,9 @@ std::string opening_family(const std::string& name) {
   return base.substr(base.find_first_not_of(" \t"));
 }
 
+constexpr int kNemesisMinimumGames = 5;
+constexpr double kNemesisMaximumWinRate = 0.45;
+
 }  // namespace
 
 StatisticsService::StatisticsService(Database& database)
@@ -111,7 +114,8 @@ std::string StatisticsService::overview_json() const {
   return root.dump();
 }
 
-std::string StatisticsService::openings_json() const {
+std::string StatisticsService::openings_json(
+    const std::string& time_control) const {
   const auto profile = database_.active_profile();
   if (!profile.has_value()) {
     return nlohmann::json{{"hasProfile", false}, {"gamesWithOpening", 0}}
@@ -139,7 +143,13 @@ std::string StatisticsService::openings_json() const {
   int games_with_opening = 0;
   int games_without_opening = 0;
 
+  // "all" keeps every game; anything else must match the row's bucket exactly.
+  // Filtered-out games are skipped before the with/without-opening counters so
+  // the card's own totals describe the filtered set rather than the library.
+  const bool filtered = time_control != "all" && !time_control.empty();
+
   for (const auto& row : rows) {
+    if (filtered && row.time_control_type != time_control) continue;
     if (row.opening_name.empty()) {
       games_without_opening += 1;
       continue;
@@ -177,23 +187,36 @@ std::string StatisticsService::openings_json() const {
               return a->color < b->color;
             });
 
-  constexpr std::size_t kMaxFamilies = 60;
-  nlohmann::json list = nlohmann::json::array();
-  for (std::size_t index = 0; index < ordered.size() && index < kMaxFamilies;
-       ++index) {
-    const Family& family = *ordered[index];
-    // Variations, most played first; the family's base ECO follows the dominant
-    // line so the collapsed header shows a representative code.
+  const Family* nemesis = nullptr;
+  double nemesis_win_rate = 1.0;
+  for (const Family* family : ordered) {
+    if (family->tally.games < kNemesisMinimumGames ||
+        family->tally.decided() == 0) {
+      continue;
+    }
+    const double win_rate = static_cast<double>(family->tally.wins) /
+                            family->tally.decided();
+    if (win_rate >= kNemesisMaximumWinRate || win_rate >= nemesis_win_rate) {
+      continue;
+    }
+    nemesis = family;
+    nemesis_win_rate = win_rate;
+  }
+
+  const auto family_json = [](const Family& family) {
     std::vector<const Variation*> variations;
     variations.reserve(family.variations.size());
-    for (const auto& item : family.variations)
+    for (const auto& item : family.variations) {
       variations.push_back(&item.second);
+    }
     std::sort(variations.begin(), variations.end(),
               [](const Variation* a, const Variation* b) {
-                if (a->tally.games != b->tally.games)
+                if (a->tally.games != b->tally.games) {
                   return a->tally.games > b->tally.games;
+                }
                 return a->name < b->name;
               });
+
     nlohmann::json variation_list = nlohmann::json::array();
     for (const Variation* variation : variations) {
       nlohmann::json node = tally_json(variation->tally);
@@ -201,22 +224,28 @@ std::string StatisticsService::openings_json() const {
       node["name"] = variation->name;
       variation_list.push_back(std::move(node));
     }
+
     nlohmann::json node = tally_json(family.tally);
     node["family"] = family.family;
     node["color"] = family.color;
     node["eco"] = variations.empty() ? std::string{} : variations.front()->eco;
+    node["hasDistinctVariations"] =
+        variations.size() > 1 ||
+        (variations.size() == 1 && variations.front()->name != family.family);
     node["variations"] = std::move(variation_list);
-    list.push_back(std::move(node));
+    return node;
+  };
+
+  constexpr std::size_t kMaxFamilies = 60;
+  nlohmann::json list = nlohmann::json::array();
+  for (std::size_t index = 0; index < ordered.size() && index < kMaxFamilies;
+       ++index) {
+    list.push_back(family_json(*ordered[index]));
   }
 
   nlohmann::json ranked = nlohmann::json::array();
   std::map<std::string, int> color_counts;
   for (auto& family : list) {
-    const auto& variations = family.at("variations");
-    family["hasDistinctVariations"] =
-        variations.size() > 1 ||
-        (variations.size() == 1 &&
-         variations.front().at("name") != family.at("family"));
     color_counts[family.at("color").get<std::string>()] +=
         family.at("games").get<int>();
     if (family.at("games").get<int>() >= 3 && !family.at("winRate").is_null()) {
@@ -245,6 +274,8 @@ std::string StatisticsService::openings_json() const {
       {"distinctFamilies", static_cast<int>(families.size())},
       {"families", list},
       {"bestWinRateFamilies", ranked},
+      {"nemesis", nemesis == nullptr ? nlohmann::json(nullptr)
+                                      : family_json(*nemesis)},
       {"defaultColor", default_color},
   };
   return root.dump();

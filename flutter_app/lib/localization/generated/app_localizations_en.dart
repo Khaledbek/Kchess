@@ -54,6 +54,144 @@ class AppLocalizationsEn extends AppLocalizations {
       'This section is reserved for future play modes, such as games against bots.';
 
   @override
+  String get playAgainstBot => 'Play against a bot';
+
+  @override
+  String get playAgainstBotSubtitle => 'Start a local game against Stockfish.';
+
+  @override
+  String get continueAgainstBot => 'Continue against bot';
+
+  @override
+  String get botPlayerColor => 'Your color';
+
+  @override
+  String get temporaryBotGameNotSaved =>
+      'This game is not saved and is discarded completely when you close or cancel it.';
+
+  @override
+  String get botGameLog => 'Bot game history';
+
+  @override
+  String get botGameLogSubtitle =>
+      'Open your saved games against bots, continue an active game, or analyse finished games.';
+
+  @override
+  String get botGameLogEmpty => 'No saved bot games yet.';
+
+  @override
+  String get botGameLogLoadFailed =>
+      'The bot game history could not be loaded.';
+
+  @override
+  String get botGameHistoryActive => 'In progress';
+
+  @override
+  String get botGameHistoryWin => 'Won';
+
+  @override
+  String get botGameHistoryLoss => 'Lost';
+
+  @override
+  String get botGameHistoryDraw => 'Draw';
+
+  @override
+  String get botStrength => 'Bot strength';
+
+  @override
+  String get botStrengthDescription =>
+      'Choose the bot rating in 100 Elo steps. The maximum setting represents full Stockfish strength.';
+
+  @override
+  String get botElo => 'Elo';
+
+  @override
+  String get botEngineLockedDescription =>
+      'Bot games always use Stockfish 18 and are independent of the analysis-engine setting.';
+
+  @override
+  String get botStartGame => 'Start game';
+
+  @override
+  String get botGameTitle => 'Game against bot';
+
+  @override
+  String get botGameLoading => 'Preparing game …';
+
+  @override
+  String get botGameLoadFailed => 'The bot game could not be prepared.';
+
+  @override
+  String get botMoveFailed => 'The bot move could not be calculated.';
+
+  @override
+  String get botYou => 'You';
+
+  @override
+  String get botYourTurn => 'Your turn.';
+
+  @override
+  String get botThinking => 'Stockfish is thinking …';
+
+  @override
+  String get botApplyingMove => 'Applying move …';
+
+  @override
+  String get botWaiting => 'Waiting for the next move …';
+
+  @override
+  String get botViewingHistory => 'You are viewing an earlier position.';
+
+  @override
+  String get botGameFinished => 'Game finished.';
+
+  @override
+  String get botMoveList => 'Move list';
+
+  @override
+  String get botNoMovesYet => 'No moves played yet.';
+
+  @override
+  String get botPreviousMove => 'Previous move';
+
+  @override
+  String get botNextMove => 'Next move';
+
+  @override
+  String get botReturnToLive => 'Return to current position';
+
+  @override
+  String get botHintPiece => 'Hint 1: Show piece';
+
+  @override
+  String get botHintTarget => 'Hint 2: Show target square';
+
+  @override
+  String get botHintsUsed => 'Both hints used';
+
+  @override
+  String get botHintThinking => 'Calculating hint …';
+
+  @override
+  String get botHintFailed => 'The hint could not be calculated.';
+
+  @override
+  String get botGameSettingsTitle => 'Game settings';
+
+  @override
+  String get botGameSettingsDescription =>
+      'These settings apply only to this bot game and do not change the general analysis settings.';
+
+  @override
+  String get botGameEvaluationBarHelp =>
+      'Shows the current Stockfish 18 evaluation during this bot game. The setting is saved with the game.';
+
+  @override
+  String botHintCounter(int used) {
+    return '$used / 2 hints for this move';
+  }
+
+  @override
   String get downloads => 'Downloads';
 
   @override
@@ -135,6 +273,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importFen => 'Import FEN position';
+
+  @override
+  String get exportFen => 'Export FEN';
+
+  @override
+  String get fenCopiedToClipboard => 'FEN copied to clipboard.';
 
   @override
   String get pgnText => 'PGN text';
@@ -1183,4 +1327,193 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statsTimeControlOther => 'Other';
+
+  @override
+  String get botGameDeleteQuestion => 'Delete bot game?';
+
+  @override
+  String get botGameDeleteBody =>
+      'This bot-game history entry will be permanently deleted. Any analysis game already created from it remains in your local game library.';
+
+  @override
+  String get promotionTitle => 'Pawn promotion';
+
+  @override
+  String get promotionChoosePiece =>
+      'Choose the piece the pawn should promote to.';
+
+  @override
+  String get promotionQueen => 'Queen';
+
+  @override
+  String get promotionRook => 'Rook';
+
+  @override
+  String get promotionBishop => 'Bishop';
+
+  @override
+  String get promotionKnight => 'Knight';
+
+  @override
+  String get trainingSection => 'Training';
+
+  @override
+  String get trainingIntroTitle => 'Training arena';
+
+  @override
+  String get trainingIntroBody =>
+      'Pick a training area. Your progress is stored locally on this device.';
+
+  @override
+  String get trainingOpeningTitle => 'Opening lab';
+
+  @override
+  String get trainingOpeningSubtitle =>
+      'Drill your repertoire lines and your weak spots.';
+
+  @override
+  String get trainingOpeningAction => 'Train lines';
+
+  @override
+  String trainingNemesisBadge(String opening, String rate) {
+    return 'Nemesis: $opening — only $rate win rate';
+  }
+
+  @override
+  String get trainingNemesisNone =>
+      'No weak line found in your statistics yet.';
+
+  @override
+  String get trainingTacticsTitle => 'Blunder buster';
+
+  @override
+  String get trainingTacticsSubtitle =>
+      'Find the better move in critical middlegame positions.';
+
+  @override
+  String trainingTacticsSolved(int count) {
+    return '$count tactics solved';
+  }
+
+  @override
+  String get trainingTacticsAction => 'Start tactics';
+
+  @override
+  String get trainingTacticsEmpty => 'No tactics puzzles in the catalogue yet.';
+
+  @override
+  String get trainingEndgameTitle => 'Endgame academy';
+
+  @override
+  String get trainingEndgameSubtitle =>
+      'Master theoretical endgames step by step.';
+
+  @override
+  String trainingEndgameProgress(int mastered, int total, int percent) {
+    return '$mastered / $total positions mastered ($percent%)';
+  }
+
+  @override
+  String get trainingEndgameAction => 'Open endgames';
+
+  @override
+  String get trainingMastered => 'Mastered';
+
+  @override
+  String trainingStreak(int done, int total) {
+    return '$done/$total clean repeats';
+  }
+
+  @override
+  String trainingLastAttempt(String date) {
+    return 'Last practised: $date';
+  }
+
+  @override
+  String get trainingNeverAttempted => 'Not practised yet';
+
+  @override
+  String get trainingOpeningLabSelected => 'Selected line';
+
+  @override
+  String get trainingOpeningLabEmpty =>
+      'Pick an opening in the statistics tab and tap “Train” to load it here.';
+
+  @override
+  String get trainingOpeningLabPending =>
+      'The line trainer follows once the core supplies the opening moves.';
+
+  @override
+  String get statsTrainOpening => 'Train';
+
+  @override
+  String trainingGoalWin(String side) {
+    return '$side to move — win the position';
+  }
+
+  @override
+  String trainingGoalDraw(String side) {
+    return '$side to move — hold the draw';
+  }
+
+  @override
+  String get trainingWrongMove => 'Not the best move. Give it another try.';
+
+  @override
+  String get trainingSolvedTitle => 'Excellent! Position solved.';
+
+  @override
+  String get trainingSolvedClean =>
+      'Solved without a slip — this one counts towards mastery.';
+
+  @override
+  String get trainingSolvedWithErrors =>
+      'Solved, but with corrections. Only a clean run counts towards mastery.';
+
+  @override
+  String get trainingPracticeAgain => 'Practise again';
+
+  @override
+  String get trainingNextEndgame => 'Next endgame';
+
+  @override
+  String get trainingBackToList => 'Back to the list';
+
+  @override
+  String trainingMoveProgress(int done, int total) {
+    return 'Move $done of $total';
+  }
+
+  @override
+  String get trainingBoardError => 'The position could not be loaded.';
+
+  @override
+  String get trainingShowHint => 'Show hint';
+
+  @override
+  String get trainingYourMove => 'Your move';
+
+  @override
+  String get trainingRestart => 'Restart';
+
+  @override
+  String get trainingOppositionTitle => 'Pawn opposition';
+
+  @override
+  String get trainingOppositionHint =>
+      'Take the opposition first, then outflank the king. Push the pawn only after your king is in front of it.';
+
+  @override
+  String get trainingLucenaTitle => 'Lucena position';
+
+  @override
+  String get trainingLucenaHint =>
+      'Place the rook on the fourth rank before bringing out the king; it will later shield the checks.';
+
+  @override
+  String get trainingPhilidorTitle => 'Philidor defence';
+
+  @override
+  String get trainingPhilidorHint =>
+      'Keep the rook on the sixth rank until the pawn advances, then check from behind.';
 }

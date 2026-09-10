@@ -3,6 +3,7 @@
 // -----------------------------------------------------------------------------
 
 part 'statistics_details.dart';
+part 'training_models.dart';
 
 enum ProfileType {
   chessCom,
@@ -331,6 +332,7 @@ class OpeningsStats {
     this.gamesWithoutOpening = 0,
     this.distinctFamilies = 0,
     this.bestWinRateFamilies = const [],
+    this.nemesis,
     this.defaultColor = 'white',
     this.families = const [],
   });
@@ -346,6 +348,9 @@ class OpeningsStats {
             .cast<Map<String, Object?>>()
             .map(OpeningFamily.fromJson)
             .toList(growable: false),
+    nemesis: json['nemesis'] == null
+        ? null
+        : OpeningFamily.fromJson(json['nemesis']! as Map<String, Object?>),
     families: (json['families'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>()
         .map(OpeningFamily.fromJson)
@@ -358,6 +363,7 @@ class OpeningsStats {
   final int distinctFamilies;
   final String defaultColor;
   final List<OpeningFamily> bestWinRateFamilies;
+  final OpeningFamily? nemesis;
   final List<OpeningFamily> families;
 
   bool get isEmpty => gamesWithOpening == 0;
@@ -1059,6 +1065,9 @@ class BoardMoveResolution {
     required this.fenAfter,
     required this.positionAfter,
     this.mainLinePly,
+    this.terminal = false,
+    this.checkmate = false,
+    this.result = '*',
   });
 
   factory BoardMoveResolution.fromJson(Map<String, Object?> json) =>
@@ -1070,6 +1079,9 @@ class BoardMoveResolution {
           json['positionAfter']! as Map<String, Object?>,
         ),
         mainLinePly: json['mainLinePly'] as int?,
+        terminal: json['terminal'] as bool? ?? false,
+        checkmate: json['checkmate'] as bool? ?? false,
+        result: json['result'] as String? ?? '*',
       );
 
   final String uci;
@@ -1077,6 +1089,217 @@ class BoardMoveResolution {
   final String fenAfter;
   final BoardPosition positionAfter;
   final int? mainLinePly;
+  final bool terminal;
+  final bool checkmate;
+  final String result;
+}
+
+// -----------------------------------------------------------------------------
+// Section: Local bot play DTOs
+// -----------------------------------------------------------------------------
+
+class BotGameSummary {
+  const BotGameSummary({
+    required this.gameId,
+    required this.botElo,
+    required this.playerColor,
+    required this.botColor,
+    required this.status,
+    required this.result,
+    required this.outcome,
+    required this.moveCount,
+    required this.createdAt,
+    required this.updatedAt,
+    this.analysisGameId,
+  });
+
+  factory BotGameSummary.fromJson(Map<String, Object?> json) => BotGameSummary(
+    gameId: json['gameId']! as String,
+    botElo: json['botElo']! as int,
+    playerColor: json['playerColor']! as String,
+    botColor: json['botColor']! as String,
+    status: json['status']! as String,
+    result: json['result'] as String? ?? '*',
+    outcome: json['outcome'] as String? ?? 'unfinished',
+    moveCount: json['moveCount'] as int? ?? 0,
+    createdAt: json['createdAt'] as int? ?? 0,
+    updatedAt: json['updatedAt'] as int? ?? 0,
+    analysisGameId: json['analysisGameId'] as String?,
+  );
+
+  final String gameId;
+  final int botElo;
+  final String playerColor;
+  final String botColor;
+  final String status;
+  final String result;
+  final String outcome;
+  final int moveCount;
+  final int createdAt;
+  final int updatedAt;
+  final String? analysisGameId;
+
+  bool get isActive => status == 'active';
+  bool get canAnalyze => !isActive && moveCount > 0;
+}
+
+class BotGameMove {
+  const BotGameMove({
+    required this.ply,
+    required this.uci,
+    required this.san,
+    required this.fenAfter,
+  });
+
+  factory BotGameMove.fromJson(Map<String, Object?> json) => BotGameMove(
+    ply: json['ply']! as int,
+    uci: json['uci']! as String,
+    san: json['san']! as String,
+    fenAfter: json['fenAfter']! as String,
+  );
+
+  final int ply;
+  final String uci;
+  final String san;
+  final String fenAfter;
+}
+
+class BotGameSession {
+  const BotGameSession({
+    required this.gameId,
+    required this.botElo,
+    required this.playerColor,
+    required this.botColor,
+    required this.status,
+    required this.result,
+    this.checkmate = false,
+    required this.position,
+    required this.positions,
+    required this.moves,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.showEvaluationBar,
+  });
+
+  factory BotGameSession.fromJson(Map<String, Object?> json) => BotGameSession(
+    gameId: json['gameId']! as String,
+    botElo: json['botElo']! as int,
+    playerColor: json['playerColor']! as String,
+    botColor: json['botColor']! as String,
+    status: json['status']! as String,
+    result: json['result'] as String? ?? '*',
+    checkmate: json['checkmate'] as bool? ?? false,
+    position: BoardPosition.fromJson(json['position']! as Map<String, Object?>),
+    positions: (json['positions'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(BoardPosition.fromJson)
+        .toList(growable: false),
+    moves: (json['moves'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(BotGameMove.fromJson)
+        .toList(growable: false),
+    createdAt: json['createdAt'] as int? ?? 0,
+    updatedAt: json['updatedAt'] as int? ?? 0,
+    showEvaluationBar: json['showEvaluationBar'] as bool? ?? false,
+  );
+
+  final String gameId;
+  final int botElo;
+  final String playerColor;
+  final String botColor;
+  final String status;
+  final String result;
+  final bool checkmate;
+  final BoardPosition position;
+  final List<BoardPosition> positions;
+  final List<BotGameMove> moves;
+  final int createdAt;
+  final int updatedAt;
+  final bool showEvaluationBar;
+
+  bool get isActive => status == 'active';
+}
+
+class BotMoveSnapshot {
+  const BotMoveSnapshot({
+    required this.jobId,
+    required this.status,
+    required this.engineId,
+    required this.requestedElo,
+    required this.move,
+    required this.bestMove,
+    this.evaluationFen,
+    this.evaluationCp,
+    this.mateIn,
+    this.wdl,
+    this.postMoveEvaluationFen,
+    this.postMoveEvaluationCp,
+    this.postMoveMateIn,
+    this.postMoveWdl,
+    this.san,
+    this.fenAfter,
+    this.positionAfter,
+    this.terminal = false,
+    this.checkmate = false,
+    this.result = '*',
+    this.error,
+  });
+
+  factory BotMoveSnapshot.fromJson(Map<String, Object?> json) => BotMoveSnapshot(
+    jobId: json['jobId']! as String,
+    status: json['status']! as String,
+    engineId: json['engineId']! as String,
+    requestedElo: json['requestedElo']! as int,
+    move: json['move'] as String? ?? '',
+    bestMove: json['bestMove'] as String? ?? '',
+    evaluationFen: json['evaluationFen'] as String?,
+    evaluationCp: json['evaluationCp'] as int?,
+    mateIn: json['mateIn'] as int?,
+    wdl: json['wdl'] == null
+        ? null
+        : WdlScore.fromJson(json['wdl']! as Map<String, Object?>),
+    postMoveEvaluationFen: json['postMoveEvaluationFen'] as String?,
+    postMoveEvaluationCp: json['postMoveEvaluationCp'] as int?,
+    postMoveMateIn: json['postMoveMateIn'] as int?,
+    postMoveWdl: json['postMoveWdl'] == null
+        ? null
+        : WdlScore.fromJson(json['postMoveWdl']! as Map<String, Object?>),
+    san: json['san'] as String?,
+    fenAfter: json['fenAfter'] as String?,
+    positionAfter: json['positionAfter'] == null
+        ? null
+        : BoardPosition.fromJson(json['positionAfter']! as Map<String, Object?>),
+    terminal: json['terminal'] as bool? ?? false,
+    checkmate: json['checkmate'] as bool? ?? false,
+    result: json['result'] as String? ?? '*',
+    error: json['error'] as String?,
+  );
+
+  final String jobId;
+  final String status;
+  final String engineId;
+  final int requestedElo;
+  final String move;
+  final String bestMove;
+  final String? evaluationFen;
+  final int? evaluationCp;
+  final int? mateIn;
+  final WdlScore? wdl;
+  final String? postMoveEvaluationFen;
+  final int? postMoveEvaluationCp;
+  final int? postMoveMateIn;
+  final WdlScore? postMoveWdl;
+  final String? san;
+  final String? fenAfter;
+  final BoardPosition? positionAfter;
+  final bool terminal;
+  final bool checkmate;
+  final String result;
+  final String? error;
+
+  bool get isComplete => status == 'complete';
+  bool get isRunning => status == 'queued' || status == 'running';
+  bool get isFailed => status == 'failed';
 }
 
 class GameDetail {
@@ -1308,6 +1531,7 @@ class EngineLine {
     this.evaluationCp,
     this.mateIn,
     this.wdl,
+    this.evaluationBarWhitePermille,
   });
 
   factory EngineLine.fromJson(Map<String, Object?> json) => EngineLine(
@@ -1315,6 +1539,7 @@ class EngineLine {
     depth: json['depth']! as int,
     evaluationCp: json['evaluationCp'] as int?,
     mateIn: json['mateIn'] as int?,
+    evaluationBarWhitePermille: json['evaluationBarWhitePermille'] as int?,
     wdl: json['wdl'] == null
         ? null
         : WdlScore.fromJson(json['wdl']! as Map<String, Object?>),
@@ -1327,6 +1552,8 @@ class EngineLine {
   final int? evaluationCp;
   final int? mateIn;
   final WdlScore? wdl;
+  // Native SF19-only bar projection. Null preserves the legacy SF18 cp scale.
+  final int? evaluationBarWhitePermille;
   final int nodes;
   final List<String> moves;
 
@@ -1383,6 +1610,7 @@ class AnalysisSnapshot {
     required this.bestMove,
     required this.recommendedMove,
     required this.engineVersion,
+    this.analyzedFen = '',
     required this.configHash,
     required this.lines,
     this.error,
@@ -1413,6 +1641,7 @@ class AnalysisSnapshot {
         bestMove: json['bestMove'] as String? ?? '',
         recommendedMove: json['recommendedMove'] as String? ?? '',
         engineVersion: json['engineVersion'] as String? ?? '',
+        analyzedFen: json['analyzedFen'] as String? ?? '',
         configHash: json['configHash'] as String? ?? '',
         error: json['error'] as String?,
         classification: MoveClassification.fromJson(
@@ -1449,6 +1678,7 @@ class AnalysisSnapshot {
   final String bestMove;
   final String recommendedMove;
   final String engineVersion;
+  final String analyzedFen;
   final String configHash;
   final String? error;
   final List<EngineLine> lines;
@@ -1479,6 +1709,7 @@ class VariationAnalysisSnapshot {
     this.position = BoardPosition.empty,
     required this.bestMove,
     required this.lines,
+    this.engineVersion = '',
     this.liveDepth = 0,
     this.moverEvaluationCp,
     this.moverMateIn,
@@ -1497,6 +1728,7 @@ class VariationAnalysisSnapshot {
           json['position']! as Map<String, Object?>,
         ),
         bestMove: json['bestMove'] as String? ?? '',
+        engineVersion: json['engineVersion'] as String? ?? '',
         liveDepth: json['liveDepth'] as int? ?? 0,
         moverEvaluationCp: json['moverEvaluationCp'] as int?,
         moverMateIn: json['moverMateIn'] as int?,
@@ -1517,6 +1749,7 @@ class VariationAnalysisSnapshot {
   final String fen;
   final BoardPosition position;
   final String bestMove;
+  final String engineVersion;
   final int liveDepth;
   final int? moverEvaluationCp;
   final int? moverMateIn;
@@ -1531,6 +1764,7 @@ class VariationAnalysisSnapshot {
   VariationAnalysisSnapshot copyWith({
     String? status,
     String? bestMove,
+    String? engineVersion,
     int? liveDepth,
     int? moverEvaluationCp,
     int? moverMateIn,
@@ -1545,6 +1779,7 @@ class VariationAnalysisSnapshot {
     fen: fen,
     position: position,
     bestMove: bestMove ?? this.bestMove,
+    engineVersion: engineVersion ?? this.engineVersion,
     liveDepth: liveDepth ?? this.liveDepth,
     moverEvaluationCp: moverEvaluationCp ?? this.moverEvaluationCp,
     moverMateIn: moverMateIn ?? this.moverMateIn,

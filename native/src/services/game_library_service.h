@@ -23,6 +23,14 @@ class GameLibraryService {
       const std::string& source,
       const std::string& target,
       int first_candidate_ply) const;
+  std::string resolve_free_board_move_json(
+      const std::string& fen,
+      const std::string& source,
+      const std::string& target) const;
+  std::string board_promotion_options_json(
+      const std::string& fen,
+      const std::string& source,
+      const std::string& target) const;
   std::string import_pgn_json(const std::string& pgn);
   std::string import_fen_json(const std::string& fen, const std::string& display_name);
 

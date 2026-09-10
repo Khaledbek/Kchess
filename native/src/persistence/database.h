@@ -111,6 +111,51 @@ struct GamePhaseRow {
   int max_ply{-1};
 };
 
+struct BotGameMoveRecord {
+  int ply{0};
+  std::string uci;
+  std::string san;
+  std::string fen_after;
+};
+
+struct BotGameRecord {
+  std::string id;
+  int bot_elo{1500};
+  std::string player_color{"white"};
+  std::string bot_color{"black"};
+  std::string status{"active"};
+  std::string result{"*"};
+  std::string starting_fen;
+  std::string current_fen;
+  std::int64_t created_at{0};
+  std::int64_t updated_at{0};
+  bool show_eval_bar{false};
+  std::optional<std::string> analysis_game_id;
+  std::vector<BotGameMoveRecord> moves;
+};
+
+struct BotGameSummaryRecord {
+  std::string id;
+  int bot_elo{1500};
+  std::string player_color{"white"};
+  std::string bot_color{"black"};
+  std::string status{"active"};
+  std::string result{"*"};
+  std::int64_t created_at{0};
+  std::int64_t updated_at{0};
+  int move_count{0};
+  std::optional<std::string> analysis_game_id;
+};
+
+struct TrainingProgressRecord {
+  std::string exercise_id;
+  bool mastered{false};
+  int success_streak{0};
+  int success_count{0};
+  int attempt_count{0};
+  std::optional<std::int64_t> last_attempt_at;
+};
+
 struct FavoriteCollectionRecord {
   std::string id;
   std::string profile_id;
@@ -218,6 +263,26 @@ class Database {
   std::vector<GameRecord> games(const std::string& profile_id) const;
   std::vector<GameRecord> favorite_games() const;
   std::optional<GameRecord> game(const std::string& game_id) const;
+  BotGameRecord create_bot_game(int bot_elo, const std::string& starting_fen);
+  std::optional<BotGameRecord> active_bot_game() const;
+  std::optional<BotGameRecord> bot_game(const std::string& game_id) const;
+  std::vector<BotGameSummaryRecord> bot_games() const;
+  void append_bot_game_move(
+      const std::string& game_id,
+      int base_ply,
+      const std::string& expected_fen_before,
+      const BotGameMoveRecord& move);
+  void finish_bot_game(
+      const std::string& game_id,
+      const std::string& status,
+      const std::string& result);
+  void delete_bot_game(const std::string& game_id);
+  void set_bot_game_show_eval_bar(const std::string& game_id, bool enabled);
+  void set_bot_game_analysis_game_id(
+      const std::string& game_id, const std::string& analysis_game_id);
+
+  std::vector<TrainingProgressRecord> training_progress() const;
+  void put_training_progress(const TrainingProgressRecord& progress);
 
   // Lightweight rows for statistics, newest game first (by end/creation time).
   std::vector<GameStatRow> games_for_statistics(const std::string& profile_id) const;
