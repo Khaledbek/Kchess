@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kchess/app/kchess_app.dart';
 import 'package:kchess/features/training/data/training_library.dart';
+import 'package:kchess/features/training/data/opening_database.dart';
 import 'package:kchess/features/training/models/models.dart';
 import 'package:kchess/features/training/presentation/endgame_academy_screen.dart';
+import 'package:kchess/features/training/presentation/opening_lab_screen.dart';
 import 'package:kchess/features/training/presentation/training_arena_screen.dart';
+import 'package:kchess/features/training/presentation/tree/opening_fen_resolver.dart';
+import 'package:kchess/features/training/presentation/tree/opening_tree_controller.dart';
+import 'package:kchess/features/training/presentation/tree/skill_tree_canvas.dart';
+import 'package:kchess/features/training/presentation/tree/skill_tree_node.dart';
+import 'package:kchess/shared/widgets/chess_board_view.dart';
 import 'package:kchess/localization/generated/app_localizations.dart';
 import 'package:kchess/models/models.dart';
 import 'package:kchess/services/training_progress_service.dart';
@@ -267,7 +274,7 @@ void main() {
       expect(find.text('Blunder-Buster'), findsOneWidget);
       expect(find.text('Endspiel-Akademie'), findsOneWidget);
       expect(find.text('0 gelöste Taktiken'), findsOneWidget);
-      expect(find.text('0 / 3 Stellungen gemeistert (0%)'), findsOneWidget);
+      expect(find.text('0 / 12 Stellungen gemeistert (0%)'), findsOneWidget);
 
       // The hub is a row of cards inside an IntrinsicHeight; a card that
       // collapses still reserves its slot, so assert the rendered geometry
@@ -376,7 +383,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('0 / 3 Stellungen gemeistert (0%)'), findsOneWidget);
+      expect(find.text('0 / 12 Stellungen gemeistert (0%)'), findsOneWidget);
 
       // Three clean runs are what mastery means; the hub reads the same
       // service the player writes to, so the bar has to follow.
@@ -385,7 +392,7 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(find.text('1 / 3 Stellungen gemeistert (33%)'), findsOneWidget);
+      expect(find.text('1 / 12 Stellungen gemeistert (8%)'), findsOneWidget);
     });
 
     testWidgets('statistics deep-links an opening into the training tab', (
@@ -409,6 +416,9 @@ void main() {
 
       // …and the opening lab opens on it.
       await tester.tap(find.text('Linien trainieren'));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
       await tester.pumpAndSettle();
       expect(find.text('Ruy Lopez'), findsOneWidget);
       expect(find.widgetWithText(Chip, 'C65'), findsOneWidget);
@@ -639,4 +649,349 @@ void main() {
       expect(find.text(_drillExercise.hintText), findsOneWidget);
     });
   });
+
+  group('opening pgn tokens', () {
+    test('move numbers, results and ellipses are not moves', () {
+      expect(sanTokensFromPgn('1. e4 c5 2. Nf3'), ['e4', 'c5', 'Nf3']);
+
+      // The glued and the ellipsis spellings both turn up in the wild.
+      expect(sanTokensFromPgn('1.e4 e5 2.Nf3'), ['e4', 'e5', 'Nf3']);
+      expect(sanTokensFromPgn('1. e4 1... c5'), ['e4', 'c5']);
+
+      // A result also starts with a digit, so stripping move numbers first
+      // would leave `-0` behind as a move.
+      expect(sanTokensFromPgn('1. e4 e5 1-0'), ['e4', 'e5']);
+      expect(sanTokensFromPgn('1. d4 d5 1/2-1/2'), ['d4', 'd5']);
+      expect(sanTokensFromPgn('1. e4 e5 *'), ['e4', 'e5']);
+    });
+
+    test('castling and promotion survive intact', () {
+      expect(
+        sanTokensFromPgn('4. O-O Nf6 5. e8=Q+ Kh8'),
+        ['O-O', 'Nf6', 'e8=Q+', 'Kh8'],
+      );
+    });
+  });
+
+  group('opening fen resolver', () {
+    FakeCoreGateway scriptedSicilian() {
+      final gateway = FakeCoreGateway(initialProfiles: const [profile]);
+      gateway.boardScript[OpeningLine.startPosition] = const [
+        BoardMoveOption(uci: 'e2e4', san: 'e4', fenAfter: _afterE4),
+        BoardMoveOption(uci: 'd2d4', san: 'd4', fenAfter: _afterD4),
+      ];
+      gateway.boardScript[_afterE4] = const [
+        BoardMoveOption(uci: 'c7c5', san: 'c5', fenAfter: _afterC5),
+      ];
+      gateway.boardScript[_afterC5] = const [
+        BoardMoveOption(uci: 'g1f3', san: 'Nf3', fenAfter: _afterNf3),
+      ];
+      return gateway;
+    }
+
+    test('replays a numbered pgn to the position it reaches', () async {
+      final resolver = OpeningFenResolver(gateway: scriptedSicilian());
+
+      // The old replay matched `1.` against the move list, found nothing and
+      // left every preview sitting on the starting position.
+      expect(await resolver.resolve('1. e4 c5 2. Nf3'), _afterNf3);
+      expect(await resolver.resolve('1. e4'), _afterE4);
+    });
+
+    test('an unplayable move gives up rather than half-resolving', () async {
+      final resolver = OpeningFenResolver(gateway: scriptedSicilian());
+
+      expect(await resolver.resolve('1. e4 Qh4'), isNull);
+    });
+
+    test('check and mate suffixes still match the move list', () async {
+      final gateway = FakeCoreGateway(initialProfiles: const [profile]);
+      gateway.boardScript[OpeningLine.startPosition] = const [
+        BoardMoveOption(uci: 'e2e4', san: 'e4', fenAfter: _afterE4),
+      ];
+      final resolver = OpeningFenResolver(gateway: gateway);
+
+      expect(await resolver.resolve('1. e4+'), _afterE4);
+    });
+
+    test('a second line reuses the plies the first one worked out', () async {
+      final gateway = _CountingGateway();
+      gateway.boardScript[OpeningLine.startPosition] = const [
+        BoardMoveOption(uci: 'e2e4', san: 'e4', fenAfter: _afterE4),
+      ];
+      gateway.boardScript[_afterE4] = const [
+        BoardMoveOption(uci: 'c7c5', san: 'c5', fenAfter: _afterC5),
+      ];
+      gateway.boardScript[_afterC5] = const [
+        BoardMoveOption(uci: 'g1f3', san: 'Nf3', fenAfter: _afterNf3),
+      ];
+      final resolver = OpeningFenResolver(gateway: gateway);
+
+      await resolver.resolve('1. e4 c5 2. Nf3');
+      final afterFirst = gateway.legalMoveCalls;
+      expect(afterFirst, 3, reason: 'one move-list lookup per ply');
+
+      // The tree replays hundreds of variations that share their first plies,
+      // so a sibling must cost nothing.
+      await resolver.resolve('1. e4 c5');
+      expect(gateway.legalMoveCalls, afterFirst);
+    });
+  });
+
+  group('opening skill tree', () {
+    const sicilian = OpeningTreeNode(
+      id: 10,
+      name: 'Sizilianisch',
+      eco: 'B20',
+      pgn: '1. e4 c5',
+      openingId: 100,
+      childCount: 1,
+    );
+    const najdorf = OpeningTreeNode(
+      id: 11,
+      parentId: 10,
+      name: 'Najdorf',
+      eco: 'B90',
+      pgn: '1. e4 c5 2. Nf3',
+      openingId: 101,
+      childCount: 0,
+    );
+
+    /// Pumps the canvas over an injected tree, so nothing here has to touch
+    /// the bundled SQLite database.
+    Future<
+      ({
+        TrainingProgressService progress,
+        List<OpeningTreeNode> trained,
+        OpeningTreeController controller,
+      })
+    >
+    pumpTree(WidgetTester tester, {TrainingProgressService? progress}) async {
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final gateway = FakeCoreGateway(initialProfiles: const [profile]);
+      gateway.boardScript[OpeningLine.startPosition] = const [
+        BoardMoveOption(uci: 'e2e4', san: 'e4', fenAfter: _afterE4),
+      ];
+      gateway.boardScript[_afterE4] = const [
+        BoardMoveOption(uci: 'c7c5', san: 'c5', fenAfter: _afterC5),
+      ];
+      gateway.boardScript[_afterC5] = const [
+        BoardMoveOption(uci: 'g1f3', san: 'Nf3', fenAfter: _afterNf3),
+      ];
+
+      final service =
+          progress ?? TrainingProgressService(store: InMemoryProgressStore());
+      addTearDown(service.dispose);
+      await service.load();
+
+      final controller = OpeningTreeController.withRoots(
+        resolver: OpeningFenResolver(gateway: gateway),
+        roots: const [sicilian],
+        childLoader: (parentId) async =>
+            parentId == sicilian.id ? const [najdorf] : const [],
+      );
+      addTearDown(controller.dispose);
+
+      final trained = <OpeningTreeNode>[];
+      await tester.pumpWidget(
+        _localized(
+          Scaffold(
+            body: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) => SkillTreeCanvas(
+                controller: controller,
+                progress: service,
+                onNodeSelected: trained.add,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (progress: service, trained: trained, controller: controller);
+    }
+
+    testWidgets('a root card renders the position its line reaches', (
+      tester,
+    ) async {
+      await pumpTree(tester);
+
+      expect(find.text('Sizilianisch'), findsOneWidget);
+      expect(find.text('B20'), findsOneWidget);
+
+      // Root FENs were never queued for replay at all, so every card on the
+      // first screen the user saw came up as an empty box.
+      expect(find.byType(ChessBoardView), findsOneWidget);
+      final board = tester.widget<ChessBoardView>(find.byType(ChessBoardView));
+      expect(board.position.fen, _afterC5);
+    });
+
+    testWidgets('a card renders at its laid-out size on a phone too', (
+      tester,
+    ) async {
+      // The layout pass places cards before they are built, so a card that
+      // came out a different size would put every connector curve in the
+      // wrong place — and a phone-width viewport is where an overflowing
+      // card would show up first.
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final service = TrainingProgressService(store: InMemoryProgressStore());
+      addTearDown(service.dispose);
+      final gateway = FakeCoreGateway(initialProfiles: const [profile]);
+      gateway.boardScript[OpeningLine.startPosition] = const [
+        BoardMoveOption(uci: 'e2e4', san: 'e4', fenAfter: _afterE4),
+      ];
+      gateway.boardScript[_afterE4] = const [
+        BoardMoveOption(uci: 'c7c5', san: 'c5', fenAfter: _afterC5),
+      ];
+
+      final controller = OpeningTreeController.withRoots(
+        resolver: OpeningFenResolver(gateway: gateway),
+        roots: const [sicilian],
+        childLoader: (_) async => const [],
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _localized(
+          Scaffold(
+            body: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) => SkillTreeCanvas(
+                controller: controller,
+                progress: service,
+                onNodeSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final card = tester.getSize(find.byType(SkillTreeNodeWidget));
+      expect(card.width, TreeMetrics.nodeWidth);
+      expect(card.height, TreeMetrics.nodeHeight);
+
+      // A squashed or cropped board is worse than no board, so the preview
+      // stays square whatever the card around it does.
+      final board = tester.getSize(find.byType(ChessBoardView));
+      expect(board.width, SkillTreeNodeWidget.previewSide);
+      expect(board.height, SkillTreeNodeWidget.previewSide);
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a card with variations can still be trained', (tester) async {
+      final result = await pumpTree(tester);
+
+      // The train button used to be rendered only on childless cards, which
+      // put every named opening out of reach.
+      await tester.tap(find.byKey(const Key('opening-tree-train-10')));
+      await tester.pumpAndSettle();
+
+      expect(result.trained, hasLength(1));
+      expect(
+        result.trained.single.openingId,
+        100,
+        reason: 'the card has to hand over the openings row, not its tree id',
+      );
+    });
+
+    testWidgets('unfolding a card loads and places its variations', (
+      tester,
+    ) async {
+      final result = await pumpTree(tester);
+      expect(find.text('Najdorf'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('opening-tree-expand-10')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Najdorf'), findsOneWidget);
+
+      // Children sit exactly one column to the right of their parent.
+      final parent = result.controller.rootNodes.single;
+      expect(parent.expanded, isTrue);
+      expect(parent.children.single.x - parent.x, TreeMetrics.columnStride);
+    });
+
+    testWidgets('the lab opens on the tree and settles without a line', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final service = TrainingProgressService(store: InMemoryProgressStore());
+      addTearDown(service.dispose);
+
+      await tester.pumpWidget(
+        _localized(
+          OpeningLabScreen(
+            gateway: FakeCoreGateway(initialProfiles: const [profile]),
+            progress: service,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No deep-linked request, so the lab has to land on the tree rather than
+      // on a player — and lay it out without tripping an assertion.
+      expect(find.byType(SkillTreeCanvas), findsOneWidget);
+      expect(find.byType(OpeningLinePlayer), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a trained line lights up its mastery dots', (tester) async {
+      final service = TrainingProgressService(store: InMemoryProgressStore());
+      await service.markExerciseCompleted('opening_100', true);
+
+      await pumpTree(tester, progress: service);
+
+      final filled = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(SkillTreeCanvas),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Container &&
+                    widget.decoration is BoxDecoration &&
+                    (widget.decoration! as BoxDecoration).shape ==
+                        BoxShape.circle,
+              ),
+            ),
+          )
+          .toList();
+
+      expect(
+        filled,
+        hasLength(ExerciseProgress.masteryThreshold),
+        reason: 'one dot per clean repeat mastery needs',
+      );
+    });
+  });
+}
+
+/// The first three plies of the Sicilian, as the fake core hands them back.
+const _afterE4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
+const _afterD4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq d3 0 1';
+const _afterC5 =
+    'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2';
+const _afterNf3 =
+    'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2';
+
+/// Counts move-list lookups, so a test can show the resolver's prefix cache is
+/// doing its job rather than just arriving at the right answer slowly.
+class _CountingGateway extends FakeCoreGateway {
+  int legalMoveCalls = 0;
+
+  @override
+  Future<List<BoardMoveOption>> boardLegalMoves(String fen) {
+    legalMoveCalls++;
+    return super.boardLegalMoves(fen);
+  }
 }

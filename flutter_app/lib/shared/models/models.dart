@@ -796,7 +796,8 @@ class GameSummary {
   final String? favoriteCollectionId;
   final bool downloaded;
   final bool analyzed;
-  final String termination; // checkmate | resignation | timeout | draw | other | unknown
+  final String
+  termination; // checkmate | resignation | timeout | draw | other | unknown
   final int endedAt;
 }
 
@@ -883,6 +884,10 @@ class BoardPosition {
     required this.sideToMove,
     required this.draggableColor,
     this.fullmoveNumber = 1,
+    this.inCheck = false,
+    this.legalMoveCount,
+    this.status = BoardStatus.playable,
+    this.insufficientMaterial = false,
   });
 
   static const empty = BoardPosition(
@@ -958,12 +963,19 @@ class BoardPosition {
     fullmoveNumber: 1,
   );
 
+  /// Every field except the four the core always sends is optional, so a
+  /// stored-game payload keeps parsing unchanged.
+
   factory BoardPosition.fromJson(Map<String, Object?> json) => BoardPosition(
     fen: json['fen']! as String,
     pieces: (json['pieces']! as List<Object?>).cast<String>(),
     sideToMove: json['sideToMove']! as String,
     draggableColor: json['draggableColor']! as String,
     fullmoveNumber: json['fullmoveNumber'] as int? ?? 1,
+    inCheck: json['inCheck'] as bool? ?? false,
+    legalMoveCount: json['legalMoveCount'] as int?,
+    status: json['status'] as String? ?? BoardStatus.playable,
+    insufficientMaterial: json['insufficientMaterial'] as bool? ?? false,
   );
 
   final String fen;
@@ -971,6 +983,35 @@ class BoardPosition {
   final String sideToMove;
   final String draggableColor;
   final int fullmoveNumber;
+
+  /// Whether the side to move is in check. Only the gameless board payload
+  /// fills this in; game positions default to false.
+  final bool inCheck;
+
+  /// Null for payloads that do not compute it (stored games).
+  final int? legalMoveCount;
+
+  /// One of [BoardStatus]. Checkmate and stalemate are indistinguishable from
+  /// an empty move list alone, so the core decides which it is.
+  final String status;
+
+  /// Whether *neither* side can force mate any more, so the position is a dead
+  /// draw. Decided by the core and deliberately side-agnostic: a lone king
+  /// facing a pawn is not a draw just because its owner has nothing.
+  final bool insufficientMaterial;
+
+  bool get isCheckmate => status == BoardStatus.checkmate;
+  bool get isStalemate => status == BoardStatus.stalemate;
+  bool get isPlayable => status == BoardStatus.playable;
+}
+
+/// Terminal state of a position, as reported by the native core.
+class BoardStatus {
+  const BoardStatus._();
+
+  static const playable = 'playable';
+  static const checkmate = 'checkmate';
+  static const stalemate = 'stalemate';
 }
 
 class BoardMoveResolution {

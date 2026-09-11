@@ -585,8 +585,6 @@
   "trainingHint": "Hint",
   "trainingBoardPending": "The board trainer follows once the core exposes move validation over the native interface.",
   "trainingOpeningLabSelected": "Selected line",
-  "trainingOpeningLabEmpty": "Pick an opening in the statistics tab and tap “Train” to load it here.",
-  "trainingOpeningLabPending": "The line trainer follows once the core supplies the opening moves.",
   "statsTrainOpening": "Train",
   "trainingGoalWin": "{side} to move — win the position",
   "@trainingGoalWin": {
@@ -626,5 +624,161 @@
   "trainingShowHint": "Show hint",
   "trainingYourMove": "Your move",
   "trainingOpponentThinking": "Reply …",
-  "trainingRestart": "Restart"
+  "trainingRestart": "Restart",
+  "trainingDrillMoveCounter": "Move {done} / {total}",
+  "@trainingDrillMoveCounter": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingDrillGoalCheckmate": "Checkmate Black",
+  "trainingDrillReset": "Restart",
+  "trainingDrillNewPosition": "New position",
+  "trainingDrillGenerating": "Generating a position …",
+  "trainingDrillGenerateFailed": "No suitable position could be generated.",
+  "trainingDrillVictoryTitle": "Checkmate! Cleanly played.",
+  "trainingDrillVictoryBody": "Took {moves} moves.",
+  "@trainingDrillVictoryBody": {
+    "placeholders": {
+      "moves": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingDrillStalemateTitle": "Stalemate!",
+  "trainingDrillStalemateBody": "The king has no moves left. A draw instead of a win.",
+  "trainingDrillLimitTitle": "Move limit exceeded",
+  "trainingDrillLimitBody": "The mate has to land within {total} moves. Try driving the king to the edge faster.",
+  "@trainingDrillLimitBody": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingDrillDrawTitle": "Draw",
+  "trainingDrillDrawBody": "Without mating material the position can no longer be won.",
+  "trainingDrillRetry": "Try again",
+  "trainingDrillNextLevel": "Next level",
+  "trainingDrillEngineFallback": "Engine unavailable — the defender is playing weaker than usual.",
+  "trainingDrillLevel": "Level {level}",
+  "@trainingDrillLevel": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingDrillLocked": "Master level {level} first",
+  "@trainingDrillLocked": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingDrillSolved": "Solved",
+  "trainingDrillOpen": "Open",
+  "trainingDifficultyBeginner": "Beginner",
+  "trainingDifficultyIntermediate": "Intermediate",
+  "trainingDifficultyMaster": "Master",
+  "trainingCategoryProgress": "{mastered} of {total} levels mastered",
+  "@trainingCategoryProgress": {
+    "placeholders": {
+      "mastered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingTheoryPositions": "Theoretical positions",
+  "trainingStudiesTitle": "Classical Studies (1851)",
+  "trainingStudiesSubtitle": "86 historical master studies by Kling & Horwitz.",
+  "trainingStudyNumber": "Study {number}",
+  "@trainingStudyNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingStudySourceYear": "Kling & Horwitz (1851)",
+  "trainingStudyMoves": "Move {moves}",
+  "@trainingStudyMoves": {
+    "placeholders": {
+      "moves": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingNextStudy": "Next study",
+  "trainingOpeningLabIntro": "Replay the mainline move by move. The computer answers for the other side.",
+  "trainingOpeningLabStart": "Train line",
+  "trainingOpeningLabPlayingAs": "You play {side}",
+  "@trainingOpeningLabPlayingAs": {
+    "placeholders": {
+      "side": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningLabIdea": "Idea",
+  "trainingOpeningLabWrongMove": "Not the main move. Give it another try.",
+  "trainingOpeningLabDoneTitle": "Line complete!",
+  "trainingOpeningLabDoneBody": "You found all {count} moves of the mainline.",
+  "@trainingOpeningLabDoneBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningLabBackToOverview": "Back to the overview",
+  "trainingOpeningLabNoMatch": "That opening is not in the repertoire yet. Pick one of the lines below.",
+  "trainingOpeningLabEmptyCatalog": "No repertoire lines in the catalogue yet.",
+  "trainingOpeningLineItalian": "Italian Game: Giuoco Piano",
+  "trainingOpeningLineCaroKann": "Caro-Kann: Advance Variation",
+  "trainingOpeningLineQgdExchange": "Queen's Gambit Declined: Exchange Variation",
+  "trainingOpeningIdeaItalian1": "Takes the centre and frees the bishop and queen.",
+  "trainingOpeningIdeaItalian2": "Develops with tempo and hits e5 straight away.",
+  "trainingOpeningIdeaItalian3": "The bishop eyes f7, the weakest point in Black's camp.",
+  "trainingOpeningIdeaItalian4": "Prepares d4 and supports the push in the centre.",
+  "trainingOpeningIdeaItalian5": "Solidly backs up e4 — the quiet Giuoco Pianissimo.",
+  "trainingOpeningIdeaItalian6": "The king gets safe before the centre opens up.",
+  "trainingOpeningIdeaCaroKann1": "Prepares d5 without shutting in the c8 bishop.",
+  "trainingOpeningIdeaCaroKann2": "Challenges White's centre immediately.",
+  "trainingOpeningIdeaCaroKann3": "The point of the Caro-Kann: the bishop gets out in front of the pawn chain.",
+  "trainingOpeningIdeaCaroKann4": "Closes the chain and opens the path for the f8 bishop.",
+  "trainingOpeningIdeaCaroKann5": "The thematic counter-strike against White's pawn chain.",
+  "trainingOpeningIdeaCaroKann6": "The knight backs up c5 and heads on via b6 or f8.",
+  "trainingOpeningIdeaQgd1": "Claims an equal share of the centre.",
+  "trainingOpeningIdeaQgd2": "Declines the gambit and holds d5 with a pawn.",
+  "trainingOpeningIdeaQgd3": "Develops and adds another defender to d5.",
+  "trainingOpeningIdeaQgd4": "Recapturing with the e-pawn keeps the centre closed.",
+  "trainingOpeningIdeaQgd5": "Breaks the pin and prepares to castle.",
+  "trainingOpeningIdeaQgd6": "The Carlsbad structure — d5 is supported for good.",
+  "trainingOpeningTreeEmpty": "No opening lines available yet.",
+  "trainingOpeningTreeExpand": "Show variations",
+  "trainingOpeningTreeCollapse": "Hide variations",
+  "trainingOpeningTreeVariations": "{count,plural, =1{1 variation} other{{count} variations}}",
+  "@trainingOpeningTreeVariations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningTreeLoadFailed": "That line is not in the database yet.",
+  "trainingOpeningTreeZoomIn": "Zoom in",
+  "trainingOpeningTreeZoomOut": "Zoom out",
+  "trainingOpeningTreeFit": "Fit the tree",
+  "trainingOpeningTreeLearning": "In progress",
+  "trainingOpeningTreeHint": "Tap a card to unfold its variations, or train the line right away."
 }

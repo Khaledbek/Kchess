@@ -1240,14 +1240,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trainingOpeningLabSelected => 'Ausgewählte Linie';
 
   @override
-  String get trainingOpeningLabEmpty =>
-      'Wähle in der Statistik eine Eröffnung und tippe auf „Trainieren“, um sie hier zu laden.';
-
-  @override
-  String get trainingOpeningLabPending =>
-      'Der Linien-Trainer folgt, sobald der Core die Eröffnungszüge liefert.';
-
-  @override
   String get statsTrainOpening => 'Trainieren';
 
   @override
@@ -1303,4 +1295,282 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get trainingRestart => 'Neu starten';
+
+  @override
+  String trainingDrillMoveCounter(int done, int total) {
+    return 'Zug $done / $total';
+  }
+
+  @override
+  String get trainingDrillGoalCheckmate => 'Setze Schwarz matt';
+
+  @override
+  String get trainingDrillReset => 'Neu starten';
+
+  @override
+  String get trainingDrillNewPosition => 'Neue Stellung';
+
+  @override
+  String get trainingDrillGenerating => 'Stellung wird erzeugt …';
+
+  @override
+  String get trainingDrillGenerateFailed =>
+      'Es konnte keine passende Stellung erzeugt werden.';
+
+  @override
+  String get trainingDrillVictoryTitle => 'Matt! Sauber gespielt.';
+
+  @override
+  String trainingDrillVictoryBody(int moves) {
+    return 'Gebraucht: $moves Züge.';
+  }
+
+  @override
+  String get trainingDrillStalemateTitle => 'Patt!';
+
+  @override
+  String get trainingDrillStalemateBody =>
+      'Der König hat keine Züge mehr. Remis statt Sieg.';
+
+  @override
+  String get trainingDrillLimitTitle => 'Zuglimit überschritten';
+
+  @override
+  String trainingDrillLimitBody(int total) {
+    return 'Das Matt muss in $total Zügen gelingen. Versuche, den König schneller an den Rand zu drängen.';
+  }
+
+  @override
+  String get trainingDrillDrawTitle => 'Remis';
+
+  @override
+  String get trainingDrillDrawBody =>
+      'Ohne Mattmaterial ist die Stellung nicht mehr zu gewinnen.';
+
+  @override
+  String get trainingDrillRetry => 'Erneut versuchen';
+
+  @override
+  String get trainingDrillNextLevel => 'Nächstes Level';
+
+  @override
+  String get trainingDrillEngineFallback =>
+      'Engine nicht verfügbar — der Verteidiger spielt gerade schwächer.';
+
+  @override
+  String trainingDrillLevel(int level) {
+    return 'Level $level';
+  }
+
+  @override
+  String trainingDrillLocked(int level) {
+    return 'Erst Level $level meistern';
+  }
+
+  @override
+  String get trainingDrillSolved => 'Gelöst';
+
+  @override
+  String get trainingDrillOpen => 'Offen';
+
+  @override
+  String get trainingDifficultyBeginner => 'Anfänger';
+
+  @override
+  String get trainingDifficultyIntermediate => 'Mittel';
+
+  @override
+  String get trainingDifficultyMaster => 'Meister';
+
+  @override
+  String trainingCategoryProgress(int mastered, int total) {
+    return '$mastered von $total Leveln gemeistert';
+  }
+
+  @override
+  String get trainingTheoryPositions => 'Theoretische Stellungen';
+
+  @override
+  String get trainingStudiesTitle => 'Klassische Studien (1851)';
+
+  @override
+  String get trainingStudiesSubtitle =>
+      '86 historische Meisterstellungen von Kling & Horwitz.';
+
+  @override
+  String trainingStudyNumber(int number) {
+    return 'Studie $number';
+  }
+
+  @override
+  String get trainingStudySourceYear => 'Kling & Horwitz (1851)';
+
+  @override
+  String trainingStudyMoves(int moves) {
+    return 'Zug $moves';
+  }
+
+  @override
+  String get trainingNextStudy => 'Nächste Studie';
+
+  @override
+  String get trainingOpeningLabIntro =>
+      'Spiele die Hauptvariante Zug für Zug nach. Der Computer antwortet für die Gegenseite.';
+
+  @override
+  String get trainingOpeningLabStart => 'Linie üben';
+
+  @override
+  String trainingOpeningLabPlayingAs(String side) {
+    return 'Du spielst $side';
+  }
+
+  @override
+  String get trainingOpeningLabIdea => 'Idee';
+
+  @override
+  String get trainingOpeningLabWrongMove =>
+      'Nicht der Hauptzug. Versuche es noch einmal.';
+
+  @override
+  String get trainingOpeningLabDoneTitle => 'Linie komplett!';
+
+  @override
+  String trainingOpeningLabDoneBody(int count) {
+    return 'Du hast alle $count Züge der Hauptvariante gefunden.';
+  }
+
+  @override
+  String get trainingOpeningLabBackToOverview => 'Zurück zur Übersicht';
+
+  @override
+  String get trainingOpeningLabNoMatch =>
+      'Diese Eröffnung ist noch nicht im Repertoire. Wähle unten eine Linie aus.';
+
+  @override
+  String get trainingOpeningLabEmptyCatalog =>
+      'Noch keine Repertoire-Linien im Katalog.';
+
+  @override
+  String get trainingOpeningLineItalian => 'Italienisch: Giuoco Piano';
+
+  @override
+  String get trainingOpeningLineCaroKann => 'Caro-Kann: Vorstoßvariante';
+
+  @override
+  String get trainingOpeningLineQgdExchange =>
+      'Damengambit abgelehnt: Abtauschvariante';
+
+  @override
+  String get trainingOpeningIdeaItalian1 =>
+      'Besetzt das Zentrum und öffnet Läufer und Dame.';
+
+  @override
+  String get trainingOpeningIdeaItalian2 =>
+      'Entwickelt mit Tempo und greift sofort e5 an.';
+
+  @override
+  String get trainingOpeningIdeaItalian3 =>
+      'Der Läufer zielt auf f7 — den schwächsten Punkt in Schwarz’ Stellung.';
+
+  @override
+  String get trainingOpeningIdeaItalian4 =>
+      'Bereitet d4 vor und stützt den Vorstoß im Zentrum.';
+
+  @override
+  String get trainingOpeningIdeaItalian5 =>
+      'Deckt e4 solide ab: das ruhige Giuoco Pianissimo.';
+
+  @override
+  String get trainingOpeningIdeaItalian6 =>
+      'Der König kommt in Sicherheit, bevor sich das Zentrum öffnet.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann1 =>
+      'Bereitet d5 vor, ohne den Läufer c8 einzusperren.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann2 =>
+      'Fordert das weiße Zentrum sofort heraus.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann3 =>
+      'Der Trumpf des Caro-Kann: der Läufer steht vor der eigenen Bauernkette.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann4 =>
+      'Schließt die Kette und öffnet dem Läufer f8 den Weg.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann5 =>
+      'Der thematische Gegenschlag gegen die weiße Bauernkette.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann6 =>
+      'Der Springer stützt c5 und strebt über b6 oder f8 weiter.';
+
+  @override
+  String get trainingOpeningIdeaQgd1 =>
+      'Nimmt das Zentrum symmetrisch in Besitz.';
+
+  @override
+  String get trainingOpeningIdeaQgd2 =>
+      'Lehnt das Gambit ab und deckt d5 mit einem Bauern.';
+
+  @override
+  String get trainingOpeningIdeaQgd3 =>
+      'Entwickelt und verstärkt die Deckung von d5.';
+
+  @override
+  String get trainingOpeningIdeaQgd4 =>
+      'Wiedernahme mit dem e-Bauern: das Zentrum bleibt geschlossen.';
+
+  @override
+  String get trainingOpeningIdeaQgd5 =>
+      'Hebt die Fesselung auf und bereitet die Rochade vor.';
+
+  @override
+  String get trainingOpeningIdeaQgd6 =>
+      'Die Karlsbader Struktur — d5 ist dauerhaft gestützt.';
+
+  @override
+  String get trainingOpeningTreeEmpty =>
+      'Noch keine Eröffnungslinien verfügbar.';
+
+  @override
+  String get trainingOpeningTreeExpand => 'Varianten zeigen';
+
+  @override
+  String get trainingOpeningTreeCollapse => 'Varianten ausblenden';
+
+  @override
+  String trainingOpeningTreeVariations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Varianten',
+      one: '1 Variante',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trainingOpeningTreeLoadFailed =>
+      'Diese Linie ist noch nicht in der Datenbank.';
+
+  @override
+  String get trainingOpeningTreeZoomIn => 'Vergrößern';
+
+  @override
+  String get trainingOpeningTreeZoomOut => 'Verkleinern';
+
+  @override
+  String get trainingOpeningTreeFit => 'Baum einpassen';
+
+  @override
+  String get trainingOpeningTreeLearning => 'In Arbeit';
+
+  @override
+  String get trainingOpeningTreeHint =>
+      'Tippe auf eine Karte, um ihre Varianten aufzuklappen — oder trainiere die Linie direkt.';
 }

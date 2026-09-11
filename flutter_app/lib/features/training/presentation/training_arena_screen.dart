@@ -4,6 +4,8 @@ import '../../../localization/generated/app_localizations.dart';
 import '../../../services/training_progress_service.dart';
 import '../../../shared/models/models.dart';
 import '../../app/application/app_controller.dart';
+import '../data/endgame_catalog.dart';
+import '../data/opening_database.dart';
 import '../data/training_library.dart';
 import '../models/models.dart';
 import 'blunder_buster_screen.dart';
@@ -40,6 +42,7 @@ class _TrainingArenaScreenState extends State<TrainingArenaScreen> {
     super.initState();
     widget.progress.load();
     _openings = widget.controller.gateway.openingsStats();
+    OpeningDatabase.database; // Preload for tests
   }
 
   @override
@@ -58,7 +61,11 @@ class _TrainingArenaScreenState extends State<TrainingArenaScreen> {
   void _openOpeningLab(OpeningTrainingRequest? request) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => OpeningLabScreen(request: request),
+        builder: (_) => OpeningLabScreen(
+          gateway: widget.controller.gateway,
+          progress: widget.progress,
+          request: request,
+        ),
       ),
     );
   }
@@ -157,11 +164,19 @@ class _TrainingCards extends StatelessWidget {
     final strings = AppLocalizations.of(context);
     final catalogue = TrainingLibrary.all;
 
-    final mastered = progress.masteryCount(
-      TrainingCategories.endgame,
-      catalogue,
-    );
-    final total = TrainingLibrary.byCategory(TrainingCategories.endgame).length;
+    // The academy counts generated drill levels alongside the fixed
+    // theoretical positions, so the hub card has to span the same set or the
+    // two screens disagree about the denominator.
+    final drillIds = [
+      for (final category in EndgameCatalog.categories) ...category.progressIds,
+    ];
+    var mastered = progress.masteryCount(TrainingCategories.endgame, catalogue);
+    for (final id in drillIds) {
+      if (progress.isMastered(id)) mastered++;
+    }
+    final total =
+        TrainingLibrary.byCategory(TrainingCategories.endgame).length +
+        drillIds.length;
     final solved = progress.solvedCount(TrainingCategories.tactics, catalogue);
 
     // Built per layout: only the row layout hands the cards a bounded height,

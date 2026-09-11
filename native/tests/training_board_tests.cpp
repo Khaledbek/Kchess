@@ -1,10 +1,13 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "chess/move.h"
 #include "chess/position_view.h"
@@ -71,6 +74,57 @@ void test_seeded_lines_are_playable() {
   }
 }
 
+// Mirrors OpeningRepertoireLibrary in flutter_app/lib/features/training/data/.
+// Unlike the endgame exercises these start from the initial position and run
+// White-move-first regardless of which side the user trains, because the lab
+// hands the odd plies to the computer when the line is a Black repertoire.
+struct OpeningLine {
+  const char* id;
+  std::vector<std::string> moves;
+};
+
+const std::vector<OpeningLine>& seeded_openings() {
+  static const std::vector<OpeningLine> lines{
+      {"opening_italian_giuoco_piano",
+       {"e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6", "d3", "d6", "O-O", "O-O"}},
+      {"opening_caro_kann_advance",
+       {"e4", "c6", "d4", "d5", "e5", "Bf5", "Nf3", "e6", "Be2", "c5", "Be3", "Nd7"}},
+      {"opening_qgd_exchange",
+       {"d4", "d5", "c4", "e6", "Nc3", "Nf6", "cxd5", "exd5", "Bg5", "Be7", "e3", "c6"}},
+  };
+  return lines;
+}
+
+void test_seeded_openings_are_playable() {
+  const std::string start =
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  for (const auto& line : seeded_openings()) {
+    std::string fen = start;
+    for (std::size_t ply = 0; ply < line.moves.size(); ++ply) {
+      const auto moves = kchess::legal_moves(fen);
+      const auto match = std::find_if(
+          moves.begin(), moves.end(),
+          [&](const kchess::AppliedMove& move) { return move.san == line.moves[ply]; });
+      expect(match != moves.end(),
+             std::string(line.id) + " ply " + std::to_string(ply) + " ("
+                 + line.moves[ply] + ") is not legal in " + fen);
+      // The lab picks the move by SAN, so a duplicate SAN would make the
+      // target move ambiguous and the drill unwinnable.
+      expect(std::count_if(moves.begin(), moves.end(),
+                           [&](const kchess::AppliedMove& move) {
+                             return move.san == line.moves[ply];
+                           }) == 1,
+             std::string(line.id) + " ply " + std::to_string(ply) + " ("
+                 + line.moves[ply] + ") is ambiguous");
+      fen = match->fen_after;
+    }
+    // The line has to leave a real position behind: the lab shows the final
+    // board under the completion overlay.
+    expect(!kchess::legal_moves(fen).empty(),
+           std::string(line.id) + " must end on a playable position");
+  }
+}
+
 // The three seeded drills are played out against the engine rather than
 // replayed from a script, so what has to hold is that each start position is
 // legal, playable, and belongs to the side the drill expects to move.
@@ -109,6 +163,86 @@ void test_terminal_positions() {
   // And the drill start positions are neither.
   expect(!kchess::legal_moves("4k3/8/8/8/8/8/8/4KQ2 w - - 0 1").empty(),
          "A playable position must offer moves");
+}
+
+// Every study shipped in flutter_app/assets/endgame_studies.json comes from
+// Kling & Horwitz (1851). They are transcribed data, so the one thing that can
+// silently ruin them is a malformed or already-finished position: the trainer
+// would open on a board with nothing to play. Validate the shipped file itself
+// rather than a copy, so the asset is the single source of truth.
+void test_shipped_studies_are_playable() {
+  const auto asset = std::filesystem::path(__FILE__)
+                         .parent_path()
+                         .parent_path()
+                         .parent_path()
+                     / "flutter_app" / "assets" / "endgame_studies.json";
+  std::ifstream input(asset);
+  expect(input.good(), "Study asset must exist at " + asset.string());
+  const auto payload = nlohmann::json::parse(input);
+
+  std::size_t studies = 0;
+  std::vector<std::string> seen_ids;
+  for (const auto& section : payload.at("sections")) {
+    const auto section_id = section.at("id").get<std::string>();
+    for (const auto& study : section.at("studies")) {
+      const auto id = study.at("id").get<std::string>();
+      const auto fen = study.at("fen").get<std::string>();
+      const auto solver = study.at("solverColor").get<std::string>();
+      ++studies;
+
+      // 1. Legal, parseable position.
+      std::vector<kchess::AppliedMove> moves;
+      try {
+        moves = kchess::legal_moves(fen);
+      } catch (const std::exception& error) {
+        expect(false, id + " has an invalid FEN (" + fen + "): " + error.what());
+      }
+
+      // 2. Something to actually play.
+      expect(!moves.empty(), id + " starts with no legal move: " + fen);
+
+      // 3. The solver must be the side to move, or the study opens on the
+      //    opponent's turn and the trainer would move for them.
+      const auto board = kchess::position_view_json(fen);
+      const std::string expected = "\"sideToMove\":\"" + solver + "\"";
+      expect(board.find(expected) != std::string::npos,
+             id + " expects " + solver + " to move but the FEN disagrees: " + fen);
+
+      expect(std::find(seen_ids.begin(), seen_ids.end(), id) == seen_ids.end(),
+             "Duplicate study id " + id);
+      seen_ids.push_back(id);
+      expect(id.rfind(section_id, 0) == 0,
+             id + " does not belong to section " + section_id);
+    }
+  }
+  expect(studies > 0, "The study asset must not be empty");
+  std::cout << "  validated " << studies << " shipped studies" << '\n';
+}
+
+// The screenshot bug: a lone white king facing a black pawn was reported as a
+// dead draw because the check only looked at the solver's own pieces.
+void test_insufficient_material() {
+  const auto drawn = [](const char* fen) {
+    return kchess::insufficient_mating_material(fen);
+  };
+
+  // Nobody can mate.
+  expect(drawn("8/8/4k3/8/8/4K3/8/8 w - - 0 1"), "K vs K is a dead draw");
+  expect(drawn("8/8/4k3/8/8/4K3/8/5B2 w - - 0 1"), "K+B vs K is a dead draw");
+  expect(drawn("8/8/4k3/8/8/4K3/8/5N2 w - - 0 1"), "K+N vs K is a dead draw");
+  expect(drawn("8/5b2/4k3/8/8/4K3/8/5B2 w - - 0 1"),
+         "K+B vs K+B is a dead draw");
+
+  // Someone can still mate — these must keep playing.
+  expect(!drawn("8/1p6/1k6/8/8/2K5/8/8 w - - 0 1"),
+         "A lone king facing a pawn is not a draw");
+  expect(!drawn("8/8/4k3/8/8/4K3/8/5R2 w - - 0 1"), "A rook can mate");
+  expect(!drawn("8/8/4k3/8/8/4K3/8/5Q2 w - - 0 1"), "A queen can mate");
+  expect(!drawn("8/8/4k3/8/8/4K3/8/4BB2 w - - 0 1"), "Two bishops can mate");
+  expect(!drawn("8/8/4k3/8/8/4K3/8/4BN2 w - - 0 1"),
+         "Bishop and knight can mate");
+  expect(!drawn("8/8/4k3/8/8/4K3/8/4bn2 w - - 0 1"),
+         "The rule is side-agnostic");
 }
 
 void test_legal_moves_contract() {
@@ -185,8 +319,11 @@ void test_c_exports() {
 int main() {
   try {
     test_seeded_lines_are_playable();
+    test_seeded_openings_are_playable();
     test_seeded_drills_are_playable();
     test_terminal_positions();
+    test_insufficient_material();
+    test_shipped_studies_are_playable();
     test_legal_moves_contract();
     test_c_exports();
     std::cout << "All KChess training board tests passed.\n";

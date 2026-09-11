@@ -224,6 +224,9 @@ std::string Core::board_position_json(const std::string& fen) {
   json["legalMoveCount"] = static_cast<int>(moves.size());
   json["status"] = moves.empty() ? (check ? "checkmate" : "stalemate")
                                  : "playable";
+  // Whether anyone can still mate. The trainer used to decide this from the
+  // solver's own pieces, which called a lone king facing a pawn a draw.
+  json["insufficientMaterial"] = insufficient_mating_material(fen);
   return json.dump();
 }
 

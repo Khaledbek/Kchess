@@ -23,6 +23,7 @@ class ChessBoardView extends StatelessWidget {
     this.interactive = true,
     this.squareTint,
     this.squareOverlay,
+    this.moveTargets = const {},
     this.onDragStarted,
     this.onDragEnded,
     super.key,
@@ -61,6 +62,11 @@ class ChessBoardView extends StatelessWidget {
 
   /// Extra widget painted inside a square (a badge, a flash ring).
   final Widget? Function(String square, double squareSide)? squareOverlay;
+
+  /// Squares the selected piece can legally move to. Empty targets get a dot,
+  /// occupied ones a ring, which is the convention players already know from
+  /// every other board.
+  final Set<String> moveTargets;
 
   final ValueChanged<String> onSquareTap;
   final void Function(String source, String target) onPieceDrop;
@@ -115,6 +121,7 @@ class ChessBoardView extends StatelessWidget {
             );
 
             final overlay = squareOverlay?.call(square, squareSide);
+            final isTarget = moveTargets.contains(square);
 
             return DragTarget<String>(
               onWillAcceptWithDetails: (details) => details.data != square,
@@ -136,6 +143,17 @@ class ChessBoardView extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
+                        // Under the piece, so a capture ring frames it
+                        // rather than covering it.
+                        if (isTarget)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: _MoveTargetMarker(
+                                occupied: pieceAsset != null,
+                                squareSide: squareSide,
+                              ),
+                            ),
+                          ),
                         if (pieceAsset != null)
                           Positioned.fill(
                             child: canDrag
@@ -196,6 +214,41 @@ class ChessBoardView extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// The dot or ring marking a square the selected piece can reach.
+class _MoveTargetMarker extends StatelessWidget {
+  const _MoveTargetMarker({required this.occupied, required this.squareSide});
+
+  /// A capture is drawn as a ring around the piece; an empty square as a dot.
+  final bool occupied;
+  final double squareSide;
+
+  @override
+  Widget build(BuildContext context) {
+    // Dark enough to read on both the light and the dark square colour, which
+    // a theme colour would not manage on the board's own fixed palette.
+    const marker = Color(0x66000000);
+    if (occupied) {
+      return Padding(
+        padding: EdgeInsets.all(squareSide * 0.04),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: marker, width: squareSide * 0.09),
+          ),
+        ),
+      );
+    }
+    return Center(
+      child: SizedBox.square(
+        dimension: squareSide * 0.3,
+        child: const DecoratedBox(
+          decoration: BoxDecoration(color: marker, shape: BoxShape.circle),
+        ),
+      ),
     );
   }
 }

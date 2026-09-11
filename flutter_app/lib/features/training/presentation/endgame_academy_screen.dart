@@ -8,8 +8,12 @@ import '../../../services/training_progress_service.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/chess_board_view.dart';
+import '../data/endgame_catalog.dart';
 import '../data/training_library.dart';
+import '../models/endgame_drill.dart';
 import '../models/models.dart';
+import 'drill_levels_screen.dart';
+import 'endgame_studies_screen.dart';
 import 'training_arena_screen.dart' show MasteryProgressBar;
 
 /// Listudy-style catalogue of theoretical endgames: every seeded position with
@@ -47,10 +51,37 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
     );
   }
 
+  void _openCategory(EndgameCategory category) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DrillLevelsScreen(
+          category: category,
+          gateway: widget.gateway,
+          progress: widget.progress,
+        ),
+      ),
+    );
+  }
+
+  void _openStudies() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EndgameStudiesScreen(
+          gateway: widget.gateway,
+          progress: widget.progress,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final exercises = TrainingLibrary.byCategory(TrainingCategories.endgame);
+    final drillIds = [
+      for (final category in EndgameCatalog.categories) ...category.progressIds,
+    ];
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.trainingEndgameTitle)),
@@ -60,10 +91,15 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
         builder: (context, snapshot) {
           final progress =
               snapshot.data ?? const TrainingProgressSnapshot.empty();
-          final mastered = progress.masteryCount(
+          // The bar spans both halves of the academy: generated drill levels
+          // and the fixed theoretical positions.
+          var mastered = progress.masteryCount(
             TrainingCategories.endgame,
             TrainingLibrary.all,
           );
+          for (final id in drillIds) {
+            if (progress.isMastered(id)) mastered++;
+          }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
@@ -78,11 +114,36 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
                           padding: const EdgeInsets.all(18),
                           child: MasteryProgressBar(
                             mastered: mastered,
-                            total: exercises.length,
+                            total: drillIds.length + exercises.length,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 18),
+                      for (final category in EndgameCatalog.categories) ...[
+                        _CategoryCard(
+                          category: category,
+                          progress: progress,
+                          onTap: () => _openCategory(category),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        strings.trainingStudiesTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _StudiesEntryCard(onTap: _openStudies),
+                      const SizedBox(height: 18),
+                      Text(
+                        strings.trainingTheoryPositions,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       for (var i = 0; i < exercises.length; i++) ...[
                         if (i > 0) const SizedBox(height: 12),
                         _ExerciseCard(
@@ -98,6 +159,142 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// A Listudy-style category entry: what it teaches and how far through it the
+/// user is.
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.category,
+    required this.progress,
+    required this.onTap,
+  });
+
+  final EndgameCategory category;
+  final TrainingProgressSnapshot progress;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final ids = category.progressIds;
+    final mastered = ids.where(progress.isMastered).length;
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.sports_martial_arts,
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category.title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      category.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      strings.trainingCategoryProgress(mastered, ids.length),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudiesEntryCard extends StatelessWidget {
+  const _StudiesEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.menu_book_rounded,
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.trainingStudiesTitle,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      strings.trainingStudiesSubtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
       ),
     );
   }

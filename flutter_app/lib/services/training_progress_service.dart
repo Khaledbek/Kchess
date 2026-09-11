@@ -127,6 +127,16 @@ class TrainingProgressService {
     return count;
   }
 
+  /// Mastered count over an explicit set of ids — used by the endgame drills,
+  /// whose levels are progress keys rather than catalogue exercises.
+  int getMasteryCountOf(Iterable<String> exerciseIds) {
+    var count = 0;
+    for (final id in exerciseIds) {
+      if (progressFor(id).isMastered) count++;
+    }
+    return count;
+  }
+
   /// Total clean solves recorded for [category], repeats included.
   int getSolvedCount(String category) =>
       snapshot.solvedCount(category, catalogue);

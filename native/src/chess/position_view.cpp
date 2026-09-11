@@ -51,6 +51,38 @@ std::string position_view_json(const std::string& fen) {
   return json.dump();
 }
 
+bool insufficient_mating_material(const std::string& fen) {
+  const auto validation = validate_fen(fen);
+  if (!validation.valid) throw std::invalid_argument(validation.error);
+
+  // Bind the vector to a local first: ranging over fields(...)[0] directly
+  // iterates a destroyed temporary, because subscripting into it does not
+  // extend its lifetime.
+  const auto parts = fields(validation.normalized);
+  int white_bishops = 0, white_knights = 0, black_bishops = 0, black_knights = 0;
+  for (const char token : parts[0]) {
+    switch (token) {
+      // A pawn promotes, and a rook or queen mates on its own, so any of these
+      // means the game is still winnable by someone.
+      case 'P': case 'p': case 'R': case 'r': case 'Q': case 'q':
+        return false;
+      case 'B': ++white_bishops; break;
+      case 'N': ++white_knights; break;
+      case 'b': ++black_bishops; break;
+      case 'n': ++black_knights; break;
+      default: break;
+    }
+  }
+
+  // Bare king, or king and one minor, cannot mate. Two bishops, or bishop and
+  // knight, can.
+  const auto can_mate = [](const int bishops, const int knights) {
+    return bishops >= 2 || (bishops >= 1 && knights >= 1) || knights >= 3;
+  };
+  return !can_mate(white_bishops, white_knights)
+      && !can_mate(black_bishops, black_knights);
+}
+
 bool same_chess_position(const std::string& left, const std::string& right) {
   const auto left_validation = validate_fen(left);
   const auto right_validation = validate_fen(right);

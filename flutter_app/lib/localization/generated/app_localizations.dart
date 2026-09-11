@@ -2331,18 +2331,6 @@ abstract class AppLocalizations {
   /// **'Selected line'**
   String get trainingOpeningLabSelected;
 
-  /// No description provided for @trainingOpeningLabEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an opening in the statistics tab and tap “Train” to load it here.'**
-  String get trainingOpeningLabEmpty;
-
-  /// No description provided for @trainingOpeningLabPending.
-  ///
-  /// In en, this message translates to:
-  /// **'The line trainer follows once the core supplies the opening moves.'**
-  String get trainingOpeningLabPending;
-
   /// No description provided for @statsTrainOpening.
   ///
   /// In en, this message translates to:
@@ -2438,6 +2426,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restart'**
   String get trainingRestart;
+
+  /// No description provided for @trainingDrillMoveCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'Move {done} / {total}'**
+  String trainingDrillMoveCounter(int done, int total);
+
+  /// No description provided for @trainingDrillGoalCheckmate.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkmate Black'**
+  String get trainingDrillGoalCheckmate;
+
+  /// No description provided for @trainingDrillReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get trainingDrillReset;
+
+  /// No description provided for @trainingDrillNewPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'New position'**
+  String get trainingDrillNewPosition;
+
+  /// No description provided for @trainingDrillGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating a position …'**
+  String get trainingDrillGenerating;
+
+  /// No description provided for @trainingDrillGenerateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No suitable position could be generated.'**
+  String get trainingDrillGenerateFailed;
+
+  /// No description provided for @trainingDrillVictoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkmate! Cleanly played.'**
+  String get trainingDrillVictoryTitle;
+
+  /// No description provided for @trainingDrillVictoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Took {moves} moves.'**
+  String trainingDrillVictoryBody(int moves);
+
+  /// No description provided for @trainingDrillStalemateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stalemate!'**
+  String get trainingDrillStalemateTitle;
+
+  /// No description provided for @trainingDrillStalemateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The king has no moves left. A draw instead of a win.'**
+  String get trainingDrillStalemateBody;
+
+  /// No description provided for @trainingDrillLimitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move limit exceeded'**
+  String get trainingDrillLimitTitle;
+
+  /// No description provided for @trainingDrillLimitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The mate has to land within {total} moves. Try driving the king to the edge faster.'**
+  String trainingDrillLimitBody(int total);
+
+  /// No description provided for @trainingDrillDrawTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw'**
+  String get trainingDrillDrawTitle;
+
+  /// No description provided for @trainingDrillDrawBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Without mating material the position can no longer be won.'**
+  String get trainingDrillDrawBody;
+
+  /// No description provided for @trainingDrillRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get trainingDrillRetry;
+
+  /// No description provided for @trainingDrillNextLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Next level'**
+  String get trainingDrillNextLevel;
+
+  /// No description provided for @trainingDrillEngineFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine unavailable — the defender is playing weaker than usual.'**
+  String get trainingDrillEngineFallback;
+
+  /// No description provided for @trainingDrillLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level {level}'**
+  String trainingDrillLevel(int level);
+
+  /// No description provided for @trainingDrillLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Master level {level} first'**
+  String trainingDrillLocked(int level);
+
+  /// No description provided for @trainingDrillSolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Solved'**
+  String get trainingDrillSolved;
+
+  /// No description provided for @trainingDrillOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get trainingDrillOpen;
+
+  /// No description provided for @trainingDifficultyBeginner.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginner'**
+  String get trainingDifficultyBeginner;
+
+  /// No description provided for @trainingDifficultyIntermediate.
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate'**
+  String get trainingDifficultyIntermediate;
+
+  /// No description provided for @trainingDifficultyMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Master'**
+  String get trainingDifficultyMaster;
+
+  /// No description provided for @trainingCategoryProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{mastered} of {total} levels mastered'**
+  String trainingCategoryProgress(int mastered, int total);
+
+  /// No description provided for @trainingTheoryPositions.
+  ///
+  /// In en, this message translates to:
+  /// **'Theoretical positions'**
+  String get trainingTheoryPositions;
+
+  /// No description provided for @trainingStudiesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Classical Studies (1851)'**
+  String get trainingStudiesTitle;
+
+  /// No description provided for @trainingStudiesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'86 historical master studies by Kling & Horwitz.'**
+  String get trainingStudiesSubtitle;
+
+  /// No description provided for @trainingStudyNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Study {number}'**
+  String trainingStudyNumber(int number);
+
+  /// No description provided for @trainingStudySourceYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Kling & Horwitz (1851)'**
+  String get trainingStudySourceYear;
+
+  /// No description provided for @trainingStudyMoves.
+  ///
+  /// In en, this message translates to:
+  /// **'Move {moves}'**
+  String trainingStudyMoves(int moves);
+
+  /// No description provided for @trainingNextStudy.
+  ///
+  /// In en, this message translates to:
+  /// **'Next study'**
+  String get trainingNextStudy;
+
+  /// No description provided for @trainingOpeningLabIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay the mainline move by move. The computer answers for the other side.'**
+  String get trainingOpeningLabIntro;
+
+  /// No description provided for @trainingOpeningLabStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Train line'**
+  String get trainingOpeningLabStart;
+
+  /// No description provided for @trainingOpeningLabPlayingAs.
+  ///
+  /// In en, this message translates to:
+  /// **'You play {side}'**
+  String trainingOpeningLabPlayingAs(String side);
+
+  /// No description provided for @trainingOpeningLabIdea.
+  ///
+  /// In en, this message translates to:
+  /// **'Idea'**
+  String get trainingOpeningLabIdea;
+
+  /// No description provided for @trainingOpeningLabWrongMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Not the main move. Give it another try.'**
+  String get trainingOpeningLabWrongMove;
+
+  /// No description provided for @trainingOpeningLabDoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Line complete!'**
+  String get trainingOpeningLabDoneTitle;
+
+  /// No description provided for @trainingOpeningLabDoneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You found all {count} moves of the mainline.'**
+  String trainingOpeningLabDoneBody(int count);
+
+  /// No description provided for @trainingOpeningLabBackToOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the overview'**
+  String get trainingOpeningLabBackToOverview;
+
+  /// No description provided for @trainingOpeningLabNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'That opening is not in the repertoire yet. Pick one of the lines below.'**
+  String get trainingOpeningLabNoMatch;
+
+  /// No description provided for @trainingOpeningLabEmptyCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'No repertoire lines in the catalogue yet.'**
+  String get trainingOpeningLabEmptyCatalog;
+
+  /// No description provided for @trainingOpeningLineItalian.
+  ///
+  /// In en, this message translates to:
+  /// **'Italian Game: Giuoco Piano'**
+  String get trainingOpeningLineItalian;
+
+  /// No description provided for @trainingOpeningLineCaroKann.
+  ///
+  /// In en, this message translates to:
+  /// **'Caro-Kann: Advance Variation'**
+  String get trainingOpeningLineCaroKann;
+
+  /// No description provided for @trainingOpeningLineQgdExchange.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen\'s Gambit Declined: Exchange Variation'**
+  String get trainingOpeningLineQgdExchange;
+
+  /// No description provided for @trainingOpeningIdeaItalian1.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes the centre and frees the bishop and queen.'**
+  String get trainingOpeningIdeaItalian1;
+
+  /// No description provided for @trainingOpeningIdeaItalian2.
+  ///
+  /// In en, this message translates to:
+  /// **'Develops with tempo and hits e5 straight away.'**
+  String get trainingOpeningIdeaItalian2;
+
+  /// No description provided for @trainingOpeningIdeaItalian3.
+  ///
+  /// In en, this message translates to:
+  /// **'The bishop eyes f7, the weakest point in Black\'s camp.'**
+  String get trainingOpeningIdeaItalian3;
+
+  /// No description provided for @trainingOpeningIdeaItalian4.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepares d4 and supports the push in the centre.'**
+  String get trainingOpeningIdeaItalian4;
+
+  /// No description provided for @trainingOpeningIdeaItalian5.
+  ///
+  /// In en, this message translates to:
+  /// **'Solidly backs up e4 — the quiet Giuoco Pianissimo.'**
+  String get trainingOpeningIdeaItalian5;
+
+  /// No description provided for @trainingOpeningIdeaItalian6.
+  ///
+  /// In en, this message translates to:
+  /// **'The king gets safe before the centre opens up.'**
+  String get trainingOpeningIdeaItalian6;
+
+  /// No description provided for @trainingOpeningIdeaCaroKann1.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepares d5 without shutting in the c8 bishop.'**
+  String get trainingOpeningIdeaCaroKann1;
+
+  /// No description provided for @trainingOpeningIdeaCaroKann2.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenges White\'s centre immediately.'**
+  String get trainingOpeningIdeaCaroKann2;
+
+  /// No description provided for @trainingOpeningIdeaCaroKann3.
+  ///
+  /// In en, this message translates to:
+  /// **'The point of the Caro-Kann: the bishop gets out in front of the pawn chain.'**
+  String get trainingOpeningIdeaCaroKann3;
+
+  /// No description provided for @trainingOpeningIdeaCaroKann4.
+  ///
+  /// In en, this message translates to:
+  /// **'Closes the chain and opens the path for the f8 bishop.'**
+  String get trainingOpeningIdeaCaroKann4;
+
+  /// No description provided for @trainingOpeningIdeaCaroKann5.
+  ///
+  /// In en, this message translates to:
+  /// **'The thematic counter-strike against White\'s pawn chain.'**
+  String get trainingOpeningIdeaCaroKann5;
+
+  /// No description provided for @trainingOpeningIdeaCaroKann6.
+  ///
+  /// In en, this message translates to:
+  /// **'The knight backs up c5 and heads on via b6 or f8.'**
+  String get trainingOpeningIdeaCaroKann6;
+
+  /// No description provided for @trainingOpeningIdeaQgd1.
+  ///
+  /// In en, this message translates to:
+  /// **'Claims an equal share of the centre.'**
+  String get trainingOpeningIdeaQgd1;
+
+  /// No description provided for @trainingOpeningIdeaQgd2.
+  ///
+  /// In en, this message translates to:
+  /// **'Declines the gambit and holds d5 with a pawn.'**
+  String get trainingOpeningIdeaQgd2;
+
+  /// No description provided for @trainingOpeningIdeaQgd3.
+  ///
+  /// In en, this message translates to:
+  /// **'Develops and adds another defender to d5.'**
+  String get trainingOpeningIdeaQgd3;
+
+  /// No description provided for @trainingOpeningIdeaQgd4.
+  ///
+  /// In en, this message translates to:
+  /// **'Recapturing with the e-pawn keeps the centre closed.'**
+  String get trainingOpeningIdeaQgd4;
+
+  /// No description provided for @trainingOpeningIdeaQgd5.
+  ///
+  /// In en, this message translates to:
+  /// **'Breaks the pin and prepares to castle.'**
+  String get trainingOpeningIdeaQgd5;
+
+  /// No description provided for @trainingOpeningIdeaQgd6.
+  ///
+  /// In en, this message translates to:
+  /// **'The Carlsbad structure — d5 is supported for good.'**
+  String get trainingOpeningIdeaQgd6;
+
+  /// No description provided for @trainingOpeningTreeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No opening lines available yet.'**
+  String get trainingOpeningTreeEmpty;
+
+  /// No description provided for @trainingOpeningTreeExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Show variations'**
+  String get trainingOpeningTreeExpand;
+
+  /// No description provided for @trainingOpeningTreeCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide variations'**
+  String get trainingOpeningTreeCollapse;
+
+  /// No description provided for @trainingOpeningTreeVariations.
+  ///
+  /// In en, this message translates to:
+  /// **'{count,plural, =1{1 variation} other{{count} variations}}'**
+  String trainingOpeningTreeVariations(int count);
+
+  /// No description provided for @trainingOpeningTreeLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That line is not in the database yet.'**
+  String get trainingOpeningTreeLoadFailed;
+
+  /// No description provided for @trainingOpeningTreeZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get trainingOpeningTreeZoomIn;
+
+  /// No description provided for @trainingOpeningTreeZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get trainingOpeningTreeZoomOut;
+
+  /// No description provided for @trainingOpeningTreeFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit the tree'**
+  String get trainingOpeningTreeFit;
+
+  /// No description provided for @trainingOpeningTreeLearning.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get trainingOpeningTreeLearning;
+
+  /// No description provided for @trainingOpeningTreeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a card to unfold its variations, or train the line right away.'**
+  String get trainingOpeningTreeHint;
 }
 
 class _AppLocalizationsDelegate

@@ -239,6 +239,21 @@ class FakeCoreGateway implements CoreGateway {
   /// for it.
   final Map<String, List<BoardMoveOption>> boardScript = {};
 
+  /// FEN -> terminal status, mirroring what the core derives from the legal
+  /// move list plus the check flag. Unlisted positions are playable.
+  final Map<String, String> boardStatuses = {};
+
+  /// FENs where the side to move is in check.
+  final Set<String> checkedFens = {};
+
+  /// Defender replies for the drill tests: the player's UCI -> the engine's
+  /// answering UCI. Consulted before the opening fixtures below.
+  final Map<String, String> botReplies = {};
+
+  /// When true every position reports a capture, so the generator can never
+  /// accept a candidate. Exercises its rejection path.
+  bool captureEverywhere = false;
+
   /// Expands a FEN into the 64-entry piece list the real `position_view_json`
   /// returns. Test-double only — production Dart never parses a FEN.
   @override
@@ -257,18 +272,52 @@ class FakeCoreGateway implements CoreGateway {
       throw CoreGatewayException('Invalid FEN board layout: $fen');
     }
     final white = fields.length < 2 || fields[1] == 'w';
+    final status = boardStatuses[fen] ?? BoardStatus.playable;
     return BoardPosition(
       fen: fen,
       pieces: pieces,
       sideToMove: white ? 'white' : 'black',
       draggableColor: white ? 'white' : 'black',
       fullmoveNumber: fields.length >= 6 ? int.tryParse(fields[5]) ?? 1 : 1,
+      inCheck: checkedFens.contains(fen) || status == BoardStatus.checkmate,
+      legalMoveCount: status == BoardStatus.playable
+          ? (boardScript[fen]?.length ?? 1)
+          : 0,
+      status: status,
+      insufficientMaterial: _insufficientMaterial(pieces),
     );
   }
 
+  /// Mirrors the core's rule: a dead draw only when neither side can mate.
+  bool _insufficientMaterial(List<String> pieces) {
+    var whiteBishops = 0, whiteKnights = 0, blackBishops = 0, blackKnights = 0;
+    for (final piece in pieces) {
+      switch (piece) {
+        case 'P' || 'p' || 'R' || 'r' || 'Q' || 'q':
+          return false;
+        case 'B':
+          whiteBishops++;
+        case 'N':
+          whiteKnights++;
+        case 'b':
+          blackBishops++;
+        case 'n':
+          blackKnights++;
+      }
+    }
+    bool canMate(int bishops, int knights) =>
+        bishops >= 2 || (bishops >= 1 && knights >= 1) || knights >= 3;
+    return !canMate(whiteBishops, whiteKnights) &&
+        !canMate(blackBishops, blackKnights);
+  }
+
   @override
-  Future<List<BoardMoveOption>> boardLegalMoves(String fen) async =>
-      boardScript[fen] ?? const <BoardMoveOption>[];
+  Future<List<BoardMoveOption>> boardLegalMoves(String fen) async {
+    if (captureEverywhere) {
+      return const [BoardMoveOption(uci: 'a1a2', san: 'Kxa2', fenAfter: '')];
+    }
+    return boardScript[fen] ?? const <BoardMoveOption>[];
+  }
 
   @override
   Future<OpeningsStats> openingsStats({String timeControl = 'all'}) async {
@@ -714,6 +763,35 @@ class FakeCoreGateway implements CoreGateway {
     int? hashMb,
   }) async {
     variationAnalysisCalls++;
+    // Mirror FfiCoreGateway: engine overrides are all-or-nothing. Without this
+    // the fake accepted calls the real gateway rejects, which is exactly how a
+    // defender bot that never moved got through the suite.
+    final hasOverrides =
+        depth != null || multiPv != null || threads != null || hashMb != null;
+    if (hasOverrides &&
+        (depth == null ||
+            multiPv == null ||
+            threads == null ||
+            hashMb == null)) {
+      throw ArgumentError(
+        'Sideline engine overrides require depth, multiPv, threads and hashMb.',
+      );
+    }
+    final scripted = botReplies[uci];
+    if (scripted != null) {
+      final jobId = 'variation-$variationAnalysisCalls';
+      final snapshot = VariationAnalysisSnapshot(
+        jobId: jobId,
+        status: 'complete',
+        playedMove: uci,
+        playedSan: uci,
+        fen: fen,
+        bestMove: scripted,
+        lines: const [],
+      );
+      _variationJobs[jobId] = snapshot;
+      return snapshot;
+    }
     final fixture = switch (uci) {
       'g1f3' => (
         san: 'Nf3',

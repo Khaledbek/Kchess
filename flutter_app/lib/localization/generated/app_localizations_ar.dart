@@ -1227,14 +1227,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get trainingOpeningLabSelected => 'الخط المختار';
 
   @override
-  String get trainingOpeningLabEmpty =>
-      'اختر افتتاحية من تبويب الإحصاءات واضغط «تدريب» لتحميلها هنا.';
-
-  @override
-  String get trainingOpeningLabPending =>
-      'سيتوفر مدرّب الخطوط بمجرد أن توفّر النواة نقلات الافتتاحية.';
-
-  @override
   String get statsTrainOpening => 'تدريب';
 
   @override
@@ -1288,4 +1280,273 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get trainingRestart => 'إعادة البدء';
+
+  @override
+  String trainingDrillMoveCounter(int done, int total) {
+    return 'النقلة $done / $total';
+  }
+
+  @override
+  String get trainingDrillGoalCheckmate => 'كِش مات للأسود';
+
+  @override
+  String get trainingDrillReset => 'إعادة البدء';
+
+  @override
+  String get trainingDrillNewPosition => 'وضعية جديدة';
+
+  @override
+  String get trainingDrillGenerating => 'جارٍ توليد وضعية …';
+
+  @override
+  String get trainingDrillGenerateFailed => 'تعذّر توليد وضعية مناسبة.';
+
+  @override
+  String get trainingDrillVictoryTitle => 'كِش مات! لعب نظيف.';
+
+  @override
+  String trainingDrillVictoryBody(int moves) {
+    return 'استغرقت $moves نقلة.';
+  }
+
+  @override
+  String get trainingDrillStalemateTitle => 'جمود!';
+
+  @override
+  String get trainingDrillStalemateBody =>
+      'لم تبق للملك أي نقلة. تعادل بدلًا من الفوز.';
+
+  @override
+  String get trainingDrillLimitTitle => 'تجاوزت حد النقلات';
+
+  @override
+  String trainingDrillLimitBody(int total) {
+    return 'يجب أن يتم المات خلال $total نقلة. حاول دفع الملك إلى الحافة أسرع.';
+  }
+
+  @override
+  String get trainingDrillDrawTitle => 'تعادل';
+
+  @override
+  String get trainingDrillDrawBody =>
+      'بدون مادة كافية للمات لم تعد الوضعية قابلة للفوز.';
+
+  @override
+  String get trainingDrillRetry => 'حاول مجددًا';
+
+  @override
+  String get trainingDrillNextLevel => 'المستوى التالي';
+
+  @override
+  String get trainingDrillEngineFallback =>
+      'النواة غير متاحة — المدافع يلعب أضعف من المعتاد.';
+
+  @override
+  String trainingDrillLevel(int level) {
+    return 'المستوى $level';
+  }
+
+  @override
+  String trainingDrillLocked(int level) {
+    return 'أتقن المستوى $level أولًا';
+  }
+
+  @override
+  String get trainingDrillSolved => 'تم الحل';
+
+  @override
+  String get trainingDrillOpen => 'مفتوح';
+
+  @override
+  String get trainingDifficultyBeginner => 'مبتدئ';
+
+  @override
+  String get trainingDifficultyIntermediate => 'متوسط';
+
+  @override
+  String get trainingDifficultyMaster => 'متقدم';
+
+  @override
+  String trainingCategoryProgress(int mastered, int total) {
+    return '$mastered من $total مستوى تم إتقانها';
+  }
+
+  @override
+  String get trainingTheoryPositions => 'أوضاع نظرية';
+
+  @override
+  String get trainingStudiesTitle => 'دراسات كلاسيكية (1851)';
+
+  @override
+  String get trainingStudiesSubtitle =>
+      '86 دراسة تاريخية احترافية لكينغ وهورويتز.';
+
+  @override
+  String trainingStudyNumber(int number) {
+    return 'دراسة $number';
+  }
+
+  @override
+  String get trainingStudySourceYear => 'كلينغ وهورويتز (1851)';
+
+  @override
+  String trainingStudyMoves(int moves) {
+    return 'النقلة $moves';
+  }
+
+  @override
+  String get trainingNextStudy => 'الدراسة التالية';
+
+  @override
+  String get trainingOpeningLabIntro =>
+      'أعد لعب الخط الرئيسي نقلة بنقلة. الحاسوب يرد عن الطرف الآخر.';
+
+  @override
+  String get trainingOpeningLabStart => 'تدرّب على الخط';
+
+  @override
+  String trainingOpeningLabPlayingAs(String side) {
+    return 'أنت تلعب بـ$side';
+  }
+
+  @override
+  String get trainingOpeningLabIdea => 'الفكرة';
+
+  @override
+  String get trainingOpeningLabWrongMove =>
+      'ليست النقلة الرئيسية. حاول مرة أخرى.';
+
+  @override
+  String get trainingOpeningLabDoneTitle => 'اكتمل الخط!';
+
+  @override
+  String trainingOpeningLabDoneBody(int count) {
+    return 'وجدت جميع نقلات الخط الرئيسي البالغة $count.';
+  }
+
+  @override
+  String get trainingOpeningLabBackToOverview => 'العودة إلى القائمة';
+
+  @override
+  String get trainingOpeningLabNoMatch =>
+      'هذا الافتتاح ليس ضمن الفهرس بعد. اختر أحد الخطوط أدناه.';
+
+  @override
+  String get trainingOpeningLabEmptyCatalog =>
+      'لا توجد خطوط افتتاح في الفهرس بعد.';
+
+  @override
+  String get trainingOpeningLineItalian => 'الافتتاح الإيطالي: جيوكو بيانو';
+
+  @override
+  String get trainingOpeningLineCaroKann => 'كارو-كان: متغير التقدّم';
+
+  @override
+  String get trainingOpeningLineQgdExchange =>
+      'المناورة الوزيرية المرفوضة: متغير التبادل';
+
+  @override
+  String get trainingOpeningIdeaItalian1 =>
+      'يحتل المركز ويفتح الطريق أمام الفيل والوزير.';
+
+  @override
+  String get trainingOpeningIdeaItalian2 =>
+      'يطوّر القطعة مع كسب الوقت ويهاجم e5 فوراً.';
+
+  @override
+  String get trainingOpeningIdeaItalian3 =>
+      'الفيل يستهدف f7، أضعف نقطة في معسكر الأسود.';
+
+  @override
+  String get trainingOpeningIdeaItalian4 =>
+      'يمهّد لنقلة d4 ويدعم التقدم في المركز.';
+
+  @override
+  String get trainingOpeningIdeaItalian5 =>
+      'يدعم e4 بثبات — أسلوب جيوكو بيانيسيمو الهادئ.';
+
+  @override
+  String get trainingOpeningIdeaItalian6 => 'يؤمّن الملك قبل أن ينفتح المركز.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann1 =>
+      'يمهّد لنقلة d5 دون حبس الفيل على c8.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann2 => 'يتحدّى مركز الأبيض على الفور.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann3 =>
+      'جوهر دفاع كارو-كان: الفيل يخرج أمام سلسلة البيادق.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann4 =>
+      'يغلق السلسلة ويفتح الطريق أمام الفيل على f8.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann5 =>
+      'الضربة المضادة النموذجية ضد سلسلة بيادق الأبيض.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann6 =>
+      'الحصان يدعم c5 ويتابع طريقه عبر b6 أو f8.';
+
+  @override
+  String get trainingOpeningIdeaQgd1 => 'يقتسم المركز بالتساوي.';
+
+  @override
+  String get trainingOpeningIdeaQgd2 => 'يرفض المناورة ويحمي d5 ببيدق.';
+
+  @override
+  String get trainingOpeningIdeaQgd3 =>
+      'يطوّر القطعة ويضيف مدافعاً آخر إلى d5.';
+
+  @override
+  String get trainingOpeningIdeaQgd4 => 'الاسترداد ببيدق e يبقي المركز مغلقاً.';
+
+  @override
+  String get trainingOpeningIdeaQgd5 => 'يفكّ التثبيت ويمهّد للتبييت.';
+
+  @override
+  String get trainingOpeningIdeaQgd6 => 'بنية كارلسباد — d5 مدعوم بشكل دائم.';
+
+  @override
+  String get trainingOpeningTreeEmpty => 'لا توجد خطوط افتتاح متاحة بعد.';
+
+  @override
+  String get trainingOpeningTreeExpand => 'إظهار التنويعات';
+
+  @override
+  String get trainingOpeningTreeCollapse => 'إخفاء التنويعات';
+
+  @override
+  String trainingOpeningTreeVariations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تنويعات',
+      one: 'تنويعة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trainingOpeningTreeLoadFailed =>
+      'هذا الخط ليس في قاعدة البيانات بعد.';
+
+  @override
+  String get trainingOpeningTreeZoomIn => 'تكبير';
+
+  @override
+  String get trainingOpeningTreeZoomOut => 'تصغير';
+
+  @override
+  String get trainingOpeningTreeFit => 'ملاءمة الشجرة';
+
+  @override
+  String get trainingOpeningTreeLearning => 'قيد التقدّم';
+
+  @override
+  String get trainingOpeningTreeHint =>
+      'انقر على بطاقة لفتح تنويعاتها، أو درّب الخط مباشرة.';
 }

@@ -1236,14 +1236,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trainingOpeningLabSelected => 'Selected line';
 
   @override
-  String get trainingOpeningLabEmpty =>
-      'Pick an opening in the statistics tab and tap “Train” to load it here.';
-
-  @override
-  String get trainingOpeningLabPending =>
-      'The line trainer follows once the core supplies the opening moves.';
-
-  @override
   String get statsTrainOpening => 'Train';
 
   @override
@@ -1298,4 +1290,280 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trainingRestart => 'Restart';
+
+  @override
+  String trainingDrillMoveCounter(int done, int total) {
+    return 'Move $done / $total';
+  }
+
+  @override
+  String get trainingDrillGoalCheckmate => 'Checkmate Black';
+
+  @override
+  String get trainingDrillReset => 'Restart';
+
+  @override
+  String get trainingDrillNewPosition => 'New position';
+
+  @override
+  String get trainingDrillGenerating => 'Generating a position …';
+
+  @override
+  String get trainingDrillGenerateFailed =>
+      'No suitable position could be generated.';
+
+  @override
+  String get trainingDrillVictoryTitle => 'Checkmate! Cleanly played.';
+
+  @override
+  String trainingDrillVictoryBody(int moves) {
+    return 'Took $moves moves.';
+  }
+
+  @override
+  String get trainingDrillStalemateTitle => 'Stalemate!';
+
+  @override
+  String get trainingDrillStalemateBody =>
+      'The king has no moves left. A draw instead of a win.';
+
+  @override
+  String get trainingDrillLimitTitle => 'Move limit exceeded';
+
+  @override
+  String trainingDrillLimitBody(int total) {
+    return 'The mate has to land within $total moves. Try driving the king to the edge faster.';
+  }
+
+  @override
+  String get trainingDrillDrawTitle => 'Draw';
+
+  @override
+  String get trainingDrillDrawBody =>
+      'Without mating material the position can no longer be won.';
+
+  @override
+  String get trainingDrillRetry => 'Try again';
+
+  @override
+  String get trainingDrillNextLevel => 'Next level';
+
+  @override
+  String get trainingDrillEngineFallback =>
+      'Engine unavailable — the defender is playing weaker than usual.';
+
+  @override
+  String trainingDrillLevel(int level) {
+    return 'Level $level';
+  }
+
+  @override
+  String trainingDrillLocked(int level) {
+    return 'Master level $level first';
+  }
+
+  @override
+  String get trainingDrillSolved => 'Solved';
+
+  @override
+  String get trainingDrillOpen => 'Open';
+
+  @override
+  String get trainingDifficultyBeginner => 'Beginner';
+
+  @override
+  String get trainingDifficultyIntermediate => 'Intermediate';
+
+  @override
+  String get trainingDifficultyMaster => 'Master';
+
+  @override
+  String trainingCategoryProgress(int mastered, int total) {
+    return '$mastered of $total levels mastered';
+  }
+
+  @override
+  String get trainingTheoryPositions => 'Theoretical positions';
+
+  @override
+  String get trainingStudiesTitle => 'Classical Studies (1851)';
+
+  @override
+  String get trainingStudiesSubtitle =>
+      '86 historical master studies by Kling & Horwitz.';
+
+  @override
+  String trainingStudyNumber(int number) {
+    return 'Study $number';
+  }
+
+  @override
+  String get trainingStudySourceYear => 'Kling & Horwitz (1851)';
+
+  @override
+  String trainingStudyMoves(int moves) {
+    return 'Move $moves';
+  }
+
+  @override
+  String get trainingNextStudy => 'Next study';
+
+  @override
+  String get trainingOpeningLabIntro =>
+      'Replay the mainline move by move. The computer answers for the other side.';
+
+  @override
+  String get trainingOpeningLabStart => 'Train line';
+
+  @override
+  String trainingOpeningLabPlayingAs(String side) {
+    return 'You play $side';
+  }
+
+  @override
+  String get trainingOpeningLabIdea => 'Idea';
+
+  @override
+  String get trainingOpeningLabWrongMove =>
+      'Not the main move. Give it another try.';
+
+  @override
+  String get trainingOpeningLabDoneTitle => 'Line complete!';
+
+  @override
+  String trainingOpeningLabDoneBody(int count) {
+    return 'You found all $count moves of the mainline.';
+  }
+
+  @override
+  String get trainingOpeningLabBackToOverview => 'Back to the overview';
+
+  @override
+  String get trainingOpeningLabNoMatch =>
+      'That opening is not in the repertoire yet. Pick one of the lines below.';
+
+  @override
+  String get trainingOpeningLabEmptyCatalog =>
+      'No repertoire lines in the catalogue yet.';
+
+  @override
+  String get trainingOpeningLineItalian => 'Italian Game: Giuoco Piano';
+
+  @override
+  String get trainingOpeningLineCaroKann => 'Caro-Kann: Advance Variation';
+
+  @override
+  String get trainingOpeningLineQgdExchange =>
+      'Queen\'s Gambit Declined: Exchange Variation';
+
+  @override
+  String get trainingOpeningIdeaItalian1 =>
+      'Takes the centre and frees the bishop and queen.';
+
+  @override
+  String get trainingOpeningIdeaItalian2 =>
+      'Develops with tempo and hits e5 straight away.';
+
+  @override
+  String get trainingOpeningIdeaItalian3 =>
+      'The bishop eyes f7, the weakest point in Black\'s camp.';
+
+  @override
+  String get trainingOpeningIdeaItalian4 =>
+      'Prepares d4 and supports the push in the centre.';
+
+  @override
+  String get trainingOpeningIdeaItalian5 =>
+      'Solidly backs up e4 — the quiet Giuoco Pianissimo.';
+
+  @override
+  String get trainingOpeningIdeaItalian6 =>
+      'The king gets safe before the centre opens up.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann1 =>
+      'Prepares d5 without shutting in the c8 bishop.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann2 =>
+      'Challenges White\'s centre immediately.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann3 =>
+      'The point of the Caro-Kann: the bishop gets out in front of the pawn chain.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann4 =>
+      'Closes the chain and opens the path for the f8 bishop.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann5 =>
+      'The thematic counter-strike against White\'s pawn chain.';
+
+  @override
+  String get trainingOpeningIdeaCaroKann6 =>
+      'The knight backs up c5 and heads on via b6 or f8.';
+
+  @override
+  String get trainingOpeningIdeaQgd1 => 'Claims an equal share of the centre.';
+
+  @override
+  String get trainingOpeningIdeaQgd2 =>
+      'Declines the gambit and holds d5 with a pawn.';
+
+  @override
+  String get trainingOpeningIdeaQgd3 =>
+      'Develops and adds another defender to d5.';
+
+  @override
+  String get trainingOpeningIdeaQgd4 =>
+      'Recapturing with the e-pawn keeps the centre closed.';
+
+  @override
+  String get trainingOpeningIdeaQgd5 =>
+      'Breaks the pin and prepares to castle.';
+
+  @override
+  String get trainingOpeningIdeaQgd6 =>
+      'The Carlsbad structure — d5 is supported for good.';
+
+  @override
+  String get trainingOpeningTreeEmpty => 'No opening lines available yet.';
+
+  @override
+  String get trainingOpeningTreeExpand => 'Show variations';
+
+  @override
+  String get trainingOpeningTreeCollapse => 'Hide variations';
+
+  @override
+  String trainingOpeningTreeVariations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count variations',
+      one: '1 variation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trainingOpeningTreeLoadFailed =>
+      'That line is not in the database yet.';
+
+  @override
+  String get trainingOpeningTreeZoomIn => 'Zoom in';
+
+  @override
+  String get trainingOpeningTreeZoomOut => 'Zoom out';
+
+  @override
+  String get trainingOpeningTreeFit => 'Fit the tree';
+
+  @override
+  String get trainingOpeningTreeLearning => 'In progress';
+
+  @override
+  String get trainingOpeningTreeHint =>
+      'Tap a card to unfold its variations, or train the line right away.';
 }
