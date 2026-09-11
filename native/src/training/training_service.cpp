@@ -17,7 +17,7 @@
 namespace kchess {
 namespace {
 
-constexpr int kMasteryThreshold = 3;
+constexpr int kMasteryThreshold = TrainingService::mastery_threshold;
 
 nlohmann::json progress_json(const TrainingProgressRecord& progress) {
   return {
@@ -145,8 +145,12 @@ std::string TrainingService::start_attempt_json(const std::string& exercise_id) 
 }
 
 TrainingProgressRecord TrainingService::complete_attempt(const Attempt& attempt) {
-  auto progress = progress_for(attempt.exercise->id);
-  const bool success = !attempt.had_error;
+  return record_completion(attempt.exercise->id, !attempt.had_error);
+}
+
+TrainingProgressRecord TrainingService::record_completion(
+    const std::string& exercise_id, const bool success) {
+  auto progress = progress_for(exercise_id);
   progress.attempt_count += 1;
   progress.last_attempt_at = unix_time_seconds();
   if (success) {

@@ -79,14 +79,6 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.headlineSmall,
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                strings.firstRunBody,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
                               const SizedBox(height: 26),
                               SegmentedButton<ProfileType>(
                                 key: const Key('profile-type-selector'),

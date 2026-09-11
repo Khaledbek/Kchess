@@ -2,7 +2,6 @@
   "@@locale": "ar",
   "appTitle": "KChess",
   "firstRunTitle": "مساحة الشطرنج المحلية",
-  "firstRunBody": "اختر مصدرًا. الملفات العامة على الإنترنت لا تحتاج إلى كلمة مرور.",
   "chessCom": "Chess.com",
   "lichess": "Lichess",
   "localPgnFen": "PGN / FEN",
@@ -13,58 +12,6 @@
   "games": "المباريات",
   "gameSection": "المباراة",
   "play": "اللعب",
-  "playPlaceholder": "هذا القسم محجوز كعنصر نائب لأنماط لعب مستقبلية، مثل اللعب ضد البوتات.",
-  "playAgainstBot": "اللعب ضد بوت",
-  "playAgainstBotSubtitle": "ابدأ مباراة محلية ضد Stockfish.",
-  "continueAgainstBot": "متابعة اللعب ضد البوت",
-  "botPlayerColor": "لونك",
-  "temporaryBotGameNotSaved": "لن يتم حفظ هذه المباراة وسيتم حذفها بالكامل عند الإغلاق أو الإلغاء.",
-  "botGameLog": "سجل مباريات البوت",
-  "botGameLogSubtitle": "افتح مبارياتك المحفوظة ضد البوت، وتابع المباراة الجارية أو حلّل المباريات المنتهية.",
-  "botGameLogEmpty": "لا توجد مباريات بوت محفوظة بعد.",
-  "botGameLogLoadFailed": "تعذر تحميل سجل مباريات البوت.",
-  "botGameHistoryActive": "جارية",
-  "botGameHistoryWin": "فوز",
-  "botGameHistoryLoss": "خسارة",
-  "botGameHistoryDraw": "تعادل",
-  "botStrength": "قوة البوت",
-  "botStrengthDescription": "اختر قوة البوت بخطوات مقدارها 100 نقطة Elo. يمثل الإعداد الأقصى قوة Stockfish الكاملة.",
-  "botElo": "Elo",
-  "botEngineLockedDescription": "تستخدم مباريات البوت دائمًا Stockfish 18 بشكل مستقل عن محرك التحليل المحدد.",
-  "botStartGame": "بدء المباراة",
-  "botGameTitle": "مباراة ضد البوت",
-  "botGameLoading": "جارٍ تجهيز المباراة …",
-  "botGameLoadFailed": "تعذر تجهيز مباراة البوت.",
-  "botMoveFailed": "تعذر حساب نقلة البوت.",
-  "botYou": "أنت",
-  "botYourTurn": "دورك الآن.",
-  "botThinking": "Stockfish يفكر …",
-  "botApplyingMove": "جارٍ تنفيذ النقلة …",
-  "botWaiting": "بانتظار النقلة التالية …",
-  "botViewingHistory": "أنت تعرض وضعية سابقة.",
-  "botGameFinished": "انتهت المباراة.",
-  "botMoveList": "قائمة النقلات",
-  "botNoMovesYet": "لم تُلعب أي نقلة بعد.",
-  "botPreviousMove": "النقلة السابقة",
-  "botNextMove": "النقلة التالية",
-  "botReturnToLive": "العودة إلى الوضعية الحالية",
-  "botHintPiece": "التلميح 1: إظهار القطعة",
-  "botHintTarget": "التلميح 2: إظهار مربع الوصول",
-  "botHintsUsed": "تم استخدام التلميحين",
-  "botHintThinking": "جارٍ حساب التلميح …",
-  "botHintFailed": "تعذر حساب التلميح.",
-  "botGameSettingsTitle": "إعدادات المباراة",
-  "botGameSettingsDescription": "تنطبق هذه الإعدادات على مباراة البوت هذه فقط ولا تغيّر إعدادات التحليل العامة.",
-  "botGameEvaluationBarHelp": "يعرض تقييم Stockfish 18 الحالي أثناء مباراة البوت هذه. يُحفظ الإعداد مع المباراة.",
-  "botHintCounter": "{used} / 2 تلميحات لهذه النقلة",
-  "@botHintCounter": {
-    "placeholders": {
-      "used": {
-        "type": "int"
-      }
-    }
-  },
-  "downloads": "التنزيلات",
   "favorites": "المفضلة",
   "favoriteCollectionsTitle": "المجموعات",
   "favoriteNoCollections": "لا توجد مجموعات بعد. أنشئ مجموعة لتنظيم مبارياتك المفضلة.",
@@ -76,22 +23,16 @@
   "favoriteDeleteCollectionBody": "سيتم حذف المجموعة، وستبقى مبارياتها ضمن المفضلة بدون مجموعة.",
   "favoriteEmptyCollection": "لا تحتوي هذه المجموعة على مباريات بعد.",
   "favoriteNoLooseGames": "لا توجد مباريات مفضلة بدون مجموعة.",
-  "favoriteCollectionRule": "المجموعات بمستوى واحد فقط ولا يمكن إنشاء مجموعات داخلها.",
   "favoriteMoveToCollection": "تغيير المجموعة",
-  "favoriteMoveHelp": "يمكن أن تبقى المباراة ضمن المفضلة بدون مجموعة أو تنتمي إلى مجموعة واحدة فقط.",
   "profile": "الملف الشخصي",
   "settings": "الإعدادات",
   "analysis": "التحليل",
   "addAccount": "إضافة حساب",
   "switchAccount": "تبديل الحساب",
-  "demoNotice": "مباراة محلية",
-  "tapToAnalyze": "فتح وتحليل",
   "importData": "استيراد PGN / FEN",
   "importPgnFile": "اختيار ملف PGN",
   "pastePgn": "لصق نص PGN",
   "importFen": "استيراد وضعية FEN",
-  "exportFen": "تصدير FEN",
-  "fenCopiedToClipboard": "تم نسخ FEN إلى الحافظة.",
   "pgnText": "نص PGN",
   "pgnLabel": "PGN المباراة",
   "fenText": "FEN كامل",
@@ -116,24 +57,7 @@
   "evaluation": "التقييم",
   "engineLines": "خطوط المحرك",
   "currentMove": "النقلة الحالية",
-  "boardArrows": "إظهار أسهم الرقعة",
-  "boardArrowsHelp": "للعرض فقط؛ التبديل لا يعيد التحليل.",
   "engine": "المحرك",
-  "engineSelectionTitle": "إصدار المحرك",
-  "engineVersion": "محرك الشطرنج",
-  "engineVersionHelp": "اختر إصدار Stockfish الذي يستخدمه KChess للتحليل. تبقى جميع إعدادات التحليل الحالية دون تغيير.",
-  "engineActiveLabel": "النشط: {engine}",
-  "@engineActiveLabel": {
-    "placeholders": {
-      "engine": {
-        "type": "String"
-      }
-    }
-  },
-  "stockfish18": "Stockfish 18",
-  "stockfish19": "Stockfish 19",
-  "engineSelectionFailed": "تعذر تفعيل المحرك المحدد. سيبقى المحرك السابق محددًا.",
-  "enginePreset": "متوسط · عمق 18 · 3 خطوط",
   "depth": "العمق",
   "numberOfLines": "عدد الخطوط",
   "timeLimitSeconds": "الحد الزمني (بالثواني)",
@@ -150,45 +74,28 @@
   "systemTheme": "النظام",
   "lightTheme": "فاتح",
   "darkTheme": "داكن",
-  "engineSettingsSubtitle": "العمق والخطوط والحد الزمني وخيوط المعالجة وذاكرة Hash",
   "analysisSettingsTitle": "التحليل",
-  "analysisSettingsSubtitle": "الأسهم والتقييم وطريقة عرض التحليل",
   "analysisBoardGuidance": "إرشادات الرقعة",
   "analysisInformation": "معلومات التحليل",
   "bestMoveArrow": "سهم أفضل نقلة",
-  "bestMoveArrowHelp": "يعرض أفضل نقلة يقترحها المحرك على الرقعة.",
   "threatArrow": "سهم التهديد",
-  "threatArrowHelp": "يعرض أقوى نقلة تالية للخصم كسهم تحذير عندما يكون الدور على الخصم.",
   "evaluationBarSetting": "شريط التقييم",
-  "evaluationBarSettingHelp": "يعرض تقييم المحرك الحالي.",
   "showEngineLinesSetting": "إظهار خطوط المحرك",
-  "showEngineLinesSettingHelp": "يعرض الخطوط الرئيسية المحسوبة (MultiPV).",
   "showClassificationsSetting": "إظهار تصنيفات النقلات",
-  "showClassificationsSettingHelp": "يعرض النظرية والبارعة والحاسمة والأفضل وبقية تصنيفات النقلات.",
   "showAccuracySetting": "إظهار الدقة",
-  "showAccuracySettingHelp": "يعرض قيم الدقة المحسوبة محليًا.",
   "showTheorySetting": "إظهار معلومات النظرية",
-  "showTheorySettingHelp": "يعرض معلومات كتاب الافتتاح وعدّادات النقلات النظرية.",
   "showResultSymbolsSetting": "إظهار رموز النتيجة",
-  "showResultSymbolsSettingHelp": "يعرض رموز الفوز أو الخسارة أو التعادل فوق الملكين عند انتهاء المباراة.",
   "designSettingsTitle": "التصميم",
-  "designSettingsSubtitle": "المظهر والسمة والرقعة والقطع",
   "generalSettingsTitle": "عام",
-  "generalSettingsSubtitle": "اللغة وسلوك التطبيق",
   "dataStorageSettingsTitle": "البيانات والتخزين",
-  "dataStorageSettingsSubtitle": "ذاكرة التحليل والتنزيلات والبيانات المحلية",
-  "dataStoragePlaceholder": "ستُضاف خيارات التخزين وذاكرة التخزين المؤقت في خطوة لاحقة.",
   "licensesAbout": "التراخيص وحول التطبيق",
   "stockfishPending": "Stockfish · محلي · GPLv3",
   "provider": "المزود",
-  "localProfile": "ملف محلي",
-  "forced": "إجباري",
   "theory": "النظرية",
   "brilliant": "بارعة",
   "critical": "نقلة رائعة",
   "best": "الأفضل",
   "excellent": "ممتازة",
-  "good": "جيدة",
   "okay": "جيدة",
   "miss": "فرصة ضائعة",
   "mistake": "خطأ",
@@ -201,16 +108,10 @@
   "first": "الأولى",
   "last": "الأخيرة",
   "playPause": "تشغيل أو إيقاف",
-  "player": "اللاعب",
-  "bothPlayers": "كلاهما",
   "whitePlayer": "الأبيض",
   "blackPlayer": "الأسود",
   "analyzedMoves": "النقلات المصنفة",
   "bookGames": "مباريات الافتتاح",
-  "expectedLoss": "خسارة التوقع",
-  "versions": "الإصدارات",
-  "classifierVersionLabel": "المصنّف",
-  "accuracyVersionLabel": "الدقة",
   "analyzingGame": "جارٍ تحليل المباراة",
   "analyzedMovesProgress": "تم تحليل {completed} / {total} نصف نقلة",
   "@analyzedMovesProgress": {
@@ -232,38 +133,7 @@
       }
     }
   },
-  "moveComparisonText": "كانت {played} مصنفة: {classification}. ‏{best} هي أفضل نقلة.",
-  "@moveComparisonText": {
-    "placeholders": {
-      "played": {
-        "type": "String"
-      },
-      "classification": {
-        "type": "String"
-      },
-      "best": {
-        "type": "String"
-      }
-    }
-  },
-  "theoryMoveText": "{move} نقلة نظرية.",
-  "@theoryMoveText": {
-    "placeholders": {
-      "move": {
-        "type": "String"
-      }
-    }
-  },
-  "triedMove": "جرّبت {move}.",
-  "@triedMove": {
-    "placeholders": {
-      "move": {
-        "type": "String"
-      }
-    }
-  },
   "sidelineEngineTitle": "محرك الخط الجانبي",
-  "sidelineEngineSubtitle": "تُطبَّق هذه القيم فقط على التحليل المباشر لخطك الجانبي.",
   "mainLineLabel": "الخط الرئيسي",
   "sidelineLabel": "خطك البديل",
   "liveEngineTheorySkipped": "نظرية: تم تجاوز التحليل المباشر",
@@ -276,28 +146,6 @@
       }
     }
   },
-  "sidelineAnalysisPaused": "تم إيقاف التحليل المباشر مؤقتًا",
-  "analyzingVariation": "جارٍ تحليل الخط المؤقت…",
-  "evaluationComparison": "التقييم: {before} ← {after}",
-  "@evaluationComparison": {
-    "placeholders": {
-      "before": {
-        "type": "String"
-      },
-      "after": {
-        "type": "String"
-      }
-    }
-  },
-  "bestContinuation": "أفضل متابعة: {line}",
-  "@bestContinuation": {
-    "placeholders": {
-      "line": {
-        "type": "String"
-      }
-    }
-  },
-  "returnToMainLine": "العودة إلى الخط الرئيسي",
   "illegalOrFailedMove": "النقلة غير قانونية أو تعذر تحليلها: {message}",
   "@illegalOrFailedMove": {
     "placeholders": {
@@ -308,43 +156,27 @@
   },
   "myPlayer": "لاعبي",
   "opponent": "الخصم",
-  "variationStartingPosition": "وضع بداية الخط",
-  "variationStart": "بداية الخط",
   "engineQualityTitle": "جودة التحليل",
   "engineResourcesTitle": "الموارد",
-  "depthHelp": "Min = عمق التحليل المسبق. Max = أقصى عمق للتحليل المباشر. القيم الأعلى تستغرق عادة وقتًا أطول.",
   "adaptiveEarlyStop": "تحليل تكيفي",
-  "adaptiveEarlyStopHelp": "ينهي التحليل المسبق والتحليل المباشر الهادئ مبكرًا عندما يثبت التقييم وخطوط اللعب الرئيسية. تستمر عمليات التحقق الحرجة حتى الحد المحدد.",
-  "numberOfLinesHelp": "عدد أفضل الخطوط التي يحسبها Stockfish في الوقت نفسه.",
-  "timeLimitHelp": "حد اختياري لكل وضعية. عند إيقافه يُستخدم العمق فقط، وإلا يتوقف البحث عند بلوغ العمق أو الوقت أولًا.",
   "threads": "خيوط المعالجة",
-  "threadsHelp": "عدد خيوط المعالج لكل عامل Stockfish. يكتشف Kchess جهازك تلقائيًا ويسمح بحد أقصى بنصف خيوط المعالج المنطقية.",
   "hashMemory": "ذاكرة Hash",
-  "hashMemoryHelp": "ذاكرة RAM لجدول النقل في Stockfish. زيادة الذاكرة قد تحسن البحث في الوضعيات المتكررة.",
   "boardDisplayTitle": "عرض الرقعة",
   "rotateBoard": "تدوير الرقعة",
   "showBoardCoordinates": "إحداثيات الرقعة",
-  "showBoardCoordinatesHelp": "يعرض أسماء الأعمدة والصفوف (a–h / 1–8) على الرقعة.",
   "highlightLastMove": "تمييز آخر نقلة",
-  "highlightLastMoveHelp": "يميز مربع البداية ومربع النهاية لآخر نقلة تم لعبها.",
   "highlightSelectedSquare": "تمييز المربع المحدد",
-  "highlightSelectedSquareHelp": "يميز المربع الذي اخترته أثناء استكشاف تفريع.",
   "behaviorTitle": "السلوك",
   "autoSyncOnline": "مزامنة الحسابات عبر الإنترنت تلقائيًا",
-  "autoSyncOnlineHelp": "يزامن Chess.com وLichess تلقائيًا عند بدء التطبيق وعند تبديل الحساب.",
   "confirmBeforeDelete": "التأكيد قبل الحذف",
-  "confirmBeforeDeleteHelp": "يطلب التأكيد قبل حذف الحسابات أو المباريات المحلية.",
   "analysisCacheTitle": "ذاكرة التحليل المؤقتة",
   "useGlobalAnalysisCache": "استخدام ذاكرة المواقف المشتركة",
-  "useGlobalAnalysisCacheHelp": "يعيد استخدام تحليل متوافق للمواقف المتطابقة بين مباريات مختلفة.",
   "clearAnalysisCache": "مسح ذاكرة التحليل",
-  "clearAnalysisCacheHelp": "يمسح ذاكرة المواقف المشتركة فقط. تبقى المباريات المحفوظة والتحليلات المكتملة.",
   "clearAnalysisCacheQuestion": "مسح ذاكرة التحليل؟",
   "clearAnalysisCacheBody": "سيتم حذف ذاكرة المواقف المشتركة. ستبقى مبارياتك والمفضلة والتنزيلات والتحليلات المكتملة.",
   "analysisCacheCleared": "تم مسح ذاكرة التحليل.",
   "diagnosticsTitle": "التشخيص",
   "diagnosticLogging": "سجل التشخيص",
-  "diagnosticLoggingHelp": "يكتب سجلات تقنية محدودة لاستكشاف الأخطاء. لا يتم تسجيل PGN أو FEN الكامل أو ردود مزودي الخدمة.",
   "deleteLocalGameQuestion": "حذف الإدخال المحلي؟",
   "deleteLocalGameBody": "سيتم حذف PGN/FEN المحفوظ وتحليله المحلي نهائيًا.",
   "profileRatings": "التصنيفات",
@@ -363,9 +195,7 @@
   "statsDraws": "تعادلات",
   "statsLosses": "هزائم",
   "statsAll": "الكل",
-  "statsAllTimeControlsNote": "كل أنواع الوقت",
   "statsPhaseTitle": "حسب مرحلة اللعب",
-  "statsPhaseSubtitle": "في أي مرحلة تنتهي مبارياتك وكيف تكون نتيجتك.",
   "statsPhaseOpening": "الافتتاح (1–12)",
   "statsPhaseMiddlegame": "وسط اللعب (13–30)",
   "statsPhaseEndgame": "النهاية (+31)",
@@ -381,9 +211,7 @@
   "statsPhaseClassifiedNote": "{classified} من {total} مباراة",
   "statsTitle": "الإحصائيات",
   "statsIntroTitle": "أداؤك في الشطرنج",
-  "statsIntroBody": "اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.",
   "statsFormTitle": "الأداء الأخير",
-  "statsFormHint": "اضغط على نتيجة لفتح المباراة.",
   "statsFormVersus": "ضد",
   "statsFormEmpty": "لا توجد مباريات حديثة لعرضها.",
   "statsFormError": "تعذّر تحميل المباريات الأخيرة.",
@@ -490,40 +318,22 @@
   "statsCompareOpenWhite": "افتتح بـ{opening} — يحقق خصمك بالأسود ضدها {rate} فقط (من {games} مباراة).",
   "statsCompareAnswerBlack": "بالأسود: اختر {opening} — يحقق خصمك بالأبيض ضدها {rate} فقط (من {games} مباراة).",
   "statsCompareSampleScope": "أنت: مكتبتك المحلية بالكامل · الخصم: آخر {months} أشهر ({games} مباراة). الجانبان عيّنتان مختلفتان، لذا قد تختلف القيم حتى عند مقارنة الملف بنفسه.",
-  "statsTimeControlCorrespondence": "بالمراسلة",
-  "statsTimeControlOther": "أخرى",
-  "botGameDeleteQuestion": "حذف مباراة البوت؟",
-  "botGameDeleteBody": "سيتم حذف هذا الإدخال من سجل مباريات البوت نهائيًا. ستبقى أي مباراة تحليل تم إنشاؤها منه في مكتبة الألعاب المحلية.",
-  "promotionTitle": "ترقية البيدق",
-  "promotionChoosePiece": "اختر القطعة التي تريد ترقية البيدق إليها.",
-  "promotionQueen": "وزير",
-  "promotionRook": "قلعة",
-  "promotionBishop": "فيل",
-  "promotionKnight": "حصان",
   "trainingSection": "التدريب",
   "trainingIntroTitle": "ساحة التدريب",
-  "trainingIntroBody": "اختر مجال تدريب. يُحفظ تقدمك محليًا على هذا الجهاز.",
   "trainingOpeningTitle": "مختبر الافتتاحيات",
-  "trainingOpeningSubtitle": "راجع خطوط ذخيرتك ونقاط ضعفك.",
   "trainingOpeningAction": "درّب الخطوط",
   "trainingNemesisBadge": "أصعب افتتاحية: {opening} — نسبة فوز {rate} فقط",
   "trainingNemesisNone": "لم يتم رصد نقطة ضعف في إحصاءاتك بعد.",
   "trainingTacticsTitle": "صائد الأخطاء",
-  "trainingTacticsSubtitle": "ابحث عن النقلة الأفضل في أوضاع وسط اللعب الحرجة.",
   "trainingTacticsSolved": "{count} تكتيكًا تم حله",
   "trainingTacticsAction": "ابدأ التكتيك",
   "trainingTacticsEmpty": "لا توجد ألغاز تكتيكية في الفهرس بعد.",
   "trainingEndgameTitle": "أكاديمية النهايات",
-  "trainingEndgameSubtitle": "أتقن النهايات النظرية خطوة بخطوة.",
   "trainingEndgameProgress": "{mastered} / {total} وضعية تم إتقانها ({percent}%)",
   "trainingEndgameAction": "افتح النهايات",
   "trainingMastered": "متقن",
   "trainingStreak": "{done}/{total} تكرارات بلا خطأ",
-  "trainingLastAttempt": "آخر تدريب: {date}",
-  "trainingNeverAttempted": "لم يتم التدريب بعد",
   "trainingOpeningLabSelected": "الخط المختار",
-  "trainingOpeningLabEmpty": "اختر افتتاحية من تبويب الإحصاءات واضغط «تدريب» لتحميلها هنا.",
-  "trainingOpeningLabPending": "سيتوفر مدرّب الخطوط بمجرد أن توفّر النواة نقلات الافتتاحية.",
   "statsTrainOpening": "تدريب",
   "trainingGoalWin": "الدور على {side} — اربح الوضعية",
   "trainingGoalDraw": "الدور على {side} — حافظ على التعادل",
@@ -539,10 +349,148 @@
   "trainingShowHint": "أظهر التلميح",
   "trainingYourMove": "دورك",
   "trainingRestart": "إعادة البدء",
+  "trainingOpeningLabStart": "تدرّب على الخط",
+  "trainingOpeningLabBackToOverview": "العودة إلى القائمة",
+  "trainingOpeningTreeEmpty": "لا توجد خطوط افتتاح متاحة بعد.",
+  "trainingOpeningTreeExpand": "إظهار التنويعات",
+  "trainingOpeningTreeCollapse": "إخفاء التنويعات",
+  "trainingOpeningTreeVariations": "{count,plural, =1{تنويعة واحدة} other{{count} تنويعات}}",
+  "@trainingOpeningTreeVariations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningTreeLoadFailed": "هذا الخط ليس في قاعدة البيانات بعد.",
+  "trainingOpeningTreeZoomIn": "تكبير",
+  "trainingOpeningTreeZoomOut": "تصغير",
+  "trainingOpeningTreeFit": "ملاءمة الشجرة",
+  "trainingOpeningTreeHint": "انقر على بطاقة لفتح تنويعاتها، أو درّب الخط مباشرة.",
+  "playAgainstBot": "اللعب ضد بوت",
+  "continueAgainstBot": "متابعة اللعب ضد البوت",
+  "botPlayerColor": "لونك",
+  "temporaryBotGameNotSaved": "لن يتم حفظ هذه المباراة وسيتم حذفها بالكامل عند الإغلاق أو الإلغاء.",
+  "botGameLog": "سجل مباريات البوت",
+  "botGameLogEmpty": "لا توجد مباريات بوت محفوظة بعد.",
+  "botGameLogLoadFailed": "تعذر تحميل سجل مباريات البوت.",
+  "botGameHistoryActive": "جارية",
+  "botGameHistoryWin": "فوز",
+  "botGameHistoryLoss": "خسارة",
+  "botGameHistoryDraw": "تعادل",
+  "botStrength": "قوة البوت",
+  "botElo": "Elo",
+  "botStartGame": "بدء المباراة",
+  "botGameTitle": "مباراة ضد البوت",
+  "botGameLoading": "جارٍ تجهيز المباراة …",
+  "botGameLoadFailed": "تعذر تجهيز مباراة البوت.",
+  "botMoveFailed": "تعذر حساب نقلة البوت.",
+  "botYou": "أنت",
+  "botYourTurn": "دورك الآن.",
+  "botThinking": "Stockfish يفكر …",
+  "botApplyingMove": "جارٍ تنفيذ النقلة …",
+  "botWaiting": "بانتظار النقلة التالية …",
+  "botViewingHistory": "أنت تعرض وضعية سابقة.",
+  "botGameFinished": "انتهت المباراة.",
+  "botMoveList": "قائمة النقلات",
+  "botNoMovesYet": "لم تُلعب أي نقلة بعد.",
+  "botPreviousMove": "النقلة السابقة",
+  "botNextMove": "النقلة التالية",
+  "botReturnToLive": "العودة إلى الوضعية الحالية",
+  "botHintPiece": "التلميح 1: إظهار القطعة",
+  "botHintTarget": "التلميح 2: إظهار مربع الوصول",
+  "botHintsUsed": "تم استخدام التلميحين",
+  "botHintThinking": "جارٍ حساب التلميح …",
+  "botHintFailed": "تعذر حساب التلميح.",
+  "botGameSettingsTitle": "إعدادات المباراة",
+  "botHintCounter": "{used} / 2 تلميحات لهذه النقلة",
+  "@botHintCounter": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      }
+    }
+  },
+  "exportFen": "تصدير FEN",
+  "fenCopiedToClipboard": "تم نسخ FEN إلى الحافظة.",
+  "engineSelectionTitle": "إصدار المحرك",
+  "engineVersion": "محرك الشطرنج",
+  "engineActiveLabel": "النشط: {engine}",
+  "@engineActiveLabel": {
+    "placeholders": {
+      "engine": {
+        "type": "String"
+      }
+    }
+  },
+  "stockfish18": "Stockfish 18",
+  "stockfish19": "Stockfish 19",
+  "engineSelectionFailed": "تعذر تفعيل المحرك المحدد. سيبقى المحرك السابق محددًا.",
+  "forced": "إجباري",
+  "good": "جيدة",
+  "statsTimeControlCorrespondence": "بالمراسلة",
+  "statsTimeControlOther": "أخرى",
+  "botGameDeleteQuestion": "حذف مباراة البوت؟",
+  "botGameDeleteBody": "سيتم حذف هذا الإدخال من سجل مباريات البوت نهائيًا. ستبقى أي مباراة تحليل تم إنشاؤها منه في مكتبة الألعاب المحلية.",
+  "promotionTitle": "ترقية البيدق",
+  "promotionChoosePiece": "اختر القطعة التي تريد ترقية البيدق إليها.",
+  "promotionQueen": "وزير",
+  "promotionRook": "قلعة",
+  "promotionBishop": "فيل",
+  "promotionKnight": "حصان",
   "trainingOppositionTitle": "تقابل الملكين مع بيدق",
   "trainingOppositionHint": "احصل على التقابل أولًا ثم التف حول الملك. لا تحرك البيدق قبل أن يصبح ملكك أمامه.",
   "trainingLucenaTitle": "وضعية لوسينا",
   "trainingLucenaHint": "ضع الرخ على الصف الرابع قبل إخراج الملك ليصبح جسرًا يحميه من الكشوف.",
   "trainingPhilidorTitle": "دفاع فيليدور",
-  "trainingPhilidorHint": "أبقِ الرخ على الصف السادس حتى يتقدم البيدق، ثم أعطِ الكش من الخلف."
+  "trainingPhilidorHint": "أبقِ الرخ على الصف السادس حتى يتقدم البيدق، ثم أعطِ الكش من الخلف.",
+  "practiceDrills": "تدريبات كش مات",
+  "practiceStudies": "دراسات نهايات كلاسيكية",
+  "practiceFailed": "انتهت المحاولة. حاول مجددًا.",
+  "practiceThinking": "الخصم يفكر…",
+  "practiceMoves": "النقلات الملعوبة: {count}",
+  "practiceLevel": "المستوى {number}",
+  "practiceStudyNumber": "الدراسة {number}",
+  "practiceStudySource": "كلينغ وهورويتز · دراسات الشطرنج ونهايات المباريات (1851). تدرّب على هذه الوضعيات ضد ستوكفيش.",
+  "practiceQueenTitle": "ملك ووزير ضد ملك",
+  "practiceRookTitle": "ملك ورخ ضد ملك",
+  "practiceQueenRookTitle": "وزير ضد رخ",
+  "practiceQueenHint": "استخدم ملكك لدعم الوزير. اترك مربع هروب حتى تتمكن من تنفيذ كش مات.",
+  "practiceRookHint": "اقطع طريق الملك بالرخ وقرّب ملكك.",
+  "practiceQueenRookHint": "ابحث عن هجوم مزدوج على الملك والرخ. انتبه إلى التعادل بالخنق.",
+  "practiceBeginner": "مبتدئ",
+  "practiceIntermediate": "متوسط",
+  "practiceMaster": "متقدم",
+  "practiceSectionKingPawn": "ملك وبيدق",
+  "practiceSectionBishops": "ملوك وفيلة وبيادق",
+  "practiceSectionKnightsBishops": "أحصنة وفيلة وبيادق",
+  "practiceSectionTwoMinor": "قطعتان خفيفتان ضد واحدة",
+  "practiceSectionRookPawns": "رخ ضد بيادق",
+  "practiceSectionRookMinor": "رخ ضد قطع خفيفة",
+  "practiceSectionMinorRook": "قطع خفيفة ضد رخ",
+  "practiceSectionQueenPawns": "وزير ضد بيادق",
+  "practiceSectionQueens": "وزراء وبيادق",
+  "practiceSectionQueenRook": "وزير ضد رخ",
+  "practiceSectionQueenMinor": "وزير ضد قطع خفيفة",
+  "@practiceMoves": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@practiceLevel": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "@practiceStudyNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  }
 }

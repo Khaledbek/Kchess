@@ -13,13 +13,15 @@ The runtime never parses PGN to build the index and never needs Python.
 
 ## Position identity
 
-`positionKey` is the same 64-bit Stockfish 18 `Position::key()` used by `KCB`
-(see `../opening_book/book_format.md`): every piece, side to move, castling
+`positionKey` is the same canonical KChess key used by `KCB` (see
+`../opening_book/book_format.md`). Its layout is pinned to Stockfish 18
+`Position::key()` and remains independent of whether the runtime analysis engine
+is Stockfish 18 or Stockfish 19: every piece, side to move, castling
 rights and a Stockfish-valid en-passant file, with the FEN halfmove/fullmove
 clocks canonicalized to `0 1`. Clocks are excluded so transpositions share one
 identity. The builder imports the exact key function from
 `../opening_book/build_book.py` so KCO keys are byte-identical to KCB keys, and
-the native reader computes them with the vendored Stockfish core.
+the native reader computes them with the canonical KChess/Stockfish-18-compatible key implementation.
 
 Each entry stores the key of the **final** position of one named line. Because
 the source catalog contains an entry for every named prefix (`Ruy Lopez` and

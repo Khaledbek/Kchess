@@ -1,283 +1,76 @@
-# KChess Repository Instructions
+# KChess AI Router
 
-## 1. Zweck und Geltungsbereich
+## Scope
 
-Diese Datei ist die verbindliche Root-Anweisung für das gesamte KChess-Repository.
-Zusätzliche schichtspezifische Regeln stehen in:
+Diese Datei enthält nur globale Regeln. Für jede Aufgabe zusätzlich die **nächstgelegene** `AGENTS.md` im betroffenen Ordner lesen. Lokale `AGENTS.md`-Dateien enthalten nur bereichsspezifische Hinweise und sollen unnötigen Repository-Kontext vermeiden.
 
-- `flutter_app/AGENTS.md` für Flutter/Dart
-- `native/AGENTS.md` für C++20
-
-Produktverhalten wird in `docs/PRODUCT_SPEC.md` bzw. dessen kanonischer Spezifikation beschrieben.
-Architekturdetails stehen in `docs/ARCHITECTURE.md`.
-
-## 2. Verbindliche Architektur
-
-KChess verwendet eine klare Schichtentrennung:
+## Architektur
 
 ```text
-Flutter / Dart
-= ausschließlich UI, Darstellung, Navigation und View-State
-        |
-        | dart:ffi / stabile C-ABI / DTOs
-        v
-C++20 Core
-= gesamte Fach-, Schach-, Analyse-, Daten- und Persistenzlogik
+Flutter/Dart = UI, Navigation, View-State, Darstellung, dünne FFI-Adapter
+C++20        = Runtime-Domainlogik, Schach, Engine, Persistenz, Provider, Training
+Python       = Development-/Builder-/Diagnosewerkzeuge, keine App-Runtime
+ARB          = alle sichtbaren Übersetzungen
 ```
 
-### Flutter darf besitzen
+Keine fachliche Runtime-Logik neu in Flutter oder Python duplizieren.
 
-- Widgets und Screens
-- Navigation
-- responsive Layouts
-- Theme, Farben, Assets und Animationen
-- Board-Darstellung und reine UI-Interaktion
-- View-State / Screen-State / Auswahlzustände
-- dünne FFI-Adapter
-- DTO-zu-UI-Mapping
-- Polling bzw. Orchestrierung nativer Jobs
-- reine Darstellungsentscheidungen
+## AI-Kontextbudget
 
-### Flutter darf nicht besitzen
+Bei jeder Aufgabe:
 
-Keine neue Fachlogik in Dart implementieren. Insbesondere nicht:
+1. Diese Datei + nächstgelegene lokale `AGENTS.md` lesen.
+2. Mit Symbol-/Textsuche (`rg`) die betroffenen Stellen finden.
+3. Zuerst nur Zieldatei + maximal 2–4 direkte Abhängigkeiten öffnen.
+4. Große Dateien nicht komplett lesen, wenn ein Abschnitt per Symbolsuche reicht.
+5. Kontext nur erweitern, wenn ein konkreter Aufrufer, Vertrag oder Datenfluss es verlangt.
+6. Bereits gelesene unveränderte Dateien im selben Task nicht erneut vollständig laden.
 
-- Schachregeln oder Legalitätslogik
-- PGN-/FEN-Parsing
-- Ergebnis-/Matt-/Remis-Entscheidungen als fachliche Wahrheit
-- Stockfish- oder Analyseentscheidungen
-- Move-Klassifikation
-- Accuracy-Berechnung
-- Theory-/Opening-Entscheidungen
-- Cache-Kompatibilität
-- Profil-/Provider-Domainlogik
-- Datenbank-/Persistenzlogik
-- Thread-/Engine-Ressourcenregeln als fachliche Wahrheit
+Standardmäßig **nicht** durchsuchen/lesen:
 
-Falls Legacy-Dart-Code noch solche Entscheidungen enthält: nicht erweitern. Wenn der Bereich ohnehin geändert wird, die fachliche Entscheidung nach C++ verschieben und Flutter nur das Ergebnis anzeigen lassen.
+- `third_party/`
+- `build/`, `.dart_tool/`, CMake-Buildverzeichnisse
+- `native/prebuilt/`, `native/.stockfish_build_cache/`
+- `flutter_app/lib/localization/generated/`
+- große generierte Trainingsdaten unter `native/src/training/data/*.inc`
 
-### C++ besitzt die fachliche Wahrheit
+Ausnahme nur, wenn die Aufgabe genau diesen Bereich betrifft.
 
-C++20 ist zuständig für:
+## Task-Routing
 
-- Schachmodell, Züge, Legalität, PGN, SAN und FEN
-- Profile und Provider
-- lokale Datenbank und Migrationen
-- Settings-Persistenz und effektive Engine-Werte
-- Game Library, Filter, Statistik und lokale Datenmodelle
-- Stockfish-Integration
-- Voranalyse, Liveanalyse und Side-Line-Analyse
-- MultiPV, `searchmoves`, Cache und Wiederverwendung
-- Move-Klassifikation
-- Accuracy
-- Theory / Opening Book
-- Training-Kataloge, Lösungsvarianten, Fortschritt und Meisterschaftsregeln
-- Ergebnis-/Termination-Domainstatus
-- Import/Export und Offline-Verhalten
+- Analyse UI → `flutter_app/lib/features/analysis/AGENTS.md`
+- Play/Bots UI → `flutter_app/lib/features/play/AGENTS.md`
+- Training UI → `flutter_app/lib/features/training/AGENTS.md`
+- Games/Import → `flutter_app/lib/features/games/AGENTS.md`
+- Favorites → `flutter_app/lib/features/favorites/AGENTS.md`
+- Settings → `flutter_app/lib/features/settings/AGENTS.md`
+- Statistics → `flutter_app/lib/features/statistics/AGENTS.md`
+- Profile → `flutter_app/lib/features/profile/AGENTS.md`
+- Shared Board/UI → `flutter_app/lib/shared/AGENTS.md`
+- FFI → `flutter_app/lib/ffi/AGENTS.md`
+- App-Shell/Startup → `flutter_app/lib/ui/AGENTS.md`
+- Native Analyse → `native/src/analysis/AGENTS.md`
+- Stockfish/Bot Engine → `native/src/engine/AGENTS.md`
+- Native Services → `native/src/services/AGENTS.md`
+- Datenbank → `native/src/persistence/AGENTS.md`
+- C-ABI → `native/src/api/AGENTS.md`
+- Schachmodell/PGN/FEN → `native/src/chess/AGENTS.md`
+- Native Training → `native/src/training/AGENTS.md`
+- Theory/Openings → `native/src/theory/AGENTS.md`
+- Provider → `native/src/providers/AGENTS.md`
+- Python/Builder → `tools/AGENTS.md`
 
-## 3. Aktuelle Flutter-Struktur
+## Globale Regeln
 
-Seit dem UI-Refactor ist `flutter_app/lib/ui/app_root.dart` nur noch Home-/Shell-Einstieg.
-Hauptbereiche liegen getrennt unter `features/`:
+- `third_party/` bei normalen KChess-Aufgaben nicht ändern.
+- Sichtbare Flutter-Texte ausschließlich in `flutter_app/l10n/app_en.arb`, `app_de.arb`, `app_ar.arb` pflegen; alle drei gemeinsam ändern.
+- Generierte Lokalisierungsdateien nie manuell editieren.
+- Bestehende ABI-/JSON-/DB-Kompatibilität nicht als „toten Code“ entfernen, ohne alte Daten/Clients auszuschließen.
+- Stockfish 18 und 19 sind beide aktive Engines; Engine-spezifische Logik bleibt nativ.
+- Side-Line-Analyse ist flüchtig und darf Hauptlinienpersistenz nicht überschreiben.
+- Handgeschriebene nicht-triviale Dateien mit klaren Sections strukturieren.
+- Keine Builds, Tests, `flutter analyze` oder App-Runs automatisch starten, solange der Benutzer sie selbst ausführen möchte.
 
-```text
-flutter_app/lib/
-├─ app/
-├─ features/
-│  ├─ analysis/presentation/
-│  ├─ app/application/
-│  ├─ favorites/presentation/
-│  ├─ games/presentation/
-│  ├─ play/presentation/
-│  ├─ profile/presentation/
-│  ├─ settings/presentation/
-│  ├─ statistics/presentation/
-│  └─ training/presentation/
-├─ ffi/
-├─ localization/generated/
-├─ shared/
-├─ ui/
-└─ main.dart
-```
+## Änderungsstil
 
-Neue große Screens niemals wieder in `app_root.dart` sammeln. Jeder eigenständige Screen oder größere UI-Unterbereich bekommt eine passende Datei im zugehörigen Feature.
-
-## 4. Aktuelle native Struktur
-
-```text
-native/src/
-├─ analysis/       # Accuracy und Move-Klassifikation
-├─ api/            # C-ABI
-├─ chess/          # PGN/FEN/Züge/Stellungsmodell
-├─ core/
-├─ diagnostics/
-├─ engine/         # ChessEngine / Stockfish
-├─ http/
-├─ persistence/
-├─ providers/
-├─ services/       # Analysis, Library, Profiles, Settings, Statistics
-├─ training/       # Katalog, Versuche und Trainingsfortschritt
-└─ theory/
-```
-
-Neue Fachlogik in den passendsten nativen Bereich einordnen. Keine parallele zweite Implementierung in Flutter erzeugen.
-
-## 5. Lokalisierung – ausschließlich ARB
-
-Alle sichtbaren UI-Texte werden über Flutter-ARB gepflegt:
-
-```text
-flutter_app/l10n/app_en.arb
-flutter_app/l10n/app_de.arb
-flutter_app/l10n/app_ar.arb
-```
-
-Verbindliche Regeln:
-
-- Keine sichtbaren Texte hart in Dart codieren.
-- Bei neuen Texten immer alle drei ARB-Dateien aktualisieren.
-- `lib/localization/generated/*` niemals manuell bearbeiten; diese Dateien werden generiert.
-- Lokalisierungsschlüssel semantisch und stabil benennen.
-- Schachnotation, FEN, SAN, UCI und Koordinaten nicht übersetzen.
-- Arabisch ändert nur Sprache/Text. Die globale App-Geometrie bleibt bewusst LTR.
-- Ein Sprachwechsel auf Arabisch darf Board, Navigation, Spielerpositionen oder Analyse-Layout nicht spiegeln.
-
-## 6. Datei- und Section-Konvention
-
-Jede handgeschriebene Datei, die neu erstellt oder wesentlich bearbeitet wird, muss klar strukturierte Sections besitzen.
-
-### Dart / C++
-
-Mindestens eine benannte Section pro nicht-trivialer Datei, zum Beispiel:
-
-```text
-// -----------------------------------------------------------------------------
-// Section: Board presentation
-// -----------------------------------------------------------------------------
-```
-
-oder für C++:
-
-```text
-// -----------------------------------------------------------------------------
-// Section: Accuracy aggregation
-// -----------------------------------------------------------------------------
-```
-
-Regeln:
-
-- zusammengehörige Klassen/Funktionen unter derselben Section halten
-- Dateien nach einer klaren Verantwortung schneiden; neue Screens, Controller,
-  DTOs und Fachservices nicht in Sammeldateien anhäufen
-- als Richtwert möglichst unter 500 Zeilen pro handgeschriebener Datei bleiben
-- ab 1000 Zeilen muss vor der Erweiterung aufgeteilt werden; eine Ausnahme ist
-  nur zulässig, wenn eine Trennung technisch unzweckmäßig wäre, und muss in der
-  Datei kurz begründet werden
-- große bestehende Dateien bei jeder wesentlichen Änderung in kleinere,
-  fachlich benannte Einheiten zerlegen, soweit das ohne sachfremden Umbau geht
-- Sections verbessern die Lesbarkeit innerhalb einer Datei, ersetzen aber
-  keinen sinnvollen Dateischnitt
-- keine Section nur zum Selbstzweck; Namen müssen Inhalt beschreiben
-- kleine Forwarder/Exports dürfen eine einzige Section besitzen
-- generierte Dateien und vendorte Third-Party-Dateien nicht für diese Konvention verändern
-
-### Markdown
-
-Handgeschriebene Markdown-Dateien mit klaren `##`-/`###`-Abschnitten strukturieren.
-
-## 7. FFI-Grenze
-
-Flutter kommuniziert mit C++ nur über eine stabile C-ABI via `dart:ffi`.
-
-- keine C++-Klassen direkt exportieren
-- primitive Typen, UTF-8, opaque handles und serialisierbare DTOs verwenden
-- Speicherfreigabe explizit definieren
-- keine C++-Exception darf die ABI-Grenze verlassen
-- native Langläufer als Job/Status/Cancel-Workflow ausführen
-- Flutter darf native Resultate darstellen, aber deren fachliche Bedeutung nicht neu berechnen
-
-## 8. Analyse, Klassifikation und Accuracy
-
-Diese drei Systeme sind getrennte native Verantwortlichkeiten:
-
-- Engine-/Analysewerte kommen aus C++/Stockfish.
-- Move-Klassifikation wird ausschließlich nativ berechnet.
-- Accuracy wird ausschließlich nativ und unabhängig von den Klassifikationslabels berechnet.
-- Flutter zeigt Resultate, Farben, Symbole und Animationen an.
-- Eine UI-Änderung darf niemals stillschweigend Analyse-, Classifier- oder Accuracy-Regeln verändern.
-- Versionsänderungen von Analyse/Classifier/Accuracy müssen Cache/Persistenz korrekt berücksichtigen.
-
-## 9. Analyse-Persistenz
-
-Pro Partie gilt ein autoritativer gespeicherter Voranalyse-Stand.
-
-- tiefere/höherwertige Analyse darf niedrigere ersetzen
-- niedrigere Analyse darf höhere nicht überschreiben
-- vorhandene höhere Analyse wird bei niedrigeren Anforderungen wiederverwendet
-- bei Upgrade darf vorhandener Stand zur Beschleunigung genutzt werden
-- alter autoritativer Stand erst nach erfolgreichem neuen Lauf ersetzen
-- globaler Positionscache bleibt davon getrennt
-
-Side-Line-Analyse ist flüchtige Variantenanalyse und darf Hauptlinien-Persistenz nicht überschreiben. Side-Line-Engine-Einstellungen sind separat persistent und verwenden die zuletzt angewendeten Werte.
-
-## 10. UI-Verantwortung
-
-Flutter darf insbesondere folgende Dinge entscheiden:
-
-- wie ein Ergebnis animiert wird
-- wo Symbole erscheinen
-- welche Boardfarbe dargestellt wird
-- wann ein bereits gezeigter UI-Effekt nicht erneut abgespielt wird
-- Board-Rotation als Benutzerinteraktion
-- Screen-Navigation und Dialoge
-
-C++ entscheidet dagegen, welches fachliche Ergebnis vorliegt.
-
-## 11. Plattformen
-
-Unterstützt:
-
-- Windows
-- Android
-
-Keine serverseitige Runtime voraussetzen. Analyse und Kernfunktionen bleiben lokal.
-
-## 12. Stockfish und Lizenzen
-
-Stockfish steht unter GPLv3.
-
-- Lizenz- und Copyright-Hinweise erhalten
-- verwendete Version/Commit und NNUE-Netze dokumentieren
-- Änderungen und reproduzierbare Buildinformationen erhalten
-- Third-Party-Lizenzen in `THIRD_PARTY_NOTICES.md` pflegen
-- keine Aussage treffen, eine technische Trennung garantiere automatisch proprietäre Lizenzierbarkeit
-
-## 13. Arbeitsweise bei Änderungen
-
-Vor einer Änderung:
-
-1. passende `AGENTS.md` lesen
-2. bestehende Implementierung und Datenflüsse prüfen
-3. Verantwortlichkeit bestimmen: UI oder Domain
-4. bestehende Schnittstelle erweitern statt Parallelcode bauen
-
-Nach einer Änderung:
-
-1. geänderte Dateien auf Section-Struktur prüfen
-2. C++ formatieren/testen, wenn native Logik betroffen ist
-3. Flutter formatieren/analyzieren/builden, wenn UI betroffen ist
-4. ARB-Dateien validieren, wenn Text geändert wurde
-5. Windows-/Android-Build soweit Toolchain verfügbar prüfen
-6. bekannte Warnungen von echten Fehlern unterscheiden
-
-## 14. Nicht tun
-
-- keine Fachlogik aus Bequemlichkeit in Flutter duplizieren
-- keine Übersetzungen direkt in Dart schreiben
-- keine sichtbaren Katalog-, Beispiel-, Trainings-, Fehler- oder Hinweistexte
-  außerhalb der drei ARB-Dateien ablegen
-- keine generierten Localization-Dateien manuell bearbeiten
-- keine bestehenden Caches/Persistenzregeln umgehen
-- keine Stockfish-Parameter im UI hart überschreiben, wenn Settings existieren
-- keine fremden Markenassets oder proprietären Klassifikationssysteme kopieren
-- keine Engine-Hilfe für laufende Online-Partien anbieten
+Bevor Code geändert wird: Aufrufer suchen, Verantwortung bestimmen, kleinste sichere Änderung wählen. Bei Cleanup nur nachweislich tote/redundante Pfade entfernen. Keine Parallelimplementierung erstellen, wenn eine bestehende Schnittstelle erweitert werden kann.

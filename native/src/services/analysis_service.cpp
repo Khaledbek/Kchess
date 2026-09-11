@@ -671,9 +671,14 @@ MoveAssessment assess_move(
     }
   }
   const auto played_material = pv_material_evidence(fen_before, played_pv, 6);
-  const auto best_material = best_line != nullptr
-      ? pv_material_evidence(fen_before, best_line->moves, 6)
-      : PvMaterialEvidence{};
+  PvMaterialEvidence best_material;
+  if (best_line != nullptr) {
+    // Identical PVs share both the starting position and the six-ply limit.
+    // Reuse this assessment's result; do not cache across analysis snapshots.
+    best_material = best_line->moves == played_pv
+        ? played_material
+        : pv_material_evidence(fen_before, best_line->moves, 6);
+  }
 
   const MoveClassifierConfig classifier;
   bool unique_by_expected = false;
@@ -689,8 +694,8 @@ MoveAssessment assess_move(
       && *best_sample.mate_in > 0
       && (!second_sample.mate_in.has_value() || *second_sample.mate_in <= 0);
   const bool only_move_tactical = usable_engine_move(assessment.recommended_move_uci)
-      && root_move_is_tactical(fen_before, assessment.recommended_move_uci)
-      && (unique_by_expected || unique_by_cp || unique_forced_mate);
+      && (unique_by_expected || unique_by_cp || unique_forced_mate)
+      && root_move_is_tactical(fen_before, assessment.recommended_move_uci);
 
   const bool missed_forced_mate = !played_is_best
       && best_sample.mate_in.has_value() && *best_sample.mate_in > 0

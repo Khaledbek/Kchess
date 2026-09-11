@@ -128,11 +128,6 @@ class _BotGameSetupScreenState extends State<BotGameSetupScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            strings.botStrengthDescription,
-                            style: theme.textTheme.bodyMedium,
-                          ),
                           const SizedBox(height: 20),
                           Text(
                             '${strings.botElo}: $_selectedElo',
@@ -200,7 +195,6 @@ class _BotGameSetupScreenState extends State<BotGameSetupScreen> {
                     child: ListTile(
                       leading: const Icon(Icons.memory_rounded),
                       title: Text(strings.stockfish18),
-                      subtitle: Text(strings.botEngineLockedDescription),
                     ),
                   ),
                   const SizedBox(height: 18),

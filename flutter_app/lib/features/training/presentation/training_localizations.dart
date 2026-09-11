@@ -17,5 +17,5 @@ String trainingExerciseHint(AppLocalizations strings, String exerciseId) =>
       'endgame_opposition' => strings.trainingOppositionHint,
       'endgame_lucena' => strings.trainingLucenaHint,
       'endgame_philidor' => strings.trainingPhilidorHint,
-      _ => strings.trainingEndgameSubtitle,
+      _ => strings.trainingEndgameTitle,
     };

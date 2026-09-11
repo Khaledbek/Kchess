@@ -16,10 +16,12 @@ namespace kchess {
 
 class TrainingService {
  public:
+  static constexpr int mastery_threshold = 3;
   explicit TrainingService(Database& database) : database_(database) {}
 
   std::string overview_json() const;
   std::string start_attempt_json(const std::string& exercise_id);
+  TrainingProgressRecord record_completion(const std::string& exercise_id, bool clean);
   std::string play_move_json(
       const std::string& attempt_id,
       const std::string& source,

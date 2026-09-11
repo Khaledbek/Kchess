@@ -178,6 +178,10 @@ add_library(kchess_core SHARED
   src/services/statistics_details.cpp
   src/training/training_catalog.cpp
   src/training/training_service.cpp
+  src/training/practice_catalog.cpp
+  src/training/practice_position.cpp
+  src/training/practice_service.cpp
+  src/training/practice_session.cpp
   src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
   src/theory/position_key.cpp
@@ -227,6 +231,9 @@ if(KCHESS_WITH_STOCKFISH AND WIN32)
 endif()
 
 if(MSVC)
+  # Embedded opening names are UTF-8 on Windows as well as Android.
+  set_source_files_properties(src/training/practice_catalog.cpp
+    PROPERTIES COMPILE_OPTIONS "/utf-8")
   target_compile_options(kchess_core PRIVATE /W4 /permissive- /EHsc)
   target_compile_options(kchess_sqlite PRIVATE /W3)
 

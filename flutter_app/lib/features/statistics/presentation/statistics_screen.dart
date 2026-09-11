@@ -146,13 +146,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    text.introBody,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
                   const SizedBox(height: 14),
                   Align(
                     alignment: AlignmentDirectional.centerStart,
@@ -267,13 +260,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 }
 
-({String title, String introTitle, String introBody}) _statisticsText(
+({String title, String introTitle}) _statisticsText(
   BuildContext context,
 ) {
   final strings = AppLocalizations.of(context);
   return (
     title: strings.statsTitle,
     introTitle: strings.statsIntroTitle,
-    introBody: strings.statsIntroBody,
   );
 }

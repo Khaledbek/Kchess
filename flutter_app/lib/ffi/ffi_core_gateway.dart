@@ -10,7 +10,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../models/models.dart';
+import '../shared/models/models.dart';
 import 'core_gateway.dart';
 
 typedef _AbiVersionNative = Int32 Function();
@@ -381,6 +381,9 @@ class FfiCoreGateway implements CoreGateway {
       _StringNoArgsNative,
       _StringNoArgsDart
     >('kc_training_overview_json');
+    _practiceCommand = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_practice_command_json',
+    );
     _startTrainingAttempt = _library.lookupFunction<
       _StringArgNative,
       _StringArgDart
@@ -442,10 +445,6 @@ class FfiCoreGateway implements CoreGateway {
     _startProviderProfile = _library
         .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
           'kc_start_provider_profile_json',
-        );
-    _startScout = _library
-        .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
-          'kc_start_scout_json',
         );
     _startScoutReport = _library
         .lookupFunction<_StartProviderProfileNative, _StartProviderProfileDart>(
@@ -598,6 +597,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _botMoveStatus;
   late final _StatusStringDart _cancelBotMove;
   late final _StringNoArgsDart _trainingOverview;
+  late final _StringArgDart _practiceCommand;
   late final _StringArgDart _startTrainingAttempt;
   late final _StringThreeArgsDart _playTrainingMove;
   late final _StringArgDart _importPgn;
@@ -615,7 +615,6 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _variationAnalysisStatus;
   late final _StatusStringDart _cancelVariationAnalysis;
   late final _StartProviderProfileDart _startProviderProfile;
-  late final _StartProviderProfileDart _startScout;
   late final _StartProviderProfileDart _startScoutReport;
   late final _StartProviderSyncDart _startProviderSync;
   late final _StringArgDart _providerJobStatus;
@@ -742,23 +741,6 @@ class FfiCoreGateway implements CoreGateway {
                 as Map<String, Object?>;
         return ProviderOverview.fromJson(json);
       });
-
-  @override
-  Future<ProviderOverview> scoutPlayer(String username) async {
-    final native = username.toNativeUtf8();
-    late final String jobId;
-    try {
-      final started =
-          _readJson(
-                _startScout(_handle, ProfileType.chessCom.nativeValue, native),
-              )!
-              as Map<String, Object?>;
-      jobId = started['jobId']! as String;
-    } finally {
-      malloc.free(native);
-    }
-    return _waitProviderJob(jobId);
-  }
 
   @override
   Future<ScoutReport> scoutReport(String username) async {
@@ -1116,6 +1098,11 @@ class FfiCoreGateway implements CoreGateway {
     final json = _readJson(_trainingOverview(_handle))! as Map<String, Object?>;
     return TrainingOverview.fromJson(json);
   }
+
+  @override
+  Future<Object?> practiceCommand(Map<String, Object?> request) =>
+      _withNativeString(jsonEncode(request),
+          (value) => _readJson(_practiceCommand(_handle, value)));
 
   @override
   Future<TrainingAttempt> startTrainingAttempt(String exerciseId) =>

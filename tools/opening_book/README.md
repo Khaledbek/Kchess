@@ -9,6 +9,13 @@ a temporary on-disk SQLite database, so the full dump and all raw positions are
 never loaded into RAM. The output is a compact sorted binary file used by the
 C++ runtime.
 
+## Rolle im aktuellen KChess-Aufbau
+
+Dieses Tool ist reine Development-/Datenbuilder-Logik. Das erzeugte `KCB1` wird
+vom nativen C++-Core gelesen; Flutter greift nicht direkt auf das Format zu.
+Python ist keine Runtime-Abhängigkeit der App und `third_party/` wird durch den
+Builder nicht verändert.
+
 ```powershell
 python -m pip install -r tools/opening_book/requirements.txt
 python tools/opening_book/build_book.py `

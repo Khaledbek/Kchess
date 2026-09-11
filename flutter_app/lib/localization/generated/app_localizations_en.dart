@@ -16,10 +16,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get firstRunTitle => 'Your local chess workspace';
 
   @override
-  String get firstRunBody =>
-      'Choose a source. Public online profiles do not require a password.';
-
-  @override
   String get chessCom => 'Chess.com';
 
   @override
@@ -48,151 +44,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get play => 'Play';
-
-  @override
-  String get playPlaceholder =>
-      'This section is reserved for future play modes, such as games against bots.';
-
-  @override
-  String get playAgainstBot => 'Play against a bot';
-
-  @override
-  String get playAgainstBotSubtitle => 'Start a local game against Stockfish.';
-
-  @override
-  String get continueAgainstBot => 'Continue against bot';
-
-  @override
-  String get botPlayerColor => 'Your color';
-
-  @override
-  String get temporaryBotGameNotSaved =>
-      'This game is not saved and is discarded completely when you close or cancel it.';
-
-  @override
-  String get botGameLog => 'Bot game history';
-
-  @override
-  String get botGameLogSubtitle =>
-      'Open your saved games against bots, continue an active game, or analyse finished games.';
-
-  @override
-  String get botGameLogEmpty => 'No saved bot games yet.';
-
-  @override
-  String get botGameLogLoadFailed =>
-      'The bot game history could not be loaded.';
-
-  @override
-  String get botGameHistoryActive => 'In progress';
-
-  @override
-  String get botGameHistoryWin => 'Won';
-
-  @override
-  String get botGameHistoryLoss => 'Lost';
-
-  @override
-  String get botGameHistoryDraw => 'Draw';
-
-  @override
-  String get botStrength => 'Bot strength';
-
-  @override
-  String get botStrengthDescription =>
-      'Choose the bot rating in 100 Elo steps. The maximum setting represents full Stockfish strength.';
-
-  @override
-  String get botElo => 'Elo';
-
-  @override
-  String get botEngineLockedDescription =>
-      'Bot games always use Stockfish 18 and are independent of the analysis-engine setting.';
-
-  @override
-  String get botStartGame => 'Start game';
-
-  @override
-  String get botGameTitle => 'Game against bot';
-
-  @override
-  String get botGameLoading => 'Preparing game …';
-
-  @override
-  String get botGameLoadFailed => 'The bot game could not be prepared.';
-
-  @override
-  String get botMoveFailed => 'The bot move could not be calculated.';
-
-  @override
-  String get botYou => 'You';
-
-  @override
-  String get botYourTurn => 'Your turn.';
-
-  @override
-  String get botThinking => 'Stockfish is thinking …';
-
-  @override
-  String get botApplyingMove => 'Applying move …';
-
-  @override
-  String get botWaiting => 'Waiting for the next move …';
-
-  @override
-  String get botViewingHistory => 'You are viewing an earlier position.';
-
-  @override
-  String get botGameFinished => 'Game finished.';
-
-  @override
-  String get botMoveList => 'Move list';
-
-  @override
-  String get botNoMovesYet => 'No moves played yet.';
-
-  @override
-  String get botPreviousMove => 'Previous move';
-
-  @override
-  String get botNextMove => 'Next move';
-
-  @override
-  String get botReturnToLive => 'Return to current position';
-
-  @override
-  String get botHintPiece => 'Hint 1: Show piece';
-
-  @override
-  String get botHintTarget => 'Hint 2: Show target square';
-
-  @override
-  String get botHintsUsed => 'Both hints used';
-
-  @override
-  String get botHintThinking => 'Calculating hint …';
-
-  @override
-  String get botHintFailed => 'The hint could not be calculated.';
-
-  @override
-  String get botGameSettingsTitle => 'Game settings';
-
-  @override
-  String get botGameSettingsDescription =>
-      'These settings apply only to this bot game and do not change the general analysis settings.';
-
-  @override
-  String get botGameEvaluationBarHelp =>
-      'Shows the current Stockfish 18 evaluation during this bot game. The setting is saved with the game.';
-
-  @override
-  String botHintCounter(int used) {
-    return '$used / 2 hints for this move';
-  }
-
-  @override
-  String get downloads => 'Downloads';
 
   @override
   String get favorites => 'Favorites';
@@ -231,15 +82,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoriteNoLooseGames => 'No loose favorites.';
 
   @override
-  String get favoriteCollectionRule =>
-      'Collections are one level only and cannot be nested.';
-
-  @override
   String get favoriteMoveToCollection => 'Change collection';
-
-  @override
-  String get favoriteMoveHelp =>
-      'Games can stay as loose favorites or belong to exactly one collection.';
 
   @override
   String get profile => 'Profile';
@@ -257,12 +100,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchAccount => 'Switch account';
 
   @override
-  String get demoNotice => 'Local game';
-
-  @override
-  String get tapToAnalyze => 'Open and analyze';
-
-  @override
   String get importData => 'Import PGN / FEN';
 
   @override
@@ -273,12 +110,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importFen => 'Import FEN position';
-
-  @override
-  String get exportFen => 'Export FEN';
-
-  @override
-  String get fenCopiedToClipboard => 'FEN copied to clipboard.';
 
   @override
   String get pgnText => 'PGN text';
@@ -357,42 +188,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get currentMove => 'Current move';
 
   @override
-  String get boardArrows => 'Show board arrows';
-
-  @override
-  String get boardArrowsHelp =>
-      'Display only; changing this never restarts analysis.';
-
-  @override
   String get engine => 'Engine';
-
-  @override
-  String get engineSelectionTitle => 'Engine version';
-
-  @override
-  String get engineVersion => 'Chess engine';
-
-  @override
-  String get engineVersionHelp =>
-      'Choose which Stockfish version KChess uses for analysis. All existing analysis settings remain unchanged.';
-
-  @override
-  String engineActiveLabel(String engine) {
-    return 'Active: $engine';
-  }
-
-  @override
-  String get stockfish18 => 'Stockfish 18';
-
-  @override
-  String get stockfish19 => 'Stockfish 19';
-
-  @override
-  String get engineSelectionFailed =>
-      'The selected engine could not be activated. The previous engine remains selected.';
-
-  @override
-  String get enginePreset => 'Medium · depth 18 · 3 lines';
 
   @override
   String get depth => 'Depth';
@@ -445,15 +241,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get darkTheme => 'Dark';
 
   @override
-  String get engineSettingsSubtitle =>
-      'Depth, lines, time limit, threads and hash';
-
-  @override
   String get analysisSettingsTitle => 'Analysis';
-
-  @override
-  String get analysisSettingsSubtitle =>
-      'Arrows, evaluation and analysis display';
 
   @override
   String get analysisBoardGuidance => 'Board guidance';
@@ -465,78 +253,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bestMoveArrow => 'Best move arrow';
 
   @override
-  String get bestMoveArrowHelp => 'Shows the engine’s best move on the board.';
-
-  @override
   String get threatArrow => 'Threat arrow';
-
-  @override
-  String get threatArrowHelp =>
-      'Shows the opponent’s strongest next move as a warning arrow when the opponent is to move.';
 
   @override
   String get evaluationBarSetting => 'Evaluation bar';
 
   @override
-  String get evaluationBarSettingHelp => 'Shows the current engine evaluation.';
-
-  @override
   String get showEngineLinesSetting => 'Show engine lines';
-
-  @override
-  String get showEngineLinesSettingHelp =>
-      'Shows the calculated principal variations (MultiPV).';
 
   @override
   String get showClassificationsSetting => 'Show move classifications';
 
   @override
-  String get showClassificationsSettingHelp =>
-      'Shows Theory, Brilliant, Critical, Best and the other move labels.';
-
-  @override
   String get showAccuracySetting => 'Show accuracy';
-
-  @override
-  String get showAccuracySettingHelp =>
-      'Shows the locally calculated accuracy values.';
 
   @override
   String get showTheorySetting => 'Show theory information';
 
   @override
-  String get showTheorySettingHelp =>
-      'Shows opening-book information and theory counts.';
-
-  @override
   String get showResultSymbolsSetting => 'Show result symbols';
-
-  @override
-  String get showResultSymbolsSettingHelp =>
-      'Shows Win, Loss or Draw symbols above the kings when a game has ended.';
 
   @override
   String get designSettingsTitle => 'Design';
 
   @override
-  String get designSettingsSubtitle => 'Appearance, theme, board and pieces';
-
-  @override
   String get generalSettingsTitle => 'General';
 
   @override
-  String get generalSettingsSubtitle => 'Language and app behavior';
-
-  @override
   String get dataStorageSettingsTitle => 'Data & storage';
-
-  @override
-  String get dataStorageSettingsSubtitle =>
-      'Analysis cache, downloads and local data';
-
-  @override
-  String get dataStoragePlaceholder =>
-      'Storage and cache controls will be added in a following step.';
 
   @override
   String get licensesAbout => 'Licenses & about';
@@ -546,12 +290,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get provider => 'Provider';
-
-  @override
-  String get localProfile => 'Local profile';
-
-  @override
-  String get forced => 'Forced';
 
   @override
   String get theory => 'Theory';
@@ -567,9 +305,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get excellent => 'Excellent';
-
-  @override
-  String get good => 'Good';
 
   @override
   String get okay => 'Okay';
@@ -608,12 +343,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playPause => 'Play or pause';
 
   @override
-  String get player => 'Player';
-
-  @override
-  String get bothPlayers => 'Both';
-
-  @override
   String get whitePlayer => 'White';
 
   @override
@@ -624,18 +353,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookGames => 'Book games';
-
-  @override
-  String get expectedLoss => 'Expected-score loss';
-
-  @override
-  String get versions => 'Versions';
-
-  @override
-  String get classifierVersionLabel => 'Classifier';
-
-  @override
-  String get accuracyVersionLabel => 'Accuracy';
 
   @override
   String get analyzingGame => 'Analyzing game';
@@ -654,26 +371,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String moveComparisonText(String played, String classification, String best) {
-    return '$played was $classification. $best is the best move.';
-  }
-
-  @override
-  String theoryMoveText(String move) {
-    return '$move is a theory move.';
-  }
-
-  @override
-  String triedMove(String move) {
-    return 'You tried $move.';
-  }
-
-  @override
   String get sidelineEngineTitle => 'Sideline engine';
-
-  @override
-  String get sidelineEngineSubtitle =>
-      'These values apply only to live analysis of your sideline.';
 
   @override
   String get mainLineLabel => 'Main line';
@@ -693,25 +391,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sidelineAnalysisPaused => 'Live analysis paused';
-
-  @override
-  String get analyzingVariation => 'Analyzing the temporary variation…';
-
-  @override
-  String evaluationComparison(String before, String after) {
-    return 'Evaluation: $before → $after';
-  }
-
-  @override
-  String bestContinuation(String line) {
-    return 'Best continuation: $line';
-  }
-
-  @override
-  String get returnToMainLine => 'Return to main line';
-
-  @override
   String illegalOrFailedMove(String message) {
     return 'The move is illegal or could not be analyzed: $message';
   }
@@ -723,49 +402,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get opponent => 'Opponent';
 
   @override
-  String get variationStartingPosition => 'Variation starting position';
-
-  @override
-  String get variationStart => 'Start of variation';
-
-  @override
   String get engineQualityTitle => 'Analysis quality';
 
   @override
   String get engineResourcesTitle => 'Resources';
 
   @override
-  String get depthHelp =>
-      'Min = pre-analysis depth. Max = maximum live-analysis depth. Higher values usually take longer.';
-
-  @override
   String get adaptiveEarlyStop => 'Adaptive analysis';
-
-  @override
-  String get adaptiveEarlyStopHelp =>
-      'Ends quiet pre-analysis and live searches early when the evaluation and principal variations are stable. Critical verification searches still use the configured limit.';
-
-  @override
-  String get numberOfLinesHelp =>
-      'How many top engine variations Stockfish calculates at the same time.';
-
-  @override
-  String get timeLimitHelp =>
-      'Optional limit per position. Off uses depth only; otherwise the search stops when depth or time is reached first.';
 
   @override
   String get threads => 'Threads';
 
   @override
-  String get threadsHelp =>
-      'CPU threads per Stockfish worker. Kchess detects your PC automatically and allows at most half of the logical CPU threads.';
-
-  @override
   String get hashMemory => 'Hash memory';
-
-  @override
-  String get hashMemoryHelp =>
-      'RAM for Stockfish’s transposition table. More memory can improve repeated-position search.';
 
   @override
   String get boardDisplayTitle => 'Board display';
@@ -777,22 +426,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showBoardCoordinates => 'Board coordinates';
 
   @override
-  String get showBoardCoordinatesHelp =>
-      'Shows file and rank labels (a–h / 1–8) on the board.';
-
-  @override
   String get highlightLastMove => 'Highlight last move';
 
   @override
-  String get highlightLastMoveHelp =>
-      'Highlights the origin and destination squares of the last played move.';
-
-  @override
   String get highlightSelectedSquare => 'Highlight selected square';
-
-  @override
-  String get highlightSelectedSquareHelp =>
-      'Highlights the square you selected while exploring a variation.';
 
   @override
   String get behaviorTitle => 'Behavior';
@@ -801,15 +438,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get autoSyncOnline => 'Automatically sync online profiles';
 
   @override
-  String get autoSyncOnlineHelp =>
-      'Synchronizes Chess.com and Lichess automatically at startup and when switching profiles.';
-
-  @override
   String get confirmBeforeDelete => 'Confirm before deleting';
-
-  @override
-  String get confirmBeforeDeleteHelp =>
-      'Asks for confirmation before deleting profiles or local games.';
 
   @override
   String get analysisCacheTitle => 'Analysis cache';
@@ -818,15 +447,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get useGlobalAnalysisCache => 'Use shared position cache';
 
   @override
-  String get useGlobalAnalysisCacheHelp =>
-      'Reuses compatible analysis of identical positions across different games.';
-
-  @override
   String get clearAnalysisCache => 'Clear analysis cache';
-
-  @override
-  String get clearAnalysisCacheHelp =>
-      'Clears only the shared position cache. Saved games and completed game analyses are kept.';
 
   @override
   String get clearAnalysisCacheQuestion => 'Clear analysis cache?';
@@ -843,10 +464,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diagnosticLogging => 'Diagnostic logging';
-
-  @override
-  String get diagnosticLoggingHelp =>
-      'Writes bounded technical logs for troubleshooting. Full PGNs, FENs, and provider responses are not logged.';
 
   @override
   String get deleteLocalGameQuestion => 'Delete local entry?';
@@ -904,14 +521,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsAll => 'All';
 
   @override
-  String get statsAllTimeControlsNote => 'All time controls';
-
-  @override
   String get statsPhaseTitle => 'By game phase';
-
-  @override
-  String get statsPhaseSubtitle =>
-      'Where your games end and how you score there.';
 
   @override
   String get statsPhaseOpening => 'Opening (1–12)';
@@ -962,14 +572,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsIntroTitle => 'Your chess performance';
 
   @override
-  String get statsIntroBody =>
-      'See your results, recent form and opening record separated by color.';
-
-  @override
   String get statsFormTitle => 'Recent form';
-
-  @override
-  String get statsFormHint => 'Tap a result to open the game.';
 
   @override
   String get statsFormVersus => 'vs';
@@ -1323,53 +926,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get statsTimeControlCorrespondence => 'Correspondence';
-
-  @override
-  String get statsTimeControlOther => 'Other';
-
-  @override
-  String get botGameDeleteQuestion => 'Delete bot game?';
-
-  @override
-  String get botGameDeleteBody =>
-      'This bot-game history entry will be permanently deleted. Any analysis game already created from it remains in your local game library.';
-
-  @override
-  String get promotionTitle => 'Pawn promotion';
-
-  @override
-  String get promotionChoosePiece =>
-      'Choose the piece the pawn should promote to.';
-
-  @override
-  String get promotionQueen => 'Queen';
-
-  @override
-  String get promotionRook => 'Rook';
-
-  @override
-  String get promotionBishop => 'Bishop';
-
-  @override
-  String get promotionKnight => 'Knight';
-
-  @override
   String get trainingSection => 'Training';
 
   @override
   String get trainingIntroTitle => 'Training arena';
 
   @override
-  String get trainingIntroBody =>
-      'Pick a training area. Your progress is stored locally on this device.';
-
-  @override
   String get trainingOpeningTitle => 'Opening lab';
-
-  @override
-  String get trainingOpeningSubtitle =>
-      'Drill your repertoire lines and your weak spots.';
 
   @override
   String get trainingOpeningAction => 'Train lines';
@@ -1387,10 +950,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trainingTacticsTitle => 'Blunder buster';
 
   @override
-  String get trainingTacticsSubtitle =>
-      'Find the better move in critical middlegame positions.';
-
-  @override
   String trainingTacticsSolved(int count) {
     return '$count tactics solved';
   }
@@ -1403,10 +962,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trainingEndgameTitle => 'Endgame academy';
-
-  @override
-  String get trainingEndgameSubtitle =>
-      'Master theoretical endgames step by step.';
 
   @override
   String trainingEndgameProgress(int mastered, int total, int percent) {
@@ -1425,23 +980,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String trainingLastAttempt(String date) {
-    return 'Last practised: $date';
-  }
-
-  @override
-  String get trainingNeverAttempted => 'Not practised yet';
-
-  @override
   String get trainingOpeningLabSelected => 'Selected line';
-
-  @override
-  String get trainingOpeningLabEmpty =>
-      'Pick an opening in the statistics tab and tap “Train” to load it here.';
-
-  @override
-  String get trainingOpeningLabPending =>
-      'The line trainer follows once the core supplies the opening moves.';
 
   @override
   String get statsTrainOpening => 'Train';
@@ -1497,6 +1036,229 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trainingRestart => 'Restart';
 
   @override
+  String get trainingOpeningLabStart => 'Train line';
+
+  @override
+  String get trainingOpeningLabBackToOverview => 'Back to the overview';
+
+  @override
+  String get trainingOpeningTreeEmpty => 'No opening lines available yet.';
+
+  @override
+  String get trainingOpeningTreeExpand => 'Show variations';
+
+  @override
+  String get trainingOpeningTreeCollapse => 'Hide variations';
+
+  @override
+  String trainingOpeningTreeVariations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count variations',
+      one: '1 variation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trainingOpeningTreeLoadFailed =>
+      'That line is not in the database yet.';
+
+  @override
+  String get trainingOpeningTreeZoomIn => 'Zoom in';
+
+  @override
+  String get trainingOpeningTreeZoomOut => 'Zoom out';
+
+  @override
+  String get trainingOpeningTreeFit => 'Fit the tree';
+
+  @override
+  String get trainingOpeningTreeHint =>
+      'Tap a card to unfold its variations, or train the line right away.';
+
+  @override
+  String get playAgainstBot => 'Play against a bot';
+
+  @override
+  String get continueAgainstBot => 'Continue against bot';
+
+  @override
+  String get botPlayerColor => 'Your color';
+
+  @override
+  String get temporaryBotGameNotSaved =>
+      'This game is not saved and is discarded completely when you close or cancel it.';
+
+  @override
+  String get botGameLog => 'Bot game history';
+
+  @override
+  String get botGameLogEmpty => 'No saved bot games yet.';
+
+  @override
+  String get botGameLogLoadFailed =>
+      'The bot game history could not be loaded.';
+
+  @override
+  String get botGameHistoryActive => 'In progress';
+
+  @override
+  String get botGameHistoryWin => 'Won';
+
+  @override
+  String get botGameHistoryLoss => 'Lost';
+
+  @override
+  String get botGameHistoryDraw => 'Draw';
+
+  @override
+  String get botStrength => 'Bot strength';
+
+  @override
+  String get botElo => 'Elo';
+
+  @override
+  String get botStartGame => 'Start game';
+
+  @override
+  String get botGameTitle => 'Game against bot';
+
+  @override
+  String get botGameLoading => 'Preparing game …';
+
+  @override
+  String get botGameLoadFailed => 'The bot game could not be prepared.';
+
+  @override
+  String get botMoveFailed => 'The bot move could not be calculated.';
+
+  @override
+  String get botYou => 'You';
+
+  @override
+  String get botYourTurn => 'Your turn.';
+
+  @override
+  String get botThinking => 'Stockfish is thinking …';
+
+  @override
+  String get botApplyingMove => 'Applying move …';
+
+  @override
+  String get botWaiting => 'Waiting for the next move …';
+
+  @override
+  String get botViewingHistory => 'You are viewing an earlier position.';
+
+  @override
+  String get botGameFinished => 'Game finished.';
+
+  @override
+  String get botMoveList => 'Move list';
+
+  @override
+  String get botNoMovesYet => 'No moves played yet.';
+
+  @override
+  String get botPreviousMove => 'Previous move';
+
+  @override
+  String get botNextMove => 'Next move';
+
+  @override
+  String get botReturnToLive => 'Return to current position';
+
+  @override
+  String get botHintPiece => 'Hint 1: Show piece';
+
+  @override
+  String get botHintTarget => 'Hint 2: Show target square';
+
+  @override
+  String get botHintsUsed => 'Both hints used';
+
+  @override
+  String get botHintThinking => 'Calculating hint …';
+
+  @override
+  String get botHintFailed => 'The hint could not be calculated.';
+
+  @override
+  String get botGameSettingsTitle => 'Game settings';
+
+  @override
+  String botHintCounter(int used) {
+    return '$used / 2 hints for this move';
+  }
+
+  @override
+  String get exportFen => 'Export FEN';
+
+  @override
+  String get fenCopiedToClipboard => 'FEN copied to clipboard.';
+
+  @override
+  String get engineSelectionTitle => 'Engine version';
+
+  @override
+  String get engineVersion => 'Chess engine';
+
+  @override
+  String engineActiveLabel(String engine) {
+    return 'Active: $engine';
+  }
+
+  @override
+  String get stockfish18 => 'Stockfish 18';
+
+  @override
+  String get stockfish19 => 'Stockfish 19';
+
+  @override
+  String get engineSelectionFailed =>
+      'The selected engine could not be activated. The previous engine remains selected.';
+
+  @override
+  String get forced => 'Forced';
+
+  @override
+  String get good => 'Good';
+
+  @override
+  String get statsTimeControlCorrespondence => 'Correspondence';
+
+  @override
+  String get statsTimeControlOther => 'Other';
+
+  @override
+  String get botGameDeleteQuestion => 'Delete bot game?';
+
+  @override
+  String get botGameDeleteBody =>
+      'This bot-game history entry will be permanently deleted. Any analysis game already created from it remains in your local game library.';
+
+  @override
+  String get promotionTitle => 'Pawn promotion';
+
+  @override
+  String get promotionChoosePiece =>
+      'Choose the piece the pawn should promote to.';
+
+  @override
+  String get promotionQueen => 'Queen';
+
+  @override
+  String get promotionRook => 'Rook';
+
+  @override
+  String get promotionBishop => 'Bishop';
+
+  @override
+  String get promotionKnight => 'Knight';
+
+  @override
   String get trainingOppositionTitle => 'Pawn opposition';
 
   @override
@@ -1516,4 +1278,98 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get trainingPhilidorHint =>
       'Keep the rook on the sixth rank until the pawn advances, then check from behind.';
+
+  @override
+  String get practiceDrills => 'Checkmate drills';
+
+  @override
+  String get practiceStudies => 'Classical endgame studies';
+
+  @override
+  String get practiceFailed => 'Attempt ended. Try again.';
+
+  @override
+  String get practiceThinking => 'Opponent is thinking…';
+
+  @override
+  String practiceMoves(int count) {
+    return 'Moves played: $count';
+  }
+
+  @override
+  String practiceLevel(int number) {
+    return 'Level $number';
+  }
+
+  @override
+  String practiceStudyNumber(int number) {
+    return 'Study $number';
+  }
+
+  @override
+  String get practiceStudySource =>
+      'Kling & Horwitz · Chess Studies, Or, Endings of Games (1851). Practise these positions against Stockfish.';
+
+  @override
+  String get practiceQueenTitle => 'King and queen vs. king';
+
+  @override
+  String get practiceRookTitle => 'King and rook vs. king';
+
+  @override
+  String get practiceQueenRookTitle => 'Queen vs. rook';
+
+  @override
+  String get practiceQueenHint =>
+      'Use your king to support the queen. Leave an escape square until you can deliver mate.';
+
+  @override
+  String get practiceRookHint =>
+      'Cut off the king with your rook and bring your king closer.';
+
+  @override
+  String get practiceQueenRookHint =>
+      'Look for forks against the king and rook. Watch out for stalemate.';
+
+  @override
+  String get practiceBeginner => 'Beginner';
+
+  @override
+  String get practiceIntermediate => 'Intermediate';
+
+  @override
+  String get practiceMaster => 'Master';
+
+  @override
+  String get practiceSectionKingPawn => 'King and pawn';
+
+  @override
+  String get practiceSectionBishops => 'Kings, bishops and pawns';
+
+  @override
+  String get practiceSectionKnightsBishops => 'Knights, bishops and pawns';
+
+  @override
+  String get practiceSectionTwoMinor => 'Two minor pieces vs. one';
+
+  @override
+  String get practiceSectionRookPawns => 'Rook vs. pawns';
+
+  @override
+  String get practiceSectionRookMinor => 'Rook vs. minor pieces';
+
+  @override
+  String get practiceSectionMinorRook => 'Minor pieces vs. rook';
+
+  @override
+  String get practiceSectionQueenPawns => 'Queen vs. pawns';
+
+  @override
+  String get practiceSectionQueens => 'Queens and pawns';
+
+  @override
+  String get practiceSectionQueenRook => 'Queen vs. rook';
+
+  @override
+  String get practiceSectionQueenMinor => 'Queen vs. minor pieces';
 }

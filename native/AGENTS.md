@@ -1,105 +1,28 @@
-# Native C++ Core Instructions
+# Native C++ AI Instructions
 
-## 1. Rolle
+## Rolle
 
-`native/` enthält die gesamte Fach-, Schach-, Analyse-, Daten- und Persistenzlogik von KChess.
-Flutter ist nur Client dieser Logik.
+`native/` ist die fachliche Runtime-Wahrheit: Schach, Analyse, Stockfish, Persistenz, Provider, Statistik, Bots und Training.
 
-## 2. Zuständigkeiten
+## Kontext sparen
 
-C++20 ist die einzige fachliche Wahrheit für:
+- Nächstgelegene `native/src/**/AGENTS.md` lesen.
+- Mit `rg` zuerst Deklaration, Definition und Aufrufer eines Symbols finden.
+- Große Dateien (`core_api.cpp`, `database.cpp`, große Services) nur an relevanten Funktionen öffnen.
+- Nicht automatisch alle Services oder Engine-Dateien lesen.
+- `third_party/`, Prebuilt- und Build-Caches nur bei expliziten Engine-/Dependency-Aufgaben öffnen.
 
-- PGN, SAN, FEN, Züge und Legalität
-- Profile und Provider
-- Datenbank und Migrationen
-- Settings und effektive Engine-Konfiguration
-- Game Library und Statistik
-- Stockfish
-- Voranalyse und Liveanalyse
-- Side-Line-Analyse
-- MultiPV / `searchmoves`
-- globale Positionscaches und Analyse-Wiederverwendung
-- Move-Klassifikation
-- Accuracy
-- Theory / Opening Book
-- Resultat-/Termination-Domainstatus
-- Training-Kataloge und Lösungsvarianten
-- Trainingsversuche, Erfolgs-/Meisterschaftsregeln und Fortschrittspersistenz
+## Kritische Regeln
 
-## 3. Analyse-Schichten
+- C-ABI stabil halten; Exceptions nicht über ABI-Grenze lassen.
+- JSON/DTO-Verträge und Speicherbesitz explizit behandeln.
+- Migrationen, Legacy-Spalten, Settings-Aliase und alte ABI-Exports können absichtliche Kompatibilität sein.
+- Stockfish 18 und 19 bleiben getrennte aktive Runtime-Optionen.
+- Side-Lines nicht in autoritative Hauptanalyse persistieren.
+- Keine zweite fachliche Implementierung in Dart/Python erzeugen.
 
-Bestehende Trennung respektieren:
+## Cleanup
 
-```text
-engine/                 Stockfish / ChessEngine
-services/analysis_*     Orchestrierung und Persistenz der Analyse
-analysis/move_*         Klassifikation
-analysis/accuracy.*     Accuracy
-persistence/            SQLite / Migrationen
-api/                    C-ABI für Flutter
-```
+Vor Löschen mindestens Deklaration, Definition, C-ABI/JSON-Vertrag und alle internen Aufrufer prüfen. Geringe Nutzung allein ist kein Beweis für toten Code.
 
-Keine Klassifikations- oder Accuracy-Formel in Flutter spiegeln.
-
-## 4. Klassifikation und Accuracy
-
-- Klassifikation und Accuracy bleiben voneinander unabhängig.
-- Beide dürfen dieselben Engine-Rohdaten verwenden, aber Accuracy wird nicht aus Labels abgeleitet.
-- Versionsänderungen explizit versionieren.
-- Alte persistierte Werte bei Versionswechsel korrekt invalidieren oder neu berechnen.
-- Tests für Grenzfälle, Mate, WDL-/CP-Sättigung und Tiefe ergänzen.
-
-## 5. Analyse-Persistenz
-
-Pro Partie nur einen autoritativen Voranalyse-Stand erhalten.
-
-- höherwertige Analyse ersetzt niedrigere erst nach erfolgreichem Abschluss
-- niedrigere Anfrage verwendet vorhandenen höheren Stand
-- globale Positionscaches separat halten
-- Side Lines niemals in Hauptlinienanalyse überschreiben
-- Side-Line-Settings separat persistent speichern
-
-## 6. FFI / C-ABI
-
-- keine C++-Klassen direkt exponieren
-- UTF-8, primitive Typen, opaque handles oder JSON/DTOs
-- Exceptions an ABI-Grenze abfangen
-- Speicherbesitz eindeutig dokumentieren
-- Langläufer über Start/Status/Cancel oder gleichwertiges Jobmodell
-- Flutter soll keine fachliche Nachberechnung brauchen
-
-## 7. Sections pro Datei
-
-Jede handgeschriebene nicht-triviale C++-Datei besitzt mindestens eine benannte Section.
-Beispiel:
-
-```cpp
-// -----------------------------------------------------------------------------
-// Section: Cache compatibility
-// -----------------------------------------------------------------------------
-```
-
-Neue Fachservices, DTOs und Adapter nach einer klaren Verantwortung schneiden
-und möglichst unter 500 Zeilen halten. Ab 1000 Zeilen ist vor einer Erweiterung
-eine Aufteilung erforderlich; nur eine technisch begründete Ausnahme darf
-größer bleiben. Sections ersetzen keinen Dateischnitt.
-Vendorte Third-Party-Dateien, insbesondere Stockfish, nicht nur für Stilregeln verändern.
-
-## 8. Stockfish
-
-- offizielle Stockfish-Quellen und Lizenzhinweise erhalten
-- NNUE-/SIMD-/Build-Konfiguration reproduzierbar halten
-- `Threads`, `Hash` und ähnliche Optionen nicht unnötig neu setzen
-- Transposition Table und persistente Engine-Lebenszyklen sinnvoll wiederverwenden
-- Plattformkompatibilität bei SIMD beachten
-
-## 9. Tests
-
-Bei nativen Änderungen soweit relevant:
-
-- Unit Tests für geänderte Domainlogik
-- Analysis-Workflow-Test
-- Classifier-/Accuracy-Regressionstests
-- Datenbankmigrationen testen
-- `kchess_core` vollständig bauen
-- Windows/Android-spezifische CMake-Pfade beachten
+Keine automatischen Builds/Tests starten, wenn der Benutzer sie selbst ausführt.

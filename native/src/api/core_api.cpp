@@ -818,6 +818,16 @@ char* kc_training_overview_json(const kc_core_handle handle) {
   });
 }
 
+char* kc_practice_command_json(
+    const kc_core_handle handle, const char* request_utf8) {
+  if (request_utf8 == nullptr) {
+    return invalid_string_argument(core_from(handle), "Practice request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->practice_command_json(request_utf8);
+  });
+}
+
 char* kc_start_training_attempt_json(
     const kc_core_handle handle, const char* exercise_id_utf8) {
   if (exercise_id_utf8 == nullptr || exercise_id_utf8[0] == '\0') {

@@ -52,9 +52,7 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
               key: const Key('engine-version'),
               leading: const Icon(Icons.smart_toy_outlined),
               title: Text(strings.engineVersion),
-              subtitle: Text(
-                '${strings.engineVersionHelp}\n${strings.engineActiveLabel(activeEngineName)}',
-              ),
+              subtitle: Text(strings.engineActiveLabel(activeEngineName)),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -91,7 +89,6 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
                 _DepthRangeSettingTile(
                   key: const Key('engine-depth-range'),
                   title: strings.depth,
-                  description: strings.depthHelp,
                   minimumDepth: controller.settings.minAnalysisDepth,
                   maximumDepth: controller.settings.depth,
                   onMinimumChanged: controller.setMinAnalysisDepth,
@@ -102,7 +99,6 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
                   key: const Key('engine-lines'),
                   icon: Icons.format_list_numbered,
                   title: strings.numberOfLines,
-                  description: strings.numberOfLinesHelp,
                   value: controller.settings.multiPv,
                   minimum: 1,
                   maximum: 8,
@@ -113,7 +109,6 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
                   key: const Key('engine-time-limit'),
                   icon: Icons.timer_outlined,
                   title: strings.timeLimitSeconds,
-                  description: strings.timeLimitHelp,
                   value: controller.settings.timeLimitSeconds,
                   minimum: 0,
                   maximum: 60,
@@ -127,7 +122,6 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
                   key: const Key('adaptive-early-stop'),
                   secondary: const Icon(Icons.speed_outlined),
                   title: Text(strings.adaptiveEarlyStop),
-                  subtitle: Text(strings.adaptiveEarlyStopHelp),
                   value: controller.settings.adaptiveEarlyStop,
                   onChanged: controller.setAdaptiveEarlyStop,
                 ),
@@ -142,7 +136,6 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
                   key: const Key('engine-threads'),
                   icon: Icons.memory_outlined,
                   title: strings.threads,
-                  description: strings.threadsHelp,
                   value: controller.settings.threads,
                   minimum: 1,
                   maximum: controller.settings.maxThreads,
@@ -153,7 +146,6 @@ class _EngineSettingsPageState extends State<_EngineSettingsPage> {
                   key: const Key('engine-hash'),
                   icon: Icons.storage_outlined,
                   title: strings.hashMemory,
-                  description: strings.hashMemoryHelp,
                   value: controller.settings.hashMb,
                   minimum: 16,
                   maximum: 2048,

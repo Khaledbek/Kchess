@@ -360,7 +360,6 @@ class _StatsLabels {
     required this.draws,
     required this.losses,
     required this.all,
-    required this.allTimeControlsNote,
     required this.controlLabel,
   });
 
@@ -368,7 +367,6 @@ class _StatsLabels {
   final String draws;
   final String losses;
   final String all;
-  final String allTimeControlsNote;
   final String Function(String) controlLabel;
 
   String timeControl(String value) =>
@@ -382,7 +380,6 @@ _StatsLabels _statsLabels(BuildContext context) {
     draws: strings.statsDraws,
     losses: strings.statsLosses,
     all: strings.statsAll,
-    allTimeControlsNote: strings.statsAllTimeControlsNote,
     controlLabel: (value) => _timeControlLabel(context, value),
   );
 }

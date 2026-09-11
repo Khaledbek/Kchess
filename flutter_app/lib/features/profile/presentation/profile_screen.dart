@@ -11,6 +11,7 @@ class ProfileScreen extends StatelessWidget {
     final mergeTargets = controller.profiles
         .where((value) => value.type != ProfileType.localPgnFen)
         .toList(growable: false);
+    final ratingEntries = _ratingEntries(profile);
     return Scaffold(
       appBar: MediaQuery.sizeOf(context).width >= 900
           ? AppBar(title: Text(strings.profile))
@@ -151,7 +152,7 @@ class ProfileScreen extends StatelessWidget {
               child: LinearProgressIndicator(),
             ),
           const SizedBox(height: 8),
-          if (_ratingEntries(profile).isNotEmpty) ...[
+          if (ratingEntries.isNotEmpty) ...[
             _ProfileSectionTitle(label: strings.profileRatings),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -164,7 +165,7 @@ class ProfileScreen extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    for (final entry in _ratingEntries(profile))
+                    for (final entry in ratingEntries)
                       SizedBox(
                         width: cardWidth,
                         child: _RatingCard(

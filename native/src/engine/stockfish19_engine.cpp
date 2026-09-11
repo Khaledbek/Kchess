@@ -250,8 +250,7 @@ void Stockfish19Engine::start() {
   // makes upstream CommandLine call _get_pgmptr(), whose EXE-only UCRT state is
   // not initialized in this DLL and asserts in Windows debug builds.
   impl_->engine = std::make_unique<Stockfish19::Engine>(std::nullopt);
-  // A restarted adapter owns a fresh Stockfish instance with default options.
-  // Forget the cached values so the first analysis configures that instance.
+  // Discard settings cached for a previous Stockfish instance.
   impl_->configured_threads.reset();
   impl_->configured_hash_mb.reset();
 #if defined(_WIN32)
@@ -266,6 +265,11 @@ void Stockfish19Engine::start() {
   impl_->engine->set_on_verify_network([](const std::string_view) {});
   Stockfish19::Tune::init(impl_->engine->get_options());
   impl_->engine->verify_network();
+  // Construction already allocated the thread pool and TT. Record their actual
+  // options so a matching first request does not rebuild them unnecessarily.
+  const auto& options = impl_->engine->get_options();
+  impl_->configured_threads = static_cast<int>(options["Threads"]);
+  impl_->configured_hash_mb = static_cast<int>(options["Hash"]);
   impl_->ready = true;
 }
 

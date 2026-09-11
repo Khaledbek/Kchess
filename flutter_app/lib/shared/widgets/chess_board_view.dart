@@ -10,10 +10,8 @@ import '../models/models.dart';
 /// The 8x8 board itself: squares, coordinates, pieces and drag/drop.
 ///
 /// Deliberately knows nothing about games, engines or exercises — it renders a
-/// [BoardPosition] and reports the squares the user touched. Everything a
-/// caller wants to draw on top (evaluation arrows, move-classification badges,
-/// a solved overlay) arrives through [squareTint] and [squareOverlay], or is
-/// stacked over the widget by the caller.
+/// [BoardPosition] and reports the squares the user touched. Callers can tint
+/// squares through [squareTint] or stack additional overlays above the board.
 ///
 /// The analysis board and the training arena share this so a board fix lands in
 /// both.
@@ -26,9 +24,6 @@ class ChessBoardView extends StatelessWidget {
     this.showCoordinates = true,
     this.interactive = true,
     this.squareTint,
-    this.squareOverlay,
-    this.onDragStarted,
-    this.onDragEnded,
     super.key,
   });
 
@@ -63,13 +58,8 @@ class ChessBoardView extends StatelessWidget {
   /// leave it alone.
   final Color Function(String square, Color base)? squareTint;
 
-  /// Extra widget painted inside a square (a badge, a flash ring).
-  final Widget? Function(String square, double squareSide)? squareOverlay;
-
   final ValueChanged<String> onSquareTap;
   final void Function(String source, String target) onPieceDrop;
-  final ValueChanged<String>? onDragStarted;
-  final VoidCallback? onDragEnded;
 
   bool _canDragPiece(String piece) {
     if (!interactive || piece.isEmpty) return false;
@@ -118,8 +108,6 @@ class ChessBoardView extends StatelessWidget {
               ),
             );
 
-            final overlay = squareOverlay?.call(square, squareSide);
-
             return DragTarget<String>(
               onWillAcceptWithDetails: (details) => details.data != square,
               onAcceptWithDetails: (details) =>
@@ -145,9 +133,6 @@ class ChessBoardView extends StatelessWidget {
                             child: canDrag
                                 ? Draggable<String>(
                                     data: square,
-                                    onDragStarted: () =>
-                                        onDragStarted?.call(square),
-                                    onDragEnd: (_) => onDragEnded?.call(),
                                     feedback: Material(
                                       color: Colors.transparent,
                                       child: SizedBox.square(
@@ -160,7 +145,6 @@ class ChessBoardView extends StatelessWidget {
                                   )
                                 : pieceImage(),
                           ),
-                        ?overlay,
                         if (showCoordinates && column == 0)
                           Positioned(
                             left: 3,

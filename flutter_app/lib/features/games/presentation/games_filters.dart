@@ -267,7 +267,6 @@ class _GameFilterLabels {
     required this.previousMonth,
     required this.nextMonth,
     required this.noMatchingGames,
-    required this.noMatchingGamesHelp,
     required this.resetFilters,
     required this.noGamesForMonth,
     required this.result,
@@ -301,7 +300,6 @@ class _GameFilterLabels {
   final String previousMonth;
   final String nextMonth;
   final String noMatchingGames;
-  final String noMatchingGamesHelp;
   final String resetFilters;
   final String noGamesForMonth;
   final String result;
@@ -338,7 +336,6 @@ class _GameFilterLabels {
         previousMonth: 'الشهر السابق',
         nextMonth: 'الشهر التالي',
         noMatchingGames: 'لا توجد مباريات مطابقة',
-        noMatchingGamesHelp: 'غيّر البحث أو أزل بعض عوامل التصفية.',
         resetFilters: 'إعادة ضبط البحث والتصفية',
         noGamesForMonth: 'لا توجد مباريات في {month}',
         result: 'النتيجة',
@@ -374,7 +371,6 @@ class _GameFilterLabels {
         previousMonth: 'Previous month',
         nextMonth: 'Next month',
         noMatchingGames: 'No matching games',
-        noMatchingGamesHelp: 'Change the search or remove some filters.',
         resetFilters: 'Reset search and filters',
         noGamesForMonth: 'No games in {month}',
         result: 'Result',
@@ -409,7 +405,6 @@ class _GameFilterLabels {
       previousMonth: 'Vorheriger Monat',
       nextMonth: 'Nächster Monat',
       noMatchingGames: 'Keine passenden Partien',
-      noMatchingGamesHelp: 'Ändere die Suche oder entferne einzelne Filter.',
       resetFilters: 'Suche und Filter zurücksetzen',
       noGamesForMonth: 'Keine Partien im {month}',
       result: 'Ergebnis',

@@ -22,12 +22,10 @@ class AppController extends ChangeNotifier {
   bool providerSyncing = false;
   String? providerNotice;
   String? selectedMonth;
-  Object? error;
   int _providerSyncGeneration = 0;
 
   Future<void> initialize() async {
     phase = AppPhase.loading;
-    error = null;
     notifyListeners();
     try {
       await gateway.initialize();
@@ -46,8 +44,7 @@ class AppController extends ChangeNotifier {
         selectedMonth = null;
       }
       phase = AppPhase.ready;
-    } catch (caught) {
-      error = caught;
+    } catch (_) {
       phase = AppPhase.error;
     }
     notifyListeners();

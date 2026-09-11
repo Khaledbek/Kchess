@@ -13,6 +13,7 @@ import '../../../ui/shared/board_endgame_presentation.dart';
 import '../../../ui/shared/promotion_dialog.dart';
 import '../../app/application/app_controller.dart';
 import 'analysis_arrow_resolver.dart';
+import 'analysis_move_arrow.dart';
 import 'analysis_temporary_bot_game_screen.dart';
 import 'analysis_variation_graph.dart';
 
@@ -874,13 +875,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           Widget settingTile({
             required String key,
             required String title,
-            required String subtitle,
             required bool value,
             required IconData icon,
           }) => SwitchListTile(
             secondary: Icon(icon),
             title: Text(title),
-            subtitle: Text(subtitle),
             value: value,
             onChanged: (enabled) => toggle(key, enabled),
           );
@@ -948,51 +947,40 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       strings.analysisSettingsTitle,
                       style: theme.textTheme.titleLarge,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      strings.analysisSettingsSubtitle,
-                      style: theme.textTheme.bodyMedium,
-                    ),
                     const SizedBox(height: 8),
                     settingTile(
                       key: 'showBestMoveArrow',
                       title: strings.bestMoveArrow,
-                      subtitle: strings.bestMoveArrowHelp,
                       value: quickSettings.showBestMoveArrow,
                       icon: Icons.arrow_outward,
                     ),
                     settingTile(
                       key: 'showThreatArrow',
                       title: strings.threatArrow,
-                      subtitle: strings.threatArrowHelp,
                       value: quickSettings.showThreatArrow,
                       icon: Icons.warning_amber_rounded,
                     ),
                     settingTile(
                       key: 'showEvaluationBar',
                       title: strings.evaluationBarSetting,
-                      subtitle: strings.evaluationBarSettingHelp,
                       value: quickSettings.showEvaluationBar,
                       icon: Icons.balance,
                     ),
                     settingTile(
                       key: 'showEngineLines',
                       title: strings.showEngineLinesSetting,
-                      subtitle: strings.showEngineLinesSettingHelp,
                       value: quickSettings.showEngineLines,
                       icon: Icons.account_tree_outlined,
                     ),
                     settingTile(
                       key: 'showClassifications',
                       title: strings.showClassificationsSetting,
-                      subtitle: strings.showClassificationsSettingHelp,
                       value: quickSettings.showClassifications,
                       icon: Icons.auto_awesome,
                     ),
                     settingTile(
                       key: 'showResultSymbols',
                       title: strings.showResultSymbolsSetting,
-                      subtitle: strings.showResultSymbolsSettingHelp,
                       value: quickSettings.showResultSymbols,
                       icon: Icons.emoji_events_outlined,
                     ),
@@ -1010,10 +998,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
-                              ),
-                              Text(
-                                strings.sidelineEngineSubtitle,
-                                style: theme.textTheme.bodySmall,
                               ),
                             ],
                           ),
@@ -1475,30 +1459,16 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ? (displayed?.lines ?? const <EngineLine>[])
         : (afterMoveSnapshot?.lines ?? const <EngineLine>[]);
     final lines = variation?.lines ?? mainPositionLines;
-    final lineIndex = _selectedLine < 0
-        ? 0
-        : (_selectedLine >= lines.length ? lines.length - 1 : _selectedLine);
-    final selectedLine = lines.isEmpty ? null : lines[lineIndex];
     final resultBestMove =
         variation?.bestMove ??
         (move == null ? displayed?.bestMove : afterMoveSnapshot?.bestMove) ??
         '';
-    final arrowEngineVersion = variation != null
-        ? variation.engineVersion
-        : (move == null
-                  ? displayed?.engineVersion
-                  : afterMoveSnapshot?.engineVersion) ??
-              snapshot?.engineVersion ??
-              '';
     final arrowAnalysisFen = variation != null
         ? variation.fen
         : (move == null
               ? (displayed?.analyzedFen ?? '')
               : (afterMoveSnapshot?.analyzedFen ?? ''));
     final arrowMove = resolveAnalysisArrowMove(
-      engineVersion: arrowEngineVersion,
-      engineId: _settings.engineId,
-      selectedLine: selectedLine,
       lines: lines,
       resultBestMove: resultBestMove,
       boardFen: position.fen,
@@ -2171,26 +2141,18 @@ class _Board extends StatelessWidget {
                   },
                 ),
                 if (showBestArrow && bestArrowMove.length >= 4)
-                  IgnorePointer(
-                    child: CustomPaint(
-                      key: const Key('best-move-arrow'),
-                      painter: _ArrowPainter(
-                        bestArrowMove,
-                        Theme.of(context).colorScheme.tertiary,
-                        blackAtBottom: blackAtBottom,
-                      ),
-                    ),
+                  AnalysisMoveArrow(
+                    paintKey: const Key('best-move-arrow'),
+                    move: bestArrowMove,
+                    color: Theme.of(context).colorScheme.tertiary,
+                    blackAtBottom: blackAtBottom,
                   ),
                 if (showThreatArrow && threatArrowMove.length >= 4)
-                  IgnorePointer(
-                    child: CustomPaint(
-                      key: const Key('threat-arrow'),
-                      painter: _ArrowPainter(
-                        threatArrowMove,
-                        Theme.of(context).colorScheme.error,
-                        blackAtBottom: blackAtBottom,
-                      ),
-                    ),
+                  AnalysisMoveArrow(
+                    paintKey: const Key('threat-arrow'),
+                    move: threatArrowMove,
+                    color: Theme.of(context).colorScheme.error,
+                    blackAtBottom: blackAtBottom,
                   ),
                 Positioned.fill(
                   child: BoardEndgameLayer(
@@ -2200,7 +2162,6 @@ class _Board extends StatelessWidget {
                     pieces: pieces,
                     boardSide: boardSide,
                     blackAtBottom: blackAtBottom,
-                    showCheckmateBadge: false,
                   ),
                 ),
               ],
@@ -2498,63 +2459,6 @@ class _OpeningMarqueeState extends State<_OpeningMarquee>
   }
 }
 
-class _ArrowPainter extends CustomPainter {
-  const _ArrowPainter(this.move, this.color, {required this.blackAtBottom});
-
-  final String move;
-  final Color color;
-  final bool blackAtBottom;
-
-  Offset? _squareCenter(String squareName, double square) {
-    if (squareName.length != 2) return null;
-    final file = squareName.codeUnitAt(0) - 'a'.codeUnitAt(0);
-    final rank = int.tryParse(squareName[1]);
-    if (file < 0 || file > 7 || rank == null || rank < 1 || rank > 8) {
-      return null;
-    }
-    if (blackAtBottom) {
-      return Offset((7 - file + 0.5) * square, (rank - 1 + 0.5) * square);
-    }
-    return Offset((file + 0.5) * square, (8 - rank + 0.5) * square);
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final square = size.width / 8;
-    final start = _squareCenter(move.substring(0, 2), square);
-    final end = _squareCenter(move.substring(2, 4), square);
-    if (start == null || end == null) return;
-    final vector = end - start;
-    final length = vector.distance;
-    if (length == 0) return;
-    final unit = vector / length;
-    final base = end - unit * square * 0.34;
-    final perpendicular = Offset(-unit.dy, unit.dx);
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = square * 0.17
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(start, base, paint);
-    final path = Path()
-      ..moveTo(end.dx, end.dy)
-      ..lineTo(
-        base.dx + perpendicular.dx * square * 0.24,
-        base.dy + perpendicular.dy * square * 0.24,
-      )
-      ..lineTo(
-        base.dx - perpendicular.dx * square * 0.24,
-        base.dy - perpendicular.dy * square * 0.24,
-      )
-      ..close();
-    canvas.drawPath(path, paint..style = PaintingStyle.fill);
-  }
-
-  @override
-  bool shouldRepaint(covariant _ArrowPainter oldDelegate) =>
-      oldDelegate.move != move ||
-      oldDelegate.color != color ||
-      oldDelegate.blackAtBottom != blackAtBottom;
-}
 
 class _EvaluationBar extends StatelessWidget {
   const _EvaluationBar({required this.line, required this.terminalResult});

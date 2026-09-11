@@ -22,6 +22,7 @@
 #include "theory/opening_name_index.h"
 #include "theory/opening_theory_provider.h"
 #include "training/training_service.h"
+#include "training/practice_service.h"
 
 namespace kchess {
 
@@ -145,6 +146,7 @@ class Core {
   void cancel_bot_move(const std::string& job_id);
 
   std::string training_overview_json() const;
+  std::string practice_command_json(const std::string& request);
   std::string start_training_attempt_json(const std::string& exercise_id);
   std::string play_training_move_json(
       const std::string& attempt_id,
@@ -177,6 +179,7 @@ class Core {
   BotService bot_service_;
   StatisticsService statistics_service_;
   TrainingService training_service_;
+  PracticeService practice_service_;
   bool initialized_{false};
   int32_t last_status_{0};
   std::string last_error_;

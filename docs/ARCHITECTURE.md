@@ -2,80 +2,152 @@
 
 ## 1. Architekturprinzip
 
-KChess trennt Darstellung und Fachlogik strikt:
+KChess trennt UI, Runtime-Domainlogik und Development-Tooling klar:
 
 ```text
 Flutter / Dart UI
         |
-        | dart:ffi / C-ABI
+        | dart:ffi / stabile C-ABI
         v
 C++20 Core
         |
-        +-- Stockfish
+        +-- Stockfish 18
+        +-- Stockfish 19
         +-- SQLite
-        +-- Provider APIs
+        +-- Chess.com / Lichess HTTP
+
+Python tools
+        +-- KCB1 Opening-Book Builder
+        +-- KCO1 Opening-Name Builder
+        +-- Provider Smoke Tool
 ```
 
-Flutter rendert und orchestriert UI-Zustände. C++ ist die einzige fachliche Wahrheit.
+Flutter rendert und orchestriert UI-Zustände. C++ ist die fachliche Runtime-Wahrheit. Python wird nur zur Entwicklung/Datenaufbereitung verwendet.
 
 ## 2. Flutter-Schicht
 
 Flutter besitzt:
 
-- Home-/Navigation-Shell
+- App-Shell und Navigation
 - Feature-Screens
 - Board-Darstellung
-- Animationen
+- Result-/Klassifikationssymbole und Animationen
 - Theme und Assets
 - View-State
-- dünne FFI-Gateways
+- dünne FFI-Gateways und DTO-Mapping
 
-`lib/ui/app_root.dart` enthält nur noch Home-/Shell-Code. Die Hauptbereiche liegen getrennt unter `lib/features/*/presentation/`.
+Aktuelle Hauptbereiche:
+
+```text
+Games | Play | Training | Favorites | Statistics | Settings
+```
+
+Die Profilseite wird über den Profilkopf geöffnet. `lib/ui/app_root.dart` komponiert die Shell; Feature-Code liegt unter `lib/features/`.
 
 ## 3. Native Schicht
 
 Der C++20-Core besitzt:
 
 - PGN/FEN/SAN/Zugmodell und Legalität
-- Profile, Provider, Game Library und Statistik
-- Settings und Persistenz
-- Stockfish und Engine-Lifecycle
-- Voranalyse, Liveanalyse und Side-Line-Analyse
-- Cache/Wiederverwendung
-- Theory
-- Move-Klassifikation
-- Accuracy
-- Training-Kataloge und validierte Lösungsvarianten
-- Trainingsversuche, Fortschritt, Erfolgsserien und Meisterschaft
+- Profile und Provider
+- Game Library, Favoriten und Download-Kompatibilität
+- Statistik
+- Settings und SQLite-Persistenz
+- Stockfish-Engine-Lifecycle
+- Analyse, Side-Lines, MultiPV und Cache
+- Move-Klassifikation und Accuracy
+- Opening Theory und Opening Names
+- lokale Bot-Spiele
+- Training und Fortschritt
 
-## 4. Analyse
+## 4. Engine-Layer
 
-Die Analyse verwendet den offiziellen Stockfish-Core hinter `ChessEngine`/`StockfishEngine`.
-Threads und Hash werden nur bei tatsächlicher Änderung neu konfiguriert, damit Threadpool und Transposition Table wiederverwendet werden können.
-Windows und Android verwenden plattformspezifische SIMD-Pfade.
+KChess unterstützt zwei auswählbare Engines:
 
-Voranalyse und Liveanalyse sind getrennte Qualitätsstufen. Ein vorhandener höherwertiger Analyse-Stand darf für niedrigere Anforderungen wiederverwendet werden. Pro Partie bleibt nur ein autoritativer persistierter Voranalyse-Stand; ein höherer erfolgreicher Lauf ersetzt den niedrigeren.
+- `stockfish18`
+- `stockfish19`
 
-Side-Line-Analyse verwendet einen separaten flüchtigen Variantenstatus und darf Hauptliniendaten nicht überschreiben. Ihre zuletzt angewendeten Engine-Einstellungen werden separat gespeichert.
+Stockfish 18 und 19 werden getrennt gebaut und gemeinsam in den Core integriert. Stockfish 19 nutzt einen separaten Namespace-/Buildpfad, damit Symbolkollisionen vermieden werden. Die Engineauswahl wird persistent gespeichert.
 
-## 5. Klassifikation
+Engine-spezifische Besonderheiten wie SF19-MultiPV-Kohärenz und die SF19-Klassifikationskalibrierung bleiben im nativen Layer. Flutter erhält fertige Engine-/Analyse-DTOs.
 
-Die Move-Klassifikation wird ausschließlich nativ berechnet.
-`Best` ist an den tatsächlichen Stockfish-Rang-1-Zug gebunden. Weitere Kategorien verwenden native Engine-Rohdaten und konservative CP-/Mate-/Positionsregeln.
-Flutter erhält nur das fertige Klassifikationsresultat und rendert Symbol/Farbe.
+## 5. Analyse
 
-## 6. Accuracy
+Die Analysepipeline umfasst:
 
-Accuracy wird ausschließlich nativ und unabhängig von Klassifikationslabels berechnet.
-Die aktuelle Logik verwendet CP-/Mate-Regret, Entscheidungsgewichtung und Stabilitätsinformationen statt einer reinen gesättigten WDL-Differenz.
-Triviale Entscheidungen in bereits klaren Stellungen erhalten geringes Gewicht; kritische/unique Entscheidungen höheres Gewicht.
+- Hauptlinien-/Voranalyse einer Partie
+- Live-/Positionanalyse
+- MultiPV und Best Move
+- Side-Line-Analyse als flüchtiger Variantenbaum
+- native Evaluation-Bar-Projektion
+- native Move-Klassifikation
+- native Accuracy
+- Positionscache und persistierte Wiederverwendung
 
-## 7. Persistenz und Versionierung
+Side-Lines dürfen den autoritativen Hauptanalyse-Stand nicht überschreiben. Höherwertige Hauptanalyse ersetzt niedrigere erst nach erfolgreichem Abschluss.
 
-SQLite speichert Profile, Games, Analyse, Settings, Provider-Caches und Statistiken.
-Analyse-, Classifier-, Accuracy- und Theory-Versionen werden getrennt behandelt, damit vorhandene Engine-Rohdaten nach Möglichkeit wiederverwendet werden können.
+## 6. Klassifikation und Accuracy
 
-## 8. FFI
+Move-Klassifikation und Accuracy sind getrennte native Systeme.
+
+- `Best` muss mit dem tatsächlich validierten Engine-Bestmove konsistent sein.
+- Engine-spezifische Modelle dürfen getrennt kalibriert werden.
+- Brilliant/Great/Fehlerklassen werden ausschließlich im nativen Classifier bestimmt.
+- Accuracy wird nicht aus den Labels abgeleitet.
+
+## 7. Bibliothek, Favoriten und Downloads
+
+Partien stammen aus:
+
+- Chess.com-Synchronisierung
+- Lichess-Synchronisierung
+- lokalem PGN-Import
+- lokalem FEN-Import
+- lokal gespeicherten Bot-Partien
+
+Favoriten sind lokal persistent und können Sammlungen zugeordnet werden. Downloads sind kein eigener Navigationsbereich mehr: das lokale Speichern einer Online-Partie setzt den Favoritenstatus und ordnet sie der obersten Sammlung `Downloads` zu. Legacy-Downloaddaten werden nativ kompatibel behandelt.
+
+PGN/FEN-Import gehört zur lokalen PGN/FEN-Bibliothek, auch wenn gerade ein Online-Profil aktiv ist.
+
+## 8. Provider
+
+Chess.com und Lichess werden über öffentliche APIs ohne Login-Tokens oder Passwörter verwendet. Providerantworten werden nativ normalisiert und gecacht. Netzwerkfehler dürfen lokale Daten nicht zerstören.
+
+## 9. Play
+
+Lokale Bot-Partien werden über den nativen `BotService` und die Engine-/Move-Selection-Pipeline ausgeführt. Flutter zeigt Setup, Boardzustand, Resultat und Spielprotokoll. Bot-Partien dürfen nicht auf Dart-Schachlogik angewiesen sein.
+
+## 10. Training
+
+Training besteht aktuell aus:
+
+- Opening Lab
+- Blunder Buster
+- Endgame Academy
+- Endgame Studies
+
+Der C++-Core besitzt Kataloge, Positions-/Zugvalidierung, Sessionstatus, Fortschritt und Verteidiger-Jobs. Flutter besitzt Navigation, Baumdarstellung, Boardinteraktion und Polling.
+
+Die Opening-Trainingsdaten stammen aus den eingebetteten Lichess-`chess-openings`-Snapshots. Die Studien tragen ihre Quellenmetadaten direkt im eingebetteten Katalog; der aktuelle Studienbestand basiert auf gemeinfreien Kling/Horwitz-Studien.
+
+## 11. Statistik
+
+Statistik wird nativ aggregiert. Flutter stellt Overview, Form, Rating, Termination, Phasen, Openings und Spielervergleich dar. Die UI soll keine Statistikwerte fachlich neu berechnen, wenn sie bereits nativ geliefert werden.
+
+## 12. Persistenz
+
+SQLite speichert unter anderem:
+
+- Profile und aktives Profil
+- Settings
+- Games und Provider-Caches
+- Favoriten/Sammlungen
+- Analysen und Cache-Metadaten
+- Training/Progress
+
+Migrationen und alte Compatibility-Felder können bewusst weiter bestehen und dürfen nicht nur wegen geringer aktueller Nutzung entfernt werden.
+
+## 13. FFI
 
 Die Grenze ist eine stabile C-ABI:
 
@@ -83,11 +155,11 @@ Die Grenze ist eine stabile C-ABI:
 - UTF-8 und serialisierbare DTOs
 - explizite Speicherfreigabe
 - keine Exceptions über die ABI-Grenze
-- asynchrone native Jobs für Langläufer
+- native Jobs für Langläufer
 
-## 9. Lokalisierung
+## 14. Lokalisierung
 
-Alle sichtbaren Flutter-Texte stammen ausschließlich aus:
+Alle sichtbaren Flutter-Texte stammen aus:
 
 ```text
 flutter_app/l10n/app_en.arb
@@ -95,26 +167,23 @@ flutter_app/l10n/app_de.arb
 flutter_app/l10n/app_ar.arb
 ```
 
-Die generierten Dateien unter `lib/localization/generated/` werden nicht manuell bearbeitet.
-Das gilt auch für sichtbare Dateninhalte wie Übungstitel, Hinweise, leere
-Zustände und Fehlermeldungen: C++ liefert stabile semantische IDs und fachliche
-Werte, Flutter löst die zugehörigen Texte über ARB auf.
-Arabisch ändert die Sprache, nicht die globale Layout-Richtung: KChess bleibt layoutseitig LTR, damit Board, Navigation und Spielerorientierung nicht gespiegelt werden.
+Generierte Dateien unter `lib/localization/generated/` werden nicht manuell bearbeitet. Arabisch ändert Sprache/Text, nicht die globale Layout-Richtung.
 
-## 10. Datei-Struktur und Sections
+## 15. Python-Tooling
 
-Handgeschriebene Quell- und Dokumentationsdateien werden in klar benannte
-Sections gegliedert und nach einer Verantwortung geschnitten. Zielgröße sind
-höchstens ungefähr 500 Zeilen. Handgeschriebene Dateien ab 1000 Zeilen werden
-vor einer Erweiterung aufgeteilt; nur technisch begründete Ausnahmen dürfen
-größer bleiben. Große Screens werden in Screen, View-State und wiederverwendbare
-Widgets getrennt, native Fachbereiche in kleine Services, Modelle und Adapter.
-Generierte und vendorte Dateien sind von Stil-Refactors ausgenommen.
+Python wird nicht in der App ausgeliefert. Es erzeugt reproduzierbare Entwicklungsartefakte:
 
-## 11. Training
+- `tools/opening_book/build_book.py` -> `opening_book.kcb`
+- `tools/opening_names/build_names.py` -> `opening_names.kco`
+- `tools/provider_smoke.py` -> manuelle Providerdiagnose
 
-Flutter zeigt Trainingsbereiche, Übungsfortschritt und Board-Interaktionen an.
-Der C++20-Core besitzt den Trainingskatalog, die Lösungszüge, Zugvalidierung,
-Versuchsstatus, Erfolgs-/Meisterschaftsregeln und SQLite-Persistenz. Die C-ABI
-liefert hierfür DTOs mit stabilen Übungs- und Textschlüsseln; Flutter darf daraus
-keine fachlichen Ergebnisse neu berechnen.
+## 16. Third Party
+
+`third_party/` enthält externe Quellen und wird bei normalen KChess-Refactors nicht verändert. Dazu gehören insbesondere:
+
+- Stockfish 18
+- Stockfish 19
+- SQLite
+- nlohmann/json
+
+Details stehen in `docs/LICENSE_COMPLIANCE.md` und `THIRD_PARTY_NOTICES.md`.

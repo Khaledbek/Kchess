@@ -37,7 +37,6 @@ class AnalysisVariationGraph {
   bool get isEmpty => _nodes.isEmpty;
   bool get isOnVariation => currentNodeId != null;
   AnalysisVariationNode? get current => node(currentNodeId);
-  Iterable<AnalysisVariationNode> get nodes => _nodes.values;
   List<int> get rootMainLinePlies {
     final values = _rootsByMainLinePly.keys.toList(growable: false)..sort();
     return values;
@@ -127,32 +126,6 @@ class AnalysisVariationGraph {
 
   List<AnalysisVariationNode> get currentPath => pathTo(currentNodeId);
 
-  /// Route used by previous/next controls for the currently selected branch.
-  /// It contains the ancestors plus the preferred descendants, so navigating
-  /// backward does not lose the known forward continuation.
-  List<AnalysisVariationNode> get currentRoute {
-    final currentNode = current;
-    if (currentNode == null) return const <AnalysisVariationNode>[];
-    final path = pathTo(currentNode.id);
-    if (path.isEmpty) return path;
-
-    final route = <AnalysisVariationNode>[...path];
-    var cursor = currentNode;
-    while (cursor.preferredChildId != null) {
-      final child = node(cursor.preferredChildId);
-      if (child == null) break;
-      route.add(child);
-      cursor = child;
-    }
-    return route;
-  }
-
-  int get currentRouteIndex {
-    final id = currentNodeId;
-    if (id == null) return -1;
-    return currentRoute.indexWhere((node) => node.id == id);
-  }
-
   AnalysisVariationNode? get previous {
     final currentNode = current;
     return currentNode == null ? null : node(currentNode.parentId);
@@ -174,30 +147,5 @@ class AnalysisVariationGraph {
       cursor = child;
     }
     return cursor;
-  }
-
-  /// UI summary entries: one node per complete explored sideline, not one row
-  /// per individual move. All intermediate move nodes stay in memory and are
-  /// still used by previous/next navigation.
-  List<AnalysisVariationNode> terminalNodesAt(int mainLinePly) {
-    final terminals = <AnalysisVariationNode>[];
-    for (final root in rootsAt(mainLinePly)) {
-      _collectTerminalNodes(root, terminals);
-    }
-    return terminals;
-  }
-
-  void _collectTerminalNodes(
-    AnalysisVariationNode node,
-    List<AnalysisVariationNode> target,
-  ) {
-    if (node.childIds.isEmpty) {
-      target.add(node);
-      return;
-    }
-    for (final childId in node.childIds) {
-      final child = this.node(childId);
-      if (child != null) _collectTerminalNodes(child, target);
-    }
   }
 }

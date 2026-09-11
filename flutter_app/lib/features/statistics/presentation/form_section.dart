@@ -117,13 +117,6 @@ class _RecentFormCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      labels.hint,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   ],
                 );
               },
@@ -209,7 +202,6 @@ class _StreakBadge extends StatelessWidget {
 class _FormText {
   const _FormText({
     required this.title,
-    required this.hint,
     required this.versus,
     required this.empty,
     required this.error,
@@ -217,7 +209,6 @@ class _FormText {
   });
 
   final String title;
-  final String hint;
   final String versus;
   final String empty;
   final String error;
@@ -228,7 +219,6 @@ _FormText _formText(BuildContext context) {
   final strings = AppLocalizations.of(context);
   return _FormText(
     title: strings.statsFormTitle,
-    hint: strings.statsFormHint,
     versus: strings.statsFormVersus,
     empty: strings.statsFormEmpty,
     error: strings.statsFormError,

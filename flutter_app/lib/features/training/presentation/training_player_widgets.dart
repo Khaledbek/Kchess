@@ -23,7 +23,8 @@ class TrainingStatusLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final text = feedback ??
+    final text =
+        feedback ??
         (solved ? strings.trainingSolvedTitle : strings.trainingYourMove);
     final color = feedback != null
         ? scheme.error

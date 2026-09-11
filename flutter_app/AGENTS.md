@@ -1,128 +1,36 @@
-# Flutter Layer Instructions
+# Flutter AI Instructions
 
-## 1. Rolle
+## Rolle
 
-`flutter_app/` ist ausschließlich Präsentations-, Interaktions- und View-State-Schicht.
-Die fachliche Wahrheit kommt aus dem nativen C++-Core.
+Flutter ist Präsentations-, Interaktions- und View-State-Schicht. Fachliche Wahrheit kommt aus C++.
 
-## 2. Erlaubt in Flutter
+## Kontext sparen
 
-- Screens und Widgets
-- Navigation
-- responsive Layouts
-- Board-Darstellung
-- Theme/Farben/Assets
-- Animationen
-- lokale UI-Auswahlzustände
-- Dialoge, Menüs und Formulare
-- Polling nativer Jobs
-- dünne FFI-Adapter und DTO-Mapping
+- Zuerst die lokale Feature-`AGENTS.md` lesen.
+- Nicht pauschal `app_root.dart`, alle Models oder alle FFI-Dateien öffnen.
+- Bei einem Widgetproblem: Widget + direkte Callsite(s) lesen.
+- Bei einem Datenproblem: DTO-Feld per `rg` verfolgen; Native erst öffnen, wenn der Vertrag betroffen ist.
+- Bei großen Screens nur die relevante Section um den Treffer lesen.
 
-## 3. Nicht in Flutter implementieren
+## Flutter darf
 
-Keine neue Domainlogik in Dart:
+Screens, Widgets, Navigation, Layout, Theme, Assets, Animationen, lokale UI-Zustände, Dialoge, native Job-Orchestrierung, dünne FFI-Adapter und reine Darstellung besitzen.
 
-- keine Schachlegalität
-- kein PGN/FEN/SAN-Parsing als fachliche Quelle
-- keine Ergebnis-/Matt-/Remis-Berechnung
-- keine Analyseheuristiken
-- keine Move-Klassifikation
-- keine Accuracy-Berechnung
-- keine Theory-Entscheidung
-- keine Persistenz-/Cache-Regeln
-- keine effektiven Engine-Ressourcenregeln
-- keine Trainingskataloge, Lösungsvarianten, Erfolgs-/Meisterschaftsregeln oder
-  Fortschrittspersistenz
+## Flutter darf nicht als Domainquelle besitzen
 
-Wenn Legacy-Code so etwas enthält und der Bereich bearbeitet wird, bevorzugt nach C++ migrieren.
+Schachlegalität, PGN/FEN/SAN-Parsing, Ergebnislogik, Analyseheuristiken, Move-Klassifikation, Accuracy, Theory, Persistenz/Migrationen, effektive Engine-Ressourcenregeln oder Trainingslösungen.
 
-## 4. Feature-Struktur
+## Lokalisierung
 
-`lib/ui/app_root.dart` bleibt klein und enthält nur Home-/Shell-Verantwortung.
+Sichtbare Texte nur über ARB (EN/DE/AR gemeinsam). `lib/localization/generated/*` nie manuell ändern.
 
-Hauptscreens gehören unter:
+## Shared / FFI
 
-```text
-lib/features/<feature>/presentation/
-```
+- gemeinsame Models: `lib/shared/models/`
+- Theme/UI-Bausteine: `lib/shared/`
+- FFI: `lib/ffi/`
+- keine alten Compatibility-Pfade unter `lib/models`, `lib/theme`, `lib/view_models`, `lib/ui/screens` wieder einführen
 
-Aktuelle Features:
+## Arbeitsweise
 
-- `analysis`
-- `favorites`
-- `games`
-- `play`
-- `profile`
-- `settings`
-- `statistics`
-- `training`
-
-Keine neuen großen Screen-Klassen in `app_root.dart` einfügen.
-
-## 5. Lokalisierung ausschließlich über ARB
-
-Sichtbare Texte ausschließlich in:
-
-```text
-l10n/app_en.arb
-l10n/app_de.arb
-l10n/app_ar.arb
-```
-
-- keine sichtbaren Strings in Widgets hardcoden
-- auch sichtbare Katalogdaten, Übungstitel, Hinweise, Fehlermeldungen und
-  Platzhalter ausschließlich über ARB lokalisieren
-- immer DE/EN/AR gemeinsam ergänzen
-- `lib/localization/generated/*` niemals manuell ändern
-- generierte `AppLocalizations` verwenden
-- Arabisch ändert nur Text/Sprache; globale UI bleibt LTR
-- Board und App-Layout dürfen beim Sprachwechsel nicht gespiegelt werden
-
-## 6. Sections pro Datei
-
-Jede handgeschriebene nicht-triviale Dart-Datei besitzt mindestens eine benannte Section.
-Beispiel:
-
-```dart
-// -----------------------------------------------------------------------------
-// Section: Result presentation
-// -----------------------------------------------------------------------------
-```
-
-Dateien nach einer klaren UI-Verantwortung schneiden und möglichst unter 500
-Zeilen halten. Ab 1000 Zeilen ist vor einer Erweiterung eine Aufteilung in
-Screens, Widgets, View-State oder DTO-Mapping erforderlich; nur eine technisch
-begründete Ausnahme darf größer bleiben. Sections ersetzen keinen Dateischnitt.
-Generierte Dateien sind ausgenommen.
-
-## 7. Analysis UI
-
-Flutter darf native Analyseergebnisse nur darstellen:
-
-- Evaluation
-- Engine-Linien
-- Klassifikationssymbol
-- Klassifikationsfarbe
-- Accuracy
-- Theory
-- Resultatstatus
-
-Die Entscheidung, welcher Wert fachlich gilt, kommt aus C++.
-UI-Effekte wie Win/Loss/Draw/Give-up-Animation, Andocken am Spielernamen und „nur einmal zeigen“ bleiben Flutter-Verantwortung.
-
-## 8. FFI
-
-- keine Schachlogik im FFI-Adapter
-- DTOs möglichst unverändert mappen
-- Fehler aus Native in UI-Zustände übersetzen, nicht fachlich neu interpretieren
-- lange Jobs niemals auf dem UI-Thread ausführen
-
-## 9. Qualität
-
-Bei Flutter-Änderungen soweit verfügbar:
-
-1. `dart format`
-2. `flutter analyze`
-3. relevante Widget-/Unit-Tests
-4. `flutter build windows --debug`
-5. Android-Build bei plattformspezifischen Änderungen
+Vor DTO-/Widget-Cleanup projektweit nach Aufrufern suchen. Native-JSON nicht nur deshalb ändern, weil Flutter ein Feld nicht konsumiert. Keine automatischen Builds/Tests/Analyzer/Run.

@@ -147,10 +147,6 @@ nlohmann::json scout_profile_object(const ProviderProfile& profile) {
   return result;
 }
 
-std::string scout_profile_json(const ProviderProfile& profile) {
-  return scout_profile_object(profile).dump();
-}
-
 // Scouting and local statistics share the same native tally rules.
 using ScoutTally = statistics::Tally;
 
@@ -549,7 +545,7 @@ void ProviderService::run_scout(
       stats_json = normalized_stats_json(*stats.value);
     }
     std::ostringstream json;
-    json << "{\"profile\":" << scout_profile_json(*remote_profile.value)
+    json << "{\"profile\":" << scout_profile_object(*remote_profile.value).dump()
          << ",\"stats\":" << stats_json << ",\"availableMonths\":[]"
          << ",\"offlineReady\":false,\"retryAfterSeconds\":0}";
     finish_provider_job(job, "complete", json.str());

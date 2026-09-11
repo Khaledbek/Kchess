@@ -6,14 +6,15 @@ of format version 1.
 
 ## Position and move identities
 
-`positionKey` is the deterministic 64-bit Zobrist key from Stockfish 18
-(`Position::key()` with the FEN halfmove/fullmove clocks canonicalized to
-`0 1`). It includes every piece, side to move, castling rights and a Stockfish-
+`positionKey` is KChess' canonical deterministic 64-bit Zobrist key,
+originally pinned to the Stockfish 18 `Position::key()` layout (with the FEN
+halfmove/fullmove clocks canonicalized to `0 1`). The selected runtime engine
+(Stockfish 18 or 19) does not change this on-disk identity. It includes every piece, side to move, castling rights and a Stockfish-
 valid en-passant file. An en-passant target is ignored when the side to move has
 no pawn that could pseudo-legally capture it. Clocks are intentionally excluded,
 so transpositions have the same identity. The builder reproduces the official
 Stockfish PRNG seed and key layout and the native reader computes the key with
-the vendored Stockfish core. Cross-language fixtures guard this contract.
+the canonical KChess/Stockfish-18-compatible key implementation. Cross-language fixtures guard this contract.
 
 Moves are unsigned 16-bit values: bits `0..5` from-square (`a1=0`), bits
 `6..11` to-square and bits `12..14` promotion (`0` none, `1` knight, `2`

@@ -30,19 +30,11 @@ class AppProfile {
     this.avatarUrl,
     this.avatarFile,
     this.flair,
-    this.joinedAt,
-    this.lastOnlineAt,
-    this.country,
-    this.location,
-    this.publicUrl,
-    this.followers,
     this.fide,
     this.providerGames,
     this.providerWins,
     this.providerLosses,
     this.providerDraws,
-    this.playTimeSeconds,
-    this.providerStatus,
     this.providerDisabled = false,
   });
 
@@ -56,19 +48,11 @@ class AppProfile {
     avatarUrl: json['avatarUrl'] as String?,
     avatarFile: json['avatarFile'] as String?,
     flair: json['flair'] as String?,
-    joinedAt: json['joinedAt'] as int?,
-    lastOnlineAt: json['lastOnlineAt'] as int?,
-    country: json['country'] as String?,
-    location: json['location'] as String?,
-    publicUrl: json['publicUrl'] as String?,
-    followers: json['followers'] as int?,
     fide: json['fide'] as int?,
     providerGames: json['providerGames'] as int?,
     providerWins: json['providerWins'] as int?,
     providerLosses: json['providerLosses'] as int?,
     providerDraws: json['providerDraws'] as int?,
-    playTimeSeconds: json['playTimeSeconds'] as int?,
-    providerStatus: json['providerStatus'] as String?,
     providerDisabled: json['providerDisabled'] as bool? ?? false,
   );
 
@@ -81,19 +65,11 @@ class AppProfile {
   final String? avatarUrl;
   final String? avatarFile;
   final String? flair;
-  final int? joinedAt;
-  final int? lastOnlineAt;
-  final String? country;
-  final String? location;
-  final String? publicUrl;
-  final int? followers;
   final int? fide;
   final int? providerGames;
   final int? providerWins;
   final int? providerLosses;
   final int? providerDraws;
-  final int? playTimeSeconds;
-  final String? providerStatus;
   final bool providerDisabled;
 }
 
@@ -101,46 +77,28 @@ class ProviderPerformance {
   const ProviderPerformance({
     required this.key,
     this.currentRating,
-    this.bestRating,
-    this.lowestRating,
-    this.ratingProgress,
     this.games,
     this.wins,
     this.losses,
     this.draws,
-    this.winRate,
-    this.lossRate,
-    this.drawRate,
   });
 
   factory ProviderPerformance.fromJson(Map<String, Object?> json) =>
       ProviderPerformance(
         key: json['key']! as String,
         currentRating: json['currentRating'] as int?,
-        bestRating: json['bestRating'] as int?,
-        lowestRating: json['lowestRating'] as int?,
-        ratingProgress: json['ratingProgress'] as int?,
         games: json['games'] as int?,
         wins: json['wins'] as int?,
         losses: json['losses'] as int?,
         draws: json['draws'] as int?,
-        winRate: (json['winRate'] as num?)?.toDouble(),
-        lossRate: (json['lossRate'] as num?)?.toDouble(),
-        drawRate: (json['drawRate'] as num?)?.toDouble(),
       );
 
   final String key;
   final int? currentRating;
-  final int? bestRating;
-  final int? lowestRating;
-  final int? ratingProgress;
   final int? games;
   final int? wins;
   final int? losses;
   final int? draws;
-  final double? winRate;
-  final double? lossRate;
-  final double? drawRate;
 }
 
 class ProviderOverview {
@@ -148,8 +106,6 @@ class ProviderOverview {
     required this.profile,
     required this.stats,
     required this.availableMonths,
-    required this.offlineReady,
-    required this.retryAfterSeconds,
   });
 
   factory ProviderOverview.fromJson(Map<String, Object?> json) =>
@@ -161,15 +117,11 @@ class ProviderOverview {
             .toList(growable: false),
         availableMonths: (json['availableMonths'] as List<Object?>? ?? const [])
             .cast<String>(),
-        offlineReady: json['offlineReady'] as bool? ?? false,
-        retryAfterSeconds: json['retryAfterSeconds'] as int? ?? 0,
       );
 
   final AppProfile profile;
   final List<ProviderPerformance> stats;
   final List<String> availableMonths;
-  final bool offlineReady;
-  final int retryAfterSeconds;
 }
 
 /// A win/draw/loss tally from the profile's perspective, with derived rates.
@@ -180,7 +132,6 @@ class StatTally {
     this.wins = 0,
     this.draws = 0,
     this.losses = 0,
-    this.undecided = 0,
     this.winRate,
     this.winShare,
     this.scorePercent,
@@ -191,7 +142,6 @@ class StatTally {
     wins: json['wins'] as int? ?? 0,
     draws: json['draws'] as int? ?? 0,
     losses: json['losses'] as int? ?? 0,
-    undecided: json['undecided'] as int? ?? 0,
     winRate: (json['winRate'] as num?)?.toDouble(),
     winShare: (json['winShare'] as num?)?.toDouble(),
     scorePercent: (json['scorePercent'] as num?)?.toDouble(),
@@ -201,12 +151,9 @@ class StatTally {
   final int wins;
   final int draws;
   final int losses;
-  final int undecided;
   final double? winRate;
   final double? winShare;
   final double? scorePercent;
-
-  int get decided => wins + draws + losses;
 }
 
 /// One time-control bucket (bullet, blitz, rapid, ...) with its tally.
@@ -232,7 +179,6 @@ class StatisticsOverview {
     this.white = const StatTally(),
     this.black = const StatTally(),
     this.byTimeControl = const [],
-    this.recentForm = const [],
   });
 
   factory StatisticsOverview.fromJson(Map<String, Object?> json) {
@@ -253,8 +199,6 @@ class StatisticsOverview {
           .cast<Map<String, Object?>>()
           .map(StatTimeControl.fromJson)
           .toList(growable: false),
-      recentForm: (json['recentForm'] as List<Object?>? ?? const [])
-          .cast<String>(),
     );
   }
 
@@ -264,7 +208,6 @@ class StatisticsOverview {
   final StatTally white;
   final StatTally black;
   final List<StatTimeControl> byTimeControl;
-  final List<String> recentForm;
 
   bool get isEmpty => totalGames == 0;
 }
@@ -329,8 +272,6 @@ class OpeningsStats {
   const OpeningsStats({
     this.hasProfile = false,
     this.gamesWithOpening = 0,
-    this.gamesWithoutOpening = 0,
-    this.distinctFamilies = 0,
     this.bestWinRateFamilies = const [],
     this.nemesis,
     this.defaultColor = 'white',
@@ -340,8 +281,6 @@ class OpeningsStats {
   factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
     hasProfile: json['hasProfile'] as bool? ?? false,
     gamesWithOpening: json['gamesWithOpening'] as int? ?? 0,
-    gamesWithoutOpening: json['gamesWithoutOpening'] as int? ?? 0,
-    distinctFamilies: json['distinctFamilies'] as int? ?? 0,
     defaultColor: json['defaultColor'] as String? ?? 'white',
     bestWinRateFamilies:
         (json['bestWinRateFamilies'] as List<Object?>? ?? const [])
@@ -359,8 +298,6 @@ class OpeningsStats {
 
   final bool hasProfile;
   final int gamesWithOpening;
-  final int gamesWithoutOpening;
-  final int distinctFamilies;
   final String defaultColor;
   final List<OpeningFamily> bestWinRateFamilies;
   final OpeningFamily? nemesis;
@@ -756,7 +693,6 @@ class FavoriteCollection {
     required this.id,
     required this.name,
     required this.gameCount,
-    required this.createdAt,
   });
 
   factory FavoriteCollection.fromJson(Map<String, Object?> json) =>
@@ -764,13 +700,11 @@ class FavoriteCollection {
         id: json['id']! as String,
         name: json['name']! as String,
         gameCount: json['gameCount'] as int? ?? 0,
-        createdAt: json['createdAt'] as int? ?? 0,
       );
 
   final String id;
   final String name;
   final int gameCount;
-  final int createdAt;
 }
 
 class GameSummary {
@@ -781,24 +715,18 @@ class GameSummary {
     required this.blackName,
     required this.result,
     required this.timeControl,
-    required this.startingFen,
     this.whiteRating,
     this.blackRating,
     this.event = '',
     this.date = '',
-    this.isFixture = false,
     this.providerGameId,
-    this.providerUrl,
     this.profileColor = 'unknown',
     this.openingEco,
     this.openingName,
-    this.openingPly,
     this.providerOutcome = 'unknown',
     this.timeControlType = 'unknown',
-    this.providerAccuracy,
     this.localAccuracy,
     this.accuracy,
-    this.accuracySource = 'none',
     this.favorite = false,
     this.favoriteCollectionId,
     this.downloaded = false,
@@ -819,20 +747,14 @@ class GameSummary {
     event: json['event'] as String? ?? '',
     date: json['date'] as String? ?? '',
     timeControl: json['timeControl'] as String? ?? '',
-    startingFen: json['startingFen'] as String? ?? '',
-    isFixture: json['isFixture'] as bool? ?? false,
     providerGameId: json['providerGameId'] as String?,
-    providerUrl: json['providerUrl'] as String?,
     profileColor: json['profileColor'] as String? ?? 'unknown',
     openingEco: json['openingEco'] as String?,
     openingName: json['openingName'] as String?,
-    openingPly: json['openingPly'] as int?,
     providerOutcome: json['providerOutcome'] as String? ?? 'unknown',
     timeControlType: json['timeControlType'] as String? ?? 'unknown',
-    providerAccuracy: (json['providerAccuracy'] as num?)?.toDouble(),
     localAccuracy: (json['localAccuracy'] as num?)?.toDouble(),
     accuracy: (json['accuracy'] as num?)?.toDouble(),
-    accuracySource: json['accuracySource'] as String? ?? 'none',
     favorite: json['favorite'] as bool? ?? false,
     favoriteCollectionId: json['favoriteCollectionId'] as String?,
     downloaded: json['downloaded'] as bool? ?? false,
@@ -852,20 +774,14 @@ class GameSummary {
   final String event;
   final String date;
   final String timeControl;
-  final String startingFen;
-  final bool isFixture;
   final String? providerGameId;
-  final String? providerUrl;
   final String profileColor;
   final String? openingEco;
   final String? openingName;
-  final int? openingPly;
   final String providerOutcome;
   final String timeControlType;
-  final double? providerAccuracy;
   final double? localAccuracy;
   final double? accuracy;
-  final String accuracySource;
   final bool favorite;
   final String? favoriteCollectionId;
   final bool downloaded;
@@ -925,10 +841,8 @@ class ParsedMove {
     required this.sideToMove,
     required this.san,
     required this.uci,
-    required this.fenBefore,
     required this.fenAfter,
     this.clockMillis,
-    this.positionBefore = BoardPosition.empty,
     this.positionAfter = BoardPosition.empty,
   });
 
@@ -938,12 +852,8 @@ class ParsedMove {
     sideToMove: json['sideToMove']! as String,
     san: json['san']! as String,
     uci: json['uci']! as String,
-    fenBefore: json['fenBefore']! as String,
     fenAfter: json['fenAfter']! as String,
     clockMillis: json['clockMillis'] as int?,
-    positionBefore: BoardPosition.fromJson(
-      json['positionBefore']! as Map<String, Object?>,
-    ),
     positionAfter: BoardPosition.fromJson(
       json['positionAfter']! as Map<String, Object?>,
     ),
@@ -954,10 +864,8 @@ class ParsedMove {
   final String sideToMove;
   final String san;
   final String uci;
-  final String fenBefore;
   final String fenAfter;
   final int? clockMillis;
-  final BoardPosition positionBefore;
   final BoardPosition positionAfter;
 }
 
@@ -1109,8 +1017,6 @@ class BotGameSummary {
     required this.outcome,
     required this.moveCount,
     required this.createdAt,
-    required this.updatedAt,
-    this.analysisGameId,
   });
 
   factory BotGameSummary.fromJson(Map<String, Object?> json) => BotGameSummary(
@@ -1123,8 +1029,6 @@ class BotGameSummary {
     outcome: json['outcome'] as String? ?? 'unfinished',
     moveCount: json['moveCount'] as int? ?? 0,
     createdAt: json['createdAt'] as int? ?? 0,
-    updatedAt: json['updatedAt'] as int? ?? 0,
-    analysisGameId: json['analysisGameId'] as String?,
   );
 
   final String gameId;
@@ -1136,8 +1040,6 @@ class BotGameSummary {
   final String outcome;
   final int moveCount;
   final int createdAt;
-  final int updatedAt;
-  final String? analysisGameId;
 
   bool get isActive => status == 'active';
   bool get canAnalyze => !isActive && moveCount > 0;
@@ -1177,7 +1079,6 @@ class BotGameSession {
     required this.positions,
     required this.moves,
     required this.createdAt,
-    required this.updatedAt,
     required this.showEvaluationBar,
   });
 
@@ -1199,7 +1100,6 @@ class BotGameSession {
         .map(BotGameMove.fromJson)
         .toList(growable: false),
     createdAt: json['createdAt'] as int? ?? 0,
-    updatedAt: json['updatedAt'] as int? ?? 0,
     showEvaluationBar: json['showEvaluationBar'] as bool? ?? false,
   );
 
@@ -1214,7 +1114,6 @@ class BotGameSession {
   final List<BoardPosition> positions;
   final List<BotGameMove> moves;
   final int createdAt;
-  final int updatedAt;
   final bool showEvaluationBar;
 
   bool get isActive => status == 'active';
@@ -1225,7 +1124,6 @@ class BotMoveSnapshot {
     required this.jobId,
     required this.status,
     required this.engineId,
-    required this.requestedElo,
     required this.move,
     required this.bestMove,
     this.evaluationFen,
@@ -1249,7 +1147,6 @@ class BotMoveSnapshot {
     jobId: json['jobId']! as String,
     status: json['status']! as String,
     engineId: json['engineId']! as String,
-    requestedElo: json['requestedElo']! as int,
     move: json['move'] as String? ?? '',
     bestMove: json['bestMove'] as String? ?? '',
     evaluationFen: json['evaluationFen'] as String?,
@@ -1278,7 +1175,6 @@ class BotMoveSnapshot {
   final String jobId;
   final String status;
   final String engineId;
-  final int requestedElo;
   final String move;
   final String bestMove;
   final String? evaluationFen;
@@ -1305,7 +1201,6 @@ class BotMoveSnapshot {
 class GameDetail {
   const GameDetail({
     required this.summary,
-    required this.pgn,
     required this.moves,
     this.startingPosition = BoardPosition.empty,
     this.outcome,
@@ -1313,7 +1208,6 @@ class GameDetail {
 
   factory GameDetail.fromJson(Map<String, Object?> json) => GameDetail(
     summary: GameSummary.fromJson(json),
-    pgn: json['pgn'] as String? ?? '',
     moves: (json['moves'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>()
         .map(ParsedMove.fromJson)
@@ -1327,7 +1221,6 @@ class GameDetail {
   );
 
   final GameSummary summary;
-  final String pgn;
   final List<ParsedMove> moves;
   final BoardPosition startingPosition;
   final GameOutcome? outcome;
@@ -1405,7 +1298,6 @@ class PlayerAnalysisSummary {
     required this.mistake,
     required this.blunder,
     required this.totalMoves,
-    required this.analyzedMoves,
     this.localAccuracy,
   });
 
@@ -1423,7 +1315,6 @@ class PlayerAnalysisSummary {
         mistake: json['mistake']! as int,
         blunder: json['blunder']! as int,
         totalMoves: json['totalMoves']! as int,
-        analyzedMoves: json['analyzedMoves']! as int,
         localAccuracy: (json['localAccuracy'] as num?)?.toDouble(),
       );
 
@@ -1439,7 +1330,6 @@ class PlayerAnalysisSummary {
   final int mistake;
   final int blunder;
   final int totalMoves;
-  final int analyzedMoves;
   final double? localAccuracy;
 }
 
@@ -1486,22 +1376,13 @@ class AnalysisSummary {
 class TheoryMoveInfo {
   const TheoryMoveInfo({
     required this.games,
-    required this.whiteWins,
-    required this.draws,
-    required this.blackWins,
   });
 
   factory TheoryMoveInfo.fromJson(Map<String, Object?> json) => TheoryMoveInfo(
     games: json['games']! as int,
-    whiteWins: json['whiteWins']! as int,
-    draws: json['draws']! as int,
-    blackWins: json['blackWins']! as int,
   );
 
   final int games;
-  final int whiteWins;
-  final int draws;
-  final int blackWins;
 }
 
 class WdlScore {
@@ -1611,15 +1492,10 @@ class AnalysisSnapshot {
     required this.recommendedMove,
     required this.engineVersion,
     this.analyzedFen = '',
-    required this.configHash,
     required this.lines,
     this.error,
     this.summary,
     this.classification,
-    this.expectedScoreBefore,
-    this.expectedScoreBest,
-    this.expectedScorePlayed,
-    this.expectedScoreLoss,
     this.theory,
     this.classifierVersion = 0,
   });
@@ -1642,16 +1518,11 @@ class AnalysisSnapshot {
         recommendedMove: json['recommendedMove'] as String? ?? '',
         engineVersion: json['engineVersion'] as String? ?? '',
         analyzedFen: json['analyzedFen'] as String? ?? '',
-        configHash: json['configHash'] as String? ?? '',
         error: json['error'] as String?,
         classification: MoveClassification.fromJson(
           json['classification'] as String?,
         ),
         classifierVersion: json['classifierVersion'] as int? ?? 0,
-        expectedScoreBefore: (json['expectedScoreBefore'] as num?)?.toDouble(),
-        expectedScoreBest: (json['expectedScoreBest'] as num?)?.toDouble(),
-        expectedScorePlayed: (json['expectedScorePlayed'] as num?)?.toDouble(),
-        expectedScoreLoss: (json['expectedScoreLoss'] as num?)?.toDouble(),
         theory: json['theory'] == null
             ? null
             : TheoryMoveInfo.fromJson(json['theory']! as Map<String, Object?>),
@@ -1679,16 +1550,11 @@ class AnalysisSnapshot {
   final String recommendedMove;
   final String engineVersion;
   final String analyzedFen;
-  final String configHash;
   final String? error;
   final List<EngineLine> lines;
   final AnalysisSummary? summary;
   final MoveClassification? classification;
   final int classifierVersion;
-  final double? expectedScoreBefore;
-  final double? expectedScoreBest;
-  final double? expectedScorePlayed;
-  final double? expectedScoreLoss;
   final TheoryMoveInfo? theory;
 
   bool get isComplete => jobState == AnalysisJobState.completed;

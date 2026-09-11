@@ -113,3 +113,7 @@ Kchess_Update_*/
 # Python build-tool caches (tools/opening_book, tools/opening_names)
 __pycache__/
 *.pyc
+# Prevent accidental nested project copies
+/Kchess/
+/flutter_app/flutter_app/
+

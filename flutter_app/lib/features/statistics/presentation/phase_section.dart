@@ -42,13 +42,6 @@ class _PhaseCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              labels.subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
             const SizedBox(height: 14),
             FutureBuilder<PhaseStats>(
               future: future,
@@ -452,7 +445,6 @@ Color _phaseColor(String phase) => switch (phase) {
 class _PhaseText {
   const _PhaseText({
     required this.title,
-    required this.subtitle,
     required this.opening,
     required this.middlegame,
     required this.endgame,
@@ -469,7 +461,6 @@ class _PhaseText {
   });
 
   final String title;
-  final String subtitle;
   final String opening;
   final String middlegame;
   final String endgame;
@@ -505,7 +496,6 @@ _PhaseText _phaseText(BuildContext context) {
   final strings = AppLocalizations.of(context);
   return _PhaseText(
     title: strings.statsPhaseTitle,
-    subtitle: strings.statsPhaseSubtitle,
     opening: strings.statsPhaseOpening,
     middlegame: strings.statsPhaseMiddlegame,
     endgame: strings.statsPhaseEndgame,

@@ -2,7 +2,7 @@
 // Section: Native gateway contract
 // -----------------------------------------------------------------------------
 
-import '../models/models.dart';
+import '../shared/models/models.dart';
 
 abstract interface class CoreGateway {
   Future<void> initialize();
@@ -20,10 +20,6 @@ abstract interface class CoreGateway {
     String targetProfileId,
   );
   Future<ProviderOverview> providerOverview(String profileId);
-
-  /// Fetch a public player's profile + ratings for a scouting comparison,
-  /// without creating a profile or storing any games.
-  Future<ProviderOverview> scoutPlayer(String username);
 
   /// Deep scouting report for a public player: profile, ratings and their
   /// win/draw/loss by colour, time control, termination and opening, aggregated
@@ -102,6 +98,7 @@ abstract interface class CoreGateway {
   Future<BotMoveSnapshot> botMoveStatus(String jobId);
   Future<void> cancelBotMove(String jobId);
   Future<TrainingOverview> trainingOverview();
+  Future<Object?> practiceCommand(Map<String, Object?> request);
   Future<TrainingAttempt> startTrainingAttempt(String exerciseId);
   Future<TrainingMoveResult> playTrainingMove({
     required String attemptId,

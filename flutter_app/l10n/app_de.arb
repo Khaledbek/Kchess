@@ -2,7 +2,6 @@
   "@@locale": "de",
   "appTitle": "KChess",
   "firstRunTitle": "Dein lokaler Schachbereich",
-  "firstRunBody": "Wähle eine Quelle. Öffentliche Online-Profile benötigen kein Passwort.",
   "chessCom": "Chess.com",
   "lichess": "Lichess",
   "localPgnFen": "PGN / FEN",
@@ -13,72 +12,16 @@
   "games": "Partien",
   "gameSection": "Partie",
   "play": "Spielen",
-  "playPlaceholder": "Dieser Bereich ist als Platzhalter für zukünftige Spielmodi vorbereitet, z. B. Partien gegen Bots.",
-  "playAgainstBot": "Gegen einen Bot spielen",
-  "playAgainstBotSubtitle": "Starte eine lokale Partie gegen Stockfish.",
-  "continueAgainstBot": "Gegen Bot weiterspielen",
-  "botPlayerColor": "Deine Farbe",
-  "temporaryBotGameNotSaved": "Diese Partie wird nicht gespeichert und beim Schließen oder Abbrechen vollständig verworfen.",
-  "botGameLog": "Bot-Spielverlauf",
-  "botGameLogSubtitle": "Öffne deine gespeicherten Partien gegen Bots, setze laufende Partien fort oder analysiere beendete Partien.",
-  "botGameLogEmpty": "Noch keine gespeicherten Bot-Partien.",
-  "botGameLogLoadFailed": "Der Bot-Spielverlauf konnte nicht geladen werden.",
-  "botGameHistoryActive": "Laufend",
-  "botGameHistoryWin": "Gewonnen",
-  "botGameHistoryLoss": "Verloren",
-  "botGameHistoryDraw": "Remis",
-  "botStrength": "Bot-Spielstärke",
-  "botStrengthDescription": "Wähle die Bot-Stärke in 100-Elo-Schritten. Die maximale Einstellung steht für die volle Stockfish-Spielstärke.",
-  "botElo": "Elo",
-  "botEngineLockedDescription": "Bot-Partien verwenden immer Stockfish 18 und sind unabhängig von der Engine-Auswahl für die Analyse.",
-  "botStartGame": "Partie starten",
-  "botGameTitle": "Partie gegen Bot",
-  "botGameLoading": "Partie wird vorbereitet …",
-  "botGameLoadFailed": "Die Bot-Partie konnte nicht vorbereitet werden.",
-  "botMoveFailed": "Der Bot-Zug konnte nicht berechnet werden.",
-  "botYou": "Du",
-  "botYourTurn": "Du bist am Zug.",
-  "botThinking": "Stockfish denkt …",
-  "botApplyingMove": "Zug wird ausgeführt …",
-  "botWaiting": "Warte auf den nächsten Zug …",
-  "botViewingHistory": "Du siehst eine frühere Stellung.",
-  "botGameFinished": "Partie beendet.",
-  "botMoveList": "Zugliste",
-  "botNoMovesYet": "Noch keine Züge gespielt.",
-  "botPreviousMove": "Einen Zug zurück",
-  "botNextMove": "Einen Zug vor",
-  "botReturnToLive": "Zur aktuellen Stellung",
-  "botHintPiece": "Hinweis 1: Figur anzeigen",
-  "botHintTarget": "Hinweis 2: Zielfeld anzeigen",
-  "botHintsUsed": "Beide Hinweise verwendet",
-  "botHintThinking": "Hinweis wird berechnet …",
-  "botHintFailed": "Der Hinweis konnte nicht berechnet werden.",
-  "botGameSettingsTitle": "Spieleinstellungen",
-  "botGameSettingsDescription": "Diese Einstellungen gelten nur für diese Bot-Partie und ändern keine allgemeinen Analyse-Einstellungen.",
-  "botGameEvaluationBarHelp": "Zeigt während dieser Bot-Partie die aktuelle Stockfish-18-Bewertung. Die Einstellung wird mit der Partie gespeichert.",
-  "botHintCounter": "{used} / 2 Hinweise für diesen Zug",
-  "@botHintCounter": {
-    "placeholders": {
-      "used": {
-        "type": "int"
-      }
-    }
-  },
-  "downloads": "Downloads",
   "favorites": "Favoriten",
   "profile": "Profil",
   "settings": "Einstellungen",
   "analysis": "Analyse",
   "addAccount": "Konto anlegen",
   "switchAccount": "Konto wechseln",
-  "demoNotice": "Lokale Partie",
-  "tapToAnalyze": "Öffnen und analysieren",
   "importData": "PGN / FEN importieren",
   "importPgnFile": "PGN-Datei auswählen",
   "pastePgn": "PGN-Text einfügen",
   "importFen": "FEN-Stellung importieren",
-  "exportFen": "FEN exportieren",
-  "fenCopiedToClipboard": "FEN wurde in die Zwischenablage kopiert.",
   "pgnText": "PGN-Text",
   "pgnLabel": "Partie-PGN",
   "fenText": "Vollständige FEN",
@@ -103,24 +46,7 @@
   "evaluation": "Bewertung",
   "engineLines": "Engine-Linien",
   "currentMove": "Aktueller Zug",
-  "boardArrows": "Brett-Pfeile anzeigen",
-  "boardArrowsHelp": "Nur Darstellung; Umschalten startet keine neue Analyse.",
   "engine": "Engine",
-  "engineSelectionTitle": "Engine-Version",
-  "engineVersion": "Schach-Engine",
-  "engineVersionHelp": "Wähle, welche Stockfish-Version KChess für die Analyse verwendet. Alle bisherigen Analyse-Einstellungen bleiben unverändert.",
-  "engineActiveLabel": "Aktiv: {engine}",
-  "@engineActiveLabel": {
-    "placeholders": {
-      "engine": {
-        "type": "String"
-      }
-    }
-  },
-  "stockfish18": "Stockfish 18",
-  "stockfish19": "Stockfish 19",
-  "engineSelectionFailed": "Die ausgewählte Engine konnte nicht aktiviert werden. Die bisherige Engine bleibt ausgewählt.",
-  "enginePreset": "Mittel · Tiefe 18 · 3 Linien",
   "depth": "Tiefe",
   "numberOfLines": "Anzahl der Linien",
   "timeLimitSeconds": "Zeitlimit (Sekunden)",
@@ -137,45 +63,28 @@
   "systemTheme": "System",
   "lightTheme": "Hell",
   "darkTheme": "Dunkel",
-  "engineSettingsSubtitle": "Tiefe, Linien, Zeitlimit, Threads und Hash",
   "analysisSettingsTitle": "Analyse",
-  "analysisSettingsSubtitle": "Pfeile, Bewertung und Analyseanzeige",
   "analysisBoardGuidance": "Brett-Hinweise",
   "analysisInformation": "Analyseinformationen",
   "bestMoveArrow": "Bestzug-Pfeil",
-  "bestMoveArrowHelp": "Zeigt den besten Engine-Zug auf dem Brett.",
   "threatArrow": "Bedrohungs-Pfeil",
-  "threatArrowHelp": "Zeigt den stärksten gegnerischen Zug als Warnpfeil, wenn der Gegner am Zug ist.",
   "evaluationBarSetting": "Bewertungsleiste",
-  "evaluationBarSettingHelp": "Zeigt die aktuelle Engine-Bewertung.",
   "showEngineLinesSetting": "Engine-Linien anzeigen",
-  "showEngineLinesSettingHelp": "Zeigt die berechneten Hauptvarianten (MultiPV).",
   "showClassificationsSetting": "Zugklassifikationen anzeigen",
-  "showClassificationsSettingHelp": "Zeigt Theorie, Brillant, Kritisch, Bester und die weiteren Zugkategorien.",
   "showAccuracySetting": "Accuracy anzeigen",
-  "showAccuracySettingHelp": "Zeigt die lokal berechneten Accuracy-Werte.",
   "showTheorySetting": "Theorieinformationen anzeigen",
-  "showTheorySettingHelp": "Zeigt Eröffnungsbuch-Informationen und Theorie-Zähler.",
   "showResultSymbolsSetting": "Ergebnissymbole anzeigen",
-  "showResultSymbolsSettingHelp": "Zeigt bei beendeten Partien Win-, Loss- oder Draw-Symbole über den Königen.",
   "designSettingsTitle": "Design",
-  "designSettingsSubtitle": "Darstellung, Theme, Brett und Figuren",
   "generalSettingsTitle": "Allgemein",
-  "generalSettingsSubtitle": "Sprache und App-Verhalten",
   "dataStorageSettingsTitle": "Daten & Speicher",
-  "dataStorageSettingsSubtitle": "Analyse-Cache, Downloads und lokale Daten",
-  "dataStoragePlaceholder": "Speicher- und Cache-Optionen werden in einem nächsten Schritt ergänzt.",
   "licensesAbout": "Lizenzen & Über",
   "stockfishPending": "Stockfish · lokal · GPLv3",
   "provider": "Anbieter",
-  "localProfile": "Lokales Profil",
-  "forced": "Erzwungen",
   "theory": "Theorie",
   "brilliant": "Brillant",
   "critical": "Großartiger Zug",
   "best": "Bester",
   "excellent": "Ausgezeichnet",
-  "good": "Gut",
   "okay": "Okay",
   "miss": "Verpasst",
   "mistake": "Fehler",
@@ -188,16 +97,10 @@
   "first": "Erster Zug",
   "last": "Letzter Zug",
   "playPause": "Abspielen oder pausieren",
-  "player": "Spieler",
-  "bothPlayers": "Beide",
   "whitePlayer": "Weiß",
   "blackPlayer": "Schwarz",
   "analyzedMoves": "Klassifizierte Züge",
   "bookGames": "Book-Partien",
-  "expectedLoss": "Erwartungswertverlust",
-  "versions": "Versionen",
-  "classifierVersionLabel": "Klassifikator",
-  "accuracyVersionLabel": "Accuracy",
   "analyzingGame": "Partie wird analysiert",
   "analyzedMovesProgress": "{completed} / {total} Halbzüge analysiert",
   "@analyzedMovesProgress": {
@@ -219,38 +122,7 @@
       }
     }
   },
-  "moveComparisonText": "{played} war {classification}. {best} ist der beste Zug.",
-  "@moveComparisonText": {
-    "placeholders": {
-      "played": {
-        "type": "String"
-      },
-      "classification": {
-        "type": "String"
-      },
-      "best": {
-        "type": "String"
-      }
-    }
-  },
-  "theoryMoveText": "{move} ist ein Theorie-Zug.",
-  "@theoryMoveText": {
-    "placeholders": {
-      "move": {
-        "type": "String"
-      }
-    }
-  },
-  "triedMove": "Du hast {move} ausprobiert.",
-  "@triedMove": {
-    "placeholders": {
-      "move": {
-        "type": "String"
-      }
-    }
-  },
   "sidelineEngineTitle": "Side-Line-Engine",
-  "sidelineEngineSubtitle": "Diese Werte gelten nur für die Live-Analyse eigener Varianten.",
   "mainLineLabel": "Hauptlinie",
   "sidelineLabel": "Eigene Variante",
   "liveEngineTheorySkipped": "Theorie: Live-Analyse übersprungen",
@@ -263,28 +135,6 @@
       }
     }
   },
-  "sidelineAnalysisPaused": "Live-Analyse pausiert",
-  "analyzingVariation": "Die temporäre Variante wird analysiert…",
-  "evaluationComparison": "Bewertung: {before} → {after}",
-  "@evaluationComparison": {
-    "placeholders": {
-      "before": {
-        "type": "String"
-      },
-      "after": {
-        "type": "String"
-      }
-    }
-  },
-  "bestContinuation": "Beste Fortsetzung: {line}",
-  "@bestContinuation": {
-    "placeholders": {
-      "line": {
-        "type": "String"
-      }
-    }
-  },
-  "returnToMainLine": "Zur Hauptlinie zurückkehren",
   "illegalOrFailedMove": "Der Zug ist nicht legal oder konnte nicht analysiert werden: {message}",
   "@illegalOrFailedMove": {
     "placeholders": {
@@ -295,43 +145,27 @@
   },
   "myPlayer": "Mein Spieler",
   "opponent": "Gegner",
-  "variationStartingPosition": "Ausgangsstellung der Variante",
-  "variationStart": "Anfang der Variante",
   "engineQualityTitle": "Analysequalität",
   "engineResourcesTitle": "Ressourcen",
-  "depthHelp": "Min = Tiefe der Voranalyse. Max = maximale Tiefe der Liveanalyse. Höhere Werte dauern in der Regel länger.",
   "adaptiveEarlyStop": "Adaptive Analyse",
-  "adaptiveEarlyStopHelp": "Beendet ruhige Vor- und Liveanalysen früher, wenn Bewertung und Hauptvarianten stabil sind. Kritische Verifikationen rechnen weiterhin bis zum eingestellten Limit.",
-  "numberOfLinesHelp": "Wie viele beste Varianten Stockfish gleichzeitig berechnet.",
-  "timeLimitHelp": "Optionales Limit pro Stellung. Aus nutzt nur die Tiefe; sonst endet die Suche, sobald Tiefe oder Zeit zuerst erreicht ist.",
   "threads": "Threads",
-  "threadsHelp": "CPU-Threads pro Stockfish-Worker. Kchess erkennt deinen PC automatisch und erlaubt höchstens die Hälfte der logischen CPU-Threads.",
   "hashMemory": "Hash-Speicher",
-  "hashMemoryHelp": "Arbeitsspeicher für Stockfishs Transposition Table. Mehr Speicher kann die Suche in wiederkehrenden Stellungen verbessern.",
   "boardDisplayTitle": "Brettdarstellung",
   "rotateBoard": "Brett drehen",
   "showBoardCoordinates": "Brettkoordinaten",
-  "showBoardCoordinatesHelp": "Zeigt Linien- und Reihennamen (a–h / 1–8) am Brett.",
   "highlightLastMove": "Letzten Zug hervorheben",
-  "highlightLastMoveHelp": "Markiert Start- und Zielfeld des zuletzt gespielten Zuges.",
   "highlightSelectedSquare": "Ausgewähltes Feld hervorheben",
-  "highlightSelectedSquareHelp": "Markiert das Feld, das du für eine Variante ausgewählt hast.",
   "behaviorTitle": "Verhalten",
   "autoSyncOnline": "Online-Profile automatisch aktualisieren",
-  "autoSyncOnlineHelp": "Synchronisiert Chess.com und Lichess beim Start und beim Profilwechsel automatisch.",
   "confirmBeforeDelete": "Vor dem Löschen bestätigen",
-  "confirmBeforeDeleteHelp": "Fragt vor dem Löschen von Profilen oder lokalen Partien nach.",
   "analysisCacheTitle": "Analyse-Cache",
   "useGlobalAnalysisCache": "Globalen Stellungs-Cache verwenden",
-  "useGlobalAnalysisCacheHelp": "Verwendet bereits analysierte identische Stellungen auch in anderen Partien wieder.",
   "clearAnalysisCache": "Analyse-Cache leeren",
-  "clearAnalysisCacheHelp": "Löscht nur den globalen Stellungs-Cache. Gespeicherte Partien und vollständige Partieanalysen bleiben erhalten.",
   "clearAnalysisCacheQuestion": "Analyse-Cache leeren?",
   "clearAnalysisCacheBody": "Der globale Stellungs-Cache wird gelöscht. Deine Partien, Favoriten, Downloads und vollständigen Partieanalysen bleiben erhalten.",
   "analysisCacheCleared": "Analyse-Cache wurde geleert.",
   "diagnosticsTitle": "Diagnose",
   "diagnosticLogging": "Diagnoseprotokoll",
-  "diagnosticLoggingHelp": "Schreibt begrenzte technische Logs für die Fehlersuche. Vollständige PGNs, FENs und Provider-Antworten werden nicht protokolliert.",
   "deleteLocalGameQuestion": "Lokalen Eintrag löschen?",
   "deleteLocalGameBody": "Die gespeicherte PGN/FEN und ihre lokale Analyse werden dauerhaft entfernt.",
   "favoriteCollectionsTitle": "Sammlungen",
@@ -344,9 +178,7 @@
   "favoriteDeleteCollectionBody": "Die Sammlung wird gelöscht. Ihre Partien bleiben als lose Favoriten erhalten.",
   "favoriteEmptyCollection": "Diese Sammlung enthält noch keine Partien.",
   "favoriteNoLooseGames": "Keine losen Favoriten.",
-  "favoriteCollectionRule": "Sammlungen sind nur eine Ebene tief und können nicht verschachtelt werden.",
   "favoriteMoveToCollection": "Sammlung ändern",
-  "favoriteMoveHelp": "Partien können lose in Favoriten liegen oder genau einer Sammlung zugeordnet werden.",
   "profileRatings": "Ratings",
   "profileGameOverview": "Partieübersicht",
   "profileWins": "Siege",
@@ -363,9 +195,7 @@
   "statsDraws": "Remis",
   "statsLosses": "Niederlagen",
   "statsAll": "Alle",
-  "statsAllTimeControlsNote": "Alle Zeitkontrollen",
   "statsPhaseTitle": "Nach Spielphase",
-  "statsPhaseSubtitle": "In welcher Phase deine Partien enden und wie du abschneidest.",
   "statsPhaseOpening": "Eröffnung (1–12)",
   "statsPhaseMiddlegame": "Mittelspiel (13–30)",
   "statsPhaseEndgame": "Endspiel (31+)",
@@ -381,9 +211,7 @@
   "statsPhaseClassifiedNote": "{classified} von {total} Partien",
   "statsTitle": "Statistiken",
   "statsIntroTitle": "Deine Schachleistung",
-  "statsIntroBody": "Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.",
   "statsFormTitle": "Aktuelle Form",
-  "statsFormHint": "Tippe auf ein Ergebnis, um die Partie zu öffnen.",
   "statsFormVersus": "gegen",
   "statsFormEmpty": "Keine aktuellen Partien vorhanden.",
   "statsFormError": "Aktuelle Partien konnten nicht geladen werden.",
@@ -490,40 +318,22 @@
   "statsCompareOpenWhite": "Eröffne mit {opening} — dein Gegner erzielt als Schwarz dagegen nur {rate} (aus {games} Partien).",
   "statsCompareAnswerBlack": "Als Schwarz: Wähle {opening} — dein Gegner erzielt als Weiß dagegen nur {rate} (aus {games} Partien).",
   "statsCompareSampleScope": "Du: deine gesamte lokale Bibliothek · Gegner: die letzten {months} Monate ({games} Partien). Beide Seiten sind unterschiedliche Stichproben — die Werte können sich daher auch beim Selbstvergleich unterscheiden.",
-  "statsTimeControlCorrespondence": "Fernschach",
-  "statsTimeControlOther": "Sonstige",
-  "botGameDeleteQuestion": "Bot-Partie löschen?",
-  "botGameDeleteBody": "Dieser Eintrag im Bot-Spielverlauf wird dauerhaft gelöscht. Eine daraus bereits erstellte Analyse-Partie bleibt in deiner lokalen Spielbibliothek erhalten.",
-  "promotionTitle": "Bauernumwandlung",
-  "promotionChoosePiece": "Wähle die Figur, in die der Bauer umgewandelt werden soll.",
-  "promotionQueen": "Dame",
-  "promotionRook": "Turm",
-  "promotionBishop": "Läufer",
-  "promotionKnight": "Springer",
   "trainingSection": "Training",
   "trainingIntroTitle": "Training Arena",
-  "trainingIntroBody": "Wähle einen Trainingsbereich. Dein Fortschritt wird lokal auf diesem Gerät gespeichert.",
   "trainingOpeningTitle": "Eröffnungs-Labor",
-  "trainingOpeningSubtitle": "Repetiere deine Repertoire-Linien und Schwachstellen.",
   "trainingOpeningAction": "Linien trainieren",
   "trainingNemesisBadge": "Angstgegner: {opening} · nur {rate} Siegquote",
   "trainingNemesisNone": "Noch keine Schwachstelle in deiner Statistik erkannt.",
   "trainingTacticsTitle": "Blunder-Buster",
-  "trainingTacticsSubtitle": "Finde den besseren Zug in kritischen Mittelspiel-Stellungen.",
   "trainingTacticsSolved": "{count} gelöste Taktiken",
   "trainingTacticsAction": "Taktik starten",
   "trainingTacticsEmpty": "Noch keine Taktik-Aufgaben im Katalog.",
   "trainingEndgameTitle": "Endspiel-Akademie",
-  "trainingEndgameSubtitle": "Theoretische Endspiele schrittweise meistern.",
   "trainingEndgameProgress": "{mastered} / {total} Stellungen gemeistert ({percent}%)",
   "trainingEndgameAction": "Endspiele öffnen",
   "trainingMastered": "Gemeistert",
   "trainingStreak": "{done}/{total} fehlerfreie Wiederholungen",
-  "trainingLastAttempt": "Zuletzt geübt: {date}",
-  "trainingNeverAttempted": "Noch nicht geübt",
   "trainingOpeningLabSelected": "Ausgewählte Linie",
-  "trainingOpeningLabEmpty": "Wähle in der Statistik eine Eröffnung und tippe auf „Trainieren“, um sie hier zu laden.",
-  "trainingOpeningLabPending": "Der Linien-Trainer folgt, sobald der Core die Eröffnungszüge liefert.",
   "statsTrainOpening": "Trainieren",
   "trainingGoalWin": "{side} am Zug — Gewinne die Stellung",
   "trainingGoalDraw": "{side} am Zug — Halte die Stellung remis",
@@ -539,10 +349,148 @@
   "trainingShowHint": "Tipp anzeigen",
   "trainingYourMove": "Du bist am Zug",
   "trainingRestart": "Neu starten",
+  "trainingOpeningLabStart": "Linie üben",
+  "trainingOpeningLabBackToOverview": "Zurück zur Übersicht",
+  "trainingOpeningTreeEmpty": "Noch keine Eröffnungslinien verfügbar.",
+  "trainingOpeningTreeExpand": "Varianten zeigen",
+  "trainingOpeningTreeCollapse": "Varianten ausblenden",
+  "trainingOpeningTreeVariations": "{count,plural, =1{1 Variante} other{{count} Varianten}}",
+  "@trainingOpeningTreeVariations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningTreeLoadFailed": "Diese Linie ist noch nicht in der Datenbank.",
+  "trainingOpeningTreeZoomIn": "Vergrößern",
+  "trainingOpeningTreeZoomOut": "Verkleinern",
+  "trainingOpeningTreeFit": "Baum einpassen",
+  "trainingOpeningTreeHint": "Tippe auf eine Karte, um ihre Varianten aufzuklappen — oder trainiere die Linie direkt.",
+  "playAgainstBot": "Gegen einen Bot spielen",
+  "continueAgainstBot": "Gegen Bot weiterspielen",
+  "botPlayerColor": "Deine Farbe",
+  "temporaryBotGameNotSaved": "Diese Partie wird nicht gespeichert und beim Schließen oder Abbrechen vollständig verworfen.",
+  "botGameLog": "Bot-Spielverlauf",
+  "botGameLogEmpty": "Noch keine gespeicherten Bot-Partien.",
+  "botGameLogLoadFailed": "Der Bot-Spielverlauf konnte nicht geladen werden.",
+  "botGameHistoryActive": "Laufend",
+  "botGameHistoryWin": "Gewonnen",
+  "botGameHistoryLoss": "Verloren",
+  "botGameHistoryDraw": "Remis",
+  "botStrength": "Bot-Spielstärke",
+  "botElo": "Elo",
+  "botStartGame": "Partie starten",
+  "botGameTitle": "Partie gegen Bot",
+  "botGameLoading": "Partie wird vorbereitet …",
+  "botGameLoadFailed": "Die Bot-Partie konnte nicht vorbereitet werden.",
+  "botMoveFailed": "Der Bot-Zug konnte nicht berechnet werden.",
+  "botYou": "Du",
+  "botYourTurn": "Du bist am Zug.",
+  "botThinking": "Stockfish denkt …",
+  "botApplyingMove": "Zug wird ausgeführt …",
+  "botWaiting": "Warte auf den nächsten Zug …",
+  "botViewingHistory": "Du siehst eine frühere Stellung.",
+  "botGameFinished": "Partie beendet.",
+  "botMoveList": "Zugliste",
+  "botNoMovesYet": "Noch keine Züge gespielt.",
+  "botPreviousMove": "Einen Zug zurück",
+  "botNextMove": "Einen Zug vor",
+  "botReturnToLive": "Zur aktuellen Stellung",
+  "botHintPiece": "Hinweis 1: Figur anzeigen",
+  "botHintTarget": "Hinweis 2: Zielfeld anzeigen",
+  "botHintsUsed": "Beide Hinweise verwendet",
+  "botHintThinking": "Hinweis wird berechnet …",
+  "botHintFailed": "Der Hinweis konnte nicht berechnet werden.",
+  "botGameSettingsTitle": "Spieleinstellungen",
+  "botHintCounter": "{used} / 2 Hinweise für diesen Zug",
+  "@botHintCounter": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      }
+    }
+  },
+  "exportFen": "FEN exportieren",
+  "fenCopiedToClipboard": "FEN wurde in die Zwischenablage kopiert.",
+  "engineSelectionTitle": "Engine-Version",
+  "engineVersion": "Schach-Engine",
+  "engineActiveLabel": "Aktiv: {engine}",
+  "@engineActiveLabel": {
+    "placeholders": {
+      "engine": {
+        "type": "String"
+      }
+    }
+  },
+  "stockfish18": "Stockfish 18",
+  "stockfish19": "Stockfish 19",
+  "engineSelectionFailed": "Die ausgewählte Engine konnte nicht aktiviert werden. Die bisherige Engine bleibt ausgewählt.",
+  "forced": "Erzwungen",
+  "good": "Gut",
+  "statsTimeControlCorrespondence": "Fernschach",
+  "statsTimeControlOther": "Sonstige",
+  "botGameDeleteQuestion": "Bot-Partie löschen?",
+  "botGameDeleteBody": "Dieser Eintrag im Bot-Spielverlauf wird dauerhaft gelöscht. Eine daraus bereits erstellte Analyse-Partie bleibt in deiner lokalen Spielbibliothek erhalten.",
+  "promotionTitle": "Bauernumwandlung",
+  "promotionChoosePiece": "Wähle die Figur, in die der Bauer umgewandelt werden soll.",
+  "promotionQueen": "Dame",
+  "promotionRook": "Turm",
+  "promotionBishop": "Läufer",
+  "promotionKnight": "Springer",
   "trainingOppositionTitle": "Bauern-Opposition",
   "trainingOppositionHint": "Nimm zuerst die Opposition, dann umgehe den König. Ziehe den Bauern erst, wenn dein König vor ihm steht.",
   "trainingLucenaTitle": "Lucena-Stellung",
   "trainingLucenaHint": "Stelle den Turm auf die vierte Reihe, bevor der König herauskommt; später schützt er vor den Schachs.",
   "trainingPhilidorTitle": "Philidor-Verteidigung",
-  "trainingPhilidorHint": "Halte den Turm auf der sechsten Reihe, bis der Bauer vorzieht, und schache danach von hinten."
+  "trainingPhilidorHint": "Halte den Turm auf der sechsten Reihe, bis der Bauer vorzieht, und schache danach von hinten.",
+  "practiceDrills": "Matt-Training",
+  "practiceStudies": "Klassische Endspielstudien",
+  "practiceFailed": "Versuch beendet. Versuche es erneut.",
+  "practiceThinking": "Gegner denkt nach …",
+  "practiceMoves": "Gespielte Züge: {count}",
+  "practiceLevel": "Stufe {number}",
+  "practiceStudyNumber": "Studie {number}",
+  "practiceStudySource": "Kling & Horwitz · Chess Studies, Or, Endings of Games (1851). Spiele diese Stellungen gegen Stockfish.",
+  "practiceQueenTitle": "König und Dame gegen König",
+  "practiceRookTitle": "König und Turm gegen König",
+  "practiceQueenRookTitle": "Dame gegen Turm",
+  "practiceQueenHint": "Unterstütze die Dame mit deinem König. Lass ein Fluchtfeld frei, bis du mattsetzen kannst.",
+  "practiceRookHint": "Schneide den König mit dem Turm ab und bringe deinen König näher.",
+  "practiceQueenRookHint": "Suche nach Doppelangriffen auf König und Turm. Achte auf Patt.",
+  "practiceBeginner": "Anfänger",
+  "practiceIntermediate": "Fortgeschritten",
+  "practiceMaster": "Meister",
+  "practiceSectionKingPawn": "König und Bauer",
+  "practiceSectionBishops": "Könige, Läufer und Bauern",
+  "practiceSectionKnightsBishops": "Springer, Läufer und Bauern",
+  "practiceSectionTwoMinor": "Zwei Leichtfiguren gegen eine",
+  "practiceSectionRookPawns": "Turm gegen Bauern",
+  "practiceSectionRookMinor": "Turm gegen Leichtfiguren",
+  "practiceSectionMinorRook": "Leichtfiguren gegen Turm",
+  "practiceSectionQueenPawns": "Dame gegen Bauern",
+  "practiceSectionQueens": "Damen und Bauern",
+  "practiceSectionQueenRook": "Dame gegen Turm",
+  "practiceSectionQueenMinor": "Dame gegen Leichtfiguren",
+  "@practiceMoves": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@practiceLevel": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "@practiceStudyNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  }
 }

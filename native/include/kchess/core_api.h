@@ -270,6 +270,8 @@ KCHESS_API kc_status kc_cancel_bot_move(
     const char* job_id_utf8);
 
 KCHESS_API char* kc_training_overview_json(kc_core_handle handle);
+// Returned UTF-8 JSON is owned by the caller; release with kc_string_free.
+KCHESS_API char* kc_practice_command_json(kc_core_handle handle, const char* request_utf8);
 KCHESS_API char* kc_start_training_attempt_json(
     kc_core_handle handle,
     const char* exercise_id_utf8);

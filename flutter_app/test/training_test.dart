@@ -3,7 +3,7 @@
 // -----------------------------------------------------------------------------
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kchess/models/models.dart';
+import 'package:kchess/shared/models/models.dart';
 
 void main() {
   test('training overview maps native progress without recomputing it', () {

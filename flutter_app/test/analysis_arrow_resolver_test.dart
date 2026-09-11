@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kchess/features/analysis/presentation/analysis_arrow_resolver.dart';
-import 'package:kchess/models/models.dart';
+import 'package:kchess/shared/models/models.dart';
 
 // -----------------------------------------------------------------------------
 // Section: Engine-coherent best-move arrow regression coverage

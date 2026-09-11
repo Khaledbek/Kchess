@@ -55,19 +55,25 @@ int piece_value_cp(const Stockfish::Piece piece) {
   return 0;
 }
 
+template<Stockfish::PieceType Type>
+int material_difference(
+    const Stockfish::Position& position,
+    const Stockfish::Color perspective) {
+  return piece_value_cp(Stockfish::make_piece(perspective, Type))
+      * (position.count<Type>(perspective) - position.count<Type>(~perspective));
+}
+
 int material_balance(
     const Stockfish::Position& position,
     const Stockfish::Color perspective) {
-  int result = 0;
-  for (Stockfish::Square square = Stockfish::SQ_A1;
-       square <= Stockfish::SQ_H8;
-       ++square) {
-    const auto piece = position.piece_on(square);
-    if (piece == Stockfish::NO_PIECE) continue;
-    const int value = piece_value_cp(piece);
-    result += Stockfish::color_of(piece) == perspective ? value : -value;
-  }
-  return result;
+  // Stockfish maintains these counts through captures, promotions and undo.
+  // Reuse them instead of scanning 64 squares after every PV move. Kings have
+  // zero material value, exactly as in the previous square-based sum.
+  return material_difference<Stockfish::PAWN>(position, perspective)
+      + material_difference<Stockfish::KNIGHT>(position, perspective)
+      + material_difference<Stockfish::BISHOP>(position, perspective)
+      + material_difference<Stockfish::ROOK>(position, perspective)
+      + material_difference<Stockfish::QUEEN>(position, perspective);
 }
 
 Stockfish::Move find_uci_move(

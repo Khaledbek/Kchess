@@ -25,8 +25,7 @@ class EndgameExercisePlayer extends StatefulWidget {
   final CoreGateway gateway;
 
   @override
-  State<EndgameExercisePlayer> createState() =>
-      _EndgameExercisePlayerState();
+  State<EndgameExercisePlayer> createState() => _EndgameExercisePlayerState();
 }
 
 class _EndgameExercisePlayerState extends State<EndgameExercisePlayer> {
@@ -241,10 +240,8 @@ class _EndgameExercisePlayerState extends State<EndgameExercisePlayer> {
     if (!mounted || next == null) return;
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => EndgameExercisePlayer(
-          exercise: next,
-          gateway: widget.gateway,
-        ),
+        builder: (_) =>
+            EndgameExercisePlayer(exercise: next, gateway: widget.gateway),
       ),
     );
   }

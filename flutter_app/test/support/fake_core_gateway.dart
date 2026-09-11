@@ -1,5 +1,5 @@
 import 'package:kchess/ffi/core_gateway.dart';
-import 'package:kchess/models/models.dart';
+import 'package:kchess/shared/models/models.dart';
 
 // -----------------------------------------------------------------------------
 // Section: Test gateway fixtures
@@ -70,16 +70,11 @@ class FakeCoreGateway implements CoreGateway {
     blackRating: 1812,
     result: '1-0',
     timeControl: 'rapid',
-    startingFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-    isFixture: true,
     providerGameId: 'online-fixture-1',
-    providerUrl: 'https://example.invalid/game/1',
     providerOutcome: 'win',
     timeControlType: 'rapid',
-    providerAccuracy: 81.2,
     localAccuracy: 92.4,
     accuracy: 92.4,
-    accuracySource: 'local',
     endedAt: 1786363200,
   );
 
@@ -96,7 +91,6 @@ class FakeCoreGateway implements CoreGateway {
       mistake: 1,
       blunder: 1,
       totalMoves: 8,
-      analyzedMoves: 8,
       localAccuracy: 78.6,
     ),
     black: PlayerAnalysisSummary(
@@ -110,7 +104,6 @@ class FakeCoreGateway implements CoreGateway {
       mistake: 1,
       blunder: 0,
       totalMoves: 8,
-      analyzedMoves: 8,
       localAccuracy: 87.2,
     ),
     classifierVersion: 1,
@@ -133,7 +126,6 @@ class FakeCoreGateway implements CoreGateway {
       mistake: 0,
       blunder: 0,
       totalMoves: 4,
-      analyzedMoves: 1,
     ),
     black: PlayerAnalysisSummary(
       theory: 0,
@@ -146,7 +138,6 @@ class FakeCoreGateway implements CoreGateway {
       mistake: 0,
       blunder: 0,
       totalMoves: 4,
-      analyzedMoves: 0,
     ),
     classifierVersion: 0,
     accuracyAlgorithmVersion: 0,
@@ -251,7 +242,6 @@ class FakeCoreGateway implements CoreGateway {
         ),
       ),
     ],
-    recentForm: const ['win', 'loss', 'win'],
   );
 
   @override
@@ -259,7 +249,6 @@ class FakeCoreGateway implements CoreGateway {
       const OpeningsStats(
     hasProfile: true,
     gamesWithOpening: 3,
-    gamesWithoutOpening: 0,
     distinctOpenings: 2,
     openings: [
       OpeningStat(
@@ -291,7 +280,6 @@ class FakeCoreGateway implements CoreGateway {
           ProviderPerformance(
             key: 'rapid',
             currentRating: 1840,
-            bestRating: 1902,
             games: 42,
             wins: 22,
             losses: 14,
@@ -299,8 +287,6 @@ class FakeCoreGateway implements CoreGateway {
           ),
         ],
         availableMonths: const ['2026-08'],
-        offlineReady: true,
-        retryAfterSeconds: 0,
       );
 
   @override
@@ -455,7 +441,6 @@ class FakeCoreGateway implements CoreGateway {
   @override
   Future<GameDetail> game(String gameId) async => GameDetail(
     summary: fixtureGame,
-    pgn: '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6',
     startingPosition: BoardPosition(
       fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
       pieces: BoardPosition.empty.pieces,
@@ -469,7 +454,6 @@ class FakeCoreGateway implements CoreGateway {
         sideToMove: 'white',
         san: 'e4',
         uci: 'e2e4',
-        fenBefore: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
         fenAfter: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
         positionAfter: BoardPosition(
           fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
@@ -484,7 +468,6 @@ class FakeCoreGateway implements CoreGateway {
         sideToMove: 'black',
         san: 'e5',
         uci: 'e7e5',
-        fenBefore: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
         fenAfter:
             'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
         positionAfter: BoardPosition(
@@ -509,7 +492,6 @@ class FakeCoreGateway implements CoreGateway {
     positions: const [_fixtureBotStartPosition],
     moves: const [],
     createdAt: 1,
-    updatedAt: 1,
     showEvaluationBar: false,
   );
 
@@ -577,7 +559,6 @@ class FakeCoreGateway implements CoreGateway {
     jobId: 'bot-fixture',
     status: 'complete',
     engineId: 'stockfish18',
-    requestedElo: requestedElo,
     move: '',
     bestMove: '',
   );
@@ -588,7 +569,6 @@ class FakeCoreGateway implements CoreGateway {
         jobId: 'bot-fixture',
         status: 'complete',
         engineId: 'stockfish18',
-        requestedElo: 1500,
         move: '',
         bestMove: '',
       );
@@ -602,6 +582,10 @@ class FakeCoreGateway implements CoreGateway {
     exercises: [],
     categories: {},
   );
+
+  @override
+  Future<Object?> practiceCommand(Map<String, Object?> request) =>
+      Future.error(UnsupportedError('Practice fixture not configured'));
 
   @override
   Future<TrainingAttempt> startTrainingAttempt(String exerciseId) =>
@@ -679,6 +663,20 @@ class FakeCoreGateway implements CoreGateway {
     int? hashMb,
   }) async {
     variationAnalysisCalls++;
+    // Mirror FfiCoreGateway: engine overrides are all-or-nothing. Without this
+    // the fake accepted calls the real gateway rejects, which is exactly how a
+    // defender bot that never moved got through the suite.
+    final hasOverrides =
+        depth != null || multiPv != null || threads != null || hashMb != null;
+    if (hasOverrides &&
+        (depth == null ||
+            multiPv == null ||
+            threads == null ||
+            hashMb == null)) {
+      throw ArgumentError(
+        'Sideline engine overrides require depth, multiPv, threads and hashMb.',
+      );
+    }
     final fixture = switch (uci) {
       'g1f3' => (
         san: 'Nf3',
@@ -806,7 +804,6 @@ class FakeCoreGateway implements CoreGateway {
                         game.favoriteCollectionId == collection.id,
                   )
                   .length,
-              createdAt: collection.createdAt,
             ),
           )
           .toList(growable: false);
@@ -817,7 +814,6 @@ class FakeCoreGateway implements CoreGateway {
       id: 'collection-${storedFavoriteCollections.length + 1}',
       name: name.trim(),
       gameCount: 0,
-      createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
     storedFavoriteCollections.add(collection);
     return collection;
@@ -837,7 +833,6 @@ class FakeCoreGateway implements CoreGateway {
         id: old.id,
         name: name.trim(),
         gameCount: old.gameCount,
-        createdAt: old.createdAt,
       );
     }
   }
@@ -905,16 +900,11 @@ class FakeCoreGateway implements CoreGateway {
     event: game.event,
     date: game.date,
     timeControl: game.timeControl,
-    startingFen: game.startingFen,
-    isFixture: game.isFixture,
     providerGameId: game.providerGameId,
-    providerUrl: game.providerUrl,
     providerOutcome: game.providerOutcome,
     timeControlType: game.timeControlType,
-    providerAccuracy: game.providerAccuracy,
     localAccuracy: game.localAccuracy,
     accuracy: game.accuracy,
-    accuracySource: game.accuracySource,
     favorite: favorite ?? game.favorite,
     favoriteCollectionId: clearFavoriteCollection
         ? null
@@ -938,18 +928,11 @@ class FakeCoreGateway implements CoreGateway {
         bestMove: 'e2e4',
         recommendedMove: analysisRecommendedMove,
         engineVersion: 'Stockfish 18',
-        configHash: 'test',
         classification: complete ? analysisClassification : null,
         classifierVersion: complete ? 1 : 0,
-        expectedScoreBest: complete ? 0.72 : null,
-        expectedScorePlayed: complete ? 0.70 : null,
-        expectedScoreLoss: complete ? 0.02 : null,
         theory: complete && analysisClassification == MoveClassification.theory
             ? const TheoryMoveInfo(
                 games: 1284211,
-                whiteWins: 600000,
-                draws: 300000,
-                blackWins: 384211,
               )
             : null,
         lines: const [

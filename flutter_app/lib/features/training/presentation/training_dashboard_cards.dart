@@ -38,7 +38,6 @@ class TrainingDashboardCards extends StatelessWidget {
       (stretched) => _TrainingCategoryCard(
         icon: Icons.auto_stories_outlined,
         title: strings.trainingOpeningTitle,
-        subtitle: strings.trainingOpeningSubtitle,
         actionLabel: strings.trainingOpeningAction,
         onAction: onOpenOpeningLab,
         detail: _OpeningMetric(openings: openings, request: openingRequest),
@@ -47,7 +46,6 @@ class TrainingDashboardCards extends StatelessWidget {
       (stretched) => _TrainingCategoryCard(
         icon: Icons.psychology_alt_outlined,
         title: strings.trainingTacticsTitle,
-        subtitle: strings.trainingTacticsSubtitle,
         actionLabel: strings.trainingTacticsAction,
         onAction: onOpenTactics,
         detail: loading
@@ -61,7 +59,6 @@ class TrainingDashboardCards extends StatelessWidget {
       (stretched) => _TrainingCategoryCard(
         icon: Icons.school_rounded,
         title: strings.trainingEndgameTitle,
-        subtitle: strings.trainingEndgameSubtitle,
         actionLabel: strings.trainingEndgameAction,
         onAction: onOpenEndgames,
         detail: TrainingMasteryProgress(
@@ -105,7 +102,6 @@ class _TrainingCategoryCard extends StatelessWidget {
   const _TrainingCategoryCard({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.actionLabel,
     required this.onAction,
     required this.detail,
@@ -114,7 +110,6 @@ class _TrainingCategoryCard extends StatelessWidget {
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final String actionLabel;
   final VoidCallback onAction;
   final Widget detail;
@@ -143,13 +138,6 @@ class _TrainingCategoryCard extends StatelessWidget {
               title,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 14),

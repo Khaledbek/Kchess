@@ -207,8 +207,7 @@ BotMovePlan plan_bot_move(
   int typical_loss = profile.typical_loss_cp;
 
   if (plan.opening_phase) {
-    // Opening errors should be repertoire choices, not free material. Update 64
-    // will add dedicated diversity; for now keep the low-Elo error envelope tight.
+    // Opening errors should be repertoire choices, not free material.
     best_probability = std::max(best_probability, 0.30);
     typical_loss = std::min(typical_loss, 45);
     hard_loss_cap = std::min(hard_loss_cap, 100);

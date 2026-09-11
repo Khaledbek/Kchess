@@ -23,7 +23,6 @@ class BoardEndgameLayer extends StatefulWidget {
     required this.pieces,
     required this.boardSide,
     required this.blackAtBottom,
-    this.showCheckmateBadge = true,
     this.useGiveupForLoss = true,
     super.key,
   });
@@ -34,7 +33,6 @@ class BoardEndgameLayer extends StatefulWidget {
   final List<String> pieces;
   final double boardSide;
   final bool blackAtBottom;
-  final bool showCheckmateBadge;
   final bool useGiveupForLoss;
 
   @override
@@ -109,7 +107,6 @@ class _BoardEndgameLayerState extends State<BoardEndgameLayer> {
                   checkmate: widget.checkmate,
                   boardSide: widget.boardSide,
                   blackAtBottom: widget.blackAtBottom,
-                  showCheckmateBadge: widget.showCheckmateBadge,
                   useGiveupForLoss: widget.useGiveupForLoss,
                 ),
               ),
@@ -122,7 +119,6 @@ class _BoardEndgameLayerState extends State<BoardEndgameLayer> {
                   checkmate: widget.checkmate,
                   boardSide: widget.boardSide,
                   blackAtBottom: widget.blackAtBottom,
-                  showCheckmateBadge: widget.showCheckmateBadge,
                   useGiveupForLoss: widget.useGiveupForLoss,
                 ),
               ),
@@ -139,7 +135,6 @@ class _BoardEndgameLayerState extends State<BoardEndgameLayer> {
       blackKingSquare: blackKing,
       boardSide: widget.boardSide,
       blackAtBottom: widget.blackAtBottom,
-      showCheckmateBadge: widget.showCheckmateBadge,
       useGiveupForLoss: widget.useGiveupForLoss,
       onCompleted: _dock,
     );
@@ -154,7 +149,6 @@ class BoardEndgameAnimation extends StatefulWidget {
     required this.blackKingSquare,
     required this.boardSide,
     required this.blackAtBottom,
-    required this.showCheckmateBadge,
     required this.useGiveupForLoss,
     required this.onCompleted,
     super.key,
@@ -166,7 +160,6 @@ class BoardEndgameAnimation extends StatefulWidget {
   final String? blackKingSquare;
   final double boardSide;
   final bool blackAtBottom;
-  final bool showCheckmateBadge;
   final bool useGiveupForLoss;
   final VoidCallback onCompleted;
 
@@ -182,12 +175,13 @@ class _BoardEndgameAnimationState extends State<BoardEndgameAnimation>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1350),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) _finish();
-      });
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1350),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed) _finish();
+        });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _controller.forward();
     });
@@ -229,9 +223,11 @@ class _BoardEndgameAnimationState extends State<BoardEndgameAnimation>
     final fillIn = Curves.easeOutCubic.transform(
       (progress / 0.22).clamp(0.0, 1.0),
     );
-    final fillOut = 1 - Curves.easeInCubic.transform(
-      ((progress - 0.55) / 0.35).clamp(0.0, 1.0),
-    );
+    final fillOut =
+        1 -
+        Curves.easeInCubic.transform(
+          ((progress - 0.55) / 0.35).clamp(0.0, 1.0),
+        );
     final fillOpacity = math.min(fillIn, fillOut);
 
     final iconIn = Curves.easeOutBack.transform(
@@ -250,9 +246,6 @@ class _BoardEndgameAnimationState extends State<BoardEndgameAnimation>
     );
     final center = Offset.lerp(largeCenter, smallCenter, dock)!;
     final iconOpacity = ((progress - 0.12) / 0.18).clamp(0.0, 1.0);
-    final showMate = widget.showCheckmateBadge &&
-        _isCheckmatedColor(color, widget.result, widget.checkmate);
-
     return Stack(
       children: [
         Positioned.fromRect(
@@ -276,15 +269,6 @@ class _BoardEndgameAnimationState extends State<BoardEndgameAnimation>
                 fit: BoxFit.contain,
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
-            ),
-          ),
-        if (showMate && progress >= 0.58)
-          Positioned(
-            left: rect.left + squareSide * 0.04,
-            top: rect.bottom - squareSide * 0.39,
-            child: Opacity(
-              opacity: ((progress - 0.58) / 0.16).clamp(0.0, 1.0),
-              child: CheckmateBadge(size: squareSide * 0.34),
             ),
           ),
       ],
@@ -331,7 +315,6 @@ class BoardEndgameKingMarker extends StatelessWidget {
     required this.checkmate,
     required this.boardSide,
     required this.blackAtBottom,
-    required this.showCheckmateBadge,
     required this.useGiveupForLoss,
     super.key,
   });
@@ -342,7 +325,6 @@ class BoardEndgameKingMarker extends StatelessWidget {
   final bool checkmate;
   final double boardSide;
   final bool blackAtBottom;
-  final bool showCheckmateBadge;
   final bool useGiveupForLoss;
 
   @override
@@ -357,8 +339,6 @@ class BoardEndgameKingMarker extends StatelessWidget {
     final rect = boardSquareRect(square, boardSide, blackAtBottom);
     final squareSide = boardSide / 8;
     final badgeSize = squareSide * 0.42;
-    final showMate = showCheckmateBadge &&
-        _isCheckmatedColor(color, result, checkmate);
     return IgnorePointer(
       child: Stack(
         children: [
@@ -374,46 +354,10 @@ class BoardEndgameKingMarker extends StatelessWidget {
               errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
           ),
-          if (showMate)
-            Positioned(
-              left: rect.left + squareSide * 0.04,
-              top: rect.bottom - squareSide * 0.39,
-              child: CheckmateBadge(size: squareSide * 0.34),
-            ),
         ],
       ),
     );
   }
-}
-
-class CheckmateBadge extends StatelessWidget {
-  const CheckmateBadge({required this.size, super.key});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: key ?? const Key('board-checkmate-symbol'),
-    width: size,
-    height: size,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: const Color(0xFF8E1B1B),
-      borderRadius: BorderRadius.circular(size * 0.22),
-      border: Border.all(color: Colors.white, width: math.max(1, size * 0.07)),
-      boxShadow: const [BoxShadow(blurRadius: 2, color: Color(0x55000000))],
-    ),
-    child: Text(
-      '#',
-      textDirection: TextDirection.ltr,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: size * 0.72,
-        height: 1,
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  );
 }
 
 Rect boardSquareRect(String square, double boardSide, bool blackAtBottom) {
@@ -442,8 +386,17 @@ String? _resultAssetForColor(
   if (_isDrawResult(result)) return 'assets/analysis_img/result_draw.png';
   final whiteWon = result == '1-0';
   final colorIsWhite = color == 'white';
-  if (whiteWon == colorIsWhite) return 'assets/analysis_img/result_win.png';
-  if (checkmate || !useGiveupForLoss) {
+  if (whiteWon == colorIsWhite) {
+    return colorIsWhite
+        ? 'assets/analysis_img/result_win_white.png'
+        : 'assets/analysis_img/result_win_black.png';
+  }
+  if (checkmate) {
+    return colorIsWhite
+        ? 'assets/analysis_img/result_loss_white.png'
+        : 'assets/analysis_img/result_loss_black.png';
+  }
+  if (!useGiveupForLoss) {
     return 'assets/analysis_img/result_loss.png';
   }
   return 'assets/analysis_img/result_giveup.png';
@@ -457,12 +410,4 @@ Color? _resultFieldColorForColor(String color, String? result) {
   return whiteWon == colorIsWhite
       ? const Color(0xFF00D400)
       : const Color(0xFFFF1010);
-}
-
-bool _isCheckmatedColor(String color, String? result, bool checkmate) {
-  if (!checkmate || result == null || result == '*' || _isDrawResult(result)) {
-    return false;
-  }
-  final whiteWon = result == '1-0';
-  return (color == 'white') != whiteWon;
 }

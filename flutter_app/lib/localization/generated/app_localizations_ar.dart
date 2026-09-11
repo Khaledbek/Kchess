@@ -16,10 +16,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get firstRunTitle => 'مساحة الشطرنج المحلية';
 
   @override
-  String get firstRunBody =>
-      'اختر مصدرًا. الملفات العامة على الإنترنت لا تحتاج إلى كلمة مرور.';
-
-  @override
   String get chessCom => 'Chess.com';
 
   @override
@@ -48,150 +44,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get play => 'اللعب';
-
-  @override
-  String get playPlaceholder =>
-      'هذا القسم محجوز كعنصر نائب لأنماط لعب مستقبلية، مثل اللعب ضد البوتات.';
-
-  @override
-  String get playAgainstBot => 'اللعب ضد بوت';
-
-  @override
-  String get playAgainstBotSubtitle => 'ابدأ مباراة محلية ضد Stockfish.';
-
-  @override
-  String get continueAgainstBot => 'متابعة اللعب ضد البوت';
-
-  @override
-  String get botPlayerColor => 'لونك';
-
-  @override
-  String get temporaryBotGameNotSaved =>
-      'لن يتم حفظ هذه المباراة وسيتم حذفها بالكامل عند الإغلاق أو الإلغاء.';
-
-  @override
-  String get botGameLog => 'سجل مباريات البوت';
-
-  @override
-  String get botGameLogSubtitle =>
-      'افتح مبارياتك المحفوظة ضد البوت، وتابع المباراة الجارية أو حلّل المباريات المنتهية.';
-
-  @override
-  String get botGameLogEmpty => 'لا توجد مباريات بوت محفوظة بعد.';
-
-  @override
-  String get botGameLogLoadFailed => 'تعذر تحميل سجل مباريات البوت.';
-
-  @override
-  String get botGameHistoryActive => 'جارية';
-
-  @override
-  String get botGameHistoryWin => 'فوز';
-
-  @override
-  String get botGameHistoryLoss => 'خسارة';
-
-  @override
-  String get botGameHistoryDraw => 'تعادل';
-
-  @override
-  String get botStrength => 'قوة البوت';
-
-  @override
-  String get botStrengthDescription =>
-      'اختر قوة البوت بخطوات مقدارها 100 نقطة Elo. يمثل الإعداد الأقصى قوة Stockfish الكاملة.';
-
-  @override
-  String get botElo => 'Elo';
-
-  @override
-  String get botEngineLockedDescription =>
-      'تستخدم مباريات البوت دائمًا Stockfish 18 بشكل مستقل عن محرك التحليل المحدد.';
-
-  @override
-  String get botStartGame => 'بدء المباراة';
-
-  @override
-  String get botGameTitle => 'مباراة ضد البوت';
-
-  @override
-  String get botGameLoading => 'جارٍ تجهيز المباراة …';
-
-  @override
-  String get botGameLoadFailed => 'تعذر تجهيز مباراة البوت.';
-
-  @override
-  String get botMoveFailed => 'تعذر حساب نقلة البوت.';
-
-  @override
-  String get botYou => 'أنت';
-
-  @override
-  String get botYourTurn => 'دورك الآن.';
-
-  @override
-  String get botThinking => 'Stockfish يفكر …';
-
-  @override
-  String get botApplyingMove => 'جارٍ تنفيذ النقلة …';
-
-  @override
-  String get botWaiting => 'بانتظار النقلة التالية …';
-
-  @override
-  String get botViewingHistory => 'أنت تعرض وضعية سابقة.';
-
-  @override
-  String get botGameFinished => 'انتهت المباراة.';
-
-  @override
-  String get botMoveList => 'قائمة النقلات';
-
-  @override
-  String get botNoMovesYet => 'لم تُلعب أي نقلة بعد.';
-
-  @override
-  String get botPreviousMove => 'النقلة السابقة';
-
-  @override
-  String get botNextMove => 'النقلة التالية';
-
-  @override
-  String get botReturnToLive => 'العودة إلى الوضعية الحالية';
-
-  @override
-  String get botHintPiece => 'التلميح 1: إظهار القطعة';
-
-  @override
-  String get botHintTarget => 'التلميح 2: إظهار مربع الوصول';
-
-  @override
-  String get botHintsUsed => 'تم استخدام التلميحين';
-
-  @override
-  String get botHintThinking => 'جارٍ حساب التلميح …';
-
-  @override
-  String get botHintFailed => 'تعذر حساب التلميح.';
-
-  @override
-  String get botGameSettingsTitle => 'إعدادات المباراة';
-
-  @override
-  String get botGameSettingsDescription =>
-      'تنطبق هذه الإعدادات على مباراة البوت هذه فقط ولا تغيّر إعدادات التحليل العامة.';
-
-  @override
-  String get botGameEvaluationBarHelp =>
-      'يعرض تقييم Stockfish 18 الحالي أثناء مباراة البوت هذه. يُحفظ الإعداد مع المباراة.';
-
-  @override
-  String botHintCounter(int used) {
-    return '$used / 2 تلميحات لهذه النقلة';
-  }
-
-  @override
-  String get downloads => 'التنزيلات';
 
   @override
   String get favorites => 'المفضلة';
@@ -230,15 +82,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get favoriteNoLooseGames => 'لا توجد مباريات مفضلة بدون مجموعة.';
 
   @override
-  String get favoriteCollectionRule =>
-      'المجموعات بمستوى واحد فقط ولا يمكن إنشاء مجموعات داخلها.';
-
-  @override
   String get favoriteMoveToCollection => 'تغيير المجموعة';
-
-  @override
-  String get favoriteMoveHelp =>
-      'يمكن أن تبقى المباراة ضمن المفضلة بدون مجموعة أو تنتمي إلى مجموعة واحدة فقط.';
 
   @override
   String get profile => 'الملف الشخصي';
@@ -256,12 +100,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get switchAccount => 'تبديل الحساب';
 
   @override
-  String get demoNotice => 'مباراة محلية';
-
-  @override
-  String get tapToAnalyze => 'فتح وتحليل';
-
-  @override
   String get importData => 'استيراد PGN / FEN';
 
   @override
@@ -272,12 +110,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get importFen => 'استيراد وضعية FEN';
-
-  @override
-  String get exportFen => 'تصدير FEN';
-
-  @override
-  String get fenCopiedToClipboard => 'تم نسخ FEN إلى الحافظة.';
 
   @override
   String get pgnText => 'نص PGN';
@@ -355,41 +187,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get currentMove => 'النقلة الحالية';
 
   @override
-  String get boardArrows => 'إظهار أسهم الرقعة';
-
-  @override
-  String get boardArrowsHelp => 'للعرض فقط؛ التبديل لا يعيد التحليل.';
-
-  @override
   String get engine => 'المحرك';
-
-  @override
-  String get engineSelectionTitle => 'إصدار المحرك';
-
-  @override
-  String get engineVersion => 'محرك الشطرنج';
-
-  @override
-  String get engineVersionHelp =>
-      'اختر إصدار Stockfish الذي يستخدمه KChess للتحليل. تبقى جميع إعدادات التحليل الحالية دون تغيير.';
-
-  @override
-  String engineActiveLabel(String engine) {
-    return 'النشط: $engine';
-  }
-
-  @override
-  String get stockfish18 => 'Stockfish 18';
-
-  @override
-  String get stockfish19 => 'Stockfish 19';
-
-  @override
-  String get engineSelectionFailed =>
-      'تعذر تفعيل المحرك المحدد. سيبقى المحرك السابق محددًا.';
-
-  @override
-  String get enginePreset => 'متوسط · عمق 18 · 3 خطوط';
 
   @override
   String get depth => 'العمق';
@@ -442,14 +240,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get darkTheme => 'داكن';
 
   @override
-  String get engineSettingsSubtitle =>
-      'العمق والخطوط والحد الزمني وخيوط المعالجة وذاكرة Hash';
-
-  @override
   String get analysisSettingsTitle => 'التحليل';
-
-  @override
-  String get analysisSettingsSubtitle => 'الأسهم والتقييم وطريقة عرض التحليل';
 
   @override
   String get analysisBoardGuidance => 'إرشادات الرقعة';
@@ -461,77 +252,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bestMoveArrow => 'سهم أفضل نقلة';
 
   @override
-  String get bestMoveArrowHelp => 'يعرض أفضل نقلة يقترحها المحرك على الرقعة.';
-
-  @override
   String get threatArrow => 'سهم التهديد';
-
-  @override
-  String get threatArrowHelp =>
-      'يعرض أقوى نقلة تالية للخصم كسهم تحذير عندما يكون الدور على الخصم.';
 
   @override
   String get evaluationBarSetting => 'شريط التقييم';
 
   @override
-  String get evaluationBarSettingHelp => 'يعرض تقييم المحرك الحالي.';
-
-  @override
   String get showEngineLinesSetting => 'إظهار خطوط المحرك';
-
-  @override
-  String get showEngineLinesSettingHelp =>
-      'يعرض الخطوط الرئيسية المحسوبة (MultiPV).';
 
   @override
   String get showClassificationsSetting => 'إظهار تصنيفات النقلات';
 
   @override
-  String get showClassificationsSettingHelp =>
-      'يعرض النظرية والبارعة والحاسمة والأفضل وبقية تصنيفات النقلات.';
-
-  @override
   String get showAccuracySetting => 'إظهار الدقة';
-
-  @override
-  String get showAccuracySettingHelp => 'يعرض قيم الدقة المحسوبة محليًا.';
 
   @override
   String get showTheorySetting => 'إظهار معلومات النظرية';
 
   @override
-  String get showTheorySettingHelp =>
-      'يعرض معلومات كتاب الافتتاح وعدّادات النقلات النظرية.';
-
-  @override
   String get showResultSymbolsSetting => 'إظهار رموز النتيجة';
-
-  @override
-  String get showResultSymbolsSettingHelp =>
-      'يعرض رموز الفوز أو الخسارة أو التعادل فوق الملكين عند انتهاء المباراة.';
 
   @override
   String get designSettingsTitle => 'التصميم';
 
   @override
-  String get designSettingsSubtitle => 'المظهر والسمة والرقعة والقطع';
-
-  @override
   String get generalSettingsTitle => 'عام';
 
   @override
-  String get generalSettingsSubtitle => 'اللغة وسلوك التطبيق';
-
-  @override
   String get dataStorageSettingsTitle => 'البيانات والتخزين';
-
-  @override
-  String get dataStorageSettingsSubtitle =>
-      'ذاكرة التحليل والتنزيلات والبيانات المحلية';
-
-  @override
-  String get dataStoragePlaceholder =>
-      'ستُضاف خيارات التخزين وذاكرة التخزين المؤقت في خطوة لاحقة.';
 
   @override
   String get licensesAbout => 'التراخيص وحول التطبيق';
@@ -541,12 +289,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get provider => 'المزود';
-
-  @override
-  String get localProfile => 'ملف محلي';
-
-  @override
-  String get forced => 'إجباري';
 
   @override
   String get theory => 'النظرية';
@@ -562,9 +304,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get excellent => 'ممتازة';
-
-  @override
-  String get good => 'جيدة';
 
   @override
   String get okay => 'جيدة';
@@ -603,12 +342,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get playPause => 'تشغيل أو إيقاف';
 
   @override
-  String get player => 'اللاعب';
-
-  @override
-  String get bothPlayers => 'كلاهما';
-
-  @override
   String get whitePlayer => 'الأبيض';
 
   @override
@@ -619,18 +352,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookGames => 'مباريات الافتتاح';
-
-  @override
-  String get expectedLoss => 'خسارة التوقع';
-
-  @override
-  String get versions => 'الإصدارات';
-
-  @override
-  String get classifierVersionLabel => 'المصنّف';
-
-  @override
-  String get accuracyVersionLabel => 'الدقة';
 
   @override
   String get analyzingGame => 'جارٍ تحليل المباراة';
@@ -649,26 +370,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String moveComparisonText(String played, String classification, String best) {
-    return 'كانت $played مصنفة: $classification. ‏$best هي أفضل نقلة.';
-  }
-
-  @override
-  String theoryMoveText(String move) {
-    return '$move نقلة نظرية.';
-  }
-
-  @override
-  String triedMove(String move) {
-    return 'جرّبت $move.';
-  }
-
-  @override
   String get sidelineEngineTitle => 'محرك الخط الجانبي';
-
-  @override
-  String get sidelineEngineSubtitle =>
-      'تُطبَّق هذه القيم فقط على التحليل المباشر لخطك الجانبي.';
 
   @override
   String get mainLineLabel => 'الخط الرئيسي';
@@ -688,25 +390,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get sidelineAnalysisPaused => 'تم إيقاف التحليل المباشر مؤقتًا';
-
-  @override
-  String get analyzingVariation => 'جارٍ تحليل الخط المؤقت…';
-
-  @override
-  String evaluationComparison(String before, String after) {
-    return 'التقييم: $before ← $after';
-  }
-
-  @override
-  String bestContinuation(String line) {
-    return 'أفضل متابعة: $line';
-  }
-
-  @override
-  String get returnToMainLine => 'العودة إلى الخط الرئيسي';
-
-  @override
   String illegalOrFailedMove(String message) {
     return 'النقلة غير قانونية أو تعذر تحليلها: $message';
   }
@@ -718,49 +401,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get opponent => 'الخصم';
 
   @override
-  String get variationStartingPosition => 'وضع بداية الخط';
-
-  @override
-  String get variationStart => 'بداية الخط';
-
-  @override
   String get engineQualityTitle => 'جودة التحليل';
 
   @override
   String get engineResourcesTitle => 'الموارد';
 
   @override
-  String get depthHelp =>
-      'Min = عمق التحليل المسبق. Max = أقصى عمق للتحليل المباشر. القيم الأعلى تستغرق عادة وقتًا أطول.';
-
-  @override
   String get adaptiveEarlyStop => 'تحليل تكيفي';
-
-  @override
-  String get adaptiveEarlyStopHelp =>
-      'ينهي التحليل المسبق والتحليل المباشر الهادئ مبكرًا عندما يثبت التقييم وخطوط اللعب الرئيسية. تستمر عمليات التحقق الحرجة حتى الحد المحدد.';
-
-  @override
-  String get numberOfLinesHelp =>
-      'عدد أفضل الخطوط التي يحسبها Stockfish في الوقت نفسه.';
-
-  @override
-  String get timeLimitHelp =>
-      'حد اختياري لكل وضعية. عند إيقافه يُستخدم العمق فقط، وإلا يتوقف البحث عند بلوغ العمق أو الوقت أولًا.';
 
   @override
   String get threads => 'خيوط المعالجة';
 
   @override
-  String get threadsHelp =>
-      'عدد خيوط المعالج لكل عامل Stockfish. يكتشف Kchess جهازك تلقائيًا ويسمح بحد أقصى بنصف خيوط المعالج المنطقية.';
-
-  @override
   String get hashMemory => 'ذاكرة Hash';
-
-  @override
-  String get hashMemoryHelp =>
-      'ذاكرة RAM لجدول النقل في Stockfish. زيادة الذاكرة قد تحسن البحث في الوضعيات المتكررة.';
 
   @override
   String get boardDisplayTitle => 'عرض الرقعة';
@@ -772,22 +425,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get showBoardCoordinates => 'إحداثيات الرقعة';
 
   @override
-  String get showBoardCoordinatesHelp =>
-      'يعرض أسماء الأعمدة والصفوف (a–h / 1–8) على الرقعة.';
-
-  @override
   String get highlightLastMove => 'تمييز آخر نقلة';
 
   @override
-  String get highlightLastMoveHelp =>
-      'يميز مربع البداية ومربع النهاية لآخر نقلة تم لعبها.';
-
-  @override
   String get highlightSelectedSquare => 'تمييز المربع المحدد';
-
-  @override
-  String get highlightSelectedSquareHelp =>
-      'يميز المربع الذي اخترته أثناء استكشاف تفريع.';
 
   @override
   String get behaviorTitle => 'السلوك';
@@ -796,15 +437,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get autoSyncOnline => 'مزامنة الحسابات عبر الإنترنت تلقائيًا';
 
   @override
-  String get autoSyncOnlineHelp =>
-      'يزامن Chess.com وLichess تلقائيًا عند بدء التطبيق وعند تبديل الحساب.';
-
-  @override
   String get confirmBeforeDelete => 'التأكيد قبل الحذف';
-
-  @override
-  String get confirmBeforeDeleteHelp =>
-      'يطلب التأكيد قبل حذف الحسابات أو المباريات المحلية.';
 
   @override
   String get analysisCacheTitle => 'ذاكرة التحليل المؤقتة';
@@ -813,15 +446,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get useGlobalAnalysisCache => 'استخدام ذاكرة المواقف المشتركة';
 
   @override
-  String get useGlobalAnalysisCacheHelp =>
-      'يعيد استخدام تحليل متوافق للمواقف المتطابقة بين مباريات مختلفة.';
-
-  @override
   String get clearAnalysisCache => 'مسح ذاكرة التحليل';
-
-  @override
-  String get clearAnalysisCacheHelp =>
-      'يمسح ذاكرة المواقف المشتركة فقط. تبقى المباريات المحفوظة والتحليلات المكتملة.';
 
   @override
   String get clearAnalysisCacheQuestion => 'مسح ذاكرة التحليل؟';
@@ -838,10 +463,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get diagnosticLogging => 'سجل التشخيص';
-
-  @override
-  String get diagnosticLoggingHelp =>
-      'يكتب سجلات تقنية محدودة لاستكشاف الأخطاء. لا يتم تسجيل PGN أو FEN الكامل أو ردود مزودي الخدمة.';
 
   @override
   String get deleteLocalGameQuestion => 'حذف الإدخال المحلي؟';
@@ -899,14 +520,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statsAll => 'الكل';
 
   @override
-  String get statsAllTimeControlsNote => 'كل أنواع الوقت';
-
-  @override
   String get statsPhaseTitle => 'حسب مرحلة اللعب';
-
-  @override
-  String get statsPhaseSubtitle =>
-      'في أي مرحلة تنتهي مبارياتك وكيف تكون نتيجتك.';
 
   @override
   String get statsPhaseOpening => 'الافتتاح (1–12)';
@@ -956,14 +570,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statsIntroTitle => 'أداؤك في الشطرنج';
 
   @override
-  String get statsIntroBody =>
-      'اعرض نتائجك وأداءك الأخير وسجل افتتاحياتك مفصولًا حسب اللون.';
-
-  @override
   String get statsFormTitle => 'الأداء الأخير';
-
-  @override
-  String get statsFormHint => 'اضغط على نتيجة لفتح المباراة.';
 
   @override
   String get statsFormVersus => 'ضد';
@@ -1316,52 +923,13 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get statsTimeControlCorrespondence => 'بالمراسلة';
-
-  @override
-  String get statsTimeControlOther => 'أخرى';
-
-  @override
-  String get botGameDeleteQuestion => 'حذف مباراة البوت؟';
-
-  @override
-  String get botGameDeleteBody =>
-      'سيتم حذف هذا الإدخال من سجل مباريات البوت نهائيًا. ستبقى أي مباراة تحليل تم إنشاؤها منه في مكتبة الألعاب المحلية.';
-
-  @override
-  String get promotionTitle => 'ترقية البيدق';
-
-  @override
-  String get promotionChoosePiece =>
-      'اختر القطعة التي تريد ترقية البيدق إليها.';
-
-  @override
-  String get promotionQueen => 'وزير';
-
-  @override
-  String get promotionRook => 'قلعة';
-
-  @override
-  String get promotionBishop => 'فيل';
-
-  @override
-  String get promotionKnight => 'حصان';
-
-  @override
   String get trainingSection => 'التدريب';
 
   @override
   String get trainingIntroTitle => 'ساحة التدريب';
 
   @override
-  String get trainingIntroBody =>
-      'اختر مجال تدريب. يُحفظ تقدمك محليًا على هذا الجهاز.';
-
-  @override
   String get trainingOpeningTitle => 'مختبر الافتتاحيات';
-
-  @override
-  String get trainingOpeningSubtitle => 'راجع خطوط ذخيرتك ونقاط ضعفك.';
 
   @override
   String get trainingOpeningAction => 'درّب الخطوط';
@@ -1378,10 +946,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get trainingTacticsTitle => 'صائد الأخطاء';
 
   @override
-  String get trainingTacticsSubtitle =>
-      'ابحث عن النقلة الأفضل في أوضاع وسط اللعب الحرجة.';
-
-  @override
   String trainingTacticsSolved(int count) {
     return '$count تكتيكًا تم حله';
   }
@@ -1394,9 +958,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get trainingEndgameTitle => 'أكاديمية النهايات';
-
-  @override
-  String get trainingEndgameSubtitle => 'أتقن النهايات النظرية خطوة بخطوة.';
 
   @override
   String trainingEndgameProgress(int mastered, int total, int percent) {
@@ -1415,23 +976,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String trainingLastAttempt(String date) {
-    return 'آخر تدريب: $date';
-  }
-
-  @override
-  String get trainingNeverAttempted => 'لم يتم التدريب بعد';
-
-  @override
   String get trainingOpeningLabSelected => 'الخط المختار';
-
-  @override
-  String get trainingOpeningLabEmpty =>
-      'اختر افتتاحية من تبويب الإحصاءات واضغط «تدريب» لتحميلها هنا.';
-
-  @override
-  String get trainingOpeningLabPending =>
-      'سيتوفر مدرّب الخطوط بمجرد أن توفّر النواة نقلات الافتتاحية.';
 
   @override
   String get statsTrainOpening => 'تدريب';
@@ -1486,6 +1031,228 @@ class AppLocalizationsAr extends AppLocalizations {
   String get trainingRestart => 'إعادة البدء';
 
   @override
+  String get trainingOpeningLabStart => 'تدرّب على الخط';
+
+  @override
+  String get trainingOpeningLabBackToOverview => 'العودة إلى القائمة';
+
+  @override
+  String get trainingOpeningTreeEmpty => 'لا توجد خطوط افتتاح متاحة بعد.';
+
+  @override
+  String get trainingOpeningTreeExpand => 'إظهار التنويعات';
+
+  @override
+  String get trainingOpeningTreeCollapse => 'إخفاء التنويعات';
+
+  @override
+  String trainingOpeningTreeVariations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تنويعات',
+      one: 'تنويعة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trainingOpeningTreeLoadFailed =>
+      'هذا الخط ليس في قاعدة البيانات بعد.';
+
+  @override
+  String get trainingOpeningTreeZoomIn => 'تكبير';
+
+  @override
+  String get trainingOpeningTreeZoomOut => 'تصغير';
+
+  @override
+  String get trainingOpeningTreeFit => 'ملاءمة الشجرة';
+
+  @override
+  String get trainingOpeningTreeHint =>
+      'انقر على بطاقة لفتح تنويعاتها، أو درّب الخط مباشرة.';
+
+  @override
+  String get playAgainstBot => 'اللعب ضد بوت';
+
+  @override
+  String get continueAgainstBot => 'متابعة اللعب ضد البوت';
+
+  @override
+  String get botPlayerColor => 'لونك';
+
+  @override
+  String get temporaryBotGameNotSaved =>
+      'لن يتم حفظ هذه المباراة وسيتم حذفها بالكامل عند الإغلاق أو الإلغاء.';
+
+  @override
+  String get botGameLog => 'سجل مباريات البوت';
+
+  @override
+  String get botGameLogEmpty => 'لا توجد مباريات بوت محفوظة بعد.';
+
+  @override
+  String get botGameLogLoadFailed => 'تعذر تحميل سجل مباريات البوت.';
+
+  @override
+  String get botGameHistoryActive => 'جارية';
+
+  @override
+  String get botGameHistoryWin => 'فوز';
+
+  @override
+  String get botGameHistoryLoss => 'خسارة';
+
+  @override
+  String get botGameHistoryDraw => 'تعادل';
+
+  @override
+  String get botStrength => 'قوة البوت';
+
+  @override
+  String get botElo => 'Elo';
+
+  @override
+  String get botStartGame => 'بدء المباراة';
+
+  @override
+  String get botGameTitle => 'مباراة ضد البوت';
+
+  @override
+  String get botGameLoading => 'جارٍ تجهيز المباراة …';
+
+  @override
+  String get botGameLoadFailed => 'تعذر تجهيز مباراة البوت.';
+
+  @override
+  String get botMoveFailed => 'تعذر حساب نقلة البوت.';
+
+  @override
+  String get botYou => 'أنت';
+
+  @override
+  String get botYourTurn => 'دورك الآن.';
+
+  @override
+  String get botThinking => 'Stockfish يفكر …';
+
+  @override
+  String get botApplyingMove => 'جارٍ تنفيذ النقلة …';
+
+  @override
+  String get botWaiting => 'بانتظار النقلة التالية …';
+
+  @override
+  String get botViewingHistory => 'أنت تعرض وضعية سابقة.';
+
+  @override
+  String get botGameFinished => 'انتهت المباراة.';
+
+  @override
+  String get botMoveList => 'قائمة النقلات';
+
+  @override
+  String get botNoMovesYet => 'لم تُلعب أي نقلة بعد.';
+
+  @override
+  String get botPreviousMove => 'النقلة السابقة';
+
+  @override
+  String get botNextMove => 'النقلة التالية';
+
+  @override
+  String get botReturnToLive => 'العودة إلى الوضعية الحالية';
+
+  @override
+  String get botHintPiece => 'التلميح 1: إظهار القطعة';
+
+  @override
+  String get botHintTarget => 'التلميح 2: إظهار مربع الوصول';
+
+  @override
+  String get botHintsUsed => 'تم استخدام التلميحين';
+
+  @override
+  String get botHintThinking => 'جارٍ حساب التلميح …';
+
+  @override
+  String get botHintFailed => 'تعذر حساب التلميح.';
+
+  @override
+  String get botGameSettingsTitle => 'إعدادات المباراة';
+
+  @override
+  String botHintCounter(int used) {
+    return '$used / 2 تلميحات لهذه النقلة';
+  }
+
+  @override
+  String get exportFen => 'تصدير FEN';
+
+  @override
+  String get fenCopiedToClipboard => 'تم نسخ FEN إلى الحافظة.';
+
+  @override
+  String get engineSelectionTitle => 'إصدار المحرك';
+
+  @override
+  String get engineVersion => 'محرك الشطرنج';
+
+  @override
+  String engineActiveLabel(String engine) {
+    return 'النشط: $engine';
+  }
+
+  @override
+  String get stockfish18 => 'Stockfish 18';
+
+  @override
+  String get stockfish19 => 'Stockfish 19';
+
+  @override
+  String get engineSelectionFailed =>
+      'تعذر تفعيل المحرك المحدد. سيبقى المحرك السابق محددًا.';
+
+  @override
+  String get forced => 'إجباري';
+
+  @override
+  String get good => 'جيدة';
+
+  @override
+  String get statsTimeControlCorrespondence => 'بالمراسلة';
+
+  @override
+  String get statsTimeControlOther => 'أخرى';
+
+  @override
+  String get botGameDeleteQuestion => 'حذف مباراة البوت؟';
+
+  @override
+  String get botGameDeleteBody =>
+      'سيتم حذف هذا الإدخال من سجل مباريات البوت نهائيًا. ستبقى أي مباراة تحليل تم إنشاؤها منه في مكتبة الألعاب المحلية.';
+
+  @override
+  String get promotionTitle => 'ترقية البيدق';
+
+  @override
+  String get promotionChoosePiece =>
+      'اختر القطعة التي تريد ترقية البيدق إليها.';
+
+  @override
+  String get promotionQueen => 'وزير';
+
+  @override
+  String get promotionRook => 'قلعة';
+
+  @override
+  String get promotionBishop => 'فيل';
+
+  @override
+  String get promotionKnight => 'حصان';
+
+  @override
   String get trainingOppositionTitle => 'تقابل الملكين مع بيدق';
 
   @override
@@ -1505,4 +1272,97 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get trainingPhilidorHint =>
       'أبقِ الرخ على الصف السادس حتى يتقدم البيدق، ثم أعطِ الكش من الخلف.';
+
+  @override
+  String get practiceDrills => 'تدريبات كش مات';
+
+  @override
+  String get practiceStudies => 'دراسات نهايات كلاسيكية';
+
+  @override
+  String get practiceFailed => 'انتهت المحاولة. حاول مجددًا.';
+
+  @override
+  String get practiceThinking => 'الخصم يفكر…';
+
+  @override
+  String practiceMoves(int count) {
+    return 'النقلات الملعوبة: $count';
+  }
+
+  @override
+  String practiceLevel(int number) {
+    return 'المستوى $number';
+  }
+
+  @override
+  String practiceStudyNumber(int number) {
+    return 'الدراسة $number';
+  }
+
+  @override
+  String get practiceStudySource =>
+      'كلينغ وهورويتز · دراسات الشطرنج ونهايات المباريات (1851). تدرّب على هذه الوضعيات ضد ستوكفيش.';
+
+  @override
+  String get practiceQueenTitle => 'ملك ووزير ضد ملك';
+
+  @override
+  String get practiceRookTitle => 'ملك ورخ ضد ملك';
+
+  @override
+  String get practiceQueenRookTitle => 'وزير ضد رخ';
+
+  @override
+  String get practiceQueenHint =>
+      'استخدم ملكك لدعم الوزير. اترك مربع هروب حتى تتمكن من تنفيذ كش مات.';
+
+  @override
+  String get practiceRookHint => 'اقطع طريق الملك بالرخ وقرّب ملكك.';
+
+  @override
+  String get practiceQueenRookHint =>
+      'ابحث عن هجوم مزدوج على الملك والرخ. انتبه إلى التعادل بالخنق.';
+
+  @override
+  String get practiceBeginner => 'مبتدئ';
+
+  @override
+  String get practiceIntermediate => 'متوسط';
+
+  @override
+  String get practiceMaster => 'متقدم';
+
+  @override
+  String get practiceSectionKingPawn => 'ملك وبيدق';
+
+  @override
+  String get practiceSectionBishops => 'ملوك وفيلة وبيادق';
+
+  @override
+  String get practiceSectionKnightsBishops => 'أحصنة وفيلة وبيادق';
+
+  @override
+  String get practiceSectionTwoMinor => 'قطعتان خفيفتان ضد واحدة';
+
+  @override
+  String get practiceSectionRookPawns => 'رخ ضد بيادق';
+
+  @override
+  String get practiceSectionRookMinor => 'رخ ضد قطع خفيفة';
+
+  @override
+  String get practiceSectionMinorRook => 'قطع خفيفة ضد رخ';
+
+  @override
+  String get practiceSectionQueenPawns => 'وزير ضد بيادق';
+
+  @override
+  String get practiceSectionQueens => 'وزراء وبيادق';
+
+  @override
+  String get practiceSectionQueenRook => 'وزير ضد رخ';
+
+  @override
+  String get practiceSectionQueenMinor => 'وزير ضد قطع خفيفة';
 }

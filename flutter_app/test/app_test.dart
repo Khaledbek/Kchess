@@ -3,10 +3,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kchess/app/kchess_app.dart';
 import 'package:kchess/localization/generated/app_localizations.dart';
-import 'package:kchess/models/models.dart';
+import 'package:kchess/shared/models/models.dart';
 import 'package:kchess/ui/app_root.dart';
-import 'package:kchess/ui/screens/analysis_screen.dart';
-import 'package:kchess/view_models/app_controller.dart';
+import 'package:kchess/features/analysis/presentation/analysis_screen.dart';
+import 'package:kchess/features/app/application/app_controller.dart';
 
 import 'support/fake_core_gateway.dart';
 
@@ -520,7 +520,6 @@ void main() {
       blackName: 'OlderOpponent',
       result: '1-0',
       timeControl: '300+0',
-      startingFen: 'start',
       providerOutcome: 'win',
       timeControlType: 'blitz',
       downloaded: true,

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kchess/localization/generated/app_localizations.dart';
 import 'package:kchess/ui/app_root.dart';
-import 'package:kchess/view_models/app_controller.dart';
+import 'package:kchess/features/app/application/app_controller.dart';
 
 import 'support/fake_core_gateway.dart';
 

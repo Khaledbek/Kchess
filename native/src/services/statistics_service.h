@@ -12,8 +12,7 @@ namespace kchess {
 
 // Computes performance statistics for the active profile by aggregating stored
 // games in the native layer, so the UI receives compact summaries instead of
-// the whole library. The first module is the Overview; later modules (openings,
-// rating, move quality) will extend this service.
+// the whole library.
 class StatisticsService {
  public:
   explicit StatisticsService(Database& database);

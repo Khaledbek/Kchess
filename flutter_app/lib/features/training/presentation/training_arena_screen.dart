@@ -51,9 +51,8 @@ class _TrainingArenaScreenState extends State<TrainingArenaScreen> {
   Future<void> _openEndgames() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EndgameAcademyScreen(
-          gateway: widget.controller.gateway,
-        ),
+        builder: (_) =>
+            EndgameAcademyScreen(gateway: widget.controller.gateway),
       ),
     );
     if (mounted) setState(_reload);
@@ -84,13 +83,6 @@ class _TrainingArenaScreenState extends State<TrainingArenaScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      strings.trainingIntroBody,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                     const SizedBox(height: 20),
                     TrainingDashboardCards(
                       overview: snapshot.data,
@@ -100,15 +92,15 @@ class _TrainingArenaScreenState extends State<TrainingArenaScreen> {
                       onOpenOpeningLab: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => OpeningLabScreen(
+                            gateway: widget.controller.gateway,
                             request: widget.openingRequest,
                           ),
                         ),
                       ),
                       onOpenTactics: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => BlunderBusterScreen(
-                            overview: snapshot.data,
-                          ),
+                          builder: (_) =>
+                              BlunderBusterScreen(overview: snapshot.data),
                         ),
                       ),
                       onOpenEndgames: _openEndgames,

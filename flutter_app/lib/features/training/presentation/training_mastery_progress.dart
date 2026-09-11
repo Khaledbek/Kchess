@@ -30,9 +30,8 @@ class TrainingMasteryProgress extends StatelessWidget {
             total,
             (ratio * 100).round(),
           ),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         ClipRRect(

@@ -23,7 +23,6 @@ class PlayScreen extends StatelessWidget {
             key: const Key('play-against-bot'),
             icon: Icons.smart_toy_outlined,
             title: strings.playAgainstBot,
-            subtitle: strings.playAgainstBotSubtitle,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => BotGameSetupScreen(gateway: gateway),
@@ -35,7 +34,6 @@ class PlayScreen extends StatelessWidget {
             key: const Key('bot-game-log'),
             icon: Icons.history_rounded,
             title: strings.botGameLog,
-            subtitle: strings.botGameLogSubtitle,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => BotGameLogScreen(gateway: gateway),
@@ -52,14 +50,12 @@ class _PlayModeTile extends StatelessWidget {
   const _PlayModeTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -89,10 +85,6 @@ class _PlayModeTile extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(subtitle),
-        ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: onTap,
       ),
@@ -105,9 +97,8 @@ class _PlayModeTile extends StatelessWidget {
 // -----------------------------------------------------------------------------
 
 class _EmptySection extends StatelessWidget {
-  const _EmptySection({required this.title, this.message});
+  const _EmptySection({required this.title});
   final String title;
-  final String? message;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -115,10 +106,8 @@ class _EmptySection extends StatelessWidget {
         ? AppBar(title: Text(title))
         : null,
     body: Center(
-      child: Text(message ?? AppLocalizations.of(context).emptySection),
+      child: Text(AppLocalizations.of(context).emptySection),
     ),
   );
 }
 
-/// A rich game row: outcome accent, time-control badge, both players with
-/// piece markers and rating pills, a result pill, accuracy and quick actions.

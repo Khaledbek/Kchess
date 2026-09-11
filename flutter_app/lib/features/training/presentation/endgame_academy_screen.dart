@@ -11,6 +11,8 @@ import '../../../shared/theme/app_theme.dart';
 import 'endgame_exercise_player.dart';
 import 'training_localizations.dart';
 import 'training_mastery_progress.dart';
+import 'drill_levels_screen.dart';
+import 'endgame_studies_screen.dart';
 
 class EndgameAcademyScreen extends StatefulWidget {
   const EndgameAcademyScreen({required this.gateway, super.key});
@@ -37,13 +39,27 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
   Future<void> _open(TrainingExercise exercise) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EndgameExercisePlayer(
-          exercise: exercise,
-          gateway: widget.gateway,
-        ),
+        builder: (_) =>
+            EndgameExercisePlayer(exercise: exercise, gateway: widget.gateway),
       ),
     );
     if (mounted) setState(_reload);
+  }
+
+  void _openCategory() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DrillLevelsScreen(gateway: widget.gateway),
+      ),
+    );
+  }
+
+  void _openStudies() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EndgameStudiesScreen(gateway: widget.gateway),
+      ),
+    );
   }
 
   @override
@@ -71,6 +87,16 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      ListTile(
+                        title: Text(strings.practiceDrills),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: _openCategory,
+                      ),
+                      ListTile(
+                        title: Text(strings.practiceStudies),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: _openStudies,
+                      ),
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(18),
@@ -81,7 +107,11 @@ class _EndgameAcademyScreenState extends State<EndgameAcademyScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      for (var index = 0; index < exercises.length; index++) ...[
+                      for (
+                        var index = 0;
+                        index < exercises.length;
+                        index++
+                      ) ...[
                         if (index > 0) const SizedBox(height: 12),
                         _ExerciseCard(
                           exercise: exercises[index],

@@ -44,7 +44,8 @@ Core::Core(std::filesystem::path data_directory)
       analysis_service_(database_, *opening_theory_),
       bot_service_(database_),
       statistics_service_(database_),
-      training_service_(database_) {
+      training_service_(database_),
+      practice_service_(database_, training_service_, bot_service_) {
   diagnostics::configure_logging(data_directory_);
   diagnostics::info("core", "Core created");
 }
@@ -530,7 +531,11 @@ void Core::cancel_bot_move(const std::string& job_id) {
 // -----------------------------------------------------------------------------
 
 std::string Core::training_overview_json() const {
-  return training_service_.overview_json();
+  return practice_service_.overview(training_service_.overview_json());
+}
+
+std::string Core::practice_command_json(const std::string& request) {
+  return practice_service_.command(request);
 }
 
 std::string Core::start_training_attempt_json(const std::string& exercise_id) {
