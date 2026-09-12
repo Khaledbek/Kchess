@@ -16,10 +16,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get firstRunTitle => 'Dein lokaler Schachbereich';
 
   @override
-  String get firstRunBody =>
-      'Wähle eine Quelle. Öffentliche Online-Profile benötigen kein Passwort.';
-
-  @override
   String get chessCom => 'Chess.com';
 
   @override
@@ -48,13 +44,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get play => 'Spielen';
-
-  @override
-  String get playPlaceholder =>
-      'Dieser Bereich ist als Platzhalter für zukünftige Spielmodi vorbereitet, z. B. Partien gegen Bots.';
-
-  @override
-  String get downloads => 'Downloads';
 
   @override
   String get favorites => 'Favoriten';
@@ -93,15 +82,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get favoriteNoLooseGames => 'Keine losen Favoriten.';
 
   @override
-  String get favoriteCollectionRule =>
-      'Sammlungen sind nur eine Ebene tief und können nicht verschachtelt werden.';
-
-  @override
   String get favoriteMoveToCollection => 'Sammlung ändern';
-
-  @override
-  String get favoriteMoveHelp =>
-      'Partien können lose in Favoriten liegen oder genau einer Sammlung zugeordnet werden.';
 
   @override
   String get profile => 'Profil';
@@ -117,12 +98,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get switchAccount => 'Konto wechseln';
-
-  @override
-  String get demoNotice => 'Lokale Partie';
-
-  @override
-  String get tapToAnalyze => 'Öffnen und analysieren';
 
   @override
   String get importData => 'PGN / FEN importieren';
@@ -214,17 +189,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get currentMove => 'Aktueller Zug';
 
   @override
-  String get boardArrows => 'Brett-Pfeile anzeigen';
-
-  @override
-  String get boardArrowsHelp =>
-      'Nur Darstellung; Umschalten startet keine neue Analyse.';
-
-  @override
   String get engine => 'Engine';
-
-  @override
-  String get enginePreset => 'Mittel · Tiefe 18 · 3 Linien';
 
   @override
   String get depth => 'Tiefe';
@@ -277,14 +242,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get darkTheme => 'Dunkel';
 
   @override
-  String get engineSettingsSubtitle =>
-      'Tiefe, Linien, Zeitlimit, Threads und Hash';
-
-  @override
   String get analysisSettingsTitle => 'Analyse';
-
-  @override
-  String get analysisSettingsSubtitle => 'Pfeile, Bewertung und Analyseanzeige';
 
   @override
   String get analysisBoardGuidance => 'Brett-Hinweise';
@@ -296,90 +254,43 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bestMoveArrow => 'Bestzug-Pfeil';
 
   @override
-  String get bestMoveArrowHelp => 'Zeigt den besten Engine-Zug auf dem Brett.';
-
-  @override
   String get threatArrow => 'Bedrohungs-Pfeil';
-
-  @override
-  String get threatArrowHelp =>
-      'Zeigt den stärksten gegnerischen Zug als Warnpfeil, wenn der Gegner am Zug ist.';
 
   @override
   String get evaluationBarSetting => 'Bewertungsleiste';
 
   @override
-  String get evaluationBarSettingHelp => 'Zeigt die aktuelle Engine-Bewertung.';
-
-  @override
   String get showEngineLinesSetting => 'Engine-Linien anzeigen';
-
-  @override
-  String get showEngineLinesSettingHelp =>
-      'Zeigt die berechneten Hauptvarianten (MultiPV).';
 
   @override
   String get showClassificationsSetting => 'Zugklassifikationen anzeigen';
 
   @override
-  String get showClassificationsSettingHelp =>
-      'Zeigt Theorie, Brillant, Kritisch, Bester und die weiteren Zugkategorien.';
-
-  @override
   String get showAccuracySetting => 'Accuracy anzeigen';
-
-  @override
-  String get showAccuracySettingHelp =>
-      'Zeigt die lokal berechneten Accuracy-Werte.';
 
   @override
   String get showTheorySetting => 'Theorieinformationen anzeigen';
 
   @override
-  String get showTheorySettingHelp =>
-      'Zeigt Eröffnungsbuch-Informationen und Theorie-Zähler.';
-
-  @override
   String get showResultSymbolsSetting => 'Ergebnissymbole anzeigen';
-
-  @override
-  String get showResultSymbolsSettingHelp =>
-      'Zeigt bei beendeten Partien Win-, Loss- oder Draw-Symbole über den Königen.';
 
   @override
   String get designSettingsTitle => 'Design';
 
   @override
-  String get designSettingsSubtitle => 'Darstellung, Theme, Brett und Figuren';
-
-  @override
   String get generalSettingsTitle => 'Allgemein';
-
-  @override
-  String get generalSettingsSubtitle => 'Sprache und App-Verhalten';
 
   @override
   String get dataStorageSettingsTitle => 'Daten & Speicher';
 
   @override
-  String get dataStorageSettingsSubtitle =>
-      'Analyse-Cache, Downloads und lokale Daten';
-
-  @override
-  String get dataStoragePlaceholder =>
-      'Speicher- und Cache-Optionen werden in einem nächsten Schritt ergänzt.';
-
-  @override
   String get licensesAbout => 'Lizenzen & Über';
 
   @override
-  String get stockfishPending => 'Stockfish 18 · lokal · GPLv3';
+  String get stockfishPending => 'Stockfish · lokal · GPLv3';
 
   @override
   String get provider => 'Anbieter';
-
-  @override
-  String get localProfile => 'Lokales Profil';
 
   @override
   String get theory => 'Theorie';
@@ -433,12 +344,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playPause => 'Abspielen oder pausieren';
 
   @override
-  String get player => 'Spieler';
-
-  @override
-  String get bothPlayers => 'Beide';
-
-  @override
   String get whitePlayer => 'Weiß';
 
   @override
@@ -449,18 +354,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bookGames => 'Book-Partien';
-
-  @override
-  String get expectedLoss => 'Erwartungswertverlust';
-
-  @override
-  String get versions => 'Versionen';
-
-  @override
-  String get classifierVersionLabel => 'Klassifikator';
-
-  @override
-  String get accuracyVersionLabel => 'Accuracy';
 
   @override
   String get analyzingGame => 'Partie wird analysiert';
@@ -479,26 +372,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String moveComparisonText(String played, String classification, String best) {
-    return '$played war $classification. $best ist der beste Zug.';
-  }
-
-  @override
-  String theoryMoveText(String move) {
-    return '$move ist ein Theorie-Zug.';
-  }
-
-  @override
-  String triedMove(String move) {
-    return 'Du hast $move ausprobiert.';
-  }
-
-  @override
   String get sidelineEngineTitle => 'Side-Line-Engine';
-
-  @override
-  String get sidelineEngineSubtitle =>
-      'Diese Werte gelten nur für die Live-Analyse eigener Varianten.';
 
   @override
   String get mainLineLabel => 'Hauptlinie';
@@ -518,25 +392,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get sidelineAnalysisPaused => 'Live-Analyse pausiert';
-
-  @override
-  String get analyzingVariation => 'Die temporäre Variante wird analysiert…';
-
-  @override
-  String evaluationComparison(String before, String after) {
-    return 'Bewertung: $before → $after';
-  }
-
-  @override
-  String bestContinuation(String line) {
-    return 'Beste Fortsetzung: $line';
-  }
-
-  @override
-  String get returnToMainLine => 'Zur Hauptlinie zurückkehren';
-
-  @override
   String illegalOrFailedMove(String message) {
     return 'Der Zug ist nicht legal oder konnte nicht analysiert werden: $message';
   }
@@ -548,49 +403,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get opponent => 'Gegner';
 
   @override
-  String get variationStartingPosition => 'Ausgangsstellung der Variante';
-
-  @override
-  String get variationStart => 'Anfang der Variante';
-
-  @override
   String get engineQualityTitle => 'Analysequalität';
 
   @override
   String get engineResourcesTitle => 'Ressourcen';
 
   @override
-  String get depthHelp =>
-      'Min = Tiefe der Voranalyse. Max = maximale Tiefe der Liveanalyse. Höhere Werte dauern in der Regel länger.';
-
-  @override
   String get adaptiveEarlyStop => 'Adaptive Analyse';
-
-  @override
-  String get adaptiveEarlyStopHelp =>
-      'Beendet ruhige Vor- und Liveanalysen früher, wenn Bewertung und Hauptvarianten stabil sind. Kritische Verifikationen rechnen weiterhin bis zum eingestellten Limit.';
-
-  @override
-  String get numberOfLinesHelp =>
-      'Wie viele beste Varianten Stockfish gleichzeitig berechnet.';
-
-  @override
-  String get timeLimitHelp =>
-      'Optionales Limit pro Stellung. Aus nutzt nur die Tiefe; sonst endet die Suche, sobald Tiefe oder Zeit zuerst erreicht ist.';
 
   @override
   String get threads => 'Threads';
 
   @override
-  String get threadsHelp =>
-      'CPU-Threads pro Stockfish-Worker. Kchess erkennt deinen PC automatisch und erlaubt höchstens die Hälfte der logischen CPU-Threads.';
-
-  @override
   String get hashMemory => 'Hash-Speicher';
-
-  @override
-  String get hashMemoryHelp =>
-      'Arbeitsspeicher für Stockfishs Transposition Table. Mehr Speicher kann die Suche in wiederkehrenden Stellungen verbessern.';
 
   @override
   String get boardDisplayTitle => 'Brettdarstellung';
@@ -602,22 +427,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get showBoardCoordinates => 'Brettkoordinaten';
 
   @override
-  String get showBoardCoordinatesHelp =>
-      'Zeigt Linien- und Reihennamen (a–h / 1–8) am Brett.';
-
-  @override
   String get highlightLastMove => 'Letzten Zug hervorheben';
 
   @override
-  String get highlightLastMoveHelp =>
-      'Markiert Start- und Zielfeld des zuletzt gespielten Zuges.';
-
-  @override
   String get highlightSelectedSquare => 'Ausgewähltes Feld hervorheben';
-
-  @override
-  String get highlightSelectedSquareHelp =>
-      'Markiert das Feld, das du für eine Variante ausgewählt hast.';
 
   @override
   String get behaviorTitle => 'Verhalten';
@@ -626,15 +439,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get autoSyncOnline => 'Online-Profile automatisch aktualisieren';
 
   @override
-  String get autoSyncOnlineHelp =>
-      'Synchronisiert Chess.com und Lichess beim Start und beim Profilwechsel automatisch.';
-
-  @override
   String get confirmBeforeDelete => 'Vor dem Löschen bestätigen';
-
-  @override
-  String get confirmBeforeDeleteHelp =>
-      'Fragt vor dem Löschen von Profilen oder lokalen Partien nach.';
 
   @override
   String get analysisCacheTitle => 'Analyse-Cache';
@@ -643,15 +448,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get useGlobalAnalysisCache => 'Globalen Stellungs-Cache verwenden';
 
   @override
-  String get useGlobalAnalysisCacheHelp =>
-      'Verwendet bereits analysierte identische Stellungen auch in anderen Partien wieder.';
-
-  @override
   String get clearAnalysisCache => 'Analyse-Cache leeren';
-
-  @override
-  String get clearAnalysisCacheHelp =>
-      'Löscht nur den globalen Stellungs-Cache. Gespeicherte Partien und vollständige Partieanalysen bleiben erhalten.';
 
   @override
   String get clearAnalysisCacheQuestion => 'Analyse-Cache leeren?';
@@ -668,10 +465,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get diagnosticLogging => 'Diagnoseprotokoll';
-
-  @override
-  String get diagnosticLoggingHelp =>
-      'Schreibt begrenzte technische Logs für die Fehlersuche. Vollständige PGNs, FENs und Provider-Antworten werden nicht protokolliert.';
 
   @override
   String get deleteLocalGameQuestion => 'Lokalen Eintrag löschen?';
@@ -729,14 +522,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get statsAll => 'Alle';
 
   @override
-  String get statsAllTimeControlsNote => 'Alle Zeitkontrollen';
-
-  @override
   String get statsPhaseTitle => 'Nach Spielphase';
-
-  @override
-  String get statsPhaseSubtitle =>
-      'In welcher Phase deine Partien enden und wie du abschneidest.';
 
   @override
   String get statsPhaseOpening => 'Eröffnung (1–12)';
@@ -787,15 +573,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get statsIntroTitle => 'Deine Schachleistung';
 
   @override
-  String get statsIntroBody =>
-      'Sieh deine Ergebnisse, aktuelle Form und Eröffnungsbilanz getrennt nach Farbe.';
-
-  @override
   String get statsFormTitle => 'Aktuelle Form';
-
-  @override
-  String get statsFormHint =>
-      'Tippe auf ein Ergebnis, um die Partie zu öffnen.';
 
   @override
   String get statsFormVersus => 'gegen';
@@ -1158,15 +936,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trainingIntroTitle => 'Training Arena';
 
   @override
-  String get trainingIntroBody =>
-      'Wähle einen Trainingsbereich. Dein Fortschritt wird lokal auf diesem Gerät gespeichert.';
-
-  @override
   String get trainingOpeningTitle => 'Eröffnungs-Labor';
-
-  @override
-  String get trainingOpeningSubtitle =>
-      'Repetiere deine Repertoire-Linien und Schwachstellen.';
 
   @override
   String get trainingOpeningAction => 'Linien trainieren';
@@ -1184,10 +954,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trainingTacticsTitle => 'Blunder-Buster';
 
   @override
-  String get trainingTacticsSubtitle =>
-      'Finde den besseren Zug in kritischen Mittelspiel-Stellungen.';
-
-  @override
   String trainingTacticsSolved(int count) {
     return '$count gelöste Taktiken';
   }
@@ -1200,10 +966,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get trainingEndgameTitle => 'Endspiel-Akademie';
-
-  @override
-  String get trainingEndgameSubtitle =>
-      'Theoretische Endspiele schrittweise meistern.';
 
   @override
   String trainingEndgameProgress(int mastered, int total, int percent) {
@@ -1222,30 +984,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String trainingLastAttempt(String date) {
-    return 'Zuletzt geübt: $date';
-  }
-
-  @override
-  String get trainingNeverAttempted => 'Noch nicht geübt';
-
-  @override
-  String get trainingHint => 'Tipp';
-
-  @override
-  String get trainingBoardPending =>
-      'Das Brett-Training folgt, sobald der Core die Zugprüfung über die native Schnittstelle bereitstellt.';
-
-  @override
   String get trainingOpeningLabSelected => 'Ausgewählte Linie';
-
-  @override
-  String get trainingOpeningLabEmpty =>
-      'Wähle in der Statistik eine Eröffnung und tippe auf „Trainieren“, um sie hier zu laden.';
-
-  @override
-  String get trainingOpeningLabPending =>
-      'Der Linien-Trainer folgt, sobald der Core die Eröffnungszüge liefert.';
 
   @override
   String get statsTrainOpening => 'Trainieren';
@@ -1299,8 +1038,487 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trainingYourMove => 'Du bist am Zug';
 
   @override
-  String get trainingOpponentThinking => 'Gegenzug …';
+  String get trainingRestart => 'Neu starten';
 
   @override
-  String get trainingRestart => 'Neu starten';
+  String get trainingOpeningLabStart => 'Linie üben';
+
+  @override
+  String get trainingOpeningLabBackToOverview => 'Zurück zur Übersicht';
+
+  @override
+  String get trainingOpeningTreeEmpty =>
+      'Noch keine Eröffnungslinien verfügbar.';
+
+  @override
+  String get trainingOpeningTreeExpand => 'Varianten zeigen';
+
+  @override
+  String get trainingOpeningTreeCollapse => 'Varianten ausblenden';
+
+  @override
+  String trainingOpeningTreeVariations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Varianten',
+      one: '1 Variante',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trainingOpeningTreeLoadFailed =>
+      'Diese Linie ist noch nicht in der Datenbank.';
+
+  @override
+  String get trainingOpeningTreeZoomIn => 'Vergrößern';
+
+  @override
+  String get trainingOpeningTreeZoomOut => 'Verkleinern';
+
+  @override
+  String get trainingOpeningTreeFit => 'Baum einpassen';
+
+  @override
+  String get trainingOpeningTreeHint =>
+      'Tippe auf eine Karte, um ihre Varianten aufzuklappen — oder trainiere die Linie direkt.';
+
+  @override
+  String get trainingOpeningIncorrectMove => 'Falscher Zug';
+
+  @override
+  String get trainingOpeningTryAgain => 'Versuch es erneut.';
+
+  @override
+  String trainingOpeningPlayInstead(String move) {
+    return 'Richtig war $move';
+  }
+
+  @override
+  String get trainingOpeningScenariosTitle => 'Eröffnungs-Szenarien';
+
+  @override
+  String get trainingOpeningScenariosCaption =>
+      'Spiele den Buchzug gegen jede Antwort, die das Buch kennt.';
+
+  @override
+  String trainingOpeningScenarioDepth(int done, int total) {
+    return 'Tiefe gemeistert: $done/$total Züge';
+  }
+
+  @override
+  String get trainingOpeningPlayAs => 'Spielen als';
+
+  @override
+  String trainingOpeningOpponentPlayed(String move) {
+    return 'Der Gegner spielte $move.';
+  }
+
+  @override
+  String trainingOpeningScenarioReady(String move) {
+    return 'Stellung nach $move.';
+  }
+
+  @override
+  String get trainingOpeningFindBest => 'Finde die beste Engine-Antwort.';
+
+  @override
+  String trainingOpeningCurrentDepth(int done, int total) {
+    return 'Aktuelle Tiefe: Zug $done / $total';
+  }
+
+  @override
+  String trainingOpeningCorrect(String move) {
+    return '$move — das ist der Buchzug.';
+  }
+
+  @override
+  String trainingOpeningAlternative(String move, int rank) {
+    return '$move geht auch — Buchwahl Nr. $rank.';
+  }
+
+  @override
+  String trainingOpeningDepthReached(int depth) {
+    return 'Tiefe $depth erreicht';
+  }
+
+  @override
+  String get trainingOpeningBookExhausted =>
+      'Hier endet das Buch — du hast alles beantwortet, was es kennt.';
+
+  @override
+  String get trainingOpeningNoBook =>
+      'Das Eröffnungsbuch kennt für diese Stellung keine Züge.';
+
+  @override
+  String get trainingOpeningDrillClean =>
+      'Ohne Fehler — dieser Durchgang zählt zur Meisterschaft.';
+
+  @override
+  String get trainingOpeningDrillWithErrors =>
+      'Mit Korrekturen beendet. Nur ein fehlerfreier Durchgang zählt zur Meisterschaft.';
+
+  @override
+  String get trainingOpeningDrillAgain => 'Nochmal trainieren';
+
+  @override
+  String trainingOpeningBookChoices(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'eine von $count Buchantworten',
+      one: 'die einzige Buchantwort',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get openingWeaknessTitle => 'Eröffnungen mit Trainingsbedarf';
+
+  @override
+  String get openingWeaknessCaption =>
+      'Linien, die du immer wieder verlierst oder falsch spielst — die schlimmsten zuerst.';
+
+  @override
+  String openingWeaknessLost(int losses, int games) {
+    return '$losses von $games Partien verloren';
+  }
+
+  @override
+  String openingWeaknessErrors(int count, int analysed) {
+    return 'Eröffnungsfehler in $count von $analysed analysierten Partien';
+  }
+
+  @override
+  String openingWeaknessRecurring(String move, int count, String better) {
+    return 'Du hast hier $count-mal $move gespielt — die Engine bevorzugt $better.';
+  }
+
+  @override
+  String openingWeaknessRecurringFlagged(String move, int count) {
+    return 'Du hast hier $count-mal $move gespielt, und die Engine hat es jedes Mal markiert.';
+  }
+
+  @override
+  String get openingWeaknessAnalyseHint =>
+      'Analysiere deine Partien, um auch die Züge zu finden, die schiefgehen — nicht nur die Ergebnisse.';
+
+  @override
+  String openingWeaknessShowAll(int count) {
+    return 'Alle $count zeigen';
+  }
+
+  @override
+  String get openingWeaknessShowFewer => 'Weniger zeigen';
+
+  @override
+  String get openingWeaknessFamily => 'Über die ganze Eröffnungsfamilie';
+
+  @override
+  String get trainingWeakSpotsTitle => 'Deine Schwachstellen';
+
+  @override
+  String get trainingWeakSpotBadge => 'Schwachstelle';
+
+  @override
+  String trainingWeakSpotMetric(String opening) {
+    return 'Schwachstelle: $opening';
+  }
+
+  @override
+  String get playAgainstBot => 'Gegen einen Bot spielen';
+
+  @override
+  String get continueAgainstBot => 'Gegen Bot weiterspielen';
+
+  @override
+  String get botPlayerColor => 'Deine Farbe';
+
+  @override
+  String get temporaryBotGameNotSaved =>
+      'Diese Partie wird nicht gespeichert und beim Schließen oder Abbrechen vollständig verworfen.';
+
+  @override
+  String get botGameLog => 'Bot-Spielverlauf';
+
+  @override
+  String get botGameLogEmpty => 'Noch keine gespeicherten Bot-Partien.';
+
+  @override
+  String get botGameLogLoadFailed =>
+      'Der Bot-Spielverlauf konnte nicht geladen werden.';
+
+  @override
+  String get botGameHistoryActive => 'Laufend';
+
+  @override
+  String get botGameHistoryWin => 'Gewonnen';
+
+  @override
+  String get botGameHistoryLoss => 'Verloren';
+
+  @override
+  String get botGameHistoryDraw => 'Remis';
+
+  @override
+  String get botStrength => 'Bot-Spielstärke';
+
+  @override
+  String get botElo => 'Elo';
+
+  @override
+  String get botStartGame => 'Partie starten';
+
+  @override
+  String get botGameTitle => 'Partie gegen Bot';
+
+  @override
+  String get botGameLoading => 'Partie wird vorbereitet …';
+
+  @override
+  String get botGameLoadFailed =>
+      'Die Bot-Partie konnte nicht vorbereitet werden.';
+
+  @override
+  String get botMoveFailed => 'Der Bot-Zug konnte nicht berechnet werden.';
+
+  @override
+  String get botYou => 'Du';
+
+  @override
+  String get botYourTurn => 'Du bist am Zug.';
+
+  @override
+  String get botThinking => 'Stockfish denkt …';
+
+  @override
+  String get botApplyingMove => 'Zug wird ausgeführt …';
+
+  @override
+  String get botWaiting => 'Warte auf den nächsten Zug …';
+
+  @override
+  String get botViewingHistory => 'Du siehst eine frühere Stellung.';
+
+  @override
+  String get botGameFinished => 'Partie beendet.';
+
+  @override
+  String get botMoveList => 'Zugliste';
+
+  @override
+  String get botNoMovesYet => 'Noch keine Züge gespielt.';
+
+  @override
+  String get botPreviousMove => 'Einen Zug zurück';
+
+  @override
+  String get botNextMove => 'Einen Zug vor';
+
+  @override
+  String get botReturnToLive => 'Zur aktuellen Stellung';
+
+  @override
+  String get botHintPiece => 'Hinweis 1: Figur anzeigen';
+
+  @override
+  String get botHintTarget => 'Hinweis 2: Zielfeld anzeigen';
+
+  @override
+  String get botHintsUsed => 'Beide Hinweise verwendet';
+
+  @override
+  String get botHintThinking => 'Hinweis wird berechnet …';
+
+  @override
+  String get botHintFailed => 'Der Hinweis konnte nicht berechnet werden.';
+
+  @override
+  String get botGameSettingsTitle => 'Spieleinstellungen';
+
+  @override
+  String botHintCounter(int used) {
+    return '$used / 2 Hinweise für diesen Zug';
+  }
+
+  @override
+  String get exportFen => 'FEN exportieren';
+
+  @override
+  String get fenCopiedToClipboard => 'FEN wurde in die Zwischenablage kopiert.';
+
+  @override
+  String get engineSelectionTitle => 'Engine-Version';
+
+  @override
+  String get engineVersion => 'Schach-Engine';
+
+  @override
+  String engineActiveLabel(String engine) {
+    return 'Aktiv: $engine';
+  }
+
+  @override
+  String get stockfish18 => 'Stockfish 18';
+
+  @override
+  String get stockfish19 => 'Stockfish 19';
+
+  @override
+  String get engineSelectionFailed =>
+      'Die ausgewählte Engine konnte nicht aktiviert werden. Die bisherige Engine bleibt ausgewählt.';
+
+  @override
+  String get forced => 'Erzwungen';
+
+  @override
+  String get good => 'Gut';
+
+  @override
+  String get statsTimeControlCorrespondence => 'Fernschach';
+
+  @override
+  String get statsTimeControlOther => 'Sonstige';
+
+  @override
+  String get botGameDeleteQuestion => 'Bot-Partie löschen?';
+
+  @override
+  String get botGameDeleteBody =>
+      'Dieser Eintrag im Bot-Spielverlauf wird dauerhaft gelöscht. Eine daraus bereits erstellte Analyse-Partie bleibt in deiner lokalen Spielbibliothek erhalten.';
+
+  @override
+  String get promotionTitle => 'Bauernumwandlung';
+
+  @override
+  String get promotionChoosePiece =>
+      'Wähle die Figur, in die der Bauer umgewandelt werden soll.';
+
+  @override
+  String get promotionQueen => 'Dame';
+
+  @override
+  String get promotionRook => 'Turm';
+
+  @override
+  String get promotionBishop => 'Läufer';
+
+  @override
+  String get promotionKnight => 'Springer';
+
+  @override
+  String get trainingOppositionTitle => 'Bauern-Opposition';
+
+  @override
+  String get trainingOppositionHint =>
+      'Nimm zuerst die Opposition, dann umgehe den König. Ziehe den Bauern erst, wenn dein König vor ihm steht.';
+
+  @override
+  String get trainingLucenaTitle => 'Lucena-Stellung';
+
+  @override
+  String get trainingLucenaHint =>
+      'Stelle den Turm auf die vierte Reihe, bevor der König herauskommt; später schützt er vor den Schachs.';
+
+  @override
+  String get trainingPhilidorTitle => 'Philidor-Verteidigung';
+
+  @override
+  String get trainingPhilidorHint =>
+      'Halte den Turm auf der sechsten Reihe, bis der Bauer vorzieht, und schache danach von hinten.';
+
+  @override
+  String get practiceDrills => 'Matt-Training';
+
+  @override
+  String get practiceStudies => 'Klassische Endspielstudien';
+
+  @override
+  String get practiceFailed => 'Versuch beendet. Versuche es erneut.';
+
+  @override
+  String get practiceThinking => 'Gegner denkt nach …';
+
+  @override
+  String practiceMoves(int count) {
+    return 'Gespielte Züge: $count';
+  }
+
+  @override
+  String practiceLevel(int number) {
+    return 'Stufe $number';
+  }
+
+  @override
+  String practiceStudyNumber(int number) {
+    return 'Studie $number';
+  }
+
+  @override
+  String get practiceStudySource =>
+      'Kling & Horwitz · Chess Studies, Or, Endings of Games (1851). Spiele diese Stellungen gegen Stockfish.';
+
+  @override
+  String get practiceQueenTitle => 'König und Dame gegen König';
+
+  @override
+  String get practiceRookTitle => 'König und Turm gegen König';
+
+  @override
+  String get practiceQueenRookTitle => 'Dame gegen Turm';
+
+  @override
+  String get practiceQueenHint =>
+      'Unterstütze die Dame mit deinem König. Lass ein Fluchtfeld frei, bis du mattsetzen kannst.';
+
+  @override
+  String get practiceRookHint =>
+      'Schneide den König mit dem Turm ab und bringe deinen König näher.';
+
+  @override
+  String get practiceQueenRookHint =>
+      'Suche nach Doppelangriffen auf König und Turm. Achte auf Patt.';
+
+  @override
+  String get practiceBeginner => 'Anfänger';
+
+  @override
+  String get practiceIntermediate => 'Fortgeschritten';
+
+  @override
+  String get practiceMaster => 'Meister';
+
+  @override
+  String get practiceSectionKingPawn => 'König und Bauer';
+
+  @override
+  String get practiceSectionBishops => 'Könige, Läufer und Bauern';
+
+  @override
+  String get practiceSectionKnightsBishops => 'Springer, Läufer und Bauern';
+
+  @override
+  String get practiceSectionTwoMinor => 'Zwei Leichtfiguren gegen eine';
+
+  @override
+  String get practiceSectionRookPawns => 'Turm gegen Bauern';
+
+  @override
+  String get practiceSectionRookMinor => 'Turm gegen Leichtfiguren';
+
+  @override
+  String get practiceSectionMinorRook => 'Leichtfiguren gegen Turm';
+
+  @override
+  String get practiceSectionQueenPawns => 'Dame gegen Bauern';
+
+  @override
+  String get practiceSectionQueens => 'Damen und Bauern';
+
+  @override
+  String get practiceSectionQueenRook => 'Dame gegen Turm';
+
+  @override
+  String get practiceSectionQueenMinor => 'Dame gegen Leichtfiguren';
 }

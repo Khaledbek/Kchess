@@ -1,352 +1,137 @@
-# PRODUCT_SPEC.md
+# KChess Product Specification
 
-## 1. Produktidee
+## 1. Produkt
 
-Lokale Schach-Analyse-App für Android und Windows mit einer gemeinsamen Flutter-Oberfläche und einem nativen C++-Core. Stockfish analysiert vollständig lokal auf dem Gerät. Die App benötigt keinen eigenen Server.
+KChess ist eine lokale Schach-App für Android und Windows. Die Oberfläche läuft in Flutter; Schach-, Analyse-, Provider-, Trainings- und Persistenzlogik läuft im nativen C++20-Core. Python ist nur Development-/Builder-Tooling. Ein eigener Server ist nicht erforderlich.
 
-Hauptquellen:
-1. Chess.com-Benutzerprofil
-2. Lichess-Benutzerprofil
+Unterstützte Profilquellen:
+
+1. Chess.com
+2. Lichess
 3. lokales PGN/FEN-Profil
 
----
-
-## 2. App-Start / Splash
-
-Bei jedem Start:
-1. Splash-/Ladeseite anzeigen.
-2. native C++-Core initialisieren.
-3. lokale Datenbank öffnen/migrieren.
-4. Einstellungen und Profile laden.
-5. letztes aktives Profil bestimmen.
-
-Wenn noch kein Profil existiert:
-- First-Run-Onboarding öffnen.
-
-Wenn Profile existieren:
-- zuletzt verwendetes Profil öffnen.
-
-Der Splash darf nicht künstlich verlängert werden.
-
----
-
-## 3. First-Run-Onboarding
-
-Nur beim ersten Start ohne vorhandenes Profil.
-
-Elemente:
-- App-Titel/Logo
-- Eingabefeld
-- Auswahl des Profiltyps:
-  - Chess.com
-  - Lichess
-  - PGN/FEN lokal
-- Button zum Fortfahren
-
-### Verhalten Chess.com
-- Feldlabel: Benutzername
-- öffentliche Profil-API prüfen
-- bei Erfolg Profil anlegen
-- Anzeigename = Benutzername
-- Avatar-URL speichern, falls API `avatar` liefert
-- sonst lokales `provider_chesscom_fallback` Asset
-- keine Anmeldung/Passworteingabe
-
-### Verhalten Lichess
-- Feldlabel: Benutzername
-- öffentliche User-API prüfen
-- bei Erfolg Profil anlegen
-- Anzeigename = Benutzername
-- kein erfundenes Avatar-Feld
-- lokales `provider_lichess_fallback` Asset verwenden
-- optional Lichess-Flair als separates kleines Metadatum
-
-### Verhalten PGN/FEN
-- Feldlabel: Profilname
-- kein Netzwerkzugriff
-- lokales Schach-Profil anlegen
-- `profile_local_chess` Asset verwenden
-
----
-
-## 4. Profil-/Navigationsleiste
-
-### Windows
-Linke permanente Sidebar.
-
-Oben:
-- runder Avatar
-- daneben Profilname
-- Klick auf Profilkopf öffnet Profilseite
-
-Darunter:
-- `+ Konto anlegen`
-- `Konto wechseln`
-
-Navigation:
-- Spiele
-- Downloads
-- Favoriten
-- Profil
-- Einstellungen
-
-### Android
-Gleiche Informationsarchitektur als Drawer/kompakte Navigation.
-
-Profilwechsel:
-- Liste aller lokalen Profile
-- Avatar
-- Name
-- Providerkennzeichnung
-- Auswahl setzt Profil als aktiv
-- aktive UUID persistent speichern
-
----
-
-## 5. Profilseite – Chess.com / Lichess
-
-Nur Daten anzeigen, die über offizielle API oder lokal berechenbar sind.
-
-Oben:
-- Avatar/Fallback
-- Benutzername
-- Provider
-- optional Titel
-- optionale öffentliche Metadaten
-
-Zeitformat/Variante auswählbar, z. B.:
-- Bullet
-- Blitz
-- Rapid
-- Classical/Daily, sofern Provider unterstützt
-- Varianten nur, wenn tatsächlich vorhanden
-
-Für ausgewählte Performance:
-- aktuelle Elo/Rating
-- Bestwert, falls vorhanden
-- gespielte Partien
-- Gewinne grün
-- Niederlagen rot
-- Remis neutral
-- Winrate
-- Lossrate
-- Drawrate
-- ggf. Rating-Verlauf/Progress, wenn API verfügbar
-- weitere sinnvolle öffentliche Statistiken nur bei tatsächlicher API-Verfügbarkeit
-
-Keine Statistik erfinden.
-
-### Local PGN/FEN
-Keine Provider-Statistikseite.
-Optional nur lokale Zusammenfassung:
-- gespeicherte Partien
-- analysierte Partien
-- importierte FENs
-
----
-
-## 6. Hauptseite Online-Profile: Spiele
-
-Standard:
-- Spiele des laufenden Kalendermonats
-- neueste zuerst
-
-Header:
-- Suche
-- Filter
-- Sortierung
-- Favoriten-Shortcut
-- Downloads-Shortcut
-- Monat wechseln
-
-Filter:
-- gewonnen
-- verloren
-- remis
-- als Weiß
-- als Schwarz
-- Zeitformat
-- analysiert / nicht analysiert
-- heruntergeladen / nicht heruntergeladen
-
-Sortierung:
-- Datum neu → alt
-- Datum alt → neu
-- eigene Accuracy hoch → niedrig
-- eigene Accuracy niedrig → hoch
-- Rating optional
-
-### Spielelisten-Zeile
-
-Links:
-- eigenes, neutrales Symbol für Zeitformat
-
-Mitte:
-- Weißer Spieler oben
-- Schwarzer Spieler unten
-- jeweiliges Rating in Klammern
-- eigenes Profil visuell dezent hervorheben
-
-Zusatz:
-- Accuracy des Profilspielers
-  - Providerwert, wenn vorhanden und noch keine lokale Analyse existiert
-  - lokale App-Accuracy bevorzugen, sobald analysiert
-  - `—`, wenn keine Accuracy vorhanden
-
-Rechts:
-- Ergebnisindikator:
-  - Sieg: grün
-  - Niederlage: rot
-  - Remis: neutral/grau
-- Download-Button
-- Favoriten-Herz
-
-Nicht die exakten Chess.com-Glyphen/Farbsysteme kopieren.
-
----
-
-## 7. Favoriten
-
-Ein Herz markiert/unmarkiert ein Spiel als Favorit.
-
-Favoriten:
-- sind profilbezogen
-- bleiben lokal gespeichert
-- können online oder heruntergeladen sein
-- eigener Bereich `Favoriten`
-
-Favorisieren lädt ein Spiel nicht automatisch herunter.
-
----
-
-## 8. Downloads
-
-Download-Button speichert das komplette Spiel für Offline-Nutzung.
-
-Bereich `Downloads`:
-- nur lokal verfügbare Spiele
-- gleiche Karten-/Listenansicht
-- Filter/Sortierung
-- Analyse ohne Internet
-
-Löschen eines Downloads:
-- Favoritenstatus nicht automatisch löschen
-- lokale Analyse nur nach klarer Benutzeraktion löschen oder beibehalten gemäß implementierter Datenstrategie
-
----
-
-## 9. Hauptseite PGN/FEN-Profil
-
-Keine Online-Spielesynchronisierung.
-
-Oben:
-- `+` Import/Aktion
-
-`+` öffnet:
-- PGN aus Zwischenablage einfügen
-- PGN-Datei laden
-- FEN einfügen
-
-Liste zeigt:
-- alle importierten/gespeicherten Partien
-- analysiert / nicht analysiert
-- Datum/Metadaten, soweit PGN vorhanden
-- Favorit
-- lokale Accuracy nach Analyse
-
-FEN-Einträge können als gespeicherte Positionen behandelt werden.
-
----
-
-## 10. Einstellungen
-
-Unterbereiche:
-1. Engine
-2. Sprache
-3. Design
-4. Lizenzen/Über
-
-### Engine
-Basis:
-- Preset Niedrig / Mittel / Hoch / Benutzerdefiniert
-- Depth
-- Lines / MultiPV
-- Threads
-- Hash
-- optional Zeit pro Zug
-- Reset
-
-Standard = Mittel.
-
-### Sprache
-- Deutsch
-- English
-- العربية
-
-Flutter ARB:
-- `app_de.arb`
-- `app_en.arb`
-- `app_ar.arb`
-
-Arabisch = RTL.
-
-### Design
-V1:
-- System
-- Hell
-- Dunkel
-- Akzent/Betonung aus kleiner eigener Palette
-
-Nicht V1:
-- alternative Figuren-Sets
-- alternative Brett-Sets
-
-### Lizenzen/Über
-Anzeigen:
-- App-Version
-- Stockfish-Version/Commit
-- GPLv3-Hinweis
-- Stockfish-Source-Link/Bereitstellung
-- Third-Party Notices
-
----
-
-## 11. Analyseansicht
-
-Öffnen durch Klick auf eine Partie.
-
-### 11.1 Brett
-- Schachbrett oben
-- Standard-Figurenset aus `img/`
-- Spielerorientierung:
-  - wenn Profilspieler bekannt und Weiß: Weiß unten
-  - wenn Profilspieler bekannt und Schwarz: Schwarz unten
-  - bei lokalem PGN: falls ein "eigener Spieler" eindeutig bekannt ist entsprechend orientieren, sonst Weiß unten
-- Gegner oben
-- Spieler unten
-
-Spielername + Rating können ober-/unterhalb des Bretts angezeigt werden.
-
-### 11.2 Unterer Analysebereich
-Brett bleibt fix sichtbar.
-Bottom-Control-Bar bleibt fix sichtbar.
-Nur der Inhaltsbereich dazwischen scrollt.
-
-Auf breitem Windows-Layout:
-- zwei Spalten
-
-Auf Android:
-- ebenfalls zwei logische Hälften; responsive Darstellung darf intern kompakter werden, ohne Informationen zu entfernen.
-
-#### Linke Hälfte
-Aktueller Zug:
-- SAN
-- Move-Kategorie
-- eigenes Farbsystem
-- eigenes Symbol
-
-Kategorien:
+## 2. Start und Profile
+
+Beim Start:
+
+1. Flutter-Splash anzeigen.
+2. nativen Core initialisieren.
+3. SQLite öffnen und Migrationen anwenden.
+4. Settings/Profile laden.
+5. letztes aktives Profil wiederherstellen.
+6. bei fehlendem Profil First-Run-Onboarding öffnen.
+
+Online-Profile verwenden ausschließlich öffentliche Providerdaten; keine Passwort- oder Token-Anmeldung. Lokale Profile funktionieren vollständig offline.
+
+Profile können gewechselt und gelöscht werden. Lokale PGN/FEN-Profile können in ein Online-Profil zusammengeführt werden, soweit die bestehende Merge-Logik dies zulässt.
+
+## 3. Hauptnavigation
+
+Aktuelle Reihenfolge:
+
+1. Spiele
+2. Play
+3. Training
+4. Favoriten
+5. Statistik
+6. Einstellungen
+
+Auf breitem Windows-Layout erscheint eine NavigationRail/Sidebar; auf schmaleren Layouts ein Drawer. Der Profilkopf öffnet die Profilseite.
+
+Es gibt **keinen separaten Downloads-Navigationspunkt** mehr.
+
+## 4. Spiele und Bibliothek
+
+### Online-Profile
+
+Der Games-Bereich zeigt synchronisierte Provider-Partien mit Suche, Filterung, Sortierung und Monatsauswahl. Providerdaten werden nativ gecacht und können bei aktivierter Einstellung automatisch synchronisiert werden.
+
+### Lokales PGN/FEN
+
+Importmöglichkeiten:
+
+- PGN-Text
+- PGN-Datei
+- FEN
+
+PGN/FEN-Import wird der lokalen PGN/FEN-Bibliothek zugeordnet, auch wenn ein Online-Profil aktiv ist. Der zuvor aktive Profilkontext bleibt erhalten.
+
+### Spieleinträge
+
+Je nach verfügbarer Information können unter anderem angezeigt werden:
+
+- Spieler und Ratings
+- Farbe/Perspektive
+- Datum/Zeitkontrolle
+- Ergebnis
+- Favoritenstatus
+- Analyse-/Accuracy-Status
+- Opening/ECO
+
+## 5. Favoriten und Downloads
+
+Favoriten sind lokal persistent und können Sammlungen zugeordnet werden.
+
+Downloads sind heute eine Kompatibilitäts-/Sammlungssemantik:
+
+- „lokal speichern“ einer Online-Partie markiert sie als Favorit
+- die Partie wird der obersten Sammlung `Downloads` zugeordnet
+- `downloaded` wird aus dieser Mitgliedschaft abgeleitet
+- Legacy-Downloaddaten werden nativ migriert/kompatibel interpretiert
+
+Favoriten und Downloads sind damit keine getrennten Datenwelten mehr.
+
+## 6. Play
+
+Der Play-Bereich enthält aktuell:
+
+- gegen einen lokalen Bot spielen
+- Bot-Spielprotokoll ansehen
+
+Setup, Zugauswahl, Engine-/Bot-Logik, Ergebnisstatus und Speicherung kommen aus dem nativen Core. Flutter übernimmt Darstellung und Interaktion.
+
+## 7. Training
+
+Training umfasst aktuell:
+
+- **Opening Lab** – Eröffnungsbaum und Repertoire-/Katalogtraining
+- **Blunder Buster** – taktisch/fehlerorientiertes Training
+- **Endgame Academy** – strukturierte Endspiel-Drills
+- **Endgame Studies** – eingebettete Studien
+
+Der native Core besitzt Katalog, legale Stellungen, Lösungszüge, Zugvalidierung, Sessionstatus, Fortschritt und Meisterschaftsregeln. Flutter zeigt Dashboard, Baum, Board und Fortschritt.
+
+## 8. Analyse
+
+Eine gespeicherte Partie oder Position kann lokal analysiert werden.
+
+Funktionen:
+
+- Stockfish 18 oder Stockfish 19 auswählbar
+- Hauptlinienanalyse
+- MultiPV
+- Best-Move-Pfeil
+- Evaluation/WDL-Darstellung
+- Move-Klassifikation
+- lokale Accuracy
+- Theory-/Opening-Erkennung
+- PGN-/Zugnavigation
+- temporäre Side-Lines als Variantenbaum
+- Rückkehr zur Hauptlinie
+- Boardrotation
+- Result-/Endgame-Symbole
+
+Side-Line-Analyse ist flüchtig und darf den persistierten Hauptanalyse-Stand nicht überschreiben.
+
+## 9. Klassifikation
+
+Die Klassifikation ist eine eigene native KChess-Logik und kein kopiertes Fremdsystem.
+
+Unterstützte sichtbare Kategorien umfassen unter anderem:
+
+- Theory
 - Brilliant
+- Great
 - Best
 - Excellent
 - Okay
@@ -354,200 +139,151 @@ Kategorien:
 - Mistake
 - Blunder
 
-Darunter:
-- mögliche Engine-Lines als Antworten/Fortsetzungen
-- MultiPV
-- Eval
-- Line-Nummer
-- anklickbare Variante
+`Best` muss mit einem tatsächlich validierten Engine-Bestmove konsistent sein. Brilliant/Great werden konservativ und engine-/positionsabhängig nativ bestimmt. SF18 und SF19 dürfen getrennte native Kalibrierungen besitzen.
 
-#### Rechte Hälfte
-- bester Zug
-- Evaluation
-- beste Hauptvariante
-- ggf. Differenz zum tatsächlich gespielten Zug
+## 10. Accuracy
 
-### 11.3 PGN / Varianten
-Im scrollbaren Analysebereich:
-- komplette Zugliste/PGN
-- aktueller Zug hervorgehoben
-- Klick auf Zug springt zur Stellung
-- ausprobierte Nebenvarianten in Klammern darstellen
-- Varianten dürfen das Originalspiel nicht überschreiben
-- Rückkehr zur Hauptlinie ermöglichen
+Provider-Accuracy und lokale KChess-Accuracy sind getrennte Quellen.
 
----
+- Providerwerte nur als Providerdaten behandeln.
+- lokale Accuracy wird aus der nativen Analyse berechnet.
+- lokale Accuracy nicht als offizielle Chess.com-/Lichess-Accuracy bezeichnen.
+- Accuracy bleibt unabhängig von den Klassifikationslabels.
 
-## 12. Steuerleiste Analyse
+## 11. Statistik
 
-Fix am unteren Rand der Analyseansicht.
+Der Statistikbereich aggregiert lokale und synchronisierte Partien nativ. Aktuelle UI-Bereiche umfassen:
 
-Genau fünf Hauptbuttons:
-1. `|<` erster Zug / Startstellung
-2. `<` vorheriger Zug
-3. `▶/⏸` ab aktuellem Zug automatisch abspielen
-4. `>` nächster Zug
-5. `>|` letzter Zug / Endstellung
+- Overview
+- Form
+- Rating
+- Termination
+- Spielphasen
+- Openings
+- einzelne Opening-Partien
+- Spielervergleich
 
-Auto-Play:
-- ein Zug pro Sekunde
-- startet ab aktueller Position
-- stoppt am Partieende
-- Button wechselt auf Pause während Wiedergabe
+Flutter stellt diese Daten dar und soll keine parallele Statistik-Domainlogik erzeugen.
 
-Optional Tastatur auf Windows:
-- Home
-- Pfeil links
-- Space
-- Pfeil rechts
-- End
+## 12. Profilseite
 
----
+Online-Profile zeigen nur Daten, die von der öffentlichen API oder aus lokal gespeicherten Partien ableitbar sind. Dazu gehören je nach Provider/Performance beispielsweise Rating, Titel und verfügbare Performance-/Partiedaten.
 
-## 13. Analyseablauf
+Lokale PGN/FEN-Profile besitzen keine erfundene Providerstatistik.
 
-Für eine komplette Partie:
-1. PGN parsen
-2. jede Stellung vor und nach einem Zug erzeugen
-3. Stockfish lokal analysieren
-4. Best Move und MultiPV speichern
-5. Score normalisieren
-6. Verlust/Verbesserung aus Sicht des ziehenden Spielers bestimmen
-7. Move-Kategorie berechnen
-8. lokale Accuracy berechnen
-9. Resultate persistieren
-10. UI inkrementell aktualisieren
+## 13. Einstellungen
 
-Analyse muss abbrechbar sein.
+Aktuelle Settings-Kategorien:
 
-Bei App-Schließen:
-- abgeschlossene Ergebnisse speichern
-- laufende Analyse sauber abbrechen
-- späterer Resume kann als Erweiterung vorbereitet werden
+1. Engine
+2. Analyse
+3. Design
+4. Allgemein
+5. Daten & Speicher
 
----
+### Engine
 
-## 14. Move-Klassifikation – unabhängiges System
+- Auswahl Stockfish 18 / Stockfish 19
+- Threads/Hash bzw. native Engine-Ressourcenwerte
+- persistente Auswahl
 
-Kein Chess.com-Klassifikationssystem kopieren.
+### Analyse
 
-V1 soll ein eigenes, dokumentiertes System verwenden.
+Analysebudgets, Tiefe/Lines/MultiPV und Side-Line-bezogene Werte werden über die bestehende Settings-Pipeline verwaltet.
 
-Empfohlen:
-- Bewertungsänderung nicht blind in Centipawns interpretieren
-- Mate-Scores gesondert
-- wenn möglich Stockfish-WDL/Win-Probability-basierte Verlustmetrik
-- Schwellenwerte zentral in `MoveClassifierConfig`
-- Unit Tests mit festen Stellungen
+### Design
 
-Grundlogik:
-- `Best`: tatsächlich gespielter Zug entspricht Engine-Bestmove oder ist innerhalb sehr kleiner Bewertungsdifferenz
-- `Excellent`: sehr geringer Verlust
-- `Okay`: kleiner akzeptabler Verlust
-- `Mistake`: deutlicher Verlust
-- `Blunder`: sehr großer Verlust oder Verlust eines klaren Gewinns
-- `Miss`: verpasste klare Chance, ohne zwingend der größte Fehler zu sein
-- `Brilliant`: nur konservativ bei sehr starkem/nahezu einzigem Zug mit nachvollziehbarer taktischer Eigenschaft; niemals allein wegen hoher Eval
+System-/Hell-/Dunkelmodus und UI-Darstellungsoptionen.
 
-Wenn zuverlässige Brilliant-Heuristik in V1 nicht möglich ist, Kategorie unterstützen, aber selten/gar nicht vergeben, statt falsche Ergebnisse zu erzeugen.
+### Allgemein
 
----
+Sprache sowie Provider-/App-Verhalten wie automatische Online-Synchronisierung.
 
-## 15. Accuracy
+### Daten & Speicher
 
-Zwei Quellen unterscheiden:
+Cache-/lokale Datenspeicheraktionen mit klarer Trennung zwischen Cache, Partien, Favoriten und persistierter Analyse.
 
-### Provider Accuracy
-Von Chess.com/Lichess, wenn tatsächlich vorhanden.
-Feld:
-`provider_accuracy`
+## 14. Lokalisierung
 
-### App Accuracy
-Von lokaler Stockfish-Analyse.
-Feld:
-`local_accuracy`
+Unterstützte UI-Sprachen:
 
-UI-Regel:
-- nach lokaler Analyse standardmäßig `local_accuracy`
-- Providerwert optional in Details separat anzeigen
-- niemals lokale Accuracy als offizielle Chess.com-/Lichess-Accuracy bezeichnen
+- Deutsch
+- English
+- العربية
 
-Formel in eigenem Modul und mit Version speichern:
-`accuracy_algorithm_version`
+Alle sichtbaren Flutter-Texte gehören in:
 
-So bleiben spätere Verbesserungen nachvollziehbar.
+- `flutter_app/l10n/app_de.arb`
+- `flutter_app/l10n/app_en.arb`
+- `flutter_app/l10n/app_ar.arb`
 
----
+Arabisch ändert Text/Sprache, nicht die globale LTR-Geometrie. Board, Navigation und Spielerorientierung werden nicht automatisch gespiegelt.
 
-## 16. API- und Cache-Verhalten
+## 15. Provider und Netzwerk
 
 ### Chess.com
-Laufender Monat:
-`/pub/player/{username}/games/{YYYY}/{MM}`
 
-Profil:
-`/pub/player/{username}`
-
-Stats:
-`/pub/player/{username}/stats`
-
-- seriell
-- Cache-Header nutzen
-- optionales `avatar`
-- optionales `accuracies`
+Öffentliche Profil-, Statistik- und Monats-/Game-APIs werden nativ angesprochen. Cache-Header und Rate-Limiting respektieren.
 
 ### Lichess
-Profil:
-`/api/user/{username}`
 
-Performance:
-`/api/user/{username}/perf/{perf}`
+Öffentliche User-/Performance-/Games-APIs werden nativ angesprochen. NDJSON/Games-Verarbeitung und Rate-Limiting bleiben im C++-Providerlayer.
 
-Games:
-`/api/games/user/{username}`
+Netzwerkfehler dürfen lokale Daten nicht löschen. Online-Synchronisierung ist optional; lokale Analyse/Training/Import funktionieren ohne eigenen Server.
 
-Für laufenden Monat:
-- `since` = Monatsbeginn
-- `until` = Monatsende/jetzt
-- NDJSON streamen
-- `accuracy=true`, wenn sinnvoll
-- nur einen Request gleichzeitig
+## 16. Persistenz
 
----
+SQLite speichert unter anderem:
 
-## 17. Fehlerfälle
+- Profile und aktives Profil
+- Settings
+- Spiele und Provider-Caches
+- Favoriten/Sammlungen
+- Analyseergebnisse und Cache-Metadaten
+- Trainingsfortschritt
 
-Beispiele:
-- Benutzer existiert nicht
-- Internet fehlt
-- API 429
-- API 5xx
-- ungültiges PGN
-- ungültiges FEN
-- Stockfish startet nicht
-- Analyse abgebrochen
-- Speicher voll
-- DB-Migration fehlgeschlagen
+Migrationen müssen ältere lokale Daten erhalten, soweit technisch möglich.
 
-UI:
-- verständliche Meldung
-- Retry nur bei sinnvoller Fehlerklasse
-- keine Endlosschleifen
-- lokale Daten nicht wegen Netzwerkfehler löschen
+## 17. Assets und Opening-Daten
 
----
+KChess verwendet lokale Assets für Board/Icons/Provider-Fallbacks sowie zwei offline genutzte Opening-Datenartefakte:
 
-## 18. Nicht-Ziele V1
+- `opening_book.kcb` – statistische Theory-/Move-Daten
+- `opening_names.kco` – ECO-/Eröffnungsnamenindex
 
-- Online spielen
+Die Builder liegen unter `tools/` und sind Python-Development-Tools; Python wird nicht mit der App ausgeliefert.
+
+## 18. Plattformen
+
+Aktuell unterstützt:
+
+- Windows x64
+- Android ARM64
+
+Nicht als aktuelle Runtime-Ziele behandeln:
+
+- iOS
+- Web
+- macOS
+- Linux
+
+## 19. Nicht-Ziele
+
 - Züge an Chess.com/Lichess senden
-- Live-Engine-Unterstützung während einer Online-Partie
-- Cloud-Sync
-- eigener Server
-- Social Features
-- Chat
-- Zahlungen
-- Werbung
-- Schachlektionen
-- alternative Figuren-/Board-Themes
-- iOS/Web/macOS/Linux
+- Live-Engine-Unterstützung für laufende Online-Partien
+- eigener Cloud-Server
+- Cloud-Sync als zentrale Voraussetzung
+- Social Feed/Chat
+- Werbung/Zahlungen
+- proprietäre Fremdklassifikationen kopieren
+
+## 20. Technische Priorität
+
+Bei Widersprüchen zwischen älteren Texten und dem aktuellen Quellcode gilt:
+
+1. aktuelle `AGENTS.md`-Regeln
+2. `docs/ARCHITECTURE.md`
+3. diese Produktspezifikation
+4. tatsächliche stabile C-ABI-/Datenbank-Kompatibilität
+
+Veraltete historische Branch-/Update-Bezeichnungen sind keine Architekturquelle mehr.

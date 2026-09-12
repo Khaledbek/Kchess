@@ -49,6 +49,9 @@ flutter_app/android/captures/
 native/build/
 native/out/
 native/.cache/
+# Persistent local Stockfish libraries/build metadata survive `flutter clean`.
+native/.stockfish_build_cache/
+native/prebuilt/windows/
 
 **/CMakeFiles/
 **/CMakeCache.txt
@@ -110,3 +113,10 @@ Kchess_Update_*/
 # Python build-tool caches (tools/opening_book, tools/opening_names)
 __pycache__/
 *.pyc
+# Prevent accidental nested project copies
+/Kchess/
+/flutter_app/flutter_app/
+
+
+# PolyGlot opening book for the opening drill (~170 MB, too large for GitHub)
+native/src/training/data/Cerebellum3Merge.bin

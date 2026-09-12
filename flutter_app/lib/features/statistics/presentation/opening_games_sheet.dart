@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: opening games sheet presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 /// Opens the games for one opening variation as a modal bottom sheet (narrow) or
@@ -74,27 +78,23 @@ class _OpeningGamesBottomSheetState extends State<_OpeningGamesBottomSheet> {
     _games = _load();
   }
 
-  Future<List<GameSummary>> _load() async {
-    final color = widget.family.color;
-    final games = await widget.controller.queryGames(
-      GameQuery(
-        color: color == 'white' || color == 'black' ? color : 'all',
-        sort: 'newest',
-      ),
-    );
-    // Filter to the exact variation. Selecting rows by opening name is display
-    // selection, not aggregation — the per-opening tallies stay in the C++ core.
-    return games
-        .where((game) => game.openingName == widget.variation.name)
-        .toList(growable: false);
-  }
+  Future<List<GameSummary>> _load() => widget.controller.queryGames(
+    GameQuery(
+      color: widget.family.color,
+      openingName: widget.variation.name,
+      statisticsOutcome: _filter,
+      sort: 'newest',
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final labels = _openingGamesText(context);
     final tally = widget.variation.tally;
-    final record = '${tally.wins}W - ${tally.draws}D - ${tally.losses}L';
+    final resultLabels = _statsLabels(context);
+    final record =
+        '${tally.wins} ${resultLabels.wins} · ${tally.draws} ${resultLabels.draws} · ${tally.losses} ${resultLabels.losses}';
     final subtitle = <String>[
       if (widget.variation.eco.isNotEmpty) widget.variation.eco,
       record,
@@ -131,7 +131,10 @@ class _OpeningGamesBottomSheetState extends State<_OpeningGamesBottomSheet> {
                   ChoiceChip(
                     label: Text(labels.filter(value)),
                     selected: _filter == value,
-                    onSelected: (_) => setState(() => _filter = value),
+                    onSelected: (_) => setState(() {
+                      _filter = value;
+                      _games = _load();
+                    }),
                   ),
               ],
             ),
@@ -149,13 +152,7 @@ class _OpeningGamesBottomSheetState extends State<_OpeningGamesBottomSheet> {
                   if (snapshot.hasError || !snapshot.hasData) {
                     return _OpeningGamesMessage(text: labels.error);
                   }
-                  final games = snapshot.data!
-                      .where(
-                        (game) =>
-                            _filter == 'all' ||
-                            _statGameOutcome(game) == _filter,
-                      )
-                      .toList(growable: false);
+                  final games = snapshot.data!;
                   if (games.isEmpty) {
                     return _OpeningGamesMessage(text: labels.empty);
                   }

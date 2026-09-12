@@ -54,7 +54,6 @@ class _DataStorageSettingsPage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.cached),
                   title: Text(strings.useGlobalAnalysisCache),
-                  subtitle: Text(strings.useGlobalAnalysisCacheHelp),
                   value: controller.settings.useGlobalAnalysisCache,
                   onChanged: controller.setUseGlobalAnalysisCache,
                 ),
@@ -62,7 +61,6 @@ class _DataStorageSettingsPage extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.delete_sweep),
                   title: Text(strings.clearAnalysisCache),
-                  subtitle: Text(strings.clearAnalysisCacheHelp),
                   onTap: () => _clearEngineCache(context),
                 ),
               ],
@@ -74,7 +72,6 @@ class _DataStorageSettingsPage extends StatelessWidget {
             child: SwitchListTile(
               secondary: const Icon(Icons.bug_report),
               title: Text(strings.diagnosticLogging),
-              subtitle: Text(strings.diagnosticLoggingHelp),
               value: controller.settings.diagnosticLogging,
               onChanged: controller.setDiagnosticLogging,
             ),

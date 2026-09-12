@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Application shell and feature composition
+// -----------------------------------------------------------------------------
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -5,16 +9,20 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
+import '../ffi/core_gateway.dart';
 import '../localization/generated/app_localizations.dart';
 import '../shared/models/models.dart';
 import '../shared/theme/app_theme.dart';
+import 'shared/board_endgame_presentation.dart';
+import 'shared/promotion_dialog.dart';
 import '../features/app/application/app_controller.dart';
 import '../features/analysis/presentation/analysis_screen.dart';
 import '../features/training/models/opening_training_request.dart';
+import '../features/training/presentation/opening/opening_weakness_tile.dart';
 import '../features/training/presentation/training_arena_screen.dart';
 import '../features/training/presentation/training_navigation.dart';
-import '../services/training_progress_service.dart';
 
 part 'shared/brand_widgets.dart';
 part 'startup/splash_error_screens.dart';
@@ -31,7 +39,6 @@ part '../features/profile/presentation/profile_screen.dart';
 part '../features/statistics/presentation/statistics_screen.dart';
 part '../features/statistics/presentation/stats_widgets.dart';
 part '../features/statistics/presentation/overview_section.dart';
-part '../features/statistics/presentation/form_section.dart';
 part '../features/statistics/presentation/rating_section.dart';
 part '../features/statistics/presentation/termination_section.dart';
 part '../features/statistics/presentation/phase_section.dart';
@@ -46,6 +53,9 @@ part '../features/settings/presentation/general_settings_page.dart';
 part '../features/settings/presentation/data_storage_settings_page.dart';
 part '../features/settings/presentation/setting_controls.dart';
 part '../features/play/presentation/play_screen.dart';
+part '../features/play/presentation/bot_game_log_screen.dart';
+part '../features/play/presentation/bot_game_setup_screen.dart';
+part '../features/play/presentation/bot_game_screen.dart';
 part 'shared/game_widgets.dart';
 part '../features/settings/presentation/settings_section.dart';
 
@@ -73,25 +83,10 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  /// Index of the training destination in the rail — the statistics deep link
-  /// jumps here.
   static const _trainingIndex = 2;
 
   int _selectedIndex = 0;
-
-  /// Progress is read once per session and shared by the hub and every trainer
-  /// route pushed from it.
-  final _trainingProgress = TrainingProgressService();
-
-  /// Line handed over by the statistics tab, cleared when the user leaves the
-  /// training tab so the next visit starts from the hub's own numbers.
   OpeningTrainingRequest? _openingRequest;
-
-  @override
-  void dispose() {
-    _trainingProgress.dispose();
-    super.dispose();
-  }
 
   void _select(int index) {
     setState(() {
@@ -136,12 +131,9 @@ class _HomeShellState extends State<HomeShell> {
     ];
     final content = switch (_selectedIndex) {
       0 => GamesScreen(controller: widget.controller),
-      1 => _EmptySection(title: strings.play, message: strings.playPlaceholder),
-      // Literal, not [_trainingIndex]: a bare identifier in a pattern binds a
-      // variable and would swallow every index.
+      1 => PlayScreen(gateway: widget.controller.gateway),
       2 => TrainingArenaScreen(
         controller: widget.controller,
-        progress: _trainingProgress,
         openingRequest: _openingRequest,
       ),
       3 => FavoritesScreen(controller: widget.controller),
@@ -162,82 +154,80 @@ class _HomeShellState extends State<HomeShell> {
       openTraining: _openTraining,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          if (constraints.maxWidth >= 900) {
-            return Scaffold(
-              body: Row(
+        if (constraints.maxWidth >= 900) {
+          return Scaffold(
+            body: Row(
+              children: [
+                SafeArea(
+                  child: Container(
+                    width: 264,
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    child: Column(
+                      children: [
+                        _ProfileHeader(
+                          controller: widget.controller,
+                          onOpenProfile: openProfile,
+                        ),
+                        const SizedBox(height: 4),
+                        Expanded(
+                          child: NavigationRail(
+                            backgroundColor: Colors.transparent,
+                            extended: true,
+                            selectedIndex: _selectedIndex,
+                            onDestinationSelected: _select,
+                            destinations: [
+                              for (final destination in destinations)
+                                NavigationRailDestination(
+                                  icon: Icon(destination.icon),
+                                  selectedIcon: Icon(destination.selectedIcon),
+                                  label: Text(destination.label),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: content),
+              ],
+            ),
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(title: Text(destinations[_selectedIndex].label)),
+          drawer: Drawer(
+            child: SafeArea(
+              child: Column(
                 children: [
-                  SafeArea(
-                    child: Container(
-                      width: 264,
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      child: Column(
-                        children: [
-                          _ProfileHeader(
-                            controller: widget.controller,
-                            onOpenProfile: openProfile,
-                          ),
-                          const SizedBox(height: 4),
-                          Expanded(
-                            child: NavigationRail(
-                              backgroundColor: Colors.transparent,
-                              extended: true,
-                              selectedIndex: _selectedIndex,
-                              onDestinationSelected: _select,
-                              destinations: [
-                                for (final destination in destinations)
-                                  NavigationRailDestination(
-                                    icon: Icon(destination.icon),
-                                    selectedIcon: Icon(
-                                      destination.selectedIcon,
-                                    ),
-                                    label: Text(destination.label),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
+                  _ProfileHeader(
+                    controller: widget.controller,
+                    onOpenProfile: () {
+                      Navigator.pop(context);
+                      openProfile();
+                    },
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: destinations.length,
+                      itemBuilder: (context, index) => ListTile(
+                        selected: index == _selectedIndex,
+                        leading: Icon(destinations[index].icon),
+                        title: Text(destinations[index].label),
+                        onTap: () {
+                          _select(index);
+                          Navigator.pop(context);
+                        },
                       ),
                     ),
                   ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: content),
                 ],
               ),
-            );
-          }
-          return Scaffold(
-            appBar: AppBar(title: Text(destinations[_selectedIndex].label)),
-            drawer: Drawer(
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    _ProfileHeader(
-                      controller: widget.controller,
-                      onOpenProfile: () {
-                        Navigator.pop(context);
-                        openProfile();
-                      },
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: destinations.length,
-                        itemBuilder: (context, index) => ListTile(
-                          selected: index == _selectedIndex,
-                          leading: Icon(destinations[index].icon),
-                          title: Text(destinations[index].label),
-                          onTap: () {
-                            _select(index);
-                            Navigator.pop(context);
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
-            body: content,
-          );
+          ),
+          body: content,
+        );
         },
       ),
     );

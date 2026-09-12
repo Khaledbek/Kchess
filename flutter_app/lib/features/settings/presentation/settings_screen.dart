@@ -18,7 +18,6 @@ class SettingsScreen extends StatelessWidget {
             key: const Key('settings-category-engine'),
             icon: Icons.memory_outlined,
             title: strings.engine,
-            subtitle: strings.engineSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
               controller,
@@ -29,7 +28,6 @@ class SettingsScreen extends StatelessWidget {
             key: const Key('settings-category-analysis'),
             icon: Icons.analytics_outlined,
             title: strings.analysisSettingsTitle,
-            subtitle: strings.analysisSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
               controller,
@@ -40,7 +38,6 @@ class SettingsScreen extends StatelessWidget {
             key: const Key('settings-category-design'),
             icon: Icons.palette_outlined,
             title: strings.designSettingsTitle,
-            subtitle: strings.designSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
               controller,
@@ -51,7 +48,6 @@ class SettingsScreen extends StatelessWidget {
             key: const Key('settings-category-general'),
             icon: Icons.tune_outlined,
             title: strings.generalSettingsTitle,
-            subtitle: strings.generalSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
               controller,
@@ -62,7 +58,6 @@ class SettingsScreen extends StatelessWidget {
             key: const Key('settings-category-data-storage'),
             icon: Icons.storage_outlined,
             title: strings.dataStorageSettingsTitle,
-            subtitle: strings.dataStorageSettingsSubtitle,
             onTap: () => _openSettingsPage(
               context,
               controller,
@@ -94,14 +89,12 @@ class _SettingsCategoryTile extends StatelessWidget {
   const _SettingsCategoryTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -122,10 +115,6 @@ class _SettingsCategoryTile extends StatelessWidget {
           child: Icon(icon, color: scheme.onPrimaryContainer),
         ),
         title: Text(title),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text(subtitle),
-        ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: onTap,
       ),

@@ -1,9 +1,13 @@
+// -----------------------------------------------------------------------------
+// Section: Legal move resolution and terminal position detection
+// -----------------------------------------------------------------------------
+
 #include "chess/move.h"
 
 #include <deque>
+#include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 #include "chess/fen.h"
 #include "engine/stockfish_runtime.h"
@@ -86,14 +90,8 @@ AppliedMove apply_legal_uci_move(const std::string& fen, const std::string& uci)
   std::deque<Stockfish::StateInfo> states(1);
   Stockfish::Position position;
   position.set(validation.normalized, false, &states.back());
-  auto normalized_uci = uci;
-  // A board tap/drag supplies source and target squares. Resolve the standard
-  // UI promotion choice natively so Flutter never inspects pieces or ranks.
+  const auto normalized_uci = uci;
   auto move = Stockfish::UCIEngine::to_move(position, normalized_uci);
-  if (move == Stockfish::Move::none() && normalized_uci.size() == 4) {
-    normalized_uci.push_back('q');
-    move = Stockfish::UCIEngine::to_move(position, normalized_uci);
-  }
   if (move == Stockfish::Move::none()) throw std::invalid_argument("Illegal chess move");
   const auto san = move_san(position, move);
   states.emplace_back();
@@ -105,7 +103,8 @@ AppliedMove apply_legal_uci_move(const std::string& fen, const std::string& uci)
   };
 }
 
-std::vector<AppliedMove> legal_moves(const std::string& fen) {
+std::optional<AppliedMove> find_legal_san_move(
+    const std::string& fen, const std::string& san) {
   const auto validation = validate_fen(fen);
   if (!validation.valid) throw std::invalid_argument(validation.error);
   initialize_stockfish_runtime();
@@ -113,32 +112,75 @@ std::vector<AppliedMove> legal_moves(const std::string& fen) {
   Stockfish::Position position;
   position.set(validation.normalized, false, &states.back());
 
-  std::vector<AppliedMove> result;
+  std::optional<AppliedMove> result;
   for (const auto move : Stockfish::MoveList<Stockfish::LEGAL>(position)) {
-    // move_san() needs the position before the move, so play each candidate on
-    // its own board rather than mutating the shared one.
+    if (move_san(position, move) != san) continue;
+    if (result.has_value()) return std::nullopt;
     std::deque<Stockfish::StateInfo> after_states(1);
     Stockfish::Position after;
-    after.set(validation.normalized, false, &after_states.back());
+    after.set(position.fen(), false, &after_states.back());
     after_states.emplace_back();
     after.do_move(move, after_states.back(), nullptr);
-    result.push_back({
+    result = AppliedMove{
         .uci = Stockfish::UCIEngine::move(move, false),
-        .san = move_san(position, move),
+        .san = san,
         .fen_after = after.fen(),
-    });
+    };
   }
   return result;
 }
 
-bool in_check(const std::string& fen) {
+std::vector<std::string> legal_promotion_choices(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) {
+  if (source.size() != 2 || target.size() != 2) {
+    throw std::invalid_argument("Board squares must use algebraic coordinates");
+  }
   const auto validation = validate_fen(fen);
   if (!validation.valid) throw std::invalid_argument(validation.error);
   initialize_stockfish_runtime();
   std::deque<Stockfish::StateInfo> states(1);
   Stockfish::Position position;
   position.set(validation.normalized, false, &states.back());
-  return static_cast<bool>(position.checkers());
+
+  if (Stockfish::UCIEngine::to_move(position, source + target) != Stockfish::Move::none()) {
+    return {};
+  }
+
+  std::vector<std::string> result;
+  for (const char suffix : {'q', 'r', 'b', 'n'}) {
+    const auto candidate = source + target + suffix;
+    if (Stockfish::UCIEngine::to_move(position, candidate) != Stockfish::Move::none()) {
+      result.emplace_back(1, suffix);
+    }
+  }
+  return result;
+}
+
+
+PositionOutcome position_outcome(const std::string& fen) {
+  const auto validation = validate_fen(fen);
+  if (!validation.valid) throw std::invalid_argument(validation.error);
+  initialize_stockfish_runtime();
+  std::deque<Stockfish::StateInfo> states(1);
+  Stockfish::Position position;
+  position.set(validation.normalized, false, &states.back());
+
+  if (position.is_draw(0)) {
+    return {.terminal = true, .checkmate = false, .result = "1/2-1/2"};
+  }
+  if (Stockfish::MoveList<Stockfish::LEGAL>(position).size() != 0) {
+    return {};
+  }
+  if (!position.checkers()) {
+    return {.terminal = true, .checkmate = false, .result = "1/2-1/2"};
+  }
+  return {
+      .terminal = true,
+      .checkmate = true,
+      .result = position.side_to_move() == Stockfish::WHITE ? "0-1" : "1-0",
+  };
 }
 
 }  // namespace kchess

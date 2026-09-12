@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Provider jobs and public archive statistics
+// -----------------------------------------------------------------------------
+
 #include "services/provider_service.h"
 
 #include <algorithm>
@@ -18,6 +22,8 @@
 #include "providers/provider_common.h"
 #include "providers/provider_models.h"
 #include "services/termination.h"
+#include "services/statistics_service.h"
+#include "services/statistics_domain.h"
 
 namespace kchess {
 namespace {
@@ -141,42 +147,11 @@ nlohmann::json scout_profile_object(const ProviderProfile& profile) {
   return result;
 }
 
-std::string scout_profile_json(const ProviderProfile& profile) {
-  return scout_profile_object(profile).dump();
-}
-
-// Lightweight win/draw/loss tally for the in-memory scouting aggregation. Kept
-// local to this module (the statistics service keeps its own equivalent).
-struct ScoutTally {
-  int games{0};
-  int wins{0};
-  int draws{0};
-  int losses{0};
-  void add(const std::string& outcome) {
-    games += 1;
-    if (outcome == "win") wins += 1;
-    else if (outcome == "loss") losses += 1;
-    else if (outcome == "draw") draws += 1;
-  }
-};
+// Scouting and local statistics share the same native tally rules.
+using ScoutTally = statistics::Tally;
 
 nlohmann::json scout_tally_json(const ScoutTally& tally) {
-  const int decided = tally.wins + tally.draws + tally.losses;
-  nlohmann::json node{
-      {"games", tally.games},
-      {"wins", tally.wins},
-      {"draws", tally.draws},
-      {"losses", tally.losses},
-      {"undecided", tally.games - decided},
-  };
-  if (decided > 0) {
-    node["winRate"] = static_cast<double>(tally.wins) / decided;
-    node["scorePercent"] = (static_cast<double>(tally.wins) + 0.5 * tally.draws) / decided;
-  } else {
-    node["winRate"] = nullptr;
-    node["scorePercent"] = nullptr;
-  }
-  return node;
+  return statistics::tally_json(tally);
 }
 
 // Value of a PGN tag with its original casing preserved (unlike the lowercasing
@@ -570,7 +545,7 @@ void ProviderService::run_scout(
       stats_json = normalized_stats_json(*stats.value);
     }
     std::ostringstream json;
-    json << "{\"profile\":" << scout_profile_json(*remote_profile.value)
+    json << "{\"profile\":" << scout_profile_object(*remote_profile.value).dump()
          << ",\"stats\":" << stats_json << ",\"availableMonths\":[]"
          << ",\"offlineReady\":false,\"retryAfterSeconds\":0}";
     finish_provider_job(job, "complete", json.str());
@@ -661,11 +636,11 @@ void ProviderService::run_scout_report(
         std::string color = "unknown";
         if (lowercase(game.white_username) == requested) color = "white";
         else if (lowercase(game.black_username) == requested) color = "black";
-        overall.add(outcome);
-        if (color == "white") white.add(outcome);
-        else if (color == "black") black.add(outcome);
-        by_time_control[time_control_name(game.time_control_type)].add(outcome);
-        terminations[termination_bucket(game.pgn, game.result)].add(outcome);
+        statistics::add_outcome(overall, outcome);
+        if (color == "white") statistics::add_outcome(white, outcome);
+        else if (color == "black") statistics::add_outcome(black, outcome);
+        statistics::add_outcome(by_time_control[time_control_name(game.time_control_type)], outcome);
+        statistics::add_outcome(terminations[termination_bucket(game.pgn, game.result)], outcome);
         const std::string eco = pgn_tag_raw(game.pgn, "ECO");
         const std::string name = scout_opening_name(game.pgn);
         if (!eco.empty() || !name.empty()) {
@@ -675,7 +650,7 @@ void ProviderService::run_scout_report(
             entry.name = name;
             entry.color = color;
           }
-          entry.tally.add(outcome);
+          statistics::add_outcome(entry.tally, outcome);
         }
         games_analyzed += 1;
         if (games_analyzed >= kMaxGames) break;
@@ -726,7 +701,8 @@ void ProviderService::run_scout_report(
         {"terminations", term_list},
         {"openings", opening_list},
     };
-    finish_provider_job(job, "complete", report.dump());
+    finish_provider_job(job, "complete",
+        StatisticsService(database_).comparison_json(report.dump()));
   } catch (const ProviderException& error) {
     finish_provider_job(job, "error", {}, http_error_name(error.kind()), error.what());
   } catch (const std::exception& error) {

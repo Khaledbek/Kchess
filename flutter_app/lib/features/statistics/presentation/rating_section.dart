@@ -1,12 +1,8 @@
-part of '../../../ui/app_root.dart';
+// -----------------------------------------------------------------------------
+// Section: rating section presentation
+// -----------------------------------------------------------------------------
 
-/// A single (timestamp, rating) sample derived from a game — pure per-row
-/// display selection, no aggregation.
-class _RatingPoint {
-  const _RatingPoint({required this.endedAt, required this.rating});
-  final int endedAt;
-  final int rating;
-}
+part of '../../../ui/app_root.dart';
 
 /// One rating line for a time-control category (Blitz, Bullet, Rapid, Daily …),
 /// sorted oldest → newest with bad points already filtered out.
@@ -15,13 +11,14 @@ class _RatingSeries {
     required this.timeControl,
     required this.color,
     required this.points,
+    required this.current,
   });
 
   final String timeControl;
   final Color color;
-  final List<_RatingPoint> points;
+  final List<StatisticsRatingPoint> points;
 
-  int get current => points.last.rating;
+  final int current;
 }
 
 /// Distinct colours per time control so the merged "Alle" view reads as several
@@ -42,67 +39,24 @@ class _RatingTrendCard extends StatelessWidget {
     required this.onRetry,
   });
 
-  final Future<List<GameSummary>> future;
+  final Future<StatisticsTimeline> future;
   final String timeControl;
   final VoidCallback onRetry;
 
-  /// Fraction of a series' median rating below which a point is treated as bad
-  /// data (chess.com occasionally records unrated/variant games at a wildly
-  /// different scale). Applied per series so each scale is judged on its own.
-  static const _outlierFloorFactor = 0.6;
-
-  List<_RatingPoint> _hygiene(List<_RatingPoint> raw) {
-    List<_RatingPoint> points = raw;
-    if (raw.length >= 3) {
-      final ratings = raw.map((p) => p.rating).toList()..sort();
-      final median = ratings[ratings.length ~/ 2];
-      final floor = (median * _outlierFloorFactor).round();
-      final cleaned = raw.where((p) => p.rating >= floor).toList();
-      if (cleaned.length >= 2) points = cleaned;
-    }
-    points.sort((a, b) => a.endedAt.compareTo(b.endedAt));
-    return points;
-  }
-
-  List<_RatingSeries> _buildSeries(BuildContext context, List<GameSummary> games) {
-    final byTimeControl = <String, List<_RatingPoint>>{};
-    for (final game in games) {
-      final rating = _statProfileRating(game);
-      if (rating == null || rating <= 0 || game.endedAt <= 0) continue;
-      (byTimeControl[game.timeControlType] ??= []).add(
-        _RatingPoint(endedAt: game.endedAt, rating: rating),
-      );
-    }
-
-    // Stable order: the four named controls first, then any extras.
-    const order = [
-      'bullet',
-      'blitz',
-      'rapid',
-      'daily',
-      'classical',
-      'correspondence',
-    ];
-    final keys = <String>[
-      ...order.where(byTimeControl.containsKey),
-      ...byTimeControl.keys.where((k) => !order.contains(k)),
-    ];
-
-    final scheme = Theme.of(context).colorScheme;
-    final series = <_RatingSeries>[];
-    for (final tc in keys) {
-      final points = _hygiene(byTimeControl[tc]!);
-      if (points.isEmpty) continue;
-      series.add(
-        _RatingSeries(
-          timeControl: tc,
-          color: _kRatingSeriesColors[tc] ?? scheme.onSurfaceVariant,
-          points: points,
-        ),
-      );
-    }
-    return series;
-  }
+  List<_RatingSeries> _buildSeries(
+    BuildContext context,
+    StatisticsTimeline timeline,
+  ) => [
+    for (final series in timeline.ratingSeries)
+      _RatingSeries(
+        timeControl: series.timeControl,
+        color:
+            _kRatingSeriesColors[series.timeControl] ??
+            Theme.of(context).colorScheme.onSurfaceVariant,
+        points: series.points,
+        current: series.currentRating,
+      ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +87,7 @@ class _RatingTrendCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            FutureBuilder<List<GameSummary>>(
+            FutureBuilder<StatisticsTimeline>(
               future: future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -232,7 +186,7 @@ class _RatingTrendChartState extends State<_RatingTrendChart> {
           children: [
             for (final s in widget.series)
               _RatingLegendChip(
-                label: _timeControlLabel(s.timeControl),
+                label: _timeControlLabel(context, s.timeControl),
                 rating: s.current,
                 color: s.color,
                 active: _isolated == null || _isolated == s.timeControl,
@@ -355,7 +309,7 @@ class _RatingTrendChartState extends State<_RatingTrendChart> {
     final series = visible[spot.barIndex];
     final point = series.points[spot.spotIndex];
     return LineTooltipItem(
-      '${_timeControlLabel(series.timeControl)} · ${point.rating}\n'
+      '${_timeControlLabel(context, series.timeControl)} · ${point.rating}\n'
       '${_formatPointDate(point.endedAt)}',
       TextStyle(
         color: scheme.onInverseSurface,

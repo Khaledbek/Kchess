@@ -2,7 +2,6 @@
   "@@locale": "en",
   "appTitle": "KChess",
   "firstRunTitle": "Your local chess workspace",
-  "firstRunBody": "Choose a source. Public online profiles do not require a password.",
   "chessCom": "Chess.com",
   "lichess": "Lichess",
   "localPgnFen": "PGN / FEN",
@@ -13,8 +12,6 @@
   "games": "Games",
   "gameSection": "Game",
   "play": "Play",
-  "playPlaceholder": "This section is reserved for future play modes, such as games against bots.",
-  "downloads": "Downloads",
   "favorites": "Favorites",
   "favoriteCollectionsTitle": "Collections",
   "favoriteNoCollections": "No collections yet. Create one to group your favorite games.",
@@ -26,16 +23,12 @@
   "favoriteDeleteCollectionBody": "The collection will be deleted. Its games will remain as loose favorites.",
   "favoriteEmptyCollection": "This collection does not contain any games yet.",
   "favoriteNoLooseGames": "No loose favorites.",
-  "favoriteCollectionRule": "Collections are one level only and cannot be nested.",
   "favoriteMoveToCollection": "Change collection",
-  "favoriteMoveHelp": "Games can stay as loose favorites or belong to exactly one collection.",
   "profile": "Profile",
   "settings": "Settings",
   "analysis": "Analysis",
   "addAccount": "Add account",
   "switchAccount": "Switch account",
-  "demoNotice": "Local game",
-  "tapToAnalyze": "Open and analyze",
   "importData": "Import PGN / FEN",
   "importPgnFile": "Choose PGN file",
   "pastePgn": "Paste PGN text",
@@ -64,10 +57,7 @@
   "evaluation": "Evaluation",
   "engineLines": "Engine lines",
   "currentMove": "Current move",
-  "boardArrows": "Show board arrows",
-  "boardArrowsHelp": "Display only; changing this never restarts analysis.",
   "engine": "Engine",
-  "enginePreset": "Medium · depth 18 · 3 lines",
   "depth": "Depth",
   "numberOfLines": "Number of lines",
   "timeLimitSeconds": "Time Limit (seconds)",
@@ -84,38 +74,23 @@
   "systemTheme": "System",
   "lightTheme": "Light",
   "darkTheme": "Dark",
-  "engineSettingsSubtitle": "Depth, lines, time limit, threads and hash",
   "analysisSettingsTitle": "Analysis",
-  "analysisSettingsSubtitle": "Arrows, evaluation and analysis display",
   "analysisBoardGuidance": "Board guidance",
   "analysisInformation": "Analysis information",
   "bestMoveArrow": "Best move arrow",
-  "bestMoveArrowHelp": "Shows the engine’s best move on the board.",
   "threatArrow": "Threat arrow",
-  "threatArrowHelp": "Shows the opponent’s strongest next move as a warning arrow when the opponent is to move.",
   "evaluationBarSetting": "Evaluation bar",
-  "evaluationBarSettingHelp": "Shows the current engine evaluation.",
   "showEngineLinesSetting": "Show engine lines",
-  "showEngineLinesSettingHelp": "Shows the calculated principal variations (MultiPV).",
   "showClassificationsSetting": "Show move classifications",
-  "showClassificationsSettingHelp": "Shows Theory, Brilliant, Critical, Best and the other move labels.",
   "showAccuracySetting": "Show accuracy",
-  "showAccuracySettingHelp": "Shows the locally calculated accuracy values.",
   "showTheorySetting": "Show theory information",
-  "showTheorySettingHelp": "Shows opening-book information and theory counts.",
   "showResultSymbolsSetting": "Show result symbols",
-  "showResultSymbolsSettingHelp": "Shows Win, Loss or Draw symbols above the kings when a game has ended.",
   "designSettingsTitle": "Design",
-  "designSettingsSubtitle": "Appearance, theme, board and pieces",
   "generalSettingsTitle": "General",
-  "generalSettingsSubtitle": "Language and app behavior",
   "dataStorageSettingsTitle": "Data & storage",
-  "dataStorageSettingsSubtitle": "Analysis cache, downloads and local data",
-  "dataStoragePlaceholder": "Storage and cache controls will be added in a following step.",
   "licensesAbout": "Licenses & about",
-  "stockfishPending": "Stockfish 18 · local · GPLv3",
+  "stockfishPending": "Stockfish · local · GPLv3",
   "provider": "Provider",
-  "localProfile": "Local profile",
   "theory": "Theory",
   "brilliant": "Brilliant",
   "critical": "Great Move",
@@ -133,16 +108,10 @@
   "first": "First",
   "last": "Last",
   "playPause": "Play or pause",
-  "player": "Player",
-  "bothPlayers": "Both",
   "whitePlayer": "White",
   "blackPlayer": "Black",
   "analyzedMoves": "Classified moves",
   "bookGames": "Book games",
-  "expectedLoss": "Expected-score loss",
-  "versions": "Versions",
-  "classifierVersionLabel": "Classifier",
-  "accuracyVersionLabel": "Accuracy",
   "analyzingGame": "Analyzing game",
   "analyzedMovesProgress": "{completed} / {total} half-moves analyzed",
   "@analyzedMovesProgress": {
@@ -164,38 +133,7 @@
       }
     }
   },
-  "moveComparisonText": "{played} was {classification}. {best} is the best move.",
-  "@moveComparisonText": {
-    "placeholders": {
-      "played": {
-        "type": "String"
-      },
-      "classification": {
-        "type": "String"
-      },
-      "best": {
-        "type": "String"
-      }
-    }
-  },
-  "theoryMoveText": "{move} is a theory move.",
-  "@theoryMoveText": {
-    "placeholders": {
-      "move": {
-        "type": "String"
-      }
-    }
-  },
-  "triedMove": "You tried {move}.",
-  "@triedMove": {
-    "placeholders": {
-      "move": {
-        "type": "String"
-      }
-    }
-  },
   "sidelineEngineTitle": "Sideline engine",
-  "sidelineEngineSubtitle": "These values apply only to live analysis of your sideline.",
   "mainLineLabel": "Main line",
   "sidelineLabel": "Your sideline",
   "liveEngineTheorySkipped": "Theory: live analysis skipped",
@@ -208,28 +146,6 @@
       }
     }
   },
-  "sidelineAnalysisPaused": "Live analysis paused",
-  "analyzingVariation": "Analyzing the temporary variation…",
-  "evaluationComparison": "Evaluation: {before} → {after}",
-  "@evaluationComparison": {
-    "placeholders": {
-      "before": {
-        "type": "String"
-      },
-      "after": {
-        "type": "String"
-      }
-    }
-  },
-  "bestContinuation": "Best continuation: {line}",
-  "@bestContinuation": {
-    "placeholders": {
-      "line": {
-        "type": "String"
-      }
-    }
-  },
-  "returnToMainLine": "Return to main line",
   "illegalOrFailedMove": "The move is illegal or could not be analyzed: {message}",
   "@illegalOrFailedMove": {
     "placeholders": {
@@ -240,43 +156,27 @@
   },
   "myPlayer": "My player",
   "opponent": "Opponent",
-  "variationStartingPosition": "Variation starting position",
-  "variationStart": "Start of variation",
   "engineQualityTitle": "Analysis quality",
   "engineResourcesTitle": "Resources",
-  "depthHelp": "Min = pre-analysis depth. Max = maximum live-analysis depth. Higher values usually take longer.",
   "adaptiveEarlyStop": "Adaptive analysis",
-  "adaptiveEarlyStopHelp": "Ends quiet pre-analysis and live searches early when the evaluation and principal variations are stable. Critical verification searches still use the configured limit.",
-  "numberOfLinesHelp": "How many top engine variations Stockfish calculates at the same time.",
-  "timeLimitHelp": "Optional limit per position. Off uses depth only; otherwise the search stops when depth or time is reached first.",
   "threads": "Threads",
-  "threadsHelp": "CPU threads per Stockfish worker. Kchess detects your PC automatically and allows at most half of the logical CPU threads.",
   "hashMemory": "Hash memory",
-  "hashMemoryHelp": "RAM for Stockfish’s transposition table. More memory can improve repeated-position search.",
   "boardDisplayTitle": "Board display",
   "rotateBoard": "Rotate board",
   "showBoardCoordinates": "Board coordinates",
-  "showBoardCoordinatesHelp": "Shows file and rank labels (a–h / 1–8) on the board.",
   "highlightLastMove": "Highlight last move",
-  "highlightLastMoveHelp": "Highlights the origin and destination squares of the last played move.",
   "highlightSelectedSquare": "Highlight selected square",
-  "highlightSelectedSquareHelp": "Highlights the square you selected while exploring a variation.",
   "behaviorTitle": "Behavior",
   "autoSyncOnline": "Automatically sync online profiles",
-  "autoSyncOnlineHelp": "Synchronizes Chess.com and Lichess automatically at startup and when switching profiles.",
   "confirmBeforeDelete": "Confirm before deleting",
-  "confirmBeforeDeleteHelp": "Asks for confirmation before deleting profiles or local games.",
   "analysisCacheTitle": "Analysis cache",
   "useGlobalAnalysisCache": "Use shared position cache",
-  "useGlobalAnalysisCacheHelp": "Reuses compatible analysis of identical positions across different games.",
   "clearAnalysisCache": "Clear analysis cache",
-  "clearAnalysisCacheHelp": "Clears only the shared position cache. Saved games and completed game analyses are kept.",
   "clearAnalysisCacheQuestion": "Clear analysis cache?",
   "clearAnalysisCacheBody": "The shared position cache will be deleted. Your games, favorites, downloads, and completed game analyses will be kept.",
   "analysisCacheCleared": "Analysis cache cleared.",
   "diagnosticsTitle": "Diagnostics",
   "diagnosticLogging": "Diagnostic logging",
-  "diagnosticLoggingHelp": "Writes bounded technical logs for troubleshooting. Full PGNs, FENs, and provider responses are not logged.",
   "deleteLocalGameQuestion": "Delete local entry?",
   "deleteLocalGameBody": "The stored PGN/FEN and its local analysis will be permanently removed.",
   "profileRatings": "Ratings",
@@ -295,9 +195,7 @@
   "statsDraws": "Draws",
   "statsLosses": "Losses",
   "statsAll": "All",
-  "statsAllTimeControlsNote": "All time controls",
   "statsPhaseTitle": "By game phase",
-  "statsPhaseSubtitle": "Where your games end and how you score there.",
   "statsPhaseOpening": "Opening (1–12)",
   "statsPhaseMiddlegame": "Middlegame (13–30)",
   "statsPhaseEndgame": "Endgame (31+)",
@@ -323,9 +221,7 @@
   },
   "statsTitle": "Statistics",
   "statsIntroTitle": "Your chess performance",
-  "statsIntroBody": "See your results, recent form and opening record separated by color.",
   "statsFormTitle": "Recent form",
-  "statsFormHint": "Tap a result to open the game.",
   "statsFormVersus": "vs",
   "statsFormEmpty": "No recent games to show.",
   "statsFormError": "Could not load recent games.",
@@ -516,9 +412,7 @@
   },
   "trainingSection": "Training",
   "trainingIntroTitle": "Training arena",
-  "trainingIntroBody": "Pick a training area. Your progress is stored locally on this device.",
   "trainingOpeningTitle": "Opening lab",
-  "trainingOpeningSubtitle": "Drill your repertoire lines and your weak spots.",
   "trainingOpeningAction": "Train lines",
   "trainingNemesisBadge": "Nemesis: {opening} — only {rate} win rate",
   "@trainingNemesisBadge": {
@@ -533,7 +427,6 @@
   },
   "trainingNemesisNone": "No weak line found in your statistics yet.",
   "trainingTacticsTitle": "Blunder buster",
-  "trainingTacticsSubtitle": "Find the better move in critical middlegame positions.",
   "trainingTacticsSolved": "{count} tactics solved",
   "@trainingTacticsSolved": {
     "placeholders": {
@@ -545,7 +438,6 @@
   "trainingTacticsAction": "Start tactics",
   "trainingTacticsEmpty": "No tactics puzzles in the catalogue yet.",
   "trainingEndgameTitle": "Endgame academy",
-  "trainingEndgameSubtitle": "Master theoretical endgames step by step.",
   "trainingEndgameProgress": "{mastered} / {total} positions mastered ({percent}%)",
   "@trainingEndgameProgress": {
     "placeholders": {
@@ -573,20 +465,7 @@
       }
     }
   },
-  "trainingLastAttempt": "Last practised: {date}",
-  "@trainingLastAttempt": {
-    "placeholders": {
-      "date": {
-        "type": "String"
-      }
-    }
-  },
-  "trainingNeverAttempted": "Not practised yet",
-  "trainingHint": "Hint",
-  "trainingBoardPending": "The board trainer follows once the core exposes move validation over the native interface.",
   "trainingOpeningLabSelected": "Selected line",
-  "trainingOpeningLabEmpty": "Pick an opening in the statistics tab and tap “Train” to load it here.",
-  "trainingOpeningLabPending": "The line trainer follows once the core supplies the opening moves.",
   "statsTrainOpening": "Train",
   "trainingGoalWin": "{side} to move — win the position",
   "@trainingGoalWin": {
@@ -607,7 +486,7 @@
   "trainingWrongMove": "Not the best move. Give it another try.",
   "trainingSolvedTitle": "Excellent! Position solved.",
   "trainingSolvedClean": "Solved without a slip — this one counts towards mastery.",
-  "trainingSolvedWithErrors": "Solved, but with corrections. Only a clean run counts towards “mastered”.",
+  "trainingSolvedWithErrors": "Solved, but with corrections. Only a clean run counts towards mastery.",
   "trainingPracticeAgain": "Practise again",
   "trainingNextEndgame": "Next endgame",
   "trainingBackToList": "Back to the list",
@@ -625,6 +504,311 @@
   "trainingBoardError": "The position could not be loaded.",
   "trainingShowHint": "Show hint",
   "trainingYourMove": "Your move",
-  "trainingOpponentThinking": "Reply …",
-  "trainingRestart": "Restart"
+  "trainingRestart": "Restart",
+  "trainingOpeningLabStart": "Train line",
+  "trainingOpeningLabBackToOverview": "Back to the overview",
+  "trainingOpeningTreeEmpty": "No opening lines available yet.",
+  "trainingOpeningTreeExpand": "Show variations",
+  "trainingOpeningTreeCollapse": "Hide variations",
+  "trainingOpeningTreeVariations": "{count,plural, =1{1 variation} other{{count} variations}}",
+  "@trainingOpeningTreeVariations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningTreeLoadFailed": "That line is not in the database yet.",
+  "trainingOpeningTreeZoomIn": "Zoom in",
+  "trainingOpeningTreeZoomOut": "Zoom out",
+  "trainingOpeningTreeFit": "Fit the tree",
+  "trainingOpeningTreeHint": "Tap a card to unfold its variations, or train the line right away.",
+  "trainingOpeningIncorrectMove": "Incorrect move",
+  "trainingOpeningTryAgain": "Try again.",
+  "trainingOpeningPlayInstead": "The move was {move}",
+  "@trainingOpeningPlayInstead": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenariosTitle": "Opening scenarios",
+  "trainingOpeningScenariosCaption": "Play the book move against every reply the book can throw at you.",
+  "trainingOpeningScenarioDepth": "Depth mastery: {done}/{total} moves",
+  "@trainingOpeningScenarioDepth": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningPlayAs": "Play as",
+  "trainingOpeningOpponentPlayed": "Opponent played {move}.",
+  "@trainingOpeningOpponentPlayed": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenarioReady": "Position after {move}.",
+  "@trainingOpeningScenarioReady": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningFindBest": "Find the best engine response.",
+  "trainingOpeningCurrentDepth": "Current depth: move {done} / {total}",
+  "@trainingOpeningCurrentDepth": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningCorrect": "{move} — that is the book move.",
+  "@trainingOpeningCorrect": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningAlternative": "{move} works too — book choice #{rank}.",
+  "@trainingOpeningAlternative": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "rank": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningDepthReached": "Depth {depth} reached",
+  "@trainingOpeningDepthReached": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningBookExhausted": "The book ends here — you answered everything it knows.",
+  "trainingOpeningNoBook": "The opening book has no moves for this position.",
+  "trainingOpeningDrillClean": "No slips — this run counts towards mastery.",
+  "trainingOpeningDrillWithErrors": "Finished with corrections. Only a clean run counts towards mastery.",
+  "trainingOpeningDrillAgain": "Drill again",
+  "trainingOpeningBookChoices": "{count, plural, =1{the only book reply} other{one of {count} book replies}}",
+  "@trainingOpeningBookChoices": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessTitle": "Openings that need training",
+  "openingWeaknessCaption": "Lines you keep losing or keep getting wrong, worst first.",
+  "openingWeaknessLost": "Lost {losses} of {games} games",
+  "@openingWeaknessLost": {
+    "placeholders": {
+      "losses": {
+        "type": "int"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessErrors": "Opening mistakes in {count} of {analysed} analysed games",
+  "@openingWeaknessErrors": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "analysed": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessRecurring": "You played {move} here {count} times — the engine prefers {better}.",
+  "@openingWeaknessRecurring": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "better": {
+        "type": "String"
+      }
+    }
+  },
+  "openingWeaknessRecurringFlagged": "You played {move} here {count} times, and the engine flagged it every time.",
+  "@openingWeaknessRecurringFlagged": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessAnalyseHint": "Analyse your games to also catch the moves that go wrong, not just the results.",
+  "openingWeaknessShowAll": "Show all {count}",
+  "@openingWeaknessShowAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessShowFewer": "Show fewer",
+  "openingWeaknessFamily": "Across the whole family",
+  "trainingWeakSpotsTitle": "Your weak spots",
+  "trainingWeakSpotBadge": "Weak spot",
+  "trainingWeakSpotMetric": "Weak spot: {opening}",
+  "@trainingWeakSpotMetric": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      }
+    }
+  },
+  "playAgainstBot": "Play against a bot",
+  "continueAgainstBot": "Continue against bot",
+  "botPlayerColor": "Your color",
+  "temporaryBotGameNotSaved": "This game is not saved and is discarded completely when you close or cancel it.",
+  "botGameLog": "Bot game history",
+  "botGameLogEmpty": "No saved bot games yet.",
+  "botGameLogLoadFailed": "The bot game history could not be loaded.",
+  "botGameHistoryActive": "In progress",
+  "botGameHistoryWin": "Won",
+  "botGameHistoryLoss": "Lost",
+  "botGameHistoryDraw": "Draw",
+  "botStrength": "Bot strength",
+  "botElo": "Elo",
+  "botStartGame": "Start game",
+  "botGameTitle": "Game against bot",
+  "botGameLoading": "Preparing game …",
+  "botGameLoadFailed": "The bot game could not be prepared.",
+  "botMoveFailed": "The bot move could not be calculated.",
+  "botYou": "You",
+  "botYourTurn": "Your turn.",
+  "botThinking": "Stockfish is thinking …",
+  "botApplyingMove": "Applying move …",
+  "botWaiting": "Waiting for the next move …",
+  "botViewingHistory": "You are viewing an earlier position.",
+  "botGameFinished": "Game finished.",
+  "botMoveList": "Move list",
+  "botNoMovesYet": "No moves played yet.",
+  "botPreviousMove": "Previous move",
+  "botNextMove": "Next move",
+  "botReturnToLive": "Return to current position",
+  "botHintPiece": "Hint 1: Show piece",
+  "botHintTarget": "Hint 2: Show target square",
+  "botHintsUsed": "Both hints used",
+  "botHintThinking": "Calculating hint …",
+  "botHintFailed": "The hint could not be calculated.",
+  "botGameSettingsTitle": "Game settings",
+  "botHintCounter": "{used} / 2 hints for this move",
+  "@botHintCounter": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      }
+    }
+  },
+  "exportFen": "Export FEN",
+  "fenCopiedToClipboard": "FEN copied to clipboard.",
+  "engineSelectionTitle": "Engine version",
+  "engineVersion": "Chess engine",
+  "engineActiveLabel": "Active: {engine}",
+  "@engineActiveLabel": {
+    "placeholders": {
+      "engine": {
+        "type": "String"
+      }
+    }
+  },
+  "stockfish18": "Stockfish 18",
+  "stockfish19": "Stockfish 19",
+  "engineSelectionFailed": "The selected engine could not be activated. The previous engine remains selected.",
+  "forced": "Forced",
+  "good": "Good",
+  "statsTimeControlCorrespondence": "Correspondence",
+  "statsTimeControlOther": "Other",
+  "botGameDeleteQuestion": "Delete bot game?",
+  "botGameDeleteBody": "This bot-game history entry will be permanently deleted. Any analysis game already created from it remains in your local game library.",
+  "promotionTitle": "Pawn promotion",
+  "promotionChoosePiece": "Choose the piece the pawn should promote to.",
+  "promotionQueen": "Queen",
+  "promotionRook": "Rook",
+  "promotionBishop": "Bishop",
+  "promotionKnight": "Knight",
+  "trainingOppositionTitle": "Pawn opposition",
+  "trainingOppositionHint": "Take the opposition first, then outflank the king. Push the pawn only after your king is in front of it.",
+  "trainingLucenaTitle": "Lucena position",
+  "trainingLucenaHint": "Place the rook on the fourth rank before bringing out the king; it will later shield the checks.",
+  "trainingPhilidorTitle": "Philidor defence",
+  "trainingPhilidorHint": "Keep the rook on the sixth rank until the pawn advances, then check from behind.",
+  "practiceDrills": "Checkmate drills",
+  "practiceStudies": "Classical endgame studies",
+  "practiceFailed": "Attempt ended. Try again.",
+  "practiceThinking": "Opponent is thinking…",
+  "practiceMoves": "Moves played: {count}",
+  "practiceLevel": "Level {number}",
+  "practiceStudyNumber": "Study {number}",
+  "practiceStudySource": "Kling & Horwitz · Chess Studies, Or, Endings of Games (1851). Practise these positions against Stockfish.",
+  "practiceQueenTitle": "King and queen vs. king",
+  "practiceRookTitle": "King and rook vs. king",
+  "practiceQueenRookTitle": "Queen vs. rook",
+  "practiceQueenHint": "Use your king to support the queen. Leave an escape square until you can deliver mate.",
+  "practiceRookHint": "Cut off the king with your rook and bring your king closer.",
+  "practiceQueenRookHint": "Look for forks against the king and rook. Watch out for stalemate.",
+  "practiceBeginner": "Beginner",
+  "practiceIntermediate": "Intermediate",
+  "practiceMaster": "Master",
+  "practiceSectionKingPawn": "King and pawn",
+  "practiceSectionBishops": "Kings, bishops and pawns",
+  "practiceSectionKnightsBishops": "Knights, bishops and pawns",
+  "practiceSectionTwoMinor": "Two minor pieces vs. one",
+  "practiceSectionRookPawns": "Rook vs. pawns",
+  "practiceSectionRookMinor": "Rook vs. minor pieces",
+  "practiceSectionMinorRook": "Minor pieces vs. rook",
+  "practiceSectionQueenPawns": "Queen vs. pawns",
+  "practiceSectionQueens": "Queens and pawns",
+  "practiceSectionQueenRook": "Queen vs. rook",
+  "practiceSectionQueenMinor": "Queen vs. minor pieces",
+  "@practiceMoves": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@practiceLevel": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "@practiceStudyNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  }
 }

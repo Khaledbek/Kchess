@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Native service orchestration
+// -----------------------------------------------------------------------------
+
 #include "core/core.h"
 
 #include <algorithm>
@@ -8,9 +12,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "chess/move.h"
-#include "chess/position_view.h"
 #include "diagnostics/logger.h"
+#include "engine/stockfish_factory.h"
 #include "theory/opening_name_index.h"
 
 namespace kchess {
@@ -39,7 +42,10 @@ Core::Core(std::filesystem::path data_directory)
       opening_theory_(std::make_unique<UnavailableOpeningTheoryProvider>()),
       opening_names_(std::make_unique<UnavailableOpeningNameIndex>()),
       analysis_service_(database_, *opening_theory_),
-      statistics_service_(database_) {
+      bot_service_(database_),
+      statistics_service_(database_),
+      training_service_(database_),
+      practice_service_(database_, training_service_, bot_service_) {
   diagnostics::configure_logging(data_directory_);
   diagnostics::info("core", "Core created");
 }
@@ -168,6 +174,11 @@ void Core::set_engine_resources(const int threads, const int hash_mb) {
   settings_service_.set_engine_resources(threads, hash_mb);
 }
 
+void Core::set_sideline_engine_settings(
+    const int depth, const int multi_pv, const int threads, const int hash_mb) {
+  settings_service_.set_sideline_engine_settings(depth, multi_pv, threads, hash_mb);
+}
+
 void Core::set_show_board_arrows(const bool enabled) {
   settings_service_.set_show_board_arrows(enabled);
 }
@@ -182,6 +193,30 @@ void Core::set_theme_mode(const std::string& mode) {
 
 void Core::set_locale(const std::string& locale) {
   settings_service_.set_locale(locale);
+}
+
+void Core::set_engine_id(const std::string& engine_id) {
+  if (engine_id != "stockfish18" && engine_id != "stockfish19") {
+    throw std::invalid_argument("invalid engine id");
+  }
+  const auto current_engine_id = database_.settings().engine_id;
+  if (current_engine_id == engine_id) return;
+
+  // Prove that the candidate engine can initialize with its expected NNUE
+  // before stopping any live work or persisting the new selection. A missing
+  // or invalid Stockfish 19 runtime asset therefore leaves Stockfish 18 (and
+  // vice versa) fully selected and usable instead of creating a half-switched
+  // application state.
+  const auto candidate = create_stockfish_engine(engine_id);
+  candidate->validate_available();
+  candidate->start();
+  candidate->stop();
+
+  // Stop only live engine work after the candidate has passed its runtime
+  // probe. Existing Stockfish 18/19 analysis rows remain untouched and
+  // continue to be separated by their engine version/config hash.
+  analysis_service_.prepare_for_engine_change();
+  settings_service_.set_engine_id(engine_id);
 }
 
 std::string Core::games_json() {
@@ -214,29 +249,18 @@ std::string Core::resolve_board_move_json(
       game_id, fen, source, target, first_candidate_ply);
 }
 
-std::string Core::board_position_json(const std::string& fen) {
-  auto json = nlohmann::json::parse(position_view_json(fen));
-  // A drill has to tell checkmate from stalemate after every move, and both
-  // look identical from Flutter without the check flag.
-  const auto moves = legal_moves(fen);
-  const bool check = in_check(fen);
-  json["inCheck"] = check;
-  json["legalMoveCount"] = static_cast<int>(moves.size());
-  json["status"] = moves.empty() ? (check ? "checkmate" : "stalemate")
-                                 : "playable";
-  return json.dump();
+std::string Core::resolve_free_board_move_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) {
+  return game_library_service_.resolve_free_board_move_json(fen, source, target);
 }
 
-std::string Core::board_legal_moves_json(const std::string& fen) {
-  auto moves = nlohmann::json::array();
-  for (const auto& move : legal_moves(fen)) {
-    moves.push_back({
-        {"uci", move.uci},
-        {"san", move.san},
-        {"fenAfter", move.fen_after},
-    });
-  }
-  return moves.dump();
+std::string Core::board_promotion_options_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) {
+  return game_library_service_.board_promotion_options_json(fen, source, target);
 }
 
 std::string Core::import_pgn_json(const std::string& pgn) {
@@ -301,6 +325,10 @@ std::string Core::statistics_terminations_json() {
 
 std::string Core::statistics_phases_json() {
   return statistics_service_.phases_json();
+}
+
+std::string Core::statistics_timeline_json(const std::string& query_json) {
+  return statistics_service_.timeline_json(game_library_service_.query_games_json(query_json));
 }
 
 void Core::set_favorite(const std::string& game_id, const bool value) {
@@ -395,6 +423,132 @@ std::string Core::variation_analysis_status_json(const std::string& job_id) {
 
 void Core::cancel_variation_analysis(const std::string& job_id) {
   analysis_service_.cancel_variation_analysis(job_id);
+}
+
+// -----------------------------------------------------------------------------
+// Section: Local bot play orchestration
+// -----------------------------------------------------------------------------
+
+std::string Core::create_bot_game_json(const int requested_elo) {
+  return bot_service_.create_game_json(requested_elo);
+}
+
+std::string Core::active_bot_game_json() const {
+  return bot_service_.active_game_json();
+}
+
+std::string Core::bot_game_json(const std::string& game_id) const {
+  validate_token(game_id, "bot game id");
+  return bot_service_.game_json(game_id);
+}
+
+std::string Core::bot_games_json() const {
+  return bot_service_.games_json();
+}
+
+std::string Core::bot_game_analysis_game_json(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  const auto bot_game = database_.bot_game(game_id);
+  if (!bot_game.has_value()) throw std::invalid_argument("Bot game not found");
+  if (bot_game->status == "active") {
+    throw std::runtime_error("Finish the bot game before opening analysis");
+  }
+  if (bot_game->moves.empty()) {
+    throw std::runtime_error("Bot game has no moves to analyse");
+  }
+
+  if (bot_game->analysis_game_id.has_value()) {
+    if (database_.game(*bot_game->analysis_game_id).has_value()) {
+      classify_game_opening(*bot_game->analysis_game_id);
+      return game_library_service_.game_json(*bot_game->analysis_game_id);
+    }
+  }
+
+  const auto imported = nlohmann::json::parse(
+      game_library_service_.import_pgn_json(bot_service_.analysis_pgn(game_id)));
+  const auto analysis_game_id = imported.at("id").get<std::string>();
+  database_.set_bot_game_analysis_game_id(game_id, analysis_game_id);
+  classify_game_opening(analysis_game_id);
+  return game_library_service_.game_json(analysis_game_id);
+}
+
+std::string Core::record_bot_game_move_json(
+    const std::string& game_id,
+    const std::string& expected_fen_before,
+    const std::string& uci) {
+  validate_token(game_id, "bot game id");
+  return bot_service_.record_game_move_json(game_id, expected_fen_before, uci);
+}
+
+std::string Core::record_bot_game_move_from_ply_json(
+    const std::string& game_id,
+    const int base_ply,
+    const std::string& expected_fen_before,
+    const std::string& uci) {
+  validate_token(game_id, "bot game id");
+  return bot_service_.record_game_move_from_ply_json(
+      game_id, base_ply, expected_fen_before, uci);
+}
+
+void Core::resign_bot_game(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  bot_service_.resign_game(game_id);
+}
+
+void Core::abort_bot_game(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  bot_service_.abort_game(game_id);
+}
+
+void Core::delete_bot_game(const std::string& game_id) {
+  validate_token(game_id, "bot game id");
+  bot_service_.delete_game(game_id);
+}
+
+void Core::set_bot_game_show_eval_bar(
+    const std::string& game_id, const bool enabled) {
+  validate_token(game_id, "bot game id");
+  bot_service_.set_game_show_eval_bar(game_id, enabled);
+}
+
+std::string Core::start_bot_move_json(
+    const std::string& fen, const int requested_elo) {
+  return bot_service_.start_move_json(fen, requested_elo);
+}
+
+std::string Core::bot_move_status_json(const std::string& job_id) {
+  validate_token(job_id, "bot move job id");
+  return bot_service_.move_status_json(job_id);
+}
+
+void Core::cancel_bot_move(const std::string& job_id) {
+  validate_token(job_id, "bot move job id");
+  bot_service_.cancel_move(job_id);
+}
+
+// -----------------------------------------------------------------------------
+// Section: Native training facade
+// -----------------------------------------------------------------------------
+
+std::string Core::training_overview_json() const {
+  return practice_service_.overview(training_service_.overview_json());
+}
+
+std::string Core::practice_command_json(const std::string& request) {
+  return practice_service_.command(request);
+}
+
+std::string Core::start_training_attempt_json(const std::string& exercise_id) {
+  validate_token(exercise_id, "training exercise id");
+  return training_service_.start_attempt_json(exercise_id);
+}
+
+std::string Core::play_training_move_json(
+    const std::string& attempt_id,
+    const std::string& source,
+    const std::string& target) {
+  validate_token(attempt_id, "training attempt id");
+  return training_service_.play_move_json(attempt_id, source, target);
 }
 
 }  // namespace kchess

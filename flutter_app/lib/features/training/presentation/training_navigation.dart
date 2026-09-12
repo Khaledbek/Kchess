@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Training navigation scope
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/widgets.dart';
 
 import '../models/opening_training_request.dart';

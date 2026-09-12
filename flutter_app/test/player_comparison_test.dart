@@ -1,9 +1,13 @@
+// -----------------------------------------------------------------------------
+// Section: Comparison presentation fixtures
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kchess/localization/generated/app_localizations.dart';
-import 'package:kchess/models/models.dart';
+import 'package:kchess/shared/models/models.dart';
 import 'package:kchess/ui/app_root.dart';
-import 'package:kchess/view_models/app_controller.dart';
+import 'package:kchess/features/app/application/app_controller.dart';
 
 import 'support/fake_core_gateway.dart';
 
@@ -54,7 +58,10 @@ void main() {
 
     // The self-audit is announced rather than shown as a 0-0-0 record.
     expect(find.text('Selbstvergleich (Spiegelung)'), findsOneWidget);
-    expect(find.textContaining('Keine Partien gegen dich selbst'), findsOneWidget);
+    expect(
+      find.textContaining('Keine Partien gegen dich selbst'),
+      findsOneWidget,
+    );
 
     // The head-to-head banner must not appear at all: its footer is the only
     // place "direkte Partien" is rendered, and any phantom count would show it.
@@ -71,6 +78,9 @@ void main() {
     await _openComparisonFor(tester, 'Turing');
 
     expect(find.text('Selbstvergleich (Spiegelung)'), findsNothing);
-    expect(find.textContaining('Keine Partien gegen dich selbst'), findsNothing);
+    expect(
+      find.textContaining('Keine Partien gegen dich selbst'),
+      findsNothing,
+    );
   });
 }

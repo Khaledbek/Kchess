@@ -27,7 +27,6 @@ class _GamesEmptyState extends StatelessWidget {
         : monthLabel != null
         ? labels.noGamesForMonth.replaceAll('{month}', monthLabel)
         : fallbackText;
-    final subtitle = hasActiveFilters ? labels.noMatchingGamesHelp : null;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -59,16 +58,6 @@ class _GamesEmptyState extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
               if (hasActiveFilters) ...[
                 const SizedBox(height: 18),
                 OutlinedButton.icon(

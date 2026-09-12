@@ -36,6 +36,7 @@ class AnalysisService {
   void delete_analysis(const std::string& game_id);
   void clear_engine_cache();
   void cancel_jobs_for_games(const std::vector<std::string>& game_ids);
+  void prepare_for_engine_change() noexcept;
 
   std::string start_variation_analysis_json(
       const std::string& fen, const std::string& uci);
@@ -67,7 +68,7 @@ class AnalysisService {
     std::atomic_int requested_position_slot{-1};
     std::atomic_uint64_t target_generation{0};
     std::atomic_int completed_moves{0};
-    std::shared_ptr<StockfishEngine> engine;
+    std::shared_ptr<ChessEngine> engine;
     std::string config_hash;
     // Classifications shown while maximum-depth refinement is running come
     // from the last fully published pre-analysis run.  This keeps the UI
@@ -89,8 +90,9 @@ class AnalysisService {
     std::string error;
     AnalysisResult result;
     std::optional<MoveCategory> classification;
+    int visible_multi_pv{1};
     std::atomic_bool expose_live_result{true};
-    std::shared_ptr<StockfishEngine> engine;
+    std::shared_ptr<ChessEngine> engine;
     std::thread worker;
   };
 
@@ -160,7 +162,7 @@ class AnalysisService {
   // Ephemeral sideline-only position cache. It is never persisted into a game
   // analysis row and is cleared when the user leaves variation mode.
   std::unordered_map<std::string, AnalysisResult> variation_position_results_;
-  std::shared_ptr<StockfishEngine> variation_engine_;
+  std::shared_ptr<ChessEngine> variation_engine_;
   std::atomic_uint64_t next_variation_job_id_{1};
 };
 

@@ -1,51 +1,54 @@
 # Release- und Lizenz-Compliance
 
-## Phase-4-JSON und HTTP
+## JSON und HTTP
 
-nlohmann/json 3.12.0 wird unverändert als offizieller Single Header unter der
-permissiven MIT-Lizenz eingebettet. Der lokale SHA-256 stimmt mit dem
-Upstream-Release-Asset `json.hpp` überein. Lizenztext und Herkunft liegen in
-`licenses/nlohmann/` und `third_party/nlohmann/README.md`.
+KChess verwendet `nlohmann/json` 3.12.0 unverändert als Single Header unter der MIT-Lizenz. Herkunft und Lizenztext liegen im lokalen Third-Party-/Lizenzbaum.
 
-WinHTTP ist Bestandteil von Windows. Android `HttpsURLConnection`/JNI ist
-Bestandteil der Android-Plattform. Daher entsteht aus der HTTP-Schicht keine
-weitere zu verteilende C/C++-Runtime oder Lizenzdatei. Zertifikatsprüfung bleibt
-jeweils bei der Plattform-Voreinstellung.
+Die HTTP-Laufzeit verwendet Plattform-APIs:
+
+- Windows: WinHTTP
+- Android: `HttpsURLConnection` über JNI
+
+Dadurch wird für die HTTP-Schicht keine zusätzliche native Netzwerk-Runtime ausgeliefert. Die Zertifikatsprüfung bleibt bei den Plattform-Voreinstellungen.
 
 ## Stockfish 18
 
 - Upstream: `https://github.com/official-stockfish/Stockfish`
 - Release/Tag: `Stockfish 18` / `sf_18`
-- exakter Commit: `cb3d4ee9b47d0c5aae855b12379378ea1439675c`
-- vendorte Quelle: `third_party/stockfish/source`
-- lokale Änderungen am Upstream-Quellbaum: eine auf Windows begrenzte
-  Host-Integrationsänderung in `src/nnue/network.cpp`: NNUE-Dateien werden über
-  einen UTF-8-fähigen `std::filesystem::path` geöffnet; ein Ladefehler wirft im
-  eingebetteten DLL-Betrieb einen kontrollierbaren Fehler, statt den gesamten
-  Flutter-Prozess mit `exit()` zu beenden. Such-, Bewertungs- und Spiellogik
-  bleiben unverändert.
+- exakter Commit des vendorten Stands: `cb3d4ee9b47d0c5aae855b12379378ea1439675c`
+- Quelle: `third_party/stockfish/source`
 - Lizenz: GNU GPL Version 3
 
-Die App linkt Stockfish direkt in `kchess_core`. Sie behauptet daher keine
-lizenzrechtliche Trennung durch UCI oder FFI. Für diese kombinierte Distribution
-liegt die GPLv3 in `LICENSE` und `licenses/stockfish/Copying.txt`; AUTHORS und
-Upstream-Hinweise bleiben erhalten. Eine proprietäre Veröffentlichung ist ein
-gesondertes Rechtsprüfungs-Gate. Dies ist keine Rechtsberatung.
+Die lokale Windows-Host-Integration in `src/nnue/network.cpp` betrifft ausschließlich robustes UTF-8-Dateiöffnen und kontrollierbare Ladefehler im eingebetteten DLL-Betrieb; Such-, Bewertungs- und Spiellogik bleiben unverändert.
 
-## NNUE
-
-Stockfish 18 referenziert in `src/evaluate.h` diese offiziellen Netze:
+### Stockfish-18-NNUE
 
 | Datei | Größe | SHA-256 |
 |---|---:|---|
 | `nn-c288c895ea92.nnue` | 108919594 | `c288c895ea924429ea9092e3f36b2b3c1f00f2a3a4c759ff7e57e79e3b43e4a7` |
 | `nn-37f18f62d772.nnue` | 3519630 | `37f18f62d772f3107e1d6aaca3898c130c3c86f2ab63e6555fbbca20635a899d` |
 
-Quelle: `https://tests.stockfishchess.org/api/nn/<dateiname>`.
+## Stockfish 19
 
-Unter Windows werden beide unveränderten Dateien neben `kchess_core.dll`
-installiert. Beim Android/ELF-Build bindet Stockfish sie über seine offizielle
-Assembler-`incbin`-Strecke in `libkchess_core.so` ein.
+KChess unterstützt zusätzlich Stockfish 19 als auswählbare Runtime-Engine.
+
+- Upstream: `https://github.com/official-stockfish/Stockfish`
+- Release/Tag: `sf_19`
+- Source-Ziel: `third_party/stockfish19/source`
+- offizielles Release-Archiv SHA-256: `519b653d0d1ffb96531d982ccbe5c6a19425e8388e0e3c2f70f34b424ab32d76`
+- offizielles NNUE: `nn-1a298aa575a0.nnue`
+- NNUE SHA-256: `1a298aa575a085434d29027978dc36867fe9c5bcea9376654b7a8eba1e52dfc2`
+- Lizenz: GNU GPL Version 3
+
+`native/cmake/fetch_stockfish19.cmake` lädt Source und NNUE reproduzierbar, wenn sie lokal fehlen, und prüft die hinterlegten SHA-256-Werte. Stockfish 19 wird in einem umbenannten C++-Namespace gebaut, damit Stockfish 18 und 19 gleichzeitig mit `kchess_core` gelinkt werden können.
+
+## GPL-Einordnung
+
+KChess linkt Stockfish direkt in `kchess_core` und behauptet keine lizenzrechtliche Trennung durch UCI oder FFI. Für eine verteilte kombinierte Binary müssen die GPLv3-Anforderungen und der vollständige entsprechende Quellcode berücksichtigt werden. Dies ist keine Rechtsberatung.
+
+## SQLite
+
+SQLite wird als eingebettete lokale Datenbank aus `third_party/sqlite/` verwendet. Der in `THIRD_PARTY_NOTICES.md` dokumentierte Stand ist Public Domain.
 
 ## Reproduzierbare Build-Methode
 
@@ -56,9 +59,6 @@ cmake -S native -B build/native -A x64 -DKCHESS_WITH_STOCKFISH=ON
 cmake --build build/native --config Release
 ```
 
-MSVC nutzt C++20 sowie die Release-Flags des Generators (`/O2 /Ob2 /DNDEBUG`)
-und für Stockfish zusätzlich `/W3 /EHsc /bigobj`.
-
 Android ARM64, Debug:
 
 ```powershell
@@ -66,66 +66,48 @@ cd flutter_app
 flutter build apk --debug --target-platform android-arm64
 ```
 
-Gradle/NDK ruft `native/CMakeLists.txt` mit C++20 auf. Der Stockfish-Teil nutzt
-`-O3 -fno-exceptions -fno-rtti` und den Assembler-Include-Pfad für NNUE. Die
-Gradle-Konfiguration filtert auf `arm64-v8a`.
+Unter Windows verwendet KChess einen persistenten Source-adjacent Cache für die kompilierten Stockfish-18-/19-Libraries, damit `flutter clean` die teuren Engine-Artefakte nicht unnötig entfernt. Android baut beide Engines über den nativen CMake-Pfad für `arm64-v8a`.
 
 ## Corresponding Source
 
-Der vollständige, zur Binary passende Quellstand besteht aus diesem gesamten
-KChess-Arbeitsbaum einschließlich:
+Der zu einer Binary passende Quellstand umfasst insbesondere:
 
-- `third_party/stockfish/source` am oben genannten Commit,
-- beiden NNUE-Dateien,
-- `native/CMakeLists.txt` und allen KChess-C++/Flutter-Quellen,
-- Gradle-/Windows-Builddateien,
-- GPLv3, AUTHORS und diesen reproduzierbaren Schritten.
+- KChess Flutter- und C++-Quellen
+- `third_party/stockfish/source` für Stockfish 18
+- `third_party/stockfish19/source` für Stockfish 19 bzw. die reproduzierbare Fetch-Konfiguration
+- alle verwendeten NNUE-Netze
+- SQLite und nlohmann/json
+- CMake-/Gradle-/Windows-Builddateien
+- GPLv3-/Third-Party-Lizenzinformationen
 
-Eine veröffentlichte Binary muss genau diesen Stand oder ein gleichwertiges
-GPLv3-konformes Angebot des vollständigen entsprechenden Quellcodes begleiten.
+Ein Transport-ZIP kann `third_party/` bewusst auslassen; ein Release-/Corresponding-Source-Paket darf daraus nicht automatisch abgeleitet werden.
 
 ## Opening Theory
 
 KChess liefert ein vollständig offline genutztes KCB1-Opening-Book aus:
 
-- Quelle: Lichess Open Database, `https://database.lichess.org/`
-- Lizenz der Datenbank-Dumps: CC0 1.0
-- verwendete Standard-Rated-Dumps:
-  `lichess_db_standard_rated_2013-01.pgn.zst`,
-  `lichess_db_standard_rated_2015-01.pgn.zst` und
-  `lichess_db_standard_rated_2015-02.pgn.zst`
-- Dump-Zeiträume: Januar 2013, Januar 2015 und Februar 2015
-- gesamte komprimierte Quellgröße: 586.630.352 Byte; Einzelgrößen und
-  SHA-256-Prüfsummen stehen in `tools/opening_book/BUILD_METADATA.md`
+- Quelle: Lichess Open Database
+- Lizenz: CC0 1.0
+- verwendete Standard-Rated-Dumps: Januar 2013, Januar 2015, Februar 2015
 - Builder/Format: `kcb-builder-2` / KCB1 Version 1
-- Buildzeitpunkt: `2026-08-17T07:15:41Z`
-- Parameter: `max_ply=20`, `min_games=100`
-- Ergebnis: 3.114.122 Partien, 27.022 Entries, 756.776 Byte, SHA-256
-  `0a1a6849bef494fc267a3bc9e67dcaf37f8f7e8acb47def0e7bc5940365e2163`
+- Ergebnis: 3.114.122 Partien, 27.022 Entries, 756.776 Byte
+- SHA-256: `0a1a6849bef494fc267a3bc9e67dcaf37f8f7e8acb47def0e7bc5940365e2163`
 
-Der KCB-Header enthält `source=lichess`, `license=CC0-1.0`, Dump-Kennung,
-Builder-Version und Zeitstempel. Vollständige Buildstatistiken stehen in
-`tools/opening_book/BUILD_METADATA.md`. Es findet keine Online-Abfrage zur
-Laufzeit statt und es werden keine Lichess-Marken in der UI verwendet.
+Vollständige Quell-, Parameter- und Prüfsummeninformationen stehen in `tools/opening_book/BUILD_METADATA.md`.
 
-Zusätzlich liefert KChess einen vollständig offline genutzten
-KCO1-Eröffnungsnamen-Index aus, der Partien einen ECO-Code und einen
-Eröffnungs-/Variantennamen zuordnet:
+## Opening Names
 
-- Quelle: `lichess-org/chess-openings`, Upstream-Commit
-  `4b8622759e7ae6f93f011cc6c83a3823401ab45e` (2026-08-04)
-- Lizenz des Katalogs: CC0 1.0
-- verwendete Dateien: `a.tsv`, `b.tsv`, `c.tsv`, `d.tsv`, `e.tsv` (SHA-256 in
-  `tools/opening_names/BUILD_METADATA.md`)
+KChess liefert zusätzlich den offline genutzten KCO1-Eröffnungsnamenindex aus:
+
+- Quelle: `lichess-org/chess-openings`
+- Lizenz: CC0 1.0
+- Upstream-Commit: `4b8622759e7ae6f93f011cc6c83a3823401ab45e`
 - Builder/Format: `kco-builder-1` / KCO1 Version 1
-- Ergebnis: 3.810 Einträge, 228.888 Byte, SHA-256
-  `b4207c778ce0e37d34a3242e1936935c9242b9d6712c5f0d6f1d23704114c1bc`
+- Ergebnis: 3.810 Einträge, 228.888 Byte
+- SHA-256: `b4207c778ce0e37d34a3242e1936935c9242b9d6712c5f0d6f1d23704114c1bc`
 
-Der KCO-Header enthält `source=lichess`, `license=CC0-1.0`, Builder-Version und
-Zeitstempel. Der Positionsschlüssel ist identisch zu dem des KCB-Books; es
-findet keine Online-Abfrage zur Laufzeit statt und es werden keine
-Lichess-Marken in der UI verwendet.
+Details stehen in `tools/opening_names/BUILD_METADATA.md`.
 
-Nur für das Development-Tool werden `chess` 1.11.2 (GPL-3.0-or-later) und
-`zstandard` 0.25.0 (BSD-3-Clause) benötigt. Weder Python noch diese Pakete
-werden in Android- oder Windows-Binaries eingebettet.
+## Python-Development-Abhängigkeiten
+
+Python und seine Builder-Abhängigkeiten werden nicht in Android- oder Windows-Binaries eingebettet. Der Opening-Book-Builder verwendet unter anderem `python-chess` und `zstandard`; der Opening-Name-Builder verwendet `python-chess`.

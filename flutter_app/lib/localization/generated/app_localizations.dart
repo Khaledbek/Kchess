@@ -112,12 +112,6 @@ abstract class AppLocalizations {
   /// **'Your local chess workspace'**
   String get firstRunTitle;
 
-  /// No description provided for @firstRunBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose a source. Public online profiles do not require a password.'**
-  String get firstRunBody;
-
   /// No description provided for @chessCom.
   ///
   /// In en, this message translates to:
@@ -177,18 +171,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Play'**
   String get play;
-
-  /// No description provided for @playPlaceholder.
-  ///
-  /// In en, this message translates to:
-  /// **'This section is reserved for future play modes, such as games against bots.'**
-  String get playPlaceholder;
-
-  /// No description provided for @downloads.
-  ///
-  /// In en, this message translates to:
-  /// **'Downloads'**
-  String get downloads;
 
   /// No description provided for @favorites.
   ///
@@ -256,23 +238,11 @@ abstract class AppLocalizations {
   /// **'No loose favorites.'**
   String get favoriteNoLooseGames;
 
-  /// No description provided for @favoriteCollectionRule.
-  ///
-  /// In en, this message translates to:
-  /// **'Collections are one level only and cannot be nested.'**
-  String get favoriteCollectionRule;
-
   /// No description provided for @favoriteMoveToCollection.
   ///
   /// In en, this message translates to:
   /// **'Change collection'**
   String get favoriteMoveToCollection;
-
-  /// No description provided for @favoriteMoveHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Games can stay as loose favorites or belong to exactly one collection.'**
-  String get favoriteMoveHelp;
 
   /// No description provided for @profile.
   ///
@@ -303,18 +273,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch account'**
   String get switchAccount;
-
-  /// No description provided for @demoNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'Local game'**
-  String get demoNotice;
-
-  /// No description provided for @tapToAnalyze.
-  ///
-  /// In en, this message translates to:
-  /// **'Open and analyze'**
-  String get tapToAnalyze;
 
   /// No description provided for @importData.
   ///
@@ -484,29 +442,11 @@ abstract class AppLocalizations {
   /// **'Current move'**
   String get currentMove;
 
-  /// No description provided for @boardArrows.
-  ///
-  /// In en, this message translates to:
-  /// **'Show board arrows'**
-  String get boardArrows;
-
-  /// No description provided for @boardArrowsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Display only; changing this never restarts analysis.'**
-  String get boardArrowsHelp;
-
   /// No description provided for @engine.
   ///
   /// In en, this message translates to:
   /// **'Engine'**
   String get engine;
-
-  /// No description provided for @enginePreset.
-  ///
-  /// In en, this message translates to:
-  /// **'Medium · depth 18 · 3 lines'**
-  String get enginePreset;
 
   /// No description provided for @depth.
   ///
@@ -604,23 +544,11 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get darkTheme;
 
-  /// No description provided for @engineSettingsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Depth, lines, time limit, threads and hash'**
-  String get engineSettingsSubtitle;
-
   /// No description provided for @analysisSettingsTitle.
   ///
   /// In en, this message translates to:
   /// **'Analysis'**
   String get analysisSettingsTitle;
-
-  /// No description provided for @analysisSettingsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Arrows, evaluation and analysis display'**
-  String get analysisSettingsSubtitle;
 
   /// No description provided for @analysisBoardGuidance.
   ///
@@ -640,23 +568,11 @@ abstract class AppLocalizations {
   /// **'Best move arrow'**
   String get bestMoveArrow;
 
-  /// No description provided for @bestMoveArrowHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows the engine’s best move on the board.'**
-  String get bestMoveArrowHelp;
-
   /// No description provided for @threatArrow.
   ///
   /// In en, this message translates to:
   /// **'Threat arrow'**
   String get threatArrow;
-
-  /// No description provided for @threatArrowHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows the opponent’s strongest next move as a warning arrow when the opponent is to move.'**
-  String get threatArrowHelp;
 
   /// No description provided for @evaluationBarSetting.
   ///
@@ -664,23 +580,11 @@ abstract class AppLocalizations {
   /// **'Evaluation bar'**
   String get evaluationBarSetting;
 
-  /// No description provided for @evaluationBarSettingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows the current engine evaluation.'**
-  String get evaluationBarSettingHelp;
-
   /// No description provided for @showEngineLinesSetting.
   ///
   /// In en, this message translates to:
   /// **'Show engine lines'**
   String get showEngineLinesSetting;
-
-  /// No description provided for @showEngineLinesSettingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows the calculated principal variations (MultiPV).'**
-  String get showEngineLinesSettingHelp;
 
   /// No description provided for @showClassificationsSetting.
   ///
@@ -688,23 +592,11 @@ abstract class AppLocalizations {
   /// **'Show move classifications'**
   String get showClassificationsSetting;
 
-  /// No description provided for @showClassificationsSettingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows Theory, Brilliant, Critical, Best and the other move labels.'**
-  String get showClassificationsSettingHelp;
-
   /// No description provided for @showAccuracySetting.
   ///
   /// In en, this message translates to:
   /// **'Show accuracy'**
   String get showAccuracySetting;
-
-  /// No description provided for @showAccuracySettingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows the locally calculated accuracy values.'**
-  String get showAccuracySettingHelp;
 
   /// No description provided for @showTheorySetting.
   ///
@@ -712,23 +604,11 @@ abstract class AppLocalizations {
   /// **'Show theory information'**
   String get showTheorySetting;
 
-  /// No description provided for @showTheorySettingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows opening-book information and theory counts.'**
-  String get showTheorySettingHelp;
-
   /// No description provided for @showResultSymbolsSetting.
   ///
   /// In en, this message translates to:
   /// **'Show result symbols'**
   String get showResultSymbolsSetting;
-
-  /// No description provided for @showResultSymbolsSettingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows Win, Loss or Draw symbols above the kings when a game has ended.'**
-  String get showResultSymbolsSettingHelp;
 
   /// No description provided for @designSettingsTitle.
   ///
@@ -736,41 +616,17 @@ abstract class AppLocalizations {
   /// **'Design'**
   String get designSettingsTitle;
 
-  /// No description provided for @designSettingsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Appearance, theme, board and pieces'**
-  String get designSettingsSubtitle;
-
   /// No description provided for @generalSettingsTitle.
   ///
   /// In en, this message translates to:
   /// **'General'**
   String get generalSettingsTitle;
 
-  /// No description provided for @generalSettingsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Language and app behavior'**
-  String get generalSettingsSubtitle;
-
   /// No description provided for @dataStorageSettingsTitle.
   ///
   /// In en, this message translates to:
   /// **'Data & storage'**
   String get dataStorageSettingsTitle;
-
-  /// No description provided for @dataStorageSettingsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Analysis cache, downloads and local data'**
-  String get dataStorageSettingsSubtitle;
-
-  /// No description provided for @dataStoragePlaceholder.
-  ///
-  /// In en, this message translates to:
-  /// **'Storage and cache controls will be added in a following step.'**
-  String get dataStoragePlaceholder;
 
   /// No description provided for @licensesAbout.
   ///
@@ -781,7 +637,7 @@ abstract class AppLocalizations {
   /// No description provided for @stockfishPending.
   ///
   /// In en, this message translates to:
-  /// **'Stockfish 18 · local · GPLv3'**
+  /// **'Stockfish · local · GPLv3'**
   String get stockfishPending;
 
   /// No description provided for @provider.
@@ -789,12 +645,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Provider'**
   String get provider;
-
-  /// No description provided for @localProfile.
-  ///
-  /// In en, this message translates to:
-  /// **'Local profile'**
-  String get localProfile;
 
   /// No description provided for @theory.
   ///
@@ -898,18 +748,6 @@ abstract class AppLocalizations {
   /// **'Play or pause'**
   String get playPause;
 
-  /// No description provided for @player.
-  ///
-  /// In en, this message translates to:
-  /// **'Player'**
-  String get player;
-
-  /// No description provided for @bothPlayers.
-  ///
-  /// In en, this message translates to:
-  /// **'Both'**
-  String get bothPlayers;
-
   /// No description provided for @whitePlayer.
   ///
   /// In en, this message translates to:
@@ -933,30 +771,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Book games'**
   String get bookGames;
-
-  /// No description provided for @expectedLoss.
-  ///
-  /// In en, this message translates to:
-  /// **'Expected-score loss'**
-  String get expectedLoss;
-
-  /// No description provided for @versions.
-  ///
-  /// In en, this message translates to:
-  /// **'Versions'**
-  String get versions;
-
-  /// No description provided for @classifierVersionLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Classifier'**
-  String get classifierVersionLabel;
-
-  /// No description provided for @accuracyVersionLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Accuracy'**
-  String get accuracyVersionLabel;
 
   /// No description provided for @analyzingGame.
   ///
@@ -982,35 +796,11 @@ abstract class AppLocalizations {
   /// **'{move} is the best move.'**
   String bestMoveText(String move);
 
-  /// No description provided for @moveComparisonText.
-  ///
-  /// In en, this message translates to:
-  /// **'{played} was {classification}. {best} is the best move.'**
-  String moveComparisonText(String played, String classification, String best);
-
-  /// No description provided for @theoryMoveText.
-  ///
-  /// In en, this message translates to:
-  /// **'{move} is a theory move.'**
-  String theoryMoveText(String move);
-
-  /// No description provided for @triedMove.
-  ///
-  /// In en, this message translates to:
-  /// **'You tried {move}.'**
-  String triedMove(String move);
-
   /// No description provided for @sidelineEngineTitle.
   ///
   /// In en, this message translates to:
   /// **'Sideline engine'**
   String get sidelineEngineTitle;
-
-  /// No description provided for @sidelineEngineSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'These values apply only to live analysis of your sideline.'**
-  String get sidelineEngineSubtitle;
 
   /// No description provided for @mainLineLabel.
   ///
@@ -1042,36 +832,6 @@ abstract class AppLocalizations {
   /// **'Stockfish analyzing live · {percent}%'**
   String liveEngineProgress(int percent);
 
-  /// No description provided for @sidelineAnalysisPaused.
-  ///
-  /// In en, this message translates to:
-  /// **'Live analysis paused'**
-  String get sidelineAnalysisPaused;
-
-  /// No description provided for @analyzingVariation.
-  ///
-  /// In en, this message translates to:
-  /// **'Analyzing the temporary variation…'**
-  String get analyzingVariation;
-
-  /// No description provided for @evaluationComparison.
-  ///
-  /// In en, this message translates to:
-  /// **'Evaluation: {before} → {after}'**
-  String evaluationComparison(String before, String after);
-
-  /// No description provided for @bestContinuation.
-  ///
-  /// In en, this message translates to:
-  /// **'Best continuation: {line}'**
-  String bestContinuation(String line);
-
-  /// No description provided for @returnToMainLine.
-  ///
-  /// In en, this message translates to:
-  /// **'Return to main line'**
-  String get returnToMainLine;
-
   /// No description provided for @illegalOrFailedMove.
   ///
   /// In en, this message translates to:
@@ -1090,18 +850,6 @@ abstract class AppLocalizations {
   /// **'Opponent'**
   String get opponent;
 
-  /// No description provided for @variationStartingPosition.
-  ///
-  /// In en, this message translates to:
-  /// **'Variation starting position'**
-  String get variationStartingPosition;
-
-  /// No description provided for @variationStart.
-  ///
-  /// In en, this message translates to:
-  /// **'Start of variation'**
-  String get variationStart;
-
   /// No description provided for @engineQualityTitle.
   ///
   /// In en, this message translates to:
@@ -1114,35 +862,11 @@ abstract class AppLocalizations {
   /// **'Resources'**
   String get engineResourcesTitle;
 
-  /// No description provided for @depthHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Min = pre-analysis depth. Max = maximum live-analysis depth. Higher values usually take longer.'**
-  String get depthHelp;
-
   /// No description provided for @adaptiveEarlyStop.
   ///
   /// In en, this message translates to:
   /// **'Adaptive analysis'**
   String get adaptiveEarlyStop;
-
-  /// No description provided for @adaptiveEarlyStopHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Ends quiet pre-analysis and live searches early when the evaluation and principal variations are stable. Critical verification searches still use the configured limit.'**
-  String get adaptiveEarlyStopHelp;
-
-  /// No description provided for @numberOfLinesHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'How many top engine variations Stockfish calculates at the same time.'**
-  String get numberOfLinesHelp;
-
-  /// No description provided for @timeLimitHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Optional limit per position. Off uses depth only; otherwise the search stops when depth or time is reached first.'**
-  String get timeLimitHelp;
 
   /// No description provided for @threads.
   ///
@@ -1150,23 +874,11 @@ abstract class AppLocalizations {
   /// **'Threads'**
   String get threads;
 
-  /// No description provided for @threadsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'CPU threads per Stockfish worker. Kchess detects your PC automatically and allows at most half of the logical CPU threads.'**
-  String get threadsHelp;
-
   /// No description provided for @hashMemory.
   ///
   /// In en, this message translates to:
   /// **'Hash memory'**
   String get hashMemory;
-
-  /// No description provided for @hashMemoryHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'RAM for Stockfish’s transposition table. More memory can improve repeated-position search.'**
-  String get hashMemoryHelp;
 
   /// No description provided for @boardDisplayTitle.
   ///
@@ -1186,35 +898,17 @@ abstract class AppLocalizations {
   /// **'Board coordinates'**
   String get showBoardCoordinates;
 
-  /// No description provided for @showBoardCoordinatesHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows file and rank labels (a–h / 1–8) on the board.'**
-  String get showBoardCoordinatesHelp;
-
   /// No description provided for @highlightLastMove.
   ///
   /// In en, this message translates to:
   /// **'Highlight last move'**
   String get highlightLastMove;
 
-  /// No description provided for @highlightLastMoveHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Highlights the origin and destination squares of the last played move.'**
-  String get highlightLastMoveHelp;
-
   /// No description provided for @highlightSelectedSquare.
   ///
   /// In en, this message translates to:
   /// **'Highlight selected square'**
   String get highlightSelectedSquare;
-
-  /// No description provided for @highlightSelectedSquareHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Highlights the square you selected while exploring a variation.'**
-  String get highlightSelectedSquareHelp;
 
   /// No description provided for @behaviorTitle.
   ///
@@ -1228,23 +922,11 @@ abstract class AppLocalizations {
   /// **'Automatically sync online profiles'**
   String get autoSyncOnline;
 
-  /// No description provided for @autoSyncOnlineHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Synchronizes Chess.com and Lichess automatically at startup and when switching profiles.'**
-  String get autoSyncOnlineHelp;
-
   /// No description provided for @confirmBeforeDelete.
   ///
   /// In en, this message translates to:
   /// **'Confirm before deleting'**
   String get confirmBeforeDelete;
-
-  /// No description provided for @confirmBeforeDeleteHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Asks for confirmation before deleting profiles or local games.'**
-  String get confirmBeforeDeleteHelp;
 
   /// No description provided for @analysisCacheTitle.
   ///
@@ -1258,23 +940,11 @@ abstract class AppLocalizations {
   /// **'Use shared position cache'**
   String get useGlobalAnalysisCache;
 
-  /// No description provided for @useGlobalAnalysisCacheHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Reuses compatible analysis of identical positions across different games.'**
-  String get useGlobalAnalysisCacheHelp;
-
   /// No description provided for @clearAnalysisCache.
   ///
   /// In en, this message translates to:
   /// **'Clear analysis cache'**
   String get clearAnalysisCache;
-
-  /// No description provided for @clearAnalysisCacheHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Clears only the shared position cache. Saved games and completed game analyses are kept.'**
-  String get clearAnalysisCacheHelp;
 
   /// No description provided for @clearAnalysisCacheQuestion.
   ///
@@ -1305,12 +975,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Diagnostic logging'**
   String get diagnosticLogging;
-
-  /// No description provided for @diagnosticLoggingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Writes bounded technical logs for troubleshooting. Full PGNs, FENs, and provider responses are not logged.'**
-  String get diagnosticLoggingHelp;
 
   /// No description provided for @deleteLocalGameQuestion.
   ///
@@ -1420,23 +1084,11 @@ abstract class AppLocalizations {
   /// **'All'**
   String get statsAll;
 
-  /// No description provided for @statsAllTimeControlsNote.
-  ///
-  /// In en, this message translates to:
-  /// **'All time controls'**
-  String get statsAllTimeControlsNote;
-
   /// No description provided for @statsPhaseTitle.
   ///
   /// In en, this message translates to:
   /// **'By game phase'**
   String get statsPhaseTitle;
-
-  /// No description provided for @statsPhaseSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Where your games end and how you score there.'**
-  String get statsPhaseSubtitle;
 
   /// No description provided for @statsPhaseOpening.
   ///
@@ -1528,23 +1180,11 @@ abstract class AppLocalizations {
   /// **'Your chess performance'**
   String get statsIntroTitle;
 
-  /// No description provided for @statsIntroBody.
-  ///
-  /// In en, this message translates to:
-  /// **'See your results, recent form and opening record separated by color.'**
-  String get statsIntroBody;
-
   /// No description provided for @statsFormTitle.
   ///
   /// In en, this message translates to:
   /// **'Recent form'**
   String get statsFormTitle;
-
-  /// No description provided for @statsFormHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap a result to open the game.'**
-  String get statsFormHint;
 
   /// No description provided for @statsFormVersus.
   ///
@@ -2199,23 +1839,11 @@ abstract class AppLocalizations {
   /// **'Training arena'**
   String get trainingIntroTitle;
 
-  /// No description provided for @trainingIntroBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a training area. Your progress is stored locally on this device.'**
-  String get trainingIntroBody;
-
   /// No description provided for @trainingOpeningTitle.
   ///
   /// In en, this message translates to:
   /// **'Opening lab'**
   String get trainingOpeningTitle;
-
-  /// No description provided for @trainingOpeningSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Drill your repertoire lines and your weak spots.'**
-  String get trainingOpeningSubtitle;
 
   /// No description provided for @trainingOpeningAction.
   ///
@@ -2241,12 +1869,6 @@ abstract class AppLocalizations {
   /// **'Blunder buster'**
   String get trainingTacticsTitle;
 
-  /// No description provided for @trainingTacticsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Find the better move in critical middlegame positions.'**
-  String get trainingTacticsSubtitle;
-
   /// No description provided for @trainingTacticsSolved.
   ///
   /// In en, this message translates to:
@@ -2270,12 +1892,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Endgame academy'**
   String get trainingEndgameTitle;
-
-  /// No description provided for @trainingEndgameSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Master theoretical endgames step by step.'**
-  String get trainingEndgameSubtitle;
 
   /// No description provided for @trainingEndgameProgress.
   ///
@@ -2301,47 +1917,11 @@ abstract class AppLocalizations {
   /// **'{done}/{total} clean repeats'**
   String trainingStreak(int done, int total);
 
-  /// No description provided for @trainingLastAttempt.
-  ///
-  /// In en, this message translates to:
-  /// **'Last practised: {date}'**
-  String trainingLastAttempt(String date);
-
-  /// No description provided for @trainingNeverAttempted.
-  ///
-  /// In en, this message translates to:
-  /// **'Not practised yet'**
-  String get trainingNeverAttempted;
-
-  /// No description provided for @trainingHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Hint'**
-  String get trainingHint;
-
-  /// No description provided for @trainingBoardPending.
-  ///
-  /// In en, this message translates to:
-  /// **'The board trainer follows once the core exposes move validation over the native interface.'**
-  String get trainingBoardPending;
-
   /// No description provided for @trainingOpeningLabSelected.
   ///
   /// In en, this message translates to:
   /// **'Selected line'**
   String get trainingOpeningLabSelected;
-
-  /// No description provided for @trainingOpeningLabEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an opening in the statistics tab and tap “Train” to load it here.'**
-  String get trainingOpeningLabEmpty;
-
-  /// No description provided for @trainingOpeningLabPending.
-  ///
-  /// In en, this message translates to:
-  /// **'The line trainer follows once the core supplies the opening moves.'**
-  String get trainingOpeningLabPending;
 
   /// No description provided for @statsTrainOpening.
   ///
@@ -2382,7 +1962,7 @@ abstract class AppLocalizations {
   /// No description provided for @trainingSolvedWithErrors.
   ///
   /// In en, this message translates to:
-  /// **'Solved, but with corrections. Only a clean run counts towards “mastered”.'**
+  /// **'Solved, but with corrections. Only a clean run counts towards mastery.'**
   String get trainingSolvedWithErrors;
 
   /// No description provided for @trainingPracticeAgain.
@@ -2427,17 +2007,821 @@ abstract class AppLocalizations {
   /// **'Your move'**
   String get trainingYourMove;
 
-  /// No description provided for @trainingOpponentThinking.
-  ///
-  /// In en, this message translates to:
-  /// **'Reply …'**
-  String get trainingOpponentThinking;
-
   /// No description provided for @trainingRestart.
   ///
   /// In en, this message translates to:
   /// **'Restart'**
   String get trainingRestart;
+
+  /// No description provided for @trainingOpeningLabStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Train line'**
+  String get trainingOpeningLabStart;
+
+  /// No description provided for @trainingOpeningLabBackToOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the overview'**
+  String get trainingOpeningLabBackToOverview;
+
+  /// No description provided for @trainingOpeningTreeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No opening lines available yet.'**
+  String get trainingOpeningTreeEmpty;
+
+  /// No description provided for @trainingOpeningTreeExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Show variations'**
+  String get trainingOpeningTreeExpand;
+
+  /// No description provided for @trainingOpeningTreeCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide variations'**
+  String get trainingOpeningTreeCollapse;
+
+  /// No description provided for @trainingOpeningTreeVariations.
+  ///
+  /// In en, this message translates to:
+  /// **'{count,plural, =1{1 variation} other{{count} variations}}'**
+  String trainingOpeningTreeVariations(int count);
+
+  /// No description provided for @trainingOpeningTreeLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That line is not in the database yet.'**
+  String get trainingOpeningTreeLoadFailed;
+
+  /// No description provided for @trainingOpeningTreeZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get trainingOpeningTreeZoomIn;
+
+  /// No description provided for @trainingOpeningTreeZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get trainingOpeningTreeZoomOut;
+
+  /// No description provided for @trainingOpeningTreeFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit the tree'**
+  String get trainingOpeningTreeFit;
+
+  /// No description provided for @trainingOpeningTreeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a card to unfold its variations, or train the line right away.'**
+  String get trainingOpeningTreeHint;
+
+  /// No description provided for @trainingOpeningIncorrectMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect move'**
+  String get trainingOpeningIncorrectMove;
+
+  /// No description provided for @trainingOpeningTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again.'**
+  String get trainingOpeningTryAgain;
+
+  /// No description provided for @trainingOpeningPlayInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'The move was {move}'**
+  String trainingOpeningPlayInstead(String move);
+
+  /// No description provided for @trainingOpeningScenariosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening scenarios'**
+  String get trainingOpeningScenariosTitle;
+
+  /// No description provided for @trainingOpeningScenariosCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the book move against every reply the book can throw at you.'**
+  String get trainingOpeningScenariosCaption;
+
+  /// No description provided for @trainingOpeningScenarioDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth mastery: {done}/{total} moves'**
+  String trainingOpeningScenarioDepth(int done, int total);
+
+  /// No description provided for @trainingOpeningPlayAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Play as'**
+  String get trainingOpeningPlayAs;
+
+  /// No description provided for @trainingOpeningOpponentPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent played {move}.'**
+  String trainingOpeningOpponentPlayed(String move);
+
+  /// No description provided for @trainingOpeningScenarioReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Position after {move}.'**
+  String trainingOpeningScenarioReady(String move);
+
+  /// No description provided for @trainingOpeningFindBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the best engine response.'**
+  String get trainingOpeningFindBest;
+
+  /// No description provided for @trainingOpeningCurrentDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Current depth: move {done} / {total}'**
+  String trainingOpeningCurrentDepth(int done, int total);
+
+  /// No description provided for @trainingOpeningCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} — that is the book move.'**
+  String trainingOpeningCorrect(String move);
+
+  /// No description provided for @trainingOpeningAlternative.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} works too — book choice #{rank}.'**
+  String trainingOpeningAlternative(String move, int rank);
+
+  /// No description provided for @trainingOpeningDepthReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth {depth} reached'**
+  String trainingOpeningDepthReached(int depth);
+
+  /// No description provided for @trainingOpeningBookExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'The book ends here — you answered everything it knows.'**
+  String get trainingOpeningBookExhausted;
+
+  /// No description provided for @trainingOpeningNoBook.
+  ///
+  /// In en, this message translates to:
+  /// **'The opening book has no moves for this position.'**
+  String get trainingOpeningNoBook;
+
+  /// No description provided for @trainingOpeningDrillClean.
+  ///
+  /// In en, this message translates to:
+  /// **'No slips — this run counts towards mastery.'**
+  String get trainingOpeningDrillClean;
+
+  /// No description provided for @trainingOpeningDrillWithErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished with corrections. Only a clean run counts towards mastery.'**
+  String get trainingOpeningDrillWithErrors;
+
+  /// No description provided for @trainingOpeningDrillAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Drill again'**
+  String get trainingOpeningDrillAgain;
+
+  /// No description provided for @trainingOpeningBookChoices.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{the only book reply} other{one of {count} book replies}}'**
+  String trainingOpeningBookChoices(int count);
+
+  /// No description provided for @openingWeaknessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Openings that need training'**
+  String get openingWeaknessTitle;
+
+  /// No description provided for @openingWeaknessCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines you keep losing or keep getting wrong, worst first.'**
+  String get openingWeaknessCaption;
+
+  /// No description provided for @openingWeaknessLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost {losses} of {games} games'**
+  String openingWeaknessLost(int losses, int games);
+
+  /// No description provided for @openingWeaknessErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening mistakes in {count} of {analysed} analysed games'**
+  String openingWeaknessErrors(int count, int analysed);
+
+  /// No description provided for @openingWeaknessRecurring.
+  ///
+  /// In en, this message translates to:
+  /// **'You played {move} here {count} times — the engine prefers {better}.'**
+  String openingWeaknessRecurring(String move, int count, String better);
+
+  /// No description provided for @openingWeaknessRecurringFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'You played {move} here {count} times, and the engine flagged it every time.'**
+  String openingWeaknessRecurringFlagged(String move, int count);
+
+  /// No description provided for @openingWeaknessAnalyseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse your games to also catch the moves that go wrong, not just the results.'**
+  String get openingWeaknessAnalyseHint;
+
+  /// No description provided for @openingWeaknessShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String openingWeaknessShowAll(int count);
+
+  /// No description provided for @openingWeaknessShowFewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Show fewer'**
+  String get openingWeaknessShowFewer;
+
+  /// No description provided for @openingWeaknessFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Across the whole family'**
+  String get openingWeaknessFamily;
+
+  /// No description provided for @trainingWeakSpotsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your weak spots'**
+  String get trainingWeakSpotsTitle;
+
+  /// No description provided for @trainingWeakSpotBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot'**
+  String get trainingWeakSpotBadge;
+
+  /// No description provided for @trainingWeakSpotMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot: {opening}'**
+  String trainingWeakSpotMetric(String opening);
+
+  /// No description provided for @playAgainstBot.
+  ///
+  /// In en, this message translates to:
+  /// **'Play against a bot'**
+  String get playAgainstBot;
+
+  /// No description provided for @continueAgainstBot.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue against bot'**
+  String get continueAgainstBot;
+
+  /// No description provided for @botPlayerColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Your color'**
+  String get botPlayerColor;
+
+  /// No description provided for @temporaryBotGameNotSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'This game is not saved and is discarded completely when you close or cancel it.'**
+  String get temporaryBotGameNotSaved;
+
+  /// No description provided for @botGameLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot game history'**
+  String get botGameLog;
+
+  /// No description provided for @botGameLogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved bot games yet.'**
+  String get botGameLogEmpty;
+
+  /// No description provided for @botGameLogLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The bot game history could not be loaded.'**
+  String get botGameLogLoadFailed;
+
+  /// No description provided for @botGameHistoryActive.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get botGameHistoryActive;
+
+  /// No description provided for @botGameHistoryWin.
+  ///
+  /// In en, this message translates to:
+  /// **'Won'**
+  String get botGameHistoryWin;
+
+  /// No description provided for @botGameHistoryLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost'**
+  String get botGameHistoryLoss;
+
+  /// No description provided for @botGameHistoryDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw'**
+  String get botGameHistoryDraw;
+
+  /// No description provided for @botStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot strength'**
+  String get botStrength;
+
+  /// No description provided for @botElo.
+  ///
+  /// In en, this message translates to:
+  /// **'Elo'**
+  String get botElo;
+
+  /// No description provided for @botStartGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Start game'**
+  String get botStartGame;
+
+  /// No description provided for @botGameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Game against bot'**
+  String get botGameTitle;
+
+  /// No description provided for @botGameLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing game …'**
+  String get botGameLoading;
+
+  /// No description provided for @botGameLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The bot game could not be prepared.'**
+  String get botGameLoadFailed;
+
+  /// No description provided for @botMoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The bot move could not be calculated.'**
+  String get botMoveFailed;
+
+  /// No description provided for @botYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get botYou;
+
+  /// No description provided for @botYourTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Your turn.'**
+  String get botYourTurn;
+
+  /// No description provided for @botThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish is thinking …'**
+  String get botThinking;
+
+  /// No description provided for @botApplyingMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying move …'**
+  String get botApplyingMove;
+
+  /// No description provided for @botWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the next move …'**
+  String get botWaiting;
+
+  /// No description provided for @botViewingHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'You are viewing an earlier position.'**
+  String get botViewingHistory;
+
+  /// No description provided for @botGameFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Game finished.'**
+  String get botGameFinished;
+
+  /// No description provided for @botMoveList.
+  ///
+  /// In en, this message translates to:
+  /// **'Move list'**
+  String get botMoveList;
+
+  /// No description provided for @botNoMovesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No moves played yet.'**
+  String get botNoMovesYet;
+
+  /// No description provided for @botPreviousMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous move'**
+  String get botPreviousMove;
+
+  /// No description provided for @botNextMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Next move'**
+  String get botNextMove;
+
+  /// No description provided for @botReturnToLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to current position'**
+  String get botReturnToLive;
+
+  /// No description provided for @botHintPiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint 1: Show piece'**
+  String get botHintPiece;
+
+  /// No description provided for @botHintTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint 2: Show target square'**
+  String get botHintTarget;
+
+  /// No description provided for @botHintsUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Both hints used'**
+  String get botHintsUsed;
+
+  /// No description provided for @botHintThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating hint …'**
+  String get botHintThinking;
+
+  /// No description provided for @botHintFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The hint could not be calculated.'**
+  String get botHintFailed;
+
+  /// No description provided for @botGameSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Game settings'**
+  String get botGameSettingsTitle;
+
+  /// No description provided for @botHintCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} / 2 hints for this move'**
+  String botHintCounter(int used);
+
+  /// No description provided for @exportFen.
+  ///
+  /// In en, this message translates to:
+  /// **'Export FEN'**
+  String get exportFen;
+
+  /// No description provided for @fenCopiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'FEN copied to clipboard.'**
+  String get fenCopiedToClipboard;
+
+  /// No description provided for @engineSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine version'**
+  String get engineSelectionTitle;
+
+  /// No description provided for @engineVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Chess engine'**
+  String get engineVersion;
+
+  /// No description provided for @engineActiveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Active: {engine}'**
+  String engineActiveLabel(String engine);
+
+  /// No description provided for @stockfish18.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish 18'**
+  String get stockfish18;
+
+  /// No description provided for @stockfish19.
+  ///
+  /// In en, this message translates to:
+  /// **'Stockfish 19'**
+  String get stockfish19;
+
+  /// No description provided for @engineSelectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected engine could not be activated. The previous engine remains selected.'**
+  String get engineSelectionFailed;
+
+  /// No description provided for @forced.
+  ///
+  /// In en, this message translates to:
+  /// **'Forced'**
+  String get forced;
+
+  /// No description provided for @good.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get good;
+
+  /// No description provided for @statsTimeControlCorrespondence.
+  ///
+  /// In en, this message translates to:
+  /// **'Correspondence'**
+  String get statsTimeControlCorrespondence;
+
+  /// No description provided for @statsTimeControlOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get statsTimeControlOther;
+
+  /// No description provided for @botGameDeleteQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete bot game?'**
+  String get botGameDeleteQuestion;
+
+  /// No description provided for @botGameDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This bot-game history entry will be permanently deleted. Any analysis game already created from it remains in your local game library.'**
+  String get botGameDeleteBody;
+
+  /// No description provided for @promotionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pawn promotion'**
+  String get promotionTitle;
+
+  /// No description provided for @promotionChoosePiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the piece the pawn should promote to.'**
+  String get promotionChoosePiece;
+
+  /// No description provided for @promotionQueen.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen'**
+  String get promotionQueen;
+
+  /// No description provided for @promotionRook.
+  ///
+  /// In en, this message translates to:
+  /// **'Rook'**
+  String get promotionRook;
+
+  /// No description provided for @promotionBishop.
+  ///
+  /// In en, this message translates to:
+  /// **'Bishop'**
+  String get promotionBishop;
+
+  /// No description provided for @promotionKnight.
+  ///
+  /// In en, this message translates to:
+  /// **'Knight'**
+  String get promotionKnight;
+
+  /// No description provided for @trainingOppositionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pawn opposition'**
+  String get trainingOppositionTitle;
+
+  /// No description provided for @trainingOppositionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Take the opposition first, then outflank the king. Push the pawn only after your king is in front of it.'**
+  String get trainingOppositionHint;
+
+  /// No description provided for @trainingLucenaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lucena position'**
+  String get trainingLucenaTitle;
+
+  /// No description provided for @trainingLucenaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Place the rook on the fourth rank before bringing out the king; it will later shield the checks.'**
+  String get trainingLucenaHint;
+
+  /// No description provided for @trainingPhilidorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Philidor defence'**
+  String get trainingPhilidorTitle;
+
+  /// No description provided for @trainingPhilidorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the rook on the sixth rank until the pawn advances, then check from behind.'**
+  String get trainingPhilidorHint;
+
+  /// No description provided for @practiceDrills.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkmate drills'**
+  String get practiceDrills;
+
+  /// No description provided for @practiceStudies.
+  ///
+  /// In en, this message translates to:
+  /// **'Classical endgame studies'**
+  String get practiceStudies;
+
+  /// No description provided for @practiceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt ended. Try again.'**
+  String get practiceFailed;
+
+  /// No description provided for @practiceThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent is thinking…'**
+  String get practiceThinking;
+
+  /// No description provided for @practiceMoves.
+  ///
+  /// In en, this message translates to:
+  /// **'Moves played: {count}'**
+  String practiceMoves(int count);
+
+  /// No description provided for @practiceLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level {number}'**
+  String practiceLevel(int number);
+
+  /// No description provided for @practiceStudyNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Study {number}'**
+  String practiceStudyNumber(int number);
+
+  /// No description provided for @practiceStudySource.
+  ///
+  /// In en, this message translates to:
+  /// **'Kling & Horwitz · Chess Studies, Or, Endings of Games (1851). Practise these positions against Stockfish.'**
+  String get practiceStudySource;
+
+  /// No description provided for @practiceQueenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'King and queen vs. king'**
+  String get practiceQueenTitle;
+
+  /// No description provided for @practiceRookTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'King and rook vs. king'**
+  String get practiceRookTitle;
+
+  /// No description provided for @practiceQueenRookTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen vs. rook'**
+  String get practiceQueenRookTitle;
+
+  /// No description provided for @practiceQueenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your king to support the queen. Leave an escape square until you can deliver mate.'**
+  String get practiceQueenHint;
+
+  /// No description provided for @practiceRookHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut off the king with your rook and bring your king closer.'**
+  String get practiceRookHint;
+
+  /// No description provided for @practiceQueenRookHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Look for forks against the king and rook. Watch out for stalemate.'**
+  String get practiceQueenRookHint;
+
+  /// No description provided for @practiceBeginner.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginner'**
+  String get practiceBeginner;
+
+  /// No description provided for @practiceIntermediate.
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate'**
+  String get practiceIntermediate;
+
+  /// No description provided for @practiceMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Master'**
+  String get practiceMaster;
+
+  /// No description provided for @practiceSectionKingPawn.
+  ///
+  /// In en, this message translates to:
+  /// **'King and pawn'**
+  String get practiceSectionKingPawn;
+
+  /// No description provided for @practiceSectionBishops.
+  ///
+  /// In en, this message translates to:
+  /// **'Kings, bishops and pawns'**
+  String get practiceSectionBishops;
+
+  /// No description provided for @practiceSectionKnightsBishops.
+  ///
+  /// In en, this message translates to:
+  /// **'Knights, bishops and pawns'**
+  String get practiceSectionKnightsBishops;
+
+  /// No description provided for @practiceSectionTwoMinor.
+  ///
+  /// In en, this message translates to:
+  /// **'Two minor pieces vs. one'**
+  String get practiceSectionTwoMinor;
+
+  /// No description provided for @practiceSectionRookPawns.
+  ///
+  /// In en, this message translates to:
+  /// **'Rook vs. pawns'**
+  String get practiceSectionRookPawns;
+
+  /// No description provided for @practiceSectionRookMinor.
+  ///
+  /// In en, this message translates to:
+  /// **'Rook vs. minor pieces'**
+  String get practiceSectionRookMinor;
+
+  /// No description provided for @practiceSectionMinorRook.
+  ///
+  /// In en, this message translates to:
+  /// **'Minor pieces vs. rook'**
+  String get practiceSectionMinorRook;
+
+  /// No description provided for @practiceSectionQueenPawns.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen vs. pawns'**
+  String get practiceSectionQueenPawns;
+
+  /// No description provided for @practiceSectionQueens.
+  ///
+  /// In en, this message translates to:
+  /// **'Queens and pawns'**
+  String get practiceSectionQueens;
+
+  /// No description provided for @practiceSectionQueenRook.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen vs. rook'**
+  String get practiceSectionQueenRook;
+
+  /// No description provided for @practiceSectionQueenMinor.
+  ///
+  /// In en, this message translates to:
+  /// **'Queen vs. minor pieces'**
+  String get practiceSectionQueenMinor;
 }
 
 class _AppLocalizationsDelegate

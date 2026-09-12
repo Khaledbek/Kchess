@@ -22,12 +22,10 @@ class AppController extends ChangeNotifier {
   bool providerSyncing = false;
   String? providerNotice;
   String? selectedMonth;
-  Object? error;
   int _providerSyncGeneration = 0;
 
   Future<void> initialize() async {
     phase = AppPhase.loading;
-    error = null;
     notifyListeners();
     try {
       await gateway.initialize();
@@ -46,8 +44,7 @@ class AppController extends ChangeNotifier {
         selectedMonth = null;
       }
       phase = AppPhase.ready;
-    } catch (caught) {
-      error = caught;
+    } catch (_) {
       phase = AppPhase.error;
     }
     notifyListeners();
@@ -521,6 +518,12 @@ class AppController extends ChangeNotifier {
   Future<void> setLocale(String locale) async {
     await gateway.setLocale(locale);
     settings = settings.copyWith(locale: locale);
+    notifyListeners();
+  }
+
+  Future<void> setEngineId(String engineId) async {
+    await gateway.setEngineId(engineId);
+    settings = await gateway.settings();
     notifyListeners();
   }
 

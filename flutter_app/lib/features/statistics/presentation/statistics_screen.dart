@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: statistics screen presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -14,7 +18,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   late Future<OpeningsStats> _openings;
   late Future<TerminationStats> _terminations;
   late Future<PhaseStats> _phases;
-  late Future<List<GameSummary>> _games;
+  late Future<StatisticsTimeline> _games;
   late bool _providerSyncing;
   String? _profileId;
   String _timeControl = 'all';
@@ -59,20 +63,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     _phases = widget.controller.gateway.phaseStats();
   }
 
-  /// Openings are filtered natively rather than in Dart: the aggregation owns
-  /// the family/variation grouping, so re-running it for one time-control
-  /// bucket keeps a single source of truth for those counts.
+  /// Opening aggregation and filtering remain native; Flutter only selects the
+  /// requested time-control bucket and displays the returned DTO.
   void _loadOpenings() {
     _openings = widget.controller.gateway.openingsStats(
       timeControl: _timeControl,
     );
   }
 
-  /// The form strip and rating trend derive from per-game rows; a filtered
-  /// [queryGames] keeps the actual W/L/D→display selection and rating series in
-  /// the C++ query, not in Dart aggregation.
+  // Load native recent-form and rating summaries for the selected filter.
   void _loadGames() {
-    _games = widget.controller.queryGames(
+    _games = widget.controller.gateway.statisticsTimeline(
       GameQuery(
         timeControls: _timeControl == 'all'
             ? const <String>[]
@@ -145,13 +146,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    text.introBody,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
                   const SizedBox(height: 14),
                   Align(
                     alignment: AlignmentDirectional.centerStart,
@@ -183,12 +177,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       timeControl: _timeControl,
       onRetry: _reloadAll,
     );
-    final form = _RecentFormCard(
-      controller: widget.controller,
-      future: _games,
-      timeControl: _timeControl,
-      onRetry: _reloadGames,
-    );
     final rating = _RatingTrendCard(
       future: _games,
       timeControl: _timeControl,
@@ -199,6 +187,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       onRetry: _reloadAll,
     );
     final phase = _PhaseCard(future: _phases, onRetry: _reloadAll);
+    // Where the recent-form strip used to be; it collapses to nothing, gap
+    // included, when there is no warning.
+    final weaknesses = _OpeningWeaknessCard(future: _openings);
+    final weaknessesGap = FutureBuilder<OpeningsStats>(
+      future: _openings,
+      builder: (context, snapshot) => SizedBox(
+        height: (snapshot.data?.weaknesses.isNotEmpty ?? false) ? 20 : 0,
+      ),
+    );
     final openings = _OpeningsCard(
       future: _openings,
       onRetry: _reloadAll,
@@ -230,8 +227,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        form,
-                        const SizedBox(height: 20),
+                        weaknesses,
+                        weaknessesGap,
                         rating,
                         const SizedBox(height: 20),
                         phase,
@@ -254,8 +251,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             const SizedBox(height: 20),
             phase,
             const SizedBox(height: 20),
-            form,
-            const SizedBox(height: 20),
+            weaknesses,
+            weaknessesGap,
             rating,
             const SizedBox(height: 20),
             openings,
@@ -266,13 +263,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 }
 
-({String title, String introTitle, String introBody}) _statisticsText(
+({String title, String introTitle}) _statisticsText(
   BuildContext context,
 ) {
   final strings = AppLocalizations.of(context);
   return (
     title: strings.statsTitle,
     introTitle: strings.statsIntroTitle,
-    introBody: strings.statsIntroBody,
   );
 }

@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string_view>
 
+#include "engine/bot_move_selector.h"
 #include "engine/stockfish_runtime.h"
 #include "engine.h"
 #include "misc.h"
@@ -111,6 +112,21 @@ bool stable_engine_score(
   return false;
 }
 
+bool decisive_score_gap(
+    const std::vector<EngineLine>& lines, const int threshold_cp) {
+  if (threshold_cp <= 0 || lines.size() < 2) return false;
+  const auto& best = lines[0];
+  const auto& second = lines[1];
+  if (best.mate_in.has_value()) {
+    return *best.mate_in > 0
+        && (!second.mate_in.has_value() || *second.mate_in <= 0);
+  }
+  if (best.evaluation_cp.has_value() && second.evaluation_cp.has_value()) {
+    return *best.evaluation_cp - *second.evaluation_cp >= threshold_cp;
+  }
+  return false;
+}
+
 bool stable_engine_lines(
     const std::vector<EngineLine>& current,
     const std::vector<EngineLine>& previous,
@@ -174,6 +190,8 @@ class StockfishEngine::Impl {
   bool ready{false};
   std::optional<int> configured_threads;
   std::optional<int> configured_hash_mb;
+  std::optional<bool> configured_limit_strength;
+  std::optional<int> configured_uci_elo;
   std::filesystem::path asset_directory;
 };
 
@@ -217,10 +235,11 @@ void StockfishEngine::start() {
   // makes upstream CommandLine call _get_pgmptr(), whose EXE-only UCRT state is
   // not initialized in this DLL and asserts in Windows debug builds.
   impl_->engine = std::make_unique<Stockfish::Engine>(std::nullopt);
-  // A restarted adapter owns a fresh Stockfish instance with default options.
-  // Forget the cached values so the first analysis configures that instance.
+  // Discard settings cached for a previous Stockfish instance.
   impl_->configured_threads.reset();
   impl_->configured_hash_mb.reset();
+  impl_->configured_limit_strength.reset();
+  impl_->configured_uci_elo.reset();
 #if defined(_WIN32)
   set_option(
       *impl_->engine, "EvalFile", utf8_path(impl_->asset_directory / kBigNetwork));
@@ -231,6 +250,11 @@ void StockfishEngine::start() {
   impl_->engine->set_on_verify_networks([](const std::string_view) {});
   Stockfish::Tune::init(impl_->engine->get_options());
   impl_->engine->verify_networks();
+  // Construction already allocated the thread pool and TT. Record their actual
+  // options so a matching first request does not rebuild them unnecessarily.
+  const auto& options = impl_->engine->get_options();
+  impl_->configured_threads = static_cast<int>(options["Threads"]);
+  impl_->configured_hash_mb = static_cast<int>(options["Hash"]);
   impl_->ready = true;
 }
 
@@ -245,15 +269,26 @@ void StockfishEngine::new_game() {
 AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   std::lock_guard lock(impl_->operation_mutex);
   if (!impl_->ready || !impl_->engine) throw std::runtime_error("Stockfish is not ready");
+  const int maximum_multi_pv = request.allow_extended_multipv
+      ? kBotMaximumCandidateLines
+      : 16;
   if (request.depth < 1 || request.depth > 128 || request.multi_pv < 1
-      || request.multi_pv > 16 || request.threads < 1 || request.threads > 64
+      || request.multi_pv > maximum_multi_pv
+      || request.threads < 1 || request.threads > 64
       || request.hash_mb < 16 || request.hash_mb > 4096
       || request.time_limit_seconds < 0 || request.time_limit_seconds > 3600
+      || request.node_limit > 1000000000ULL
+      || request.time_limit_ms < 0 || request.time_limit_ms > 60000
+      || (request.uci_limit_strength
+          && (request.uci_elo < kStockfish18LowestUciElo
+              || request.uci_elo > kStockfish18HighestUciElo))
       || request.early_stop_min_depth < 0 || request.early_stop_min_depth > 128
       || request.early_stop_stable_iterations < 1
       || request.early_stop_stable_iterations > 16
       || request.early_stop_eval_tolerance_cp < 0
       || request.early_stop_eval_tolerance_cp > 500
+      || request.early_stop_score_gap_cp < 0
+      || request.early_stop_score_gap_cp > 5000
       || request.search_moves.size() > 64
       || std::any_of(
           request.search_moves.begin(), request.search_moves.end(),
@@ -296,6 +331,23 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
     set_option(*impl_->engine, "Hash", std::to_string(request.hash_mb));
     impl_->configured_hash_mb = request.hash_mb;
   }
+  // Strength limiting is a cheap UCI option change and does not clear TT.
+  // Always restore full strength when the persistent bot engine transitions
+  // from an Elo-limited job to 3200 or to another non-limited caller.
+  if (!impl_->configured_limit_strength.has_value()
+      || *impl_->configured_limit_strength != request.uci_limit_strength) {
+    set_option(
+        *impl_->engine, "UCI_LimitStrength",
+        request.uci_limit_strength ? "true" : "false");
+    impl_->configured_limit_strength = request.uci_limit_strength;
+  }
+  if (request.uci_limit_strength
+      && (!impl_->configured_uci_elo.has_value()
+          || *impl_->configured_uci_elo != request.uci_elo)) {
+    set_option(*impl_->engine, "UCI_Elo", std::to_string(request.uci_elo));
+    impl_->configured_uci_elo = request.uci_elo;
+  }
+
   set_option(*impl_->engine, "MultiPV", std::to_string(request.multi_pv));
   set_option(*impl_->engine, "Ponder", "false");
   set_option(*impl_->engine, "UCI_ShowWDL", "true");
@@ -362,7 +414,10 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
           }
           previous_stability_lines = std::move(iteration);
           last_stability_depth = depth;
-          if (stable_iterations >= request.early_stop_stable_iterations) {
+          const bool decisive_gap = decisive_score_gap(
+              previous_stability_lines, request.early_stop_score_gap_cp);
+          if (stable_iterations >= request.early_stop_stable_iterations
+              || decisive_gap) {
             converged_early = true;
             should_stop = true;
           }
@@ -387,6 +442,10 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   if (request.time_limit_seconds > 0) {
     limits.movetime = static_cast<Stockfish::TimePoint>(request.time_limit_seconds) * 1000;
   }
+  if (request.time_limit_ms > 0) {
+    limits.movetime = static_cast<Stockfish::TimePoint>(request.time_limit_ms);
+  }
+  limits.nodes = request.node_limit;
   impl_->engine->go(limits);
   if (request.cancel_requested != nullptr && request.cancel_requested->load()) {
     impl_->cancelled = true;
@@ -454,13 +513,21 @@ void StockfishEngine::stop() noexcept {
     impl_->engine.reset();
     impl_->configured_threads.reset();
     impl_->configured_hash_mb.reset();
+    impl_->configured_limit_strength.reset();
+    impl_->configured_uci_elo.reset();
     impl_->ready = false;
   } catch (...) {
   }
 }
 
+std::string StockfishEngine::id() const { return "stockfish18"; }
+
 std::string StockfishEngine::version() const {
   return "Stockfish 18 (cb3d4ee9b47d0c5aae855b12379378ea1439675c)";
+}
+
+std::string StockfishEngine::cache_identity() const {
+  return version() + "|nnue=" + std::string(kBigNetwork) + "+" + std::string(kSmallNetwork);
 }
 
 void StockfishEngine::validate_available() const {

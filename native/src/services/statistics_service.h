@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Statistics service interface
+// -----------------------------------------------------------------------------
+
 #pragma once
 
 #include <string>
@@ -8,8 +12,7 @@ namespace kchess {
 
 // Computes performance statistics for the active profile by aggregating stored
 // games in the native layer, so the UI receives compact summaries instead of
-// the whole library. The first module is the Overview; later modules (openings,
-// rating, move quality) will extend this service.
+// the whole library.
 class StatisticsService {
  public:
   explicit StatisticsService(Database& database);
@@ -36,6 +39,12 @@ class StatisticsService {
   // middlegame, endgame), derived from each game's final move number. This is a
   // "where games conclude" heuristic, not an engine-based blunder location.
   std::string phases_json() const;
+
+  // Native form/rating summaries of the library query's serialized rows.
+  std::string timeline_json(const std::string& games_json) const;
+  // Attach local comparison, head-to-head and recommendations to a scout
+  // report.
+  std::string comparison_json(const std::string& report_json) const;
 
  private:
   Database& database_;

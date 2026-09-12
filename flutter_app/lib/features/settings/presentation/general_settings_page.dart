@@ -40,7 +40,6 @@ class _GeneralSettingsPage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.sync),
                   title: Text(strings.autoSyncOnline),
-                  subtitle: Text(strings.autoSyncOnlineHelp),
                   value: controller.settings.autoSyncOnline,
                   onChanged: controller.setAutoSyncOnline,
                 ),
@@ -48,7 +47,6 @@ class _GeneralSettingsPage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.delete_outline),
                   title: Text(strings.confirmBeforeDelete),
-                  subtitle: Text(strings.confirmBeforeDeleteHelp),
                   value: controller.settings.confirmBeforeDelete,
                   onChanged: controller.setConfirmBeforeDelete,
                 ),

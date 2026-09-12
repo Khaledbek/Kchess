@@ -1,14 +1,18 @@
+// -----------------------------------------------------------------------------
+// Section: stats widgets presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 /// Time-control buckets the statistics tab can be filtered by. `all` keeps every
 /// game; the others map 1:1 onto the native `time_control_type` values so the
-/// overview payload's `byTimeControl` buckets and `queryGames` filtering agree.
+/// overview payload's `byTimeControl` buckets and native timeline filtering agree.
 const _statTimeControls = <String>['all', 'bullet', 'blitz', 'rapid'];
 
 /// Segmented filter shown at the top of the statistics tab. Selecting a bucket
 /// recomputes the metrics that the current data allows (overview headline via
 /// the pre-aggregated `byTimeControl`, and the form strip / rating trend via a
-/// filtered `queryGames`).
+/// filtered native timeline).
 class _TimeControlFilterBar extends StatelessWidget {
   const _TimeControlFilterBar({
     required this.selected,
@@ -168,9 +172,8 @@ class _WdlLegend extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           '$label $count',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -281,76 +284,8 @@ class _StatTileGrid extends StatelessWidget {
   }
 }
 
-/// One circular result indicator in the "Aktuelle Form" strip.
-class _StatResultChip extends StatelessWidget {
-  const _StatResultChip({required this.outcome, required this.onTap});
-
-  final String outcome; // win | loss | draw
-  final VoidCallback onTap;
-
-  static const double size = 34;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (color, icon, label) = switch (outcome) {
-      'win' => (AppTheme.success, Icons.check_rounded, _statsLabels(context).wins),
-      'loss' => (scheme.error, Icons.close_rounded, _statsLabels(context).losses),
-      _ => (
-        scheme.onSurfaceVariant,
-        Icons.remove_rounded,
-        _statsLabels(context).draws,
-      ),
-    };
-    return Semantics(
-      label: label,
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(size),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.16),
-            shape: BoxShape.circle,
-            border: Border.all(color: color.withValues(alpha: 0.55)),
-          ),
-          alignment: Alignment.center,
-          child: Icon(icon, size: size * 0.56, color: color),
-        ),
-      ),
-    );
-  }
-}
-
-/// Resolve one game to a win/draw/loss/unknown outcome from the profile's
-/// perspective. Mirrors the native `effective_outcome`: trust the provider
-/// outcome, else derive from the result and the colour the profile played.
-/// This is per-row display selection, not aggregation — the tallying stays in
-/// the C++ core.
-String _statGameOutcome(GameSummary game) {
-  final provider = game.providerOutcome;
-  if (provider == 'win' || provider == 'loss' || provider == 'draw') {
-    return provider;
-  }
-  final color = game.profileColor;
-  if (color != 'white' && color != 'black') return 'unknown';
-  return switch (game.result) {
-    '1/2-1/2' || '½-½' => 'draw',
-    '1-0' => color == 'white' ? 'win' : 'loss',
-    '0-1' => color == 'white' ? 'loss' : 'win',
-    _ => 'unknown',
-  };
-}
-
-/// The rating the profile carried in a game, or null when it cannot be
-/// attributed (unknown colour / missing rating).
-int? _statProfileRating(GameSummary game) => switch (game.profileColor) {
-  'white' => game.whiteRating,
-  'black' => game.blackRating,
-  _ => null,
-};
+// Native outcome DTO; Flutter only chooses the matching visual.
+String _statGameOutcome(GameSummary game) => game.statisticsOutcome;
 
 /// The opponent's display name for a game from the profile's perspective.
 String _statOpponentName(GameSummary game) => switch (game.profileColor) {
@@ -374,21 +309,17 @@ class _StatsLabels {
     required this.draws,
     required this.losses,
     required this.all,
-    required this.allTimeControlsNote,
+    required this.controlLabel,
   });
 
   final String wins;
   final String draws;
   final String losses;
   final String all;
-  final String allTimeControlsNote;
+  final String Function(String) controlLabel;
 
-  String timeControl(String value) => switch (value) {
-    'bullet' => 'Bullet',
-    'blitz' => 'Blitz',
-    'rapid' => 'Rapid',
-    _ => all,
-  };
+  String timeControl(String value) =>
+      value == 'all' ? all : controlLabel(value);
 }
 
 _StatsLabels _statsLabels(BuildContext context) {
@@ -398,7 +329,7 @@ _StatsLabels _statsLabels(BuildContext context) {
     draws: strings.statsDraws,
     losses: strings.statsLosses,
     all: strings.statsAll,
-    allTimeControlsNote: strings.statsAllTimeControlsNote,
+    controlLabel: (value) => _timeControlLabel(context, value),
   );
 }
 

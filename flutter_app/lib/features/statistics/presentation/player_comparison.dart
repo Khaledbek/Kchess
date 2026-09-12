@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: player comparison presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 /// "Spielervergleich": scout a public Chess.com player and compare their
@@ -27,15 +31,6 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
   bool _isSelf = false;
   int _generation = 0;
 
-  /// The handle the active profile plays under. Comparing it with the searched
-  /// handle is what separates a self-audit from a real opponent.
-  String get _userHandle {
-    final profile = widget.controller.activeProfile;
-    if (profile == null) return '';
-    final provider = profile.providerUsername?.trim() ?? '';
-    return provider.isNotEmpty ? provider : profile.displayName.trim();
-  }
-
   @override
   void dispose() {
     _search.dispose();
@@ -48,6 +43,7 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
     FocusScope.of(context).unfocus();
     final gateway = widget.controller.gateway;
     final generation = ++_generation;
+    final profileId = widget.controller.activeProfile?.id;
     setState(() {
       _loading = true;
       _error = null;
@@ -56,75 +52,34 @@ class _PlayerComparisonScreenState extends State<_PlayerComparisonScreen> {
     try {
       // Opponent aggregation (network) first; the user's own stats are local.
       final report = await gateway.scoutReport(username);
-      final userOverview = await gateway.statisticsOverview();
-      final userOpenings = await gateway.openingsStats();
-      final userTerminations = await gateway.terminationStats();
-      final opponentHandle = report.profile.providerUsername ?? username;
-      final userHandle = _userHandle;
-      final isSelf = userHandle.isNotEmpty &&
-          opponentHandle.trim().toLowerCase() == userHandle.toLowerCase();
-      final h2h = await _headToHead(opponentHandle, userHandle);
+      final comparison = report.comparison;
+      if (profileId != widget.controller.activeProfile?.id ||
+          comparison.profileId != (profileId ?? '')) {
+        if (mounted && generation == _generation)
+          setState(() => _loading = false);
+        return;
+      }
       if (!mounted || generation != _generation) return;
       setState(() {
-        _isSelf = isSelf;
+        _isSelf = comparison.isSelf;
         _report = report;
-        _userOverview = userOverview;
-        _userOpenings = userOpenings;
-        _userTerminations = userTerminations;
-        _h2h = h2h;
+        _userOverview = comparison.userOverview;
+        _userOpenings = comparison.userOpenings;
+        _userTerminations = comparison.userTerminations;
+        _h2h = comparison.headToHead;
         _loading = false;
       });
     } catch (error) {
       if (!mounted || generation != _generation) return;
       setState(() {
-        _error = error.toString();
+        _error = AppLocalizations.of(context).statsOverviewError;
         _loading = false;
       });
       final labels = _comparisonText(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${labels.errorPrefix}: ${error.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${labels.errorPrefix}: $_error')));
     }
-  }
-
-  /// Head-to-head from the active profile's own stored games, tallied from the
-  /// profile's perspective. A direct game needs the two sides to be *different*
-  /// handles: matching on "is this handle present" matched every game in the
-  /// library when the searched handle was the profile's own, inventing hundreds
-  /// of phantom meetings with itself.
-  Future<StatTally> _headToHead(String opponentHandle, String userHandle) async {
-    final opponent = opponentHandle.trim().toLowerCase();
-    final user = userHandle.trim().toLowerCase();
-    if (user.isEmpty || opponent.isEmpty || user == opponent) {
-      return const StatTally();
-    }
-    final games = await widget.controller.queryGames(
-      const GameQuery(sort: 'newest'),
-    );
-    var wins = 0;
-    var draws = 0;
-    var losses = 0;
-    for (final game in games) {
-      final white = game.whiteName.trim().toLowerCase();
-      final black = game.blackName.trim().toLowerCase();
-      final isDirect = (white == user && black == opponent) ||
-          (black == user && white == opponent);
-      if (!isDirect) continue;
-      switch (_statGameOutcome(game)) {
-        case 'win':
-          wins += 1;
-        case 'loss':
-          losses += 1;
-        case 'draw':
-          draws += 1;
-      }
-    }
-    return StatTally(
-      games: wins + draws + losses,
-      wins: wins,
-      draws: draws,
-      losses: losses,
-    );
   }
 
   @override
@@ -326,9 +281,8 @@ class _ComparisonResult extends StatelessWidget {
         Text(
           labels.gamesAnalyzed(report.gamesAnalyzed, report.monthsFetched),
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
     );
@@ -416,7 +370,7 @@ class _ComparisonProfileCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        _timeControlLabel(key),
+                        _timeControlLabel(context, key),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -511,25 +465,14 @@ class _PerformanceComparisonCard extends StatelessWidget {
   final ScoutReport report;
   final _ComparisonText labels;
 
-  double? _flagRate(List<GameTermination> terms, int totalLosses) {
-    if (totalLosses <= 0) return null;
-    for (final t in terms) {
-      if (t.type == 'timeout') return t.tally.losses / totalLosses;
-    }
-    return 0;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final userWhite = userOverview?.white.winRate;
     final userBlack = userOverview?.black.winRate;
-    final userFlag = _flagRate(
-      userTerminations?.terminations ?? const [],
-      userOverview?.overall.losses ?? 0,
-    );
-    final oppFlag = _flagRate(report.terminations, report.overall.losses);
+    final userFlag = report.comparison.userFlagRate;
+    final oppFlag = report.comparison.opponentFlagRate;
 
     return Card(
       child: Padding(
@@ -703,118 +646,12 @@ class _OpeningMatchupCard extends StatelessWidget {
   final bool isSelf;
   final _ComparisonText labels;
 
-  /// Games needed on *each* side before an opening may say anything at all.
-  /// Without this a single 1/1 line reads as a 100% edge.
-  static const _minGames = 5;
-
-  /// A 20-point gap counts on its own; smaller gaps must clear the z-test.
-  static const _minRateGap = 0.20;
-
-  /// One-sided 95% critical value.
-  static const _zThreshold = 1.645;
-
-  /// Where one of your own lines counts as a weakness in a self-audit.
-  static const _weakRate = 0.45;
-  static const _maxRows = 12;
-
-  String _opposite(String color) => switch (color) {
-    'white' => 'black',
-    'black' => 'white',
-    _ => 'unknown',
-  };
-
-  /// Sum every scouted line sharing an ECO and colour, so a family and its
-  /// sub-variations ("Blackmar-Diemer", "BDG Accepted", "BDG Declined") count
-  /// once against the parent. The previous putIfAbsent kept only the first and
-  /// discarded the rest, which both duplicated recommendations and understated
-  /// the opponent's sample.
-  Map<String, StatTally> _opponentByEcoColor() {
-    final merged = <String, StatTally>{};
-    for (final opening in report.openings) {
-      if (opening.eco.isEmpty) continue;
-      final key = '${opening.eco}|${opening.color}';
-      final current = merged[key];
-      final tally = opening.tally;
-      merged[key] = current == null
-          ? tally
-          : StatTally(
-              games: current.games + tally.games,
-              wins: current.wins + tally.wins,
-              draws: current.draws + tally.draws,
-              losses: current.losses + tally.losses,
-            );
-    }
-    return merged;
-  }
-
-  /// Whether the user really scores better here than the opponent does with the
-  /// other colour. Needs a usable sample on both sides, then either a 20-point
-  /// gap or a significant two-proportion z-test. Compared squared, so no square
-  /// root is needed.
-  static bool _isEdge(StatTally user, StatTally opponent) {
-    final userDecided = user.wins + user.draws + user.losses;
-    final oppDecided = opponent.wins + opponent.draws + opponent.losses;
-    if (userDecided < _minGames || oppDecided < _minGames) return false;
-    final gap = user.wins / userDecided - opponent.wins / oppDecided;
-    if (gap <= 0) return false;
-    if (gap >= _minRateGap) return true;
-    final pooled = (user.wins + opponent.wins) / (userDecided + oppDecided);
-    final variance = pooled * (1 - pooled) * (1 / userDecided + 1 / oppDecided);
-    if (variance <= 0) return false;
-    return gap * gap >= _zThreshold * _zThreshold * variance;
-  }
-
-  List<_Matchup> _matchups() {
-    final openings = userOpenings;
-    if (openings == null) return const [];
-    final opponentByKey = _opponentByEcoColor();
-    final families = [...openings.families]
-      ..sort((a, b) => b.tally.games.compareTo(a.tally.games));
-    final matchups = <_Matchup>[];
-    for (final family in families) {
-      if (family.baseEco.isEmpty) continue;
-      final opponentColor = _opposite(family.color);
-      final opponent = opponentByKey['${family.baseEco}|$opponentColor'];
-      if (opponent == null) continue;
-      // Both sides need a real sample before the row means anything.
-      if (family.tally.games < _minGames || opponent.games < _minGames) {
-        continue;
-      }
-      matchups.add(
-        _Matchup(
-          family: family,
-          opponent: opponent,
-          opponentColor: opponentColor,
-          // Mirroring yourself gives identical rates, so no edge can exist.
-          exploitable: !isSelf && _isEdge(family.tally, opponent),
-        ),
-      );
-      if (matchups.length >= _maxRows) break;
-    }
-    return matchups;
-  }
-
-  /// Self-audit view: your own lines that score badly on a usable sample.
-  List<OpeningFamily> _ownWeaknesses() {
-    final openings = userOpenings;
-    if (openings == null) return const [];
-    final weak = [
-      for (final family in openings.families)
-        if (family.tally.games >= _minGames &&
-            (_tallyRate(family.tally) ?? 1) < _weakRate)
-          family,
-    ]..sort(
-      (a, b) => (_tallyRate(a.tally) ?? 1).compareTo(_tallyRate(b.tally) ?? 1),
-    );
-    return weak.take(5).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final matchups = _matchups();
-    final leaks = matchups.where((m) => m.exploitable).toList();
+    final matchups = report.comparison.matchups;
+    final leaks = report.comparison.recommendations;
 
     return Card(
       child: Padding(
@@ -855,9 +692,25 @@ class _OpeningMatchupCard extends StatelessWidget {
             else ...[
               Row(
                 children: [
-                  Expanded(child: Text(labels.openingColumn, style: _colHead(theme))),
-                  SizedBox(width: 52, child: Text(labels.you, textAlign: TextAlign.end, style: _colHead(theme))),
-                  SizedBox(width: 52, child: Text(labels.opponent, textAlign: TextAlign.end, style: _colHead(theme))),
+                  Expanded(
+                    child: Text(labels.openingColumn, style: _colHead(theme)),
+                  ),
+                  SizedBox(
+                    width: 52,
+                    child: Text(
+                      labels.you,
+                      textAlign: TextAlign.end,
+                      style: _colHead(theme),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 52,
+                    child: Text(
+                      labels.opponent,
+                      textAlign: TextAlign.end,
+                      style: _colHead(theme),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -867,7 +720,7 @@ class _OpeningMatchupCard extends StatelessWidget {
             if (isSelf) ...[
               const SizedBox(height: 18),
               _OwnWeaknessSection(
-                weaknesses: _ownWeaknesses(),
+                weaknesses: report.comparison.weaknesses,
                 labels: labels,
               ),
             ] else if (leaks.isNotEmpty) ...[
@@ -894,29 +747,6 @@ class _OpeningMatchupCard extends StatelessWidget {
   );
 }
 
-/// One row of the matchup table: the user's opening family against the
-/// opponent's merged record in the same ECO with the opposite colour.
-class _Matchup {
-  const _Matchup({
-    required this.family,
-    required this.opponent,
-    required this.opponentColor,
-    required this.exploitable,
-  });
-
-  final OpeningFamily family;
-  final StatTally opponent;
-  final String opponentColor;
-  final bool exploitable;
-}
-
-/// Win rate computed from the tally itself. Merged opponent tallies carry no
-/// pre-computed rate, so deriving it here keeps both sides comparable.
-double? _tallyRate(StatTally tally) {
-  final decided = tally.wins + tally.draws + tally.losses;
-  return decided == 0 ? null : tally.wins / decided;
-}
-
 class _MatchupRow extends StatelessWidget {
   const _MatchupRow({
     required this.matchup,
@@ -924,7 +754,7 @@ class _MatchupRow extends StatelessWidget {
     required this.labels,
   });
 
-  final _Matchup matchup;
+  final OpeningMatchup matchup;
   final bool isSelf;
   final _ComparisonText labels;
 
@@ -936,8 +766,9 @@ class _MatchupRow extends StatelessWidget {
     final opponent = matchup.opponent;
     // Naming the mirrored side keeps a self-audit from reading as a real
     // opponent with coincidentally identical numbers.
-    final opponentLabel =
-        isSelf ? '${labels.opponent} (${labels.you})' : labels.opponent;
+    final opponentLabel = isSelf
+        ? '${labels.opponent} (${labels.you})'
+        : labels.opponent;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -973,10 +804,10 @@ class _MatchupRow extends StatelessWidget {
                     if (family.baseEco.isNotEmpty) family.baseEco,
                     '${labels.you}: ${family.tally.games} '
                         '${labels.gamesShort} '
-                        '(${_formatPercent(_tallyRate(family.tally))})',
+                        '(${_formatPercent(family.tally.winRate)})',
                     '$opponentLabel: ${opponent.games} '
                         '${labels.gamesShort} '
-                        '(${_formatPercent(_tallyRate(opponent))})',
+                        '(${_formatPercent(opponent.winRate)})',
                   ].join('  ·  '),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
@@ -988,7 +819,7 @@ class _MatchupRow extends StatelessWidget {
           SizedBox(
             width: 52,
             child: Text(
-              _formatPercent(_tallyRate(family.tally)),
+              _formatPercent(family.tally.winRate),
               textAlign: TextAlign.end,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
@@ -996,7 +827,7 @@ class _MatchupRow extends StatelessWidget {
           SizedBox(
             width: 52,
             child: Text(
-              _formatPercent(_tallyRate(opponent)),
+              _formatPercent(opponent.winRate),
               textAlign: TextAlign.end,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
@@ -1017,12 +848,12 @@ class _MatchupRow extends StatelessWidget {
 class _StrategySection extends StatelessWidget {
   const _StrategySection({required this.leaks, required this.labels});
 
-  final List<_Matchup> leaks;
+  final List<OpeningMatchup> leaks;
   final _ComparisonText labels;
 
-  String _sentence(_Matchup leak) {
+  String _sentence(OpeningMatchup leak) {
     final opening = leak.family.familyName;
-    final rate = _formatPercent(_tallyRate(leak.opponent));
+    final rate = _formatPercent(leak.opponent.winRate);
     final games = leak.opponent.games;
     return leak.family.color == 'white'
         ? labels.openWhite(opening, rate, games)
@@ -1131,7 +962,7 @@ class _OwnWeaknessSection extends StatelessWidget {
                       labels.ownWeakness(
                         _colorLabel(labels, family.color),
                         family.familyName,
-                        _formatPercent(_tallyRate(family.tally)),
+                        _formatPercent(family.tally.winRate),
                         family.tally.games,
                       ),
                       style: theme.textTheme.bodyMedium,

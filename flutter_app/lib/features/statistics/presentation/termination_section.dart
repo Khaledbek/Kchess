@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: termination section presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 /// "Partie-Ende Statistik": how the profile's games end (checkmate, resignation,
@@ -131,7 +135,7 @@ class _TerminationContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        _TerminationSpotlight(entries: entries, total: total, labels: labels),
+        _TerminationSpotlight(spotlight: stats.spotlight, labels: labels),
         const SizedBox(height: 14),
         const _DivergingAxisKey(),
         for (final entry in entries)
@@ -150,33 +154,22 @@ class _TerminationContent extends StatelessWidget {
 /// is costing the profile points — the one sentence worth reading on this card.
 /// Tinted by that verdict rather than decoratively.
 class _TerminationSpotlight extends StatelessWidget {
-  const _TerminationSpotlight({
-    required this.entries,
-    required this.total,
-    required this.labels,
-  });
+  const _TerminationSpotlight({required this.spotlight, required this.labels});
 
-  final List<GameTermination> entries;
-  final int total;
+  final TerminationSpotlight? spotlight;
   final _TerminationText labels;
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty || total == 0) return const SizedBox.shrink();
-    var top = entries.first;
-    for (final entry in entries) {
-      if (entry.count > top.count) top = entry;
-    }
+    final data = spotlight;
+    if (data == null) return const SizedBox.shrink();
+    final top = data.termination;
     final tally = top.tally;
-    if (tally.games == 0) return const SizedBox.shrink();
-
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final sharePercent = (top.count / total * 100).round();
-    final lossPercent = (tally.losses / tally.games * 100).round();
-    // A dominant ending that is mostly losses is a warning; otherwise it is
-    // simply the shape of the profile's games.
-    final costly = lossPercent >= 50;
+    final sharePercent = data.sharePercent;
+    final lossPercent = data.lossPercent;
+    final costly = data.costly;
     final accent = costly ? scheme.error : scheme.primary;
 
     return Container(
@@ -285,10 +278,7 @@ class _DivergingAxisKey extends StatelessWidget {
 /// given a visible floor: against a 280-game category one draw is otherwise a
 /// sub-pixel sliver and reads as nothing at all.
 class _TerminationDivergingBar extends StatelessWidget {
-  const _TerminationDivergingBar({
-    required this.tally,
-    required this.maxUnits,
-  });
+  const _TerminationDivergingBar({required this.tally, required this.maxUnits});
 
   final StatTally tally;
   final int maxUnits;
@@ -358,7 +348,10 @@ class _TerminationDivergingBar extends StatelessWidget {
 
             Widget segment(double width, Color color) => width <= 0
                 ? const SizedBox.shrink()
-                : SizedBox(width: width, child: ColoredBox(color: color));
+                : SizedBox(
+                    width: width,
+                    child: ColoredBox(color: color),
+                  );
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -431,8 +424,11 @@ class _TerminationTileState extends State<_TerminationTile> {
     final termination = widget.termination;
     final tally = termination.tally;
     // Only worth expanding when there is more than one outcome to reveal.
-    final outcomeKinds =
-        [tally.wins > 0, tally.draws > 0, tally.losses > 0].where((b) => b).length;
+    final outcomeKinds = [
+      tally.wins > 0,
+      tally.draws > 0,
+      tally.losses > 0,
+    ].where((b) => b).length;
     final expandable = outcomeKinds >= 2;
 
     final header = Padding(
@@ -506,8 +502,9 @@ class _TerminationTileState extends State<_TerminationTile> {
           header,
         AnimatedCrossFade(
           duration: const Duration(milliseconds: 180),
-          crossFadeState:
-              _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState: _expanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
           firstChild: const SizedBox(width: double.infinity),
           secondChild: Padding(
             padding: const EdgeInsets.only(left: 22, bottom: 6),
@@ -569,9 +566,7 @@ class _TerminationSubRow extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(label, style: theme.textTheme.bodyMedium),
-          ),
+          Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
           Text(
             '$count · ${_percent(count, categoryTotal)}',
             style: theme.textTheme.bodySmall?.copyWith(

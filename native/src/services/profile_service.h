@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <string>
-#include <vector>
 
 #include "core/models.h"
 #include "persistence/database.h"
@@ -20,9 +19,7 @@ class ProfileService {
       const std::string& provider_username);
   void set_active_profile(const std::string& profile_id);
   std::string active_profile_json() const;
-  Profile require_local_profile() const;
   Profile ensure_local_profile();
-  Profile require_active_profile() const;
 
   std::string profile_json(const Profile& profile) const;
   void delete_profile_storage(const Profile& profile);

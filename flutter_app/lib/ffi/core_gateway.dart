@@ -1,4 +1,8 @@
-import '../models/models.dart';
+// -----------------------------------------------------------------------------
+// Section: Native gateway contract
+// -----------------------------------------------------------------------------
+
+import '../shared/models/models.dart';
 
 abstract interface class CoreGateway {
   Future<void> initialize();
@@ -16,20 +20,16 @@ abstract interface class CoreGateway {
     String targetProfileId,
   );
   Future<ProviderOverview> providerOverview(String profileId);
-  /// Fetch a public player's profile + ratings for a scouting comparison,
-  /// without creating a profile or storing any games.
-  Future<ProviderOverview> scoutPlayer(String username);
+
   /// Deep scouting report for a public player: profile, ratings and their
   /// win/draw/loss by colour, time control, termination and opening, aggregated
   /// natively from recent archives without persistence.
   Future<ScoutReport> scoutReport(String username);
   Future<StatisticsOverview> statisticsOverview();
-  /// Openings for the active profile. [timeControl] is a native
-  /// `time_control_type` ("bullet", "blitz", "rapid", ...); "all" keeps
-  /// every game.
   Future<OpeningsStats> openingsStats({String timeControl = 'all'});
   Future<TerminationStats> terminationStats();
   Future<PhaseStats> phaseStats();
+  Future<StatisticsTimeline> statisticsTimeline(GameQuery query);
   Future<ProviderOverview> syncProvider(
     String profileId, {
     int year = 0,
@@ -46,14 +46,65 @@ abstract interface class CoreGateway {
     required int timeLimitSeconds,
   });
   Future<void> setEngineResources({required int threads, required int hashMb});
+  Future<void> setSidelineEngineSettings({
+    required int depth,
+    required int multiPv,
+    required int threads,
+    required int hashMb,
+  });
   Future<void> setShowBoardArrows(bool enabled);
   Future<void> setBooleanSetting(String key, bool enabled);
   Future<void> setThemeMode(AppThemeMode mode);
   Future<void> setLocale(String locale);
+  Future<void> setEngineId(String engineId);
   Future<List<GameSummary>> games();
   Future<List<GameSummary>> queryGames(GameQuery query);
   Future<List<GameSummary>> favoriteGames();
   Future<GameDetail> game(String gameId);
+  Future<BotGameSession> createBotGame(int requestedElo);
+  Future<BotGameSession?> activeBotGame();
+  Future<BotGameSession> botGame(String gameId);
+  Future<List<BotGameSummary>> botGames();
+  Future<GameSummary> botGameAnalysisGame(String gameId);
+  Future<BoardMoveResolution> recordBotGameMove({
+    required String gameId,
+    required String expectedFenBefore,
+    required String uci,
+  });
+  Future<BoardMoveResolution> replaceBotGameContinuation({
+    required String gameId,
+    required int basePly,
+    required String expectedFenBefore,
+    required String uci,
+  });
+  Future<void> resignBotGame(String gameId);
+  Future<void> abortBotGame(String gameId);
+  Future<void> deleteBotGame(String gameId);
+  Future<void> setBotGameShowEvaluationBar(String gameId, bool enabled);
+  Future<List<String>> boardPromotionOptions({
+    required String fen,
+    required String source,
+    required String target,
+  });
+  Future<BoardMoveResolution> resolveFreeBoardMove({
+    required String fen,
+    required String source,
+    required String target,
+  });
+  Future<BotMoveSnapshot> startBotMove({
+    required String fen,
+    required int requestedElo,
+  });
+  Future<BotMoveSnapshot> botMoveStatus(String jobId);
+  Future<void> cancelBotMove(String jobId);
+  Future<TrainingOverview> trainingOverview();
+  Future<Object?> practiceCommand(Map<String, Object?> request);
+  Future<TrainingAttempt> startTrainingAttempt(String exerciseId);
+  Future<TrainingMoveResult> playTrainingMove({
+    required String attemptId,
+    required String source,
+    required String target,
+  });
   Future<BoardMoveResolution> resolveBoardMove({
     required String gameId,
     required String fen,
@@ -61,12 +112,6 @@ abstract interface class CoreGateway {
     required String target,
     required int firstCandidatePly,
   });
-  /// Board state for a bare FEN. Unlike [resolveBoardMove] this needs no stored
-  /// game, so training positions can be rendered from their starting FEN.
-  Future<BoardPosition> boardPosition(String fen);
-
-  /// Every legal move in [fen], each with its SAN and resulting FEN.
-  Future<List<BoardMoveOption>> boardLegalMoves(String fen);
   Future<GameSummary> importPgn(String pgn);
   Future<GameSummary> importFen({required String fen, required String name});
   Future<AnalysisSnapshot> startAnalysis(String gameId);

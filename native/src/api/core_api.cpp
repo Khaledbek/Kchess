@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Stable C ABI entry points
+// -----------------------------------------------------------------------------
+
 #include "kchess/core_api.h"
 
 #include <cstdlib>
@@ -209,6 +213,14 @@ kc_status kc_set_engine_resources(const kc_core_handle handle, const int32_t thr
   return status_call(core_from(handle), [=] { core_from(handle)->set_engine_resources(threads, hash_mb); });
 }
 
+kc_status kc_set_sideline_engine_settings(
+    const kc_core_handle handle, const int32_t depth, const int32_t multi_pv,
+    const int32_t threads, const int32_t hash_mb) {
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->set_sideline_engine_settings(depth, multi_pv, threads, hash_mb);
+  });
+}
+
 kc_status kc_set_show_board_arrows(const kc_core_handle handle, const int32_t enabled) {
   return status_call(
       core_from(handle), [=] { core_from(handle)->set_show_board_arrows(enabled != 0); });
@@ -237,6 +249,13 @@ kc_status kc_set_locale(const kc_core_handle handle, const char* locale_utf8) {
     return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Locale is required");
   }
   return status_call(core_from(handle), [=] { core_from(handle)->set_locale(locale_utf8); });
+}
+
+kc_status kc_set_engine_id(const kc_core_handle handle, const char* engine_id_utf8) {
+  if (engine_id_utf8 == nullptr || engine_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Engine id is required");
+  }
+  return status_call(core_from(handle), [=] { core_from(handle)->set_engine_id(engine_id_utf8); });
 }
 
 char* kc_games_json(const kc_core_handle handle) {
@@ -284,16 +303,34 @@ char* kc_resolve_board_move_json(
   });
 }
 
-char* kc_board_position_json(const kc_core_handle handle, const char* fen_utf8) {
-  auto* core = core_from(handle);
-  if (fen_utf8 == nullptr) return invalid_string_argument(core, "FEN is required");
-  return string_call(core, [&] { return core->board_position_json(fen_utf8); });
+char* kc_resolve_free_board_move_json(
+    const kc_core_handle handle,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8) {
+  if (fen_utf8 == nullptr || source_utf8 == nullptr || target_utf8 == nullptr) {
+    return invalid_string_argument(
+        core_from(handle), "FEN, source and target squares are required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->resolve_free_board_move_json(
+        fen_utf8, source_utf8, target_utf8);
+  });
 }
 
-char* kc_board_legal_moves_json(const kc_core_handle handle, const char* fen_utf8) {
-  auto* core = core_from(handle);
-  if (fen_utf8 == nullptr) return invalid_string_argument(core, "FEN is required");
-  return string_call(core, [&] { return core->board_legal_moves_json(fen_utf8); });
+char* kc_board_promotion_options_json(
+    const kc_core_handle handle,
+    const char* fen_utf8,
+    const char* source_utf8,
+    const char* target_utf8) {
+  if (fen_utf8 == nullptr || source_utf8 == nullptr || target_utf8 == nullptr) {
+    return invalid_string_argument(
+        core_from(handle), "FEN, source and target squares are required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->board_promotion_options_json(
+        fen_utf8, source_utf8, target_utf8);
+  });
 }
 
 char* kc_import_pgn_json(const kc_core_handle handle, const char* pgn_utf8) {
@@ -399,15 +436,6 @@ char* kc_statistics_openings_json(const kc_core_handle handle) {
       core_from(handle), [handle] { return core_from(handle)->statistics_openings_json(); });
 }
 
-char* kc_statistics_openings_filtered_json(
-    const kc_core_handle handle, const char* time_control_utf8) {
-  const std::string time_control =
-      time_control_utf8 == nullptr ? std::string{"all"} : std::string{time_control_utf8};
-  return string_call(core_from(handle), [handle, time_control] {
-    return core_from(handle)->statistics_openings_json(time_control);
-  });
-}
-
 char* kc_statistics_terminations_json(const kc_core_handle handle) {
   return string_call(
       core_from(handle), [handle] { return core_from(handle)->statistics_terminations_json(); });
@@ -416,6 +444,14 @@ char* kc_statistics_terminations_json(const kc_core_handle handle) {
 char* kc_statistics_phases_json(const kc_core_handle handle) {
   return string_call(
       core_from(handle), [handle] { return core_from(handle)->statistics_phases_json(); });
+}
+
+char* kc_statistics_timeline_json(const kc_core_handle handle, const char* query_utf8) {
+  if (query_utf8 == nullptr)
+    return invalid_string_argument(core_from(handle), "Statistics query is required");
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->statistics_timeline_json(query_utf8);
+  });
 }
 
 kc_status kc_set_game_favorite(
@@ -606,6 +642,214 @@ kc_status kc_cancel_variation_analysis(
     return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Job id is required");
   return status_call(core_from(handle), [=] {
     core_from(handle)->cancel_variation_analysis(job_id_utf8);
+  });
+}
+
+char* kc_create_bot_game_json(
+    const kc_core_handle handle, const int32_t requested_elo) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->create_bot_game_json(requested_elo);
+  });
+}
+
+char* kc_active_bot_game_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->active_bot_game_json();
+  });
+}
+
+char* kc_bot_game_json(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->bot_game_json(game_id_utf8);
+  });
+}
+
+char* kc_bot_games_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->bot_games_json();
+  });
+}
+
+char* kc_bot_game_analysis_game_json(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->bot_game_analysis_game_json(game_id_utf8);
+  });
+}
+
+char* kc_record_bot_game_move_json(
+    const kc_core_handle handle,
+    const char* game_id_utf8,
+    const char* expected_fen_before_utf8,
+    const char* uci_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game id is required");
+  }
+  if (expected_fen_before_utf8 == nullptr || expected_fen_before_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game FEN is required");
+  }
+  if (uci_utf8 == nullptr || uci_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game move is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->record_bot_game_move_json(
+        game_id_utf8, expected_fen_before_utf8, uci_utf8);
+  });
+}
+
+char* kc_record_bot_game_move_from_ply_json(
+    const kc_core_handle handle,
+    const char* game_id_utf8,
+    const int32_t base_ply,
+    const char* expected_fen_before_utf8,
+    const char* uci_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game id is required");
+  }
+  if (base_ply < 0) {
+    return invalid_string_argument(core_from(handle), "Bot game branch ply is invalid");
+  }
+  if (expected_fen_before_utf8 == nullptr || expected_fen_before_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game FEN is required");
+  }
+  if (uci_utf8 == nullptr || uci_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot game move is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->record_bot_game_move_from_ply_json(
+        game_id_utf8, base_ply, expected_fen_before_utf8, uci_utf8);
+  });
+}
+
+kc_status kc_resign_bot_game(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Bot game id is required");
+  }
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->resign_bot_game(game_id_utf8);
+  });
+}
+
+kc_status kc_abort_bot_game(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Bot game id is required");
+  }
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->abort_bot_game(game_id_utf8);
+  });
+}
+
+kc_status kc_delete_bot_game(
+    const kc_core_handle handle, const char* game_id_utf8) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Bot game id is required");
+  }
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->delete_bot_game(game_id_utf8);
+  });
+}
+
+kc_status kc_set_bot_game_show_eval_bar(
+    const kc_core_handle handle,
+    const char* game_id_utf8,
+    const int32_t enabled) {
+  if (game_id_utf8 == nullptr || game_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Bot game id is required");
+  }
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->set_bot_game_show_eval_bar(game_id_utf8, enabled != 0);
+  });
+}
+
+char* kc_start_bot_move_json(
+    const kc_core_handle handle,
+    const char* fen_utf8,
+    const int32_t requested_elo) {
+  if (fen_utf8 == nullptr || fen_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot position FEN is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_bot_move_json(fen_utf8, requested_elo);
+  });
+}
+
+char* kc_bot_move_status_json(
+    const kc_core_handle handle, const char* job_id_utf8) {
+  if (job_id_utf8 == nullptr || job_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Bot move job id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->bot_move_status_json(job_id_utf8);
+  });
+}
+
+kc_status kc_cancel_bot_move(
+    const kc_core_handle handle, const char* job_id_utf8) {
+  if (job_id_utf8 == nullptr || job_id_utf8[0] == '\0') {
+    return set_error(core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Bot move job id is required");
+  }
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->cancel_bot_move(job_id_utf8);
+  });
+}
+
+char* kc_statistics_openings_filtered_json(
+    const kc_core_handle handle, const char* time_control_utf8) {
+  if (time_control_utf8 == nullptr || time_control_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Time-control filter is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->statistics_openings_json(time_control_utf8);
+  });
+}
+
+char* kc_training_overview_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->training_overview_json();
+  });
+}
+
+char* kc_practice_command_json(
+    const kc_core_handle handle, const char* request_utf8) {
+  if (request_utf8 == nullptr) {
+    return invalid_string_argument(core_from(handle), "Practice request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->practice_command_json(request_utf8);
+  });
+}
+
+char* kc_start_training_attempt_json(
+    const kc_core_handle handle, const char* exercise_id_utf8) {
+  if (exercise_id_utf8 == nullptr || exercise_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Training exercise id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_training_attempt_json(exercise_id_utf8);
+  });
+}
+
+char* kc_play_training_move_json(
+    const kc_core_handle handle,
+    const char* attempt_id_utf8,
+    const char* source_utf8,
+    const char* target_utf8) {
+  if (attempt_id_utf8 == nullptr || attempt_id_utf8[0] == '\0'
+      || source_utf8 == nullptr || target_utf8 == nullptr) {
+    return invalid_string_argument(core_from(handle), "Training move arguments are required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->play_training_move_json(
+        attempt_id_utf8, source_utf8, target_utf8);
   });
 }
 

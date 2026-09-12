@@ -16,19 +16,65 @@
 
 #include "analysis/accuracy.h"
 #include "analysis/move_classifier.h"
+#include "analysis/move_classifier_sf19.h"
 #include "chess/move.h"
 #include "chess/position_view.h"
 #include "core/settings_registry.h"
 #include "diagnostics/logger.h"
+#include "engine/stockfish_factory.h"
 
 namespace kchess {
 namespace {
+
+// -----------------------------------------------------------------------------
+// Section: Analysis policies and helpers
+// -----------------------------------------------------------------------------
 
 constexpr int kEngineThreadHardCap = 32;
 constexpr int kLiveStableIterations = 3;
 constexpr int kLiveStableEvalToleranceCp = 15;
 constexpr int kPreanalysisStableIterations = 3;
 constexpr int kPreanalysisStableEvalToleranceCp = 10;
+constexpr int kClassificationMultiPv = 4;
+
+bool uses_stockfish19_classifier(const std::string& engine_version) {
+  return engine_version.rfind("Stockfish 19", 0) == 0;
+}
+
+int classifier_version_for_engine(const std::string& engine_version) {
+  return uses_stockfish19_classifier(engine_version)
+      ? MoveClassifierSf19Config::version
+      : MoveClassifierConfig::version;
+}
+
+// -----------------------------------------------------------------------------
+// Section: Stockfish 19 evaluation-bar projection
+// -----------------------------------------------------------------------------
+
+std::optional<int> sf19_evaluation_bar_white_permille(
+    const EngineLine& line, const bool side_to_move_is_white) {
+  if (!line.wdl.has_value()) return std::nullopt;
+
+  const int white_wins = side_to_move_is_white
+      ? line.wdl->wins
+      : line.wdl->losses;
+  const int white_draws = line.wdl->draws;
+  const int white_losses = side_to_move_is_white
+      ? line.wdl->losses
+      : line.wdl->wins;
+  const int total = white_wins + white_draws + white_losses;
+  if (total <= 0) return std::nullopt;
+
+  // SF19 already exposes a material-calibrated WDL model. Use its expected
+  // White score for the bar geometry instead of the legacy linear cp scale.
+  // SF18 deliberately keeps the old projection.
+  const long long doubled_white_score =
+      2LL * white_wins + static_cast<long long>(white_draws);
+  const long long numerator = 1000LL * doubled_white_score;
+  const long long denominator = 2LL * total;
+  const int rounded = static_cast<int>((numerator + denominator / 2) / denominator);
+  return std::clamp(rounded, 0, 1000);
+}
 
 constexpr double kPreanalysisBoundaryMargin = 0.02;
 constexpr double kPreanalysisGapMargin = 0.04;
@@ -44,6 +90,17 @@ bool difficult_preanalysis_position(
     const std::string& played_move,
     const AnalysisResult& result) {
   if (result.lines.empty()) return false;
+
+  // If Stockfish's final bestmove differs from the last completed MultiPV-1
+  // info line, the root is still classification-sensitive. Spend the full
+  // preparation budget rather than publishing a harsh label from a mixed
+  // iteration snapshot.
+  if (!result.best_move.empty() && result.best_move != "(none)"
+      && result.best_move != "0000"
+      && !result.lines.front().best_move().empty()
+      && result.lines.front().best_move() != result.best_move) {
+    return true;
+  }
 
   const MoveClassifierConfig classifier;
   const auto best_expected = expected_score_side_to_move(evaluation_of(result.lines.front()));
@@ -102,6 +159,7 @@ bool difficult_preanalysis_position(
   // Spend the full minimum budget near category boundaries, where a few
   // centipawns can change the user-visible label.
   return near_threshold(*loss, classifier.excellent_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, classifier.good_loss, kPreanalysisBoundaryMargin)
       || near_threshold(*loss, classifier.okay_loss, kPreanalysisBoundaryMargin)
       || near_threshold(*loss, classifier.miss_loss, kPreanalysisBoundaryMargin)
       || near_threshold(*loss, classifier.blunder_outcome_loss, kPreanalysisBoundaryMargin)
@@ -216,13 +274,241 @@ PositionEvaluation evaluation_of(const EngineLine& line) {
   };
 }
 
+bool usable_engine_move(const std::string& move) {
+  return !move.empty() && move != "(none)" && move != "0000";
+}
+
+const EngineLine* line_for_move(
+    const std::vector<EngineLine>& lines, const std::string& move) {
+  if (!usable_engine_move(move)) return nullptr;
+  const auto found = std::find_if(lines.begin(), lines.end(), [&](const EngineLine& line) {
+    return line.best_move() == move;
+  });
+  return found == lines.end() ? nullptr : &*found;
+}
+
 std::string ranked_best_move(
-    const std::vector<EngineLine>& lines, const std::string& fallback) {
+    const std::vector<EngineLine>& lines,
+    const std::string& fallback) {
+  // The published rank-1 PV is the atomic best-move truth for both SF18 and
+  // SF19. A final bestmove callback can arrive after the last complete MultiPV
+  // report and therefore belong to a newer root ordering than the scores stored
+  // in `lines`. Mixing that callback with an older PV is exactly how the board
+  // arrow and move classification could disagree. Prefer rank 1 whenever a
+  // complete published line exists; the callback is only a terminal fallback.
   if (!lines.empty()) {
     const auto move = lines.front().best_move();
-    if (!move.empty()) return move;
+    if (usable_engine_move(move)) return move;
   }
-  return fallback;
+  return usable_engine_move(fallback) ? fallback : std::string{};
+}
+
+const EngineLine* ranked_best_line(
+    const std::vector<EngineLine>& lines, const std::string& final_best_move) {
+  // If Stockfish emitted a usable final bestmove, only the line for that exact
+  // move is evidence for Great/Brilliant/expected-loss calculations. Falling
+  // back to a stale MultiPV-1 line here can pair the recommendation from one
+  // iteration with the score of another move. In that rare incomplete-snapshot
+  // case we keep the recommendation authoritative and let classification fall
+  // back to plain Best rather than fabricating a severity/special label.
+  if (usable_engine_move(final_best_move)) {
+    return line_for_move(lines, final_best_move);
+  }
+  return lines.empty() ? nullptr : &lines.front();
+}
+
+const EngineLine* ranked_second_line(
+    const std::vector<EngineLine>& lines, const std::string& best_move) {
+  for (const auto& line : lines) {
+    if (line.best_move().empty() || line.best_move() == best_move) continue;
+    return &line;
+  }
+  return nullptr;
+}
+
+struct MoverEvaluationSample {
+  std::optional<double> expected;
+  std::optional<int> evaluation_cp;
+  std::optional<int> mate_in;
+  int depth{0};
+
+  bool has_score() const {
+    return expected.has_value() || evaluation_cp.has_value() || mate_in.has_value();
+  }
+};
+
+MoverEvaluationSample root_sample(const EngineLine* line) {
+  if (line == nullptr) return {};
+  return {
+      .expected = expected_score_side_to_move(evaluation_of(*line)),
+      .evaluation_cp = line->evaluation_cp,
+      .mate_in = line->mate_in,
+      .depth = line->depth,
+  };
+}
+
+MoverEvaluationSample after_sample(
+    const std::vector<EngineLine>* after_lines,
+    const std::string& fen_after,
+    const int fallback_depth) {
+  if (after_lines != nullptr && !after_lines->empty()) {
+    const auto& line = after_lines->front();
+    MoverEvaluationSample sample{
+        .expected = expected_score_mover_after_move(evaluation_of(line)),
+        .evaluation_cp = line.evaluation_cp.has_value()
+            ? std::optional<int>(-*line.evaluation_cp)
+            : std::nullopt,
+        .mate_in = std::nullopt,
+        .depth = line.depth,
+    };
+    if (line.mate_in.has_value()) {
+      if (*line.mate_in == 0) {
+        // The adapter uses mate=0 for a position where the opponent is already
+        // checkmated. From the mover's perspective that is a completed mate.
+        sample.mate_in = 1;
+        sample.evaluation_cp.reset();
+        if (sample.depth <= 0) sample.depth = fallback_depth;
+      } else {
+        sample.mate_in = -*line.mate_in;
+      }
+    } else if (line.depth == 0 && line.wdl.has_value()
+               && line.wdl->draws > 0
+               && line.wdl->wins == 0
+               && line.wdl->losses == 0) {
+      // Preserve the previous Accuracy V3 terminal-draw marker. Accuracy does
+      // not consume WDL, so a stalemate needs an explicit neutral CP sample.
+      sample.evaluation_cp = 0;
+      sample.depth = fallback_depth;
+    }
+    return sample;
+  }
+
+  const auto context = position_context(fen_after);
+  if (context.legal_move_count != 0) return {};
+  if (context.in_check) {
+    return {
+        .expected = 1.0,
+        .evaluation_cp = std::nullopt,
+        .mate_in = 1,
+        .depth = fallback_depth,
+    };
+  }
+  return {
+      .expected = 0.5,
+      .evaluation_cp = 0,
+      .mate_in = std::nullopt,
+      .depth = fallback_depth,
+  };
+}
+
+MoverEvaluationSample resolved_played_sample(
+    const bool played_is_best,
+    const MoverEvaluationSample& best,
+    const MoverEvaluationSample& root,
+    const MoverEvaluationSample& after) {
+  // SF18 compatibility invariant: an engine-best move keeps the root quality
+  // unless its caller explicitly rejects that bestmove first. SF19 performs
+  // that stronger verification below before using this legacy resolver.
+  if (played_is_best && best.has_score()) return best;
+  if (!root.has_score()) return after;
+  if (!after.has_score()) return root;
+
+  // A same-root score is the cleanest apples-to-apples comparison. Trust the
+  // resulting-position search only when it is materially deeper, or when it
+  // proves a mate that the root line did not yet see.
+  if (after.depth >= root.depth + AccuracyConfig{}.deeper_result_margin) return after;
+  if (!root.mate_in.has_value() && after.mate_in.has_value()) return after;
+  return root;
+}
+
+struct Sf19BestMoveVerification {
+  bool contradicted{false};
+  bool confirmed_for_brilliant{false};
+};
+
+Sf19BestMoveVerification verify_sf19_bestmove(
+    const MoverEvaluationSample& best,
+    const MoverEvaluationSample& after) {
+  Sf19BestMoveVerification result;
+  if (!best.has_score() || !after.has_score()) return result;
+
+  const MoveClassifierSf19Config config;
+  const auto best_value = accuracy_decision_value({
+      .evaluation_cp = best.evaluation_cp,
+      .mate_in = best.mate_in,
+      .depth = best.depth,
+  });
+  const auto after_value = accuracy_decision_value({
+      .evaluation_cp = after.evaluation_cp,
+      .mate_in = after.mate_in,
+      .depth = after.depth,
+  });
+
+  const std::optional<double> value_drop =
+      best_value.has_value() && after_value.has_value()
+      ? std::optional<double>(std::max(0.0, *best_value - *after_value))
+      : std::nullopt;
+  const std::optional<int> cp_drop =
+      best.evaluation_cp.has_value() && after.evaluation_cp.has_value()
+      ? std::optional<int>(std::max(0, *best.evaluation_cp - *after.evaluation_cp))
+      : std::nullopt;
+
+  const bool comparable_depth = after.depth > 0
+      && after.depth + config.bestmove_verification_depth_slack >= best.depth;
+  const bool credible_hard_check = after.depth >= config.bestmove_hard_min_after_depth;
+
+  const bool newly_losing_mate = after.mate_in.has_value()
+      && *after.mate_in < 0
+      && (!best.mate_in.has_value() || *best.mate_in >= 0);
+  const bool lost_forced_mate = best.mate_in.has_value()
+      && *best.mate_in > 0
+      && after.mate_in.has_value()
+      && *after.mate_in <= 0;
+  const bool mate_contradiction = newly_losing_mate || lost_forced_mate;
+
+  const bool comparable_value_contradiction = comparable_depth
+      && value_drop.has_value()
+      && *value_drop >= config.bestmove_contradiction_value_loss;
+  const bool comparable_cp_contradiction = comparable_depth
+      && cp_drop.has_value()
+      && *cp_drop >= config.bestmove_contradiction_cp_loss;
+  const bool hard_value_contradiction = credible_hard_check
+      && value_drop.has_value()
+      && *value_drop >= config.bestmove_hard_contradiction_value_loss;
+  const bool hard_cp_contradiction = credible_hard_check
+      && cp_drop.has_value()
+      && *cp_drop >= config.bestmove_hard_contradiction_cp_loss;
+
+  result.contradicted = mate_contradiction
+      || comparable_value_contradiction
+      || comparable_cp_contradiction
+      || hard_value_contradiction
+      || hard_cp_contradiction;
+
+  // Brilliant is a deliberately conservative special label. A sacrifice must
+  // survive an independent after-position search that is reasonably close in
+  // depth and agrees with the root evaluation. A missing or much shallower
+  // confirmation can still be Best/Critical, but never Brilliant.
+  const bool confirmation_depth = after.depth > 0
+      && after.depth + config.brilliant_confirmation_depth_slack >= best.depth;
+  const bool mate_compatible = !best.mate_in.has_value()
+      || !after.mate_in.has_value()
+      || ((*best.mate_in > 0) == (*after.mate_in > 0)
+          && (*best.mate_in < 0) == (*after.mate_in < 0));
+  const bool value_compatible = !value_drop.has_value()
+      || *value_drop <= config.brilliant_confirmation_value_loss;
+  const bool cp_compatible = !cp_drop.has_value()
+      || *cp_drop <= config.brilliant_confirmation_cp_loss;
+  const bool has_confirmation_score = value_drop.has_value()
+      || cp_drop.has_value()
+      || (best.mate_in.has_value() && after.mate_in.has_value());
+  result.confirmed_for_brilliant = !result.contradicted
+      && confirmation_depth
+      && mate_compatible
+      && value_compatible
+      && cp_compatible
+      && has_confirmation_score;
+  return result;
 }
 
 std::string fnv1a_hex(const std::string& value) {
@@ -237,14 +523,11 @@ std::string fnv1a_hex(const std::string& value) {
 }
 
 std::string position_cache_engine_identity(
-    const std::string& engine_version, const bool adaptive_early_stop) {
-  // A cache entry is only reusable with the exact embedded NNUE pair and the
-  // same convergence policy. An adaptive search may intentionally stop below
-  // the requested hard depth, so it must never satisfy a later strict search.
-  // The filenames contain the official network hashes, so replacing a network
-  // naturally creates a new cache namespace instead of reusing stale scores.
-  return engine_version
-      + "|nnue=nn-c288c895ea92.nnue+nn-37f18f62d772.nnue"
+    const ChessEngine& engine, const bool adaptive_early_stop) {
+  // A cache entry is only reusable with the exact engine build, NNUE network(s)
+  // and convergence policy. The engine adapter owns the evaluator identity so
+  // Stockfish versions cannot accidentally share a cache namespace.
+  return engine.cache_identity()
       + "|adaptive=" + (adaptive_early_stop ? "1" : "0");
 }
 
@@ -265,13 +548,220 @@ std::string canonical_position_cache_fen(const std::string& fen) {
 }
 
 std::string variation_position_cache_key(
-    const std::string& fen, const AppSettings& settings) {
+    const std::string& fen,
+    const AppSettings& settings,
+    const std::string& engine_cache_identity) {
   // MultiPV is intentionally not part of the key. A wider result can satisfy
   // a later two-line classifier lookup; callers verify the available line
   // count before reusing it. Threads/hash do not change requested quality.
-  return canonical_position_cache_fen(fen)
+  // Engine/NNUE identity is included even though the map is also cleared on an
+  // engine switch; this makes cross-engine reuse impossible by construction.
+  return engine_cache_identity + "|" + canonical_position_cache_fen(fen)
       + "|depth=" + std::to_string(settings.depth)
       + "|time=" + std::to_string(settings.time_limit_seconds);
+}
+
+struct MoveAssessment {
+  MoveCategory category{MoveCategory::unknown};
+  std::string recommended_move_uci;
+  std::optional<double> best_expected;
+  std::optional<double> played_expected;
+  std::optional<double> second_expected;
+  std::optional<double> loss;
+  AccuracyMove accuracy;
+};
+
+MoveAssessment assess_move(
+    const std::string& fen_before,
+    const std::string& played_move,
+    const std::string& fen_after,
+    const std::vector<EngineLine>* before_lines,
+    const std::string* before_best_move,
+    const std::vector<EngineLine>* after_lines,
+    const TheoryMoveInfo& theory,
+    const bool use_sf19_classifier) {
+  MoveAssessment assessment;
+  const auto context = position_context(fen_before);
+  assessment.accuracy.theory = theory.is_theory;
+  assessment.accuracy.legal_move_count = context.legal_move_count;
+
+  const EngineLine* best_line = nullptr;
+  const EngineLine* second_line = nullptr;
+  const EngineLine* played_line = nullptr;
+  if (before_lines != nullptr && !before_lines->empty()) {
+    const std::string empty_best_move;
+    const auto& final_best_move = before_best_move != nullptr
+        ? *before_best_move
+        : empty_best_move;
+    assessment.recommended_move_uci = ranked_best_move(
+        *before_lines, final_best_move);
+    best_line = ranked_best_line(*before_lines, assessment.recommended_move_uci);
+    second_line = ranked_second_line(*before_lines, assessment.recommended_move_uci);
+    played_line = line_for_move(*before_lines, played_move);
+  }
+
+  // There is no meaningful ranking choice with one legal move. For SF19 the
+  // final bestmove callback is normally authoritative, but it must not override
+  // a completed post-move verification that proves a large opposite swing.
+  // This matters when a late MultiPV reshuffle leaves the callback/root snapshot
+  // inconsistent: without this guard a losing sacrifice could be labelled
+  // Brilliant merely because its UCI move matched the stale final callback.
+  const bool engine_marked_best = context.legal_move_count == 1
+      || (usable_engine_move(assessment.recommended_move_uci)
+          && played_move == assessment.recommended_move_uci);
+
+  const auto best_sample = root_sample(best_line);
+  const auto second_sample = root_sample(second_line);
+  auto played_root_sample = root_sample(played_line);
+  if (engine_marked_best && !played_root_sample.has_score()) {
+    played_root_sample = best_sample;
+  }
+  const auto played_after_sample = after_sample(after_lines, fen_after, best_sample.depth);
+
+  Sf19BestMoveVerification sf19_verification;
+  if (use_sf19_classifier && engine_marked_best && context.legal_move_count > 1) {
+    sf19_verification = verify_sf19_bestmove(best_sample, played_after_sample);
+  }
+  const bool sf19_bestmove_contradicted = use_sf19_classifier
+      && sf19_verification.contradicted;
+
+  const bool played_is_best = engine_marked_best && !sf19_bestmove_contradicted;
+  assessment.accuracy.played_is_best = played_is_best;
+
+  int played_rank = 0;
+  if (played_is_best) {
+    played_rank = 1;
+  } else if (!sf19_bestmove_contradicted
+             && played_line != nullptr && played_line->rank > 0) {
+    played_rank = played_line->rank;
+  } else if (before_lines != nullptr
+             && static_cast<int>(before_lines->size()) >= kClassificationMultiPv) {
+    // A completed four-line root search that does not contain the played move
+    // proves only "outside top four"; do not fabricate an exact rank 5.
+    played_rank = kClassificationMultiPv + 1;
+  }
+
+  const auto played_sample = sf19_bestmove_contradicted
+      ? played_after_sample
+      : resolved_played_sample(
+          played_is_best, best_sample, played_root_sample, played_after_sample);
+
+  assessment.best_expected = best_sample.expected;
+  assessment.played_expected = played_sample.expected;
+  assessment.second_expected = second_sample.expected;
+  assessment.loss = expected_score_loss(
+      assessment.best_expected, assessment.played_expected);
+
+  VerifiedSacrifice sacrifice;
+  if (played_line != nullptr && played_line->best_move() == played_move) {
+    sacrifice = root_move_sacrifice_evidence(fen_before, played_line->moves);
+  } else if (played_is_best && best_line != nullptr
+             && best_line->best_move() == played_move) {
+    sacrifice = root_move_sacrifice_evidence(fen_before, best_line->moves);
+  }
+
+  std::vector<std::string> played_pv;
+  if (played_line != nullptr && played_line->best_move() == played_move) {
+    played_pv = played_line->moves;
+  } else if (!played_move.empty()) {
+    played_pv.push_back(played_move);
+    if (after_lines != nullptr && !after_lines->empty()) {
+      const auto& continuation = after_lines->front().moves;
+      played_pv.insert(played_pv.end(), continuation.begin(), continuation.end());
+    }
+  }
+  const auto played_material = pv_material_evidence(fen_before, played_pv, 6);
+  PvMaterialEvidence best_material;
+  if (best_line != nullptr) {
+    // Identical PVs share both the starting position and the six-ply limit.
+    // Reuse this assessment's result; do not cache across analysis snapshots.
+    best_material = best_line->moves == played_pv
+        ? played_material
+        : pv_material_evidence(fen_before, best_line->moves, 6);
+  }
+
+  const MoveClassifierConfig classifier;
+  bool unique_by_expected = false;
+  if (best_sample.expected.has_value() && second_sample.expected.has_value()) {
+    unique_by_expected = *best_sample.expected - *second_sample.expected
+        >= classifier.miss_unique_gap;
+  }
+  const bool unique_by_cp = best_sample.evaluation_cp.has_value()
+      && second_sample.evaluation_cp.has_value()
+      && *best_sample.evaluation_cp - *second_sample.evaluation_cp
+          >= classifier.critical_cp_gap;
+  const bool unique_forced_mate = best_sample.mate_in.has_value()
+      && *best_sample.mate_in > 0
+      && (!second_sample.mate_in.has_value() || *second_sample.mate_in <= 0);
+  const bool only_move_tactical = usable_engine_move(assessment.recommended_move_uci)
+      && (unique_by_expected || unique_by_cp || unique_forced_mate)
+      && root_move_is_tactical(fen_before, assessment.recommended_move_uci);
+
+  const bool missed_forced_mate = !played_is_best
+      && best_sample.mate_in.has_value() && *best_sample.mate_in > 0
+      && (!played_sample.mate_in.has_value() || *played_sample.mate_in <= 0);
+  const bool allowed_forced_mate = !played_is_best
+      && played_sample.mate_in.has_value() && *played_sample.mate_in < 0
+      && (!best_sample.mate_in.has_value() || *best_sample.mate_in >= 0);
+
+  const MoveClassifierInput classifier_input{
+      .theory = theory.is_theory,
+      .played_is_best = played_is_best,
+      .sacrifice_against_best_defense = sacrifice.verified,
+      .only_move_tactical = only_move_tactical,
+      .missed_forced_mate = missed_forced_mate,
+      .allowed_forced_mate = allowed_forced_mate,
+      .was_in_check_before_move = context.in_check,
+      .legal_move_count = context.legal_move_count,
+      .played_rank = played_rank,
+      .sacrifice_piece_value_cp = sacrifice.offered_piece_value_cp,
+      .sacrifice_net_material_loss_cp = sacrifice.net_material_loss_cp,
+      .material_loss_cp = played_material.maximum_loss_cp,
+      .best_material_gain_cp = best_material.maximum_gain_cp,
+      .played_material_gain_cp = played_material.maximum_gain_cp,
+      .best_expected_score = best_sample.expected,
+      .played_expected_score = played_sample.expected,
+      .second_best_expected_score = second_sample.expected,
+      .best_evaluation_cp = best_sample.evaluation_cp,
+      .played_evaluation_cp = played_sample.evaluation_cp,
+      .second_best_evaluation_cp = second_sample.evaluation_cp,
+      .best_mate_in = best_sample.mate_in,
+      .played_mate_in = played_sample.mate_in,
+      .second_best_mate_in = second_sample.mate_in,
+  };
+  if (use_sf19_classifier) {
+    assessment.category = classify_move_sf19({
+        .common = classifier_input,
+        .best_move_verified_after = sf19_verification.confirmed_for_brilliant,
+        .played_final_material_delta_cp = played_material.final_delta_cp,
+        .best_final_material_delta_cp = best_material.final_delta_cp,
+    });
+  } else {
+    // Stockfish 18 stays byte-for-byte on the established V11 classifier.
+    assessment.category = classify_move(classifier_input);
+  }
+
+  assessment.accuracy.best = {
+      .evaluation_cp = best_sample.evaluation_cp,
+      .mate_in = best_sample.mate_in,
+      .depth = best_sample.depth,
+  };
+  assessment.accuracy.played_root = {
+      .evaluation_cp = played_root_sample.evaluation_cp,
+      .mate_in = played_root_sample.mate_in,
+      .depth = played_root_sample.depth,
+  };
+  assessment.accuracy.played_after = {
+      .evaluation_cp = played_after_sample.evaluation_cp,
+      .mate_in = played_after_sample.mate_in,
+      .depth = played_after_sample.depth,
+  };
+  assessment.accuracy.second_best = {
+      .evaluation_cp = second_sample.evaluation_cp,
+      .mate_in = second_sample.mate_in,
+      .depth = second_sample.depth,
+  };
+  return assessment;
 }
 
 MoveCategory classify_variation_move(
@@ -280,99 +770,12 @@ MoveCategory classify_variation_move(
     const std::string& fen_after,
     const AnalysisResult& before,
     const AnalysisResult& after,
-    const TheoryMoveInfo& theory) {
-  std::optional<double> best_expected;
-  std::optional<double> played_expected;
-  std::optional<double> second_expected;
-  std::optional<int> best_cp;
-  std::optional<int> played_cp;
-  std::optional<int> second_cp;
-  bool played_is_best = false;
-  bool missed_forced_mate = false;
-  bool allowed_forced_mate = false;
-  bool material_sacrifice = false;
-  bool only_move_tactical = false;
-  bool forces_nontrivial_mate = false;
-  const auto context = position_context(fen_before);
-
-  if (!before.lines.empty()) {
-    played_is_best = played_move == ranked_best_move(before.lines, before.best_move);
-    best_expected = expected_score_side_to_move(evaluation_of(before.lines.front()));
-    best_cp = before.lines.front().evaluation_cp;
-    if (before.lines.size() > 1) {
-      second_expected = expected_score_side_to_move(evaluation_of(before.lines[1]));
-      second_cp = before.lines[1].evaluation_cp;
-    }
-
-    for (const auto& line : before.lines) {
-      if (line.best_move() != played_move) continue;
-      played_expected = expected_score_side_to_move(evaluation_of(line));
-      played_cp = line.evaluation_cp;
-      material_sacrifice = material_sacrifice_in_pv(fen_before, line.moves, 8);
-      forces_nontrivial_mate = line.mate_in.has_value() && *line.mate_in > 1;
-      break;
-    }
-
-    if (best_expected.has_value() && second_expected.has_value()) {
-      const bool unique_by_expected = *best_expected - *second_expected >= 0.20;
-      const bool unique_by_cp = best_cp.has_value() && second_cp.has_value()
-          && *best_cp - *second_cp >= MoveClassifierConfig{}.critical_cp_gap;
-      only_move_tactical = *best_expected >= 0.55
-          && (unique_by_expected || unique_by_cp);
-    }
-
-    const auto best_mate = before.lines.front().mate_in;
-    const bool best_has_mate = best_mate.has_value() && *best_mate > 0;
-    if (!after.lines.empty()) {
-      const auto after_mate = after.lines.front().mate_in;
-      forces_nontrivial_mate = forces_nontrivial_mate
-          || (after_mate.has_value() && *after_mate < -1);
-      if (!material_sacrifice) {
-        std::vector<std::string> played_pv;
-        played_pv.reserve(after.lines.front().moves.size() + 1);
-        played_pv.push_back(played_move);
-        played_pv.insert(
-            played_pv.end(), after.lines.front().moves.begin(), after.lines.front().moves.end());
-        material_sacrifice = material_sacrifice_in_pv(fen_before, played_pv, 8);
-      }
-      missed_forced_mate = best_has_mate
-          && (!after_mate.has_value() || *after_mate > 0);
-      allowed_forced_mate = after_mate.has_value() && *after_mate > 0
-          && (!best_mate.has_value() || *best_mate >= 0);
-    }
-  }
-
-  if (!after.lines.empty()) {
-    if (!played_expected.has_value()) {
-      played_expected = expected_score_mover_after_move(evaluation_of(after.lines.front()));
-    }
-    if (!played_cp.has_value() && after.lines.front().evaluation_cp.has_value()) {
-      played_cp = -*after.lines.front().evaluation_cp;
-    }
-  } else {
-    const auto after_context = position_context(fen_after);
-    if (after_context.legal_move_count == 0) {
-      played_expected = after_context.in_check ? 1.0 : 0.5;
-    }
-  }
-
-  return classify_move({
-      .theory = theory.is_theory,
-      .played_is_best = played_is_best,
-      .material_sacrifice = material_sacrifice,
-      .only_move_tactical = only_move_tactical,
-      .missed_forced_mate = missed_forced_mate,
-      .allowed_forced_mate = allowed_forced_mate,
-      .was_in_check_before_move = context.in_check,
-      .forces_nontrivial_mate = forces_nontrivial_mate,
-      .legal_move_count = context.legal_move_count,
-      .best_expected_score = best_expected,
-      .played_expected_score = played_expected,
-      .second_best_expected_score = second_expected,
-      .best_evaluation_cp = best_cp,
-      .played_evaluation_cp = played_cp,
-      .second_best_evaluation_cp = second_cp,
-  });
+    const TheoryMoveInfo& theory,
+    const bool use_sf19_classifier) {
+  return assess_move(
+      fen_before, played_move, fen_after,
+      &before.lines, &before.best_move, &after.lines, theory,
+      use_sf19_classifier).category;
 }
 
 }  // namespace
@@ -484,17 +887,24 @@ AnalysisRequest AnalysisService::analysis_request(
 
 AnalysisRequest AnalysisService::preanalysis_request(
     const std::string& fen, const AppSettings& budget) const {
-  // Kept separate from live refinement on purpose.  Later scheduler stages may
+  // Kept separate from live refinement on purpose. Later scheduler stages may
   // choose cheaper per-position requests, but no pre-analysis request may ever
-  // exceed this user-selected budget.
-  return analysis_request(fen, budget);
+  // exceed this user-selected budget. SF19 preparation additionally requires
+  // one complete exact MultiPV iteration before a position can be persisted.
+  // Live refinement is audited separately. SF19 sideline roots opt into the
+  // same exact-snapshot contract explicitly in start_variation_job_json(); the
+  // SF18 adapter ignores the flag entirely.
+  auto request = analysis_request(fen, budget);
+  request.require_exact_multipv_snapshot =
+      normalize_stockfish_engine_id(budget.engine_id) == kStockfish19Id;
+  return request;
 }
 
 std::string AnalysisService::analysis_config_hash(const AppSettings& settings) const {
-  StockfishEngine engine;
+  const auto engine = create_stockfish_engine(settings.engine_id);
   // Classifier/Accuracy/Book versions remain independent from the engine
   // settings and are checked by rebuild_classification().
-  std::string config = engine.version();
+  std::string config = engine->version();
   // Only settings marked cache_relevant participate. Visual/app-only settings
   // therefore never force an expensive Stockfish re-analysis.
   for (const auto& descriptor : kSettingsRegistry) {
@@ -530,9 +940,9 @@ std::optional<PersistedAnalysis> AnalysisService::reusable_analysis(
   // Resource-only changes (threads/hash) must not duplicate a game's saved
   // analysis.  Database compatibility still enforces engine version, depth,
   // MultiPV, time budget and strict-vs-adaptive semantics.
-  StockfishEngine engine;
+  const auto engine = create_stockfish_engine(settings.engine_id);
   return database_.compatible_analysis(
-      game_id, engine.version(), settings, requested_ply);
+      game_id, engine->version(), settings, requested_ply);
 }
 
 const char* AnalysisService::job_state_name(const AnalysisJobState state) noexcept {
@@ -675,6 +1085,7 @@ std::string AnalysisService::analysis_json(
       analyzed_fen = game->moves[move_index].fen_after;
     }
   }
+  json << ",\"analyzedFen\":\"" << escape_json(analyzed_fen) << '\"';
   const bool line_is_white = analyzed_fen.empty() || white_to_move(analyzed_fen);
   json << ",\"lines\":[";
   const auto line_count = std::min(
@@ -700,6 +1111,11 @@ std::string AnalysisService::analysis_json(
     } else {
       json << "null";
     }
+    json << ",\"evaluationBarWhitePermille\":";
+    append_optional_int(
+        json, uses_stockfish19_classifier(analysis.engine_version)
+            ? sf19_evaluation_bar_white_permille(line, line_is_white)
+            : std::nullopt);
     json << ",\"nodes\":" << line.nodes << ",\"moves\":[";
     for (std::size_t move_index = 0; move_index < line.moves.size(); ++move_index) {
       if (move_index != 0) json << ',';
@@ -730,9 +1146,11 @@ std::string AnalysisService::analysis_json(
     }
     auto append_player = [&](const PlayerAnalysisSummary& player) {
       json << "{\"theory\":" << player.theory
+           << ",\"forced\":" << player.forced
            << ",\"brilliant\":" << player.brilliant << ",\"critical\":" << player.critical
            << ",\"best\":" << player.best
-           << ",\"excellent\":" << player.excellent << ",\"okay\":" << player.okay
+           << ",\"excellent\":" << player.excellent << ",\"good\":" << player.good
+           << ",\"okay\":" << player.okay
            << ",\"miss\":" << player.miss << ",\"mistake\":" << player.mistake
            << ",\"blunder\":" << player.blunder << ",\"totalMoves\":"
            << player.total_moves << ",\"analyzedMoves\":" << player.analyzed_moves
@@ -762,8 +1180,14 @@ void AnalysisService::rebuild_classification(
     const bool force,
     const int through_ply) {
   const std::string book_version = opening_theory_->source_version();
+  const auto run_metadata = database_.analysis(game_id, config_hash);
+  const std::string engine_version = run_metadata.has_value()
+      ? run_metadata->engine_version
+      : std::string{};
+  const bool use_sf19_classifier = uses_stockfish19_classifier(engine_version);
+  const int classifier_version = classifier_version_for_engine(engine_version);
   if (!force && database_.classification_is_current(
-          game_id, config_hash, MoveClassifierConfig::version,
+          game_id, config_hash, classifier_version,
           AccuracyConfig::version, book_version)) {
     return;
   }
@@ -785,198 +1209,50 @@ void AnalysisService::rebuild_classification(
         && static_cast<std::uint32_t>(move.ply_index) < book_metadata.max_ply) {
       theory = opening_theory_->lookup(move.fen_before, move.uci);
     }
-    std::optional<double> best_expected;
-    std::optional<double> played_expected;
-    std::optional<double> second_expected;
-    std::optional<int> best_cp;
-    std::optional<int> played_cp;
-    std::optional<int> second_cp;
-    AccuracyEvaluation accuracy_best;
-    AccuracyEvaluation accuracy_played_root;
-    AccuracyEvaluation accuracy_played_after;
-    AccuracyEvaluation accuracy_second;
-    bool played_is_best = false;
-    bool missed_forced_mate = false;
-    bool allowed_forced_mate = false;
-    bool material_sacrifice = false;
-    bool only_move_tactical = false;
-    bool forces_nontrivial_mate = false;
-    std::string recommended_move;
-    const auto context = position_context(move.fen_before);
-    if (before.has_value() && !before->lines.empty()) {
-      recommended_move = ranked_best_move(before->lines, before->best_move);
-      played_is_best = move.uci == recommended_move;
-      if (!recommended_move.empty()) {
-        recommended_move = apply_legal_uci_move(
-            move.fen_before, recommended_move).san;
-      }
-      best_expected = expected_score_side_to_move(evaluation_of(before->lines.front()));
-      best_cp = before->lines.front().evaluation_cp;
-      accuracy_best = {
-          .evaluation_cp = before->lines.front().evaluation_cp,
-          .mate_in = before->lines.front().mate_in,
-          .depth = before->lines.front().depth,
-      };
-      if (before->lines.size() > 1) {
-        second_expected = expected_score_side_to_move(evaluation_of(before->lines[1]));
-        second_cp = before->lines[1].evaluation_cp;
-        accuracy_second = {
-            .evaluation_cp = before->lines[1].evaluation_cp,
-            .mate_in = before->lines[1].mate_in,
-            .depth = before->lines[1].depth,
-        };
-      }
+    const auto assessment = assess_move(
+        move.fen_before,
+        move.uci,
+        move.fen_after,
+        before.has_value() ? &before->lines : nullptr,
+        before.has_value() ? &before->best_move : nullptr,
+        after.has_value() ? &after->lines : nullptr,
+        theory,
+        use_sf19_classifier);
 
-      // Prefer the played move's score from the SAME root MultiPV search when
-      // Stockfish returned it. Comparing two root alternatives from one search
-      // is much more stable than comparing a before-position result with an
-      // independently deepened after-position result.
-      for (const auto& line : before->lines) {
-        if (line.best_move() != move.uci) continue;
-        played_expected = expected_score_side_to_move(evaluation_of(line));
-        played_cp = line.evaluation_cp;
-        accuracy_played_root = {
-            .evaluation_cp = line.evaluation_cp,
-            .mate_in = line.mate_in,
-            .depth = line.depth,
-        };
-        material_sacrifice = material_sacrifice_in_pv(
-            move.fen_before, line.moves, 8);
-        forces_nontrivial_mate = line.mate_in.has_value() && *line.mate_in > 1;
-        break;
-      }
+    std::string recommended_move = assessment.recommended_move_uci;
+    if (usable_engine_move(recommended_move)) {
+      recommended_move = apply_legal_uci_move(move.fen_before, recommended_move).san;
+    } else {
+      recommended_move.clear();
+    }
 
-      if (best_expected.has_value() && second_expected.has_value()) {
-        const bool unique_by_expected = *best_expected - *second_expected >= 0.20;
-        const bool unique_by_cp = best_cp.has_value() && second_cp.has_value()
-            && *best_cp - *second_cp >= MoveClassifierConfig{}.critical_cp_gap;
-        only_move_tactical = *best_expected >= 0.55
-            && (unique_by_expected || unique_by_cp);
-      }
-      const auto best_mate = before->lines.front().mate_in;
-      const bool best_has_mate = best_mate.has_value() && *best_mate > 0;
-      if (after.has_value() && !after->lines.empty()) {
-        const auto after_mate = after->lines.front().mate_in;
-        // After the move the perspective flips to the opponent. Negative mate
-        // means the mover has a forced mate. This also verifies sacrificial
-        // attacks even when the played move was not rank 1 in a shallower root
-        // search.
-        forces_nontrivial_mate = forces_nontrivial_mate
-            || (after_mate.has_value() && *after_mate < -1);
-        if (!material_sacrifice) {
-          std::vector<std::string> played_pv;
-          played_pv.reserve(after->lines.front().moves.size() + 1);
-          played_pv.push_back(move.uci);
-          played_pv.insert(
-              played_pv.end(),
-              after->lines.front().moves.begin(),
-              after->lines.front().moves.end());
-          material_sacrifice = material_sacrifice_in_pv(
-              move.fen_before, played_pv, 8);
-        }
-        // A missing mate score means a previously forced mate was lost;
-        // positive mate means the move allowed the opponent to force mate.
-        missed_forced_mate = best_has_mate
-            && (!after_mate.has_value() || *after_mate > 0);
-        allowed_forced_mate = after_mate.has_value() && *after_mate > 0
-            && (!best_mate.has_value() || *best_mate >= 0);
-      }
-    }
-    if (after.has_value() && !after->lines.empty()) {
-      const auto& after_line = after->lines.front();
-      if (!played_expected.has_value()) {
-        played_expected = expected_score_mover_after_move(evaluation_of(after_line));
-      }
-      if (!played_cp.has_value() && after_line.evaluation_cp.has_value()) {
-        played_cp = -*after_line.evaluation_cp;
-      }
-      accuracy_played_after.depth = after_line.depth;
-      if (after_line.evaluation_cp.has_value()) {
-        accuracy_played_after.evaluation_cp = -*after_line.evaluation_cp;
-      }
-      if (after_line.mate_in.has_value() && *after_line.mate_in != 0) {
-        // Engine scores are from the side-to-move perspective.  After the
-        // played move the opponent is to move, so invert mate sign back to
-        // the mover perspective used by Accuracy V3.
-        accuracy_played_after.mate_in = -*after_line.mate_in;
-      } else if (after_line.mate_in.has_value() && *after_line.mate_in == 0) {
-        // The terminal adapter uses mate=0 when the opponent is already
-        // checkmated. From the mover's perspective this is a completed mate.
-        accuracy_played_after.evaluation_cp.reset();
-        accuracy_played_after.mate_in = 1;
-        if (accuracy_played_after.depth <= 0) {
-          accuracy_played_after.depth = accuracy_best.depth;
-        }
-      } else if (after_line.depth == 0 && after_line.wdl.has_value()
-                 && after_line.wdl->draws > 0
-                 && after_line.wdl->wins == 0
-                 && after_line.wdl->losses == 0) {
-        // Stalemate / terminal draw. Accuracy itself does not consume WDL;
-        // this is only a zero-cost terminal-state marker from the engine.
-        accuracy_played_after.evaluation_cp = 0;
-        accuracy_played_after.mate_in.reset();
-        accuracy_played_after.depth = accuracy_best.depth;
-      }
-    }
-    if (!played_expected.has_value()) {
-      // Terminal positions need no engine PV. Score the actual board state
-      // directly, including the final move even when its post-move slot was
-      // satisfied by the engine adapter's zero-cost terminal result.
-      const auto after_context = position_context(move.fen_after);
-      if (after_context.legal_move_count == 0) {
-        played_expected = after_context.in_check ? 1.0 : 0.5;
-      }
-    }
-    const auto loss = expected_score_loss(best_expected, played_expected);
-    const auto category = classify_move({
-        .theory = theory.is_theory,
-        .played_is_best = played_is_best,
-        .material_sacrifice = material_sacrifice,
-        .only_move_tactical = only_move_tactical,
-        .missed_forced_mate = missed_forced_mate,
-        .allowed_forced_mate = allowed_forced_mate,
-        .was_in_check_before_move = context.in_check,
-        .forces_nontrivial_mate = forces_nontrivial_mate,
-        .legal_move_count = context.legal_move_count,
-        .best_expected_score = best_expected,
-        .played_expected_score = played_expected,
-        .second_best_expected_score = second_expected,
-        .best_evaluation_cp = best_cp,
-        .played_evaluation_cp = played_cp,
-        .second_best_evaluation_cp = second_cp,
-    });
     records.push_back({
         .ply = move.ply_index,
-        .classification = category,
-        .classifier_version = MoveClassifierConfig::version,
-        .expected_score_before = best_expected,
-        .expected_score_best = best_expected,
-        .expected_score_played = played_expected,
-        .expected_score_loss = loss,
+        .classification = assessment.category,
+        .classifier_version = classifier_version,
+        .expected_score_before = assessment.best_expected,
+        .expected_score_best = assessment.best_expected,
+        .expected_score_played = assessment.played_expected,
+        .expected_score_loss = assessment.loss,
         .recommended_move = recommended_move,
         .theory = theory,
     });
     {
       std::ostringstream log_message;
       log_message << "game=" << game_id << " ply=" << move.ply_index
-                  << " category=" << move_category_name(category);
-      if (loss.has_value()) log_message << " loss=" << std::fixed << std::setprecision(4) << *loss;
+                  << " category=" << move_category_name(assessment.category);
+      if (assessment.loss.has_value()) {
+        log_message << " loss=" << std::fixed << std::setprecision(4)
+                    << *assessment.loss;
+      }
       diagnostics::debug("classifier", log_message.str());
     }
     auto& accuracy_moves = move.side_to_move == "black" ? black_moves : white_moves;
-    accuracy_moves.push_back({
-        .theory = theory.is_theory,
-        .played_is_best = played_is_best,
-        .legal_move_count = context.legal_move_count,
-        .best = accuracy_best,
-        .played_root = accuracy_played_root,
-        .played_after = accuracy_played_after,
-        .second_best = accuracy_second,
-    });
+    accuracy_moves.push_back(assessment.accuracy);
   }
   database_.persist_classifications(
       game_id, config_hash, records, game_accuracy(white_moves), game_accuracy(black_moves),
-      MoveClassifierConfig::version, AccuracyConfig::version, book_version,
+      classifier_version, AccuracyConfig::version, book_version,
       through_ply < 0);
 }
 
@@ -1007,8 +1283,8 @@ void AnalysisService::run_analysis(
                   << " time=" << settings.time_limit_seconds;
       diagnostics::info("analysis", log_message.str());
     }
-    const std::string engine_version = job->engine->version();
-    const std::string cache_engine_identity = position_cache_engine_identity(engine_version, settings.adaptive_early_stop);
+    const std::string cache_engine_identity = position_cache_engine_identity(
+        *job->engine, settings.adaptive_early_stop);
     bool engine_started = false;
 
     std::unordered_set<int> completed_slots(
@@ -1133,10 +1409,17 @@ void AnalysisService::run_analysis(
       }
 
       const std::string cache_fen = canonical_position_cache_fen(positions[ply]);
+      const auto context = position_context(positions[ply]);
+      auto classification_cache_settings = settings;
+      if (context.legal_move_count > 0) {
+        classification_cache_settings.multi_pv = std::max(
+            settings.multi_pv,
+            std::min(context.legal_move_count, kClassificationMultiPv));
+      }
       std::optional<AnalysisResult> result;
       if (settings.use_global_analysis_cache) {
         result = database_.compatible_position_analysis(
-            cache_fen, cache_engine_identity, settings);
+            cache_fen, cache_engine_identity, classification_cache_settings);
       }
       if (result.has_value()) {
         diagnostics::debug(
@@ -1145,7 +1428,6 @@ void AnalysisService::run_analysis(
         diagnostics::debug(
             "cache", "game=" + game_id + " slot=" + std::to_string(ply)
                 + (settings.use_global_analysis_cache ? " miss" : " disabled"));
-        const auto context = position_context(positions[ply]);
         if (context.legal_move_count == 0) {
           // Terminal checkmate/stalemate positions have no candidate move and
           // therefore need no Stockfish search. Persist an empty terminal
@@ -1159,14 +1441,13 @@ void AnalysisService::run_analysis(
             engine_started = true;
           }
 
-          // Adaptive preparation stage 1: at the user's full minimum depth,
-          // calculate at most the two most important root alternatives first.
-          // Two lines are enough to distinguish Best/Great and, when the
-          // actually played move is among them, to score that move from the
-          // same root search. The user's MultiPV remains the hard ceiling.
+          // Adaptive preparation stage 1: always obtain the best two root
+          // alternatives for classification, even when the UI only displays one
+          // PV. Extra classifier lines stay hidden from the UI and do not change
+          // the user's visible MultiPV preference.
           auto scout_settings = settings;
           scout_settings.multi_pv = std::max(
-              1, std::min({settings.multi_pv, context.legal_move_count, 2}));
+              1, std::min(context.legal_move_count, 2));
 
           std::optional<AnalysisResult> scout;
           if (settings.use_global_analysis_cache) {
@@ -1221,8 +1502,7 @@ void AnalysisService::run_analysis(
           // classifier a same-position score at a fraction of the cost while
           // preserving the existing full verification for genuinely difficult
           // tactical/boundary positions below.
-          if (settings.multi_pv > scout_settings.multi_pv
-              && !played_move.empty() && !played_is_in_scout) {
+          if (!played_move.empty() && !played_is_in_scout) {
             auto played_request = preanalysis_request(positions[ply], settings);
             played_request.depth = std::max(1, scout->reached_depth);
             played_request.multi_pv = 1;
@@ -1244,7 +1524,9 @@ void AnalysisService::run_analysis(
                 && played_result.lines.front().best_move() == played_move;
             if (targeted_played_move) {
               auto played_line = std::move(played_result.lines.front());
-              played_line.rank = static_cast<int>(scout->lines.size()) + 1;
+              // searchmoves gives a score, not a trustworthy global rank. Keep
+              // rank=0 until the dedicated top-four resolution search below.
+              played_line.rank = 0;
               scout->lines.push_back(std::move(played_line));
               scout->nodes = std::max(scout->nodes, played_result.nodes);
               played_is_in_scout = true;
@@ -1263,19 +1545,72 @@ void AnalysisService::run_analysis(
             }
           }
 
+          // Resolve ranks 3/4 explicitly when the played move was outside the
+          // top-two scout. This is classification-only MultiPV: the UI still
+          // renders at most settings.multi_pv lines. If the move is absent from
+          // the top four, append its targeted score with rank 5 meaning "5+".
+          if (!played_move.empty() && !std::any_of(
+                  scout->lines.begin(), scout->lines.end(), [&](const EngineLine& line) {
+                    return line.rank > 0 && line.best_move() == played_move;
+                  })) {
+            const int classification_multi_pv = std::max(
+                1, std::min(context.legal_move_count, kClassificationMultiPv));
+            if (classification_multi_pv > scout_settings.multi_pv) {
+              const EngineLine* targeted_line = line_for_move(scout->lines, played_move);
+              auto rank_settings = settings;
+              rank_settings.depth = std::max(1, scout->reached_depth);
+              rank_settings.multi_pv = classification_multi_pv;
+              auto rank_request = preanalysis_request(positions[ply], rank_settings);
+              rank_request.depth = rank_settings.depth;
+              rank_request.multi_pv = rank_settings.multi_pv;
+              rank_request.dynamic_early_stop = false;
+              auto ranked = job->engine->analyze(rank_request);
+              if (ranked.interrupted) {
+                if (job->cancel_requested) {
+                  job->state = AnalysisJobState::cancelled;
+                  database_.set_analysis_status(game_id, config_hash, "cancelled");
+                  job->engine->stop();
+                  job->finished = true;
+                  return;
+                }
+                continue;
+              }
+              const bool played_is_top_four = std::any_of(
+                  ranked.lines.begin(), ranked.lines.end(), [&](const EngineLine& line) {
+                    return line.best_move() == played_move;
+                  });
+              if (!played_is_top_four && targeted_line != nullptr) {
+                auto outside_line = *targeted_line;
+                outside_line.rank = kClassificationMultiPv + 1;
+                ranked.lines.push_back(std::move(outside_line));
+              }
+              scout = std::move(ranked);
+              if (settings.use_global_analysis_cache) {
+                database_.persist_position_analysis(
+                    cache_fen, cache_engine_identity, rank_settings, *scout,
+                    unix_time_seconds());
+              }
+            }
+          }
+
           const bool difficult_position = difficult_preanalysis_position(
               positions[ply], played_move, *scout);
           // Step 5: difficult classifications receive the user's full minimum
           // budget. This is intentionally selective: quiet, clear positions
           // keep the cheap scout result, while tactical/mate/sacrifice and
           // boundary cases are verified without early termination.
+          const int required_classification_multi_pv = std::max(
+              1, std::min(context.legal_move_count, kClassificationMultiPv));
           const bool needs_full_verification = difficult_position
               && (scout->converged_early
-                  || settings.multi_pv > scout_settings.multi_pv
+                  || static_cast<int>(scout->lines.size()) < required_classification_multi_pv
                   || scout->reached_depth < settings.depth);
 
           if (needs_full_lines || needs_full_verification) {
-            auto full_request = preanalysis_request(positions[ply], settings);
+            auto full_settings = settings;
+            full_settings.multi_pv = std::max(
+                settings.multi_pv, required_classification_multi_pv);
+            auto full_request = preanalysis_request(positions[ply], full_settings);
             full_request.multi_pv = std::max(
                 1, std::min(full_request.multi_pv, context.legal_move_count));
             // Deliberately leave dynamic_early_stop disabled. The whole point
@@ -1294,7 +1629,7 @@ void AnalysisService::run_analysis(
             }
             if (settings.use_global_analysis_cache) {
               database_.persist_position_analysis(
-                  cache_fen, cache_engine_identity, settings, *result,
+                  cache_fen, cache_engine_identity, full_settings, *result,
                   unix_time_seconds());
             }
             diagnostics::debug(
@@ -1389,8 +1724,8 @@ void AnalysisService::run_refinement_queue(
         settings.hash_mb, kHashMbSetting.min_int, kHashMbSetting.max_int);
     settings.threads = live_refinement_threads(settings);
 
-    const std::string engine_version = job->engine->version();
-    const std::string cache_engine_identity = position_cache_engine_identity(engine_version, settings.adaptive_early_stop);
+    const std::string cache_engine_identity = position_cache_engine_identity(
+        *job->engine, settings.adaptive_early_stop);
     job->engine->start();
     job->engine->new_game();
 
@@ -1613,7 +1948,7 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
   stop_all_variation_jobs(true);
 
   const auto settings = preanalysis_budget_settings();
-  StockfishEngine version_probe;
+  const auto version_probe = create_stockfish_engine(settings.engine_id);
   const auto config_hash = analysis_config_hash(settings);
   if (auto reusable = reusable_analysis(game_id, settings);
       reusable.has_value() && reusable->status == "complete") {
@@ -1623,12 +1958,12 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
     return analysis_json(game_id, database_.analysis(
         game_id, reusable->config_hash).value());
   }
-  version_probe.validate_available();
+  version_probe->validate_available();
   const int public_total_plies = game->kind == "fen"
       ? 1
       : static_cast<int>(game->moves.size());
   auto persisted = database_.prepare_analysis(
-      game_id, config_hash, version_probe.version(), public_total_plies,
+      game_id, config_hash, version_probe->version(), public_total_plies,
       settings.depth, settings.multi_pv, settings.time_limit_seconds,
       settings.adaptive_early_stop);
   if (persisted.status == "complete") {
@@ -1651,7 +1986,7 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
     }
     if (existing == jobs_.end()) {
       auto job = std::make_shared<AnalysisJob>();
-      job->engine = std::make_shared<StockfishEngine>();
+      job->engine = create_stockfish_engine(settings.engine_id);
       job->config_hash = config_hash;
       // Resume is position-exact, not progress-counter based. Persisted
       // engine rows survive cancellation/errors, and only missing position
@@ -1759,15 +2094,33 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
       }
       if (!fen.empty()) {
         const auto requested = database_.settings();
+        int visible_depth = result->lines.empty() ? 0 : result->lines.front().depth;
+
+        // SF19 live refinement previously exposed only liveDepth while keeping
+        // the old pre-analysis PV/best move on screen. That made an old arrow
+        // look like it belonged to the deeper live search. Once SF19 has one
+        // complete exact MultiPV iteration for this very slot, publish that
+        // coherent snapshot immediately. SF18 deliberately keeps its existing
+        // persisted-checkpoint behavior.
+        if (refinement_job->engine->id() == "stockfish19"
+            && refinement_job->state.load() == AnalysisJobState::running
+            && refinement_job->current_position_slot.load() == ply) {
+          auto live = refinement_job->engine->current_result();
+          if (!live.lines.empty() && live.reached_depth > visible_depth) {
+            result->best_move = live.best_move;
+            result->lines = std::move(live.lines);
+            result->latest_ply = ply;
+            visible_depth = result->lines.front().depth;
+          }
+        }
+
         const auto checkpoint = database_.best_position_checkpoint(
             canonical_position_cache_fen(fen),
             position_cache_engine_identity(
-                refinement_job->engine->version(), requested.adaptive_early_stop),
+                *refinement_job->engine, requested.adaptive_early_stop),
             requested.depth, requested.multi_pv);
-        const int persisted_depth = result->lines.empty()
-            ? 0 : result->lines.front().depth;
         if (checkpoint.has_value() && !checkpoint->lines.empty()
-            && checkpoint->lines.front().depth > persisted_depth) {
+            && checkpoint->lines.front().depth > visible_depth) {
           result->best_move = checkpoint->best_move;
           result->lines = checkpoint->lines;
           result->latest_ply = ply;
@@ -1813,8 +2166,8 @@ std::string AnalysisService::start_move_refinement_json(
     throw std::invalid_argument("ply exceeds game position count");
   }
 
-  StockfishEngine version_probe;
-  version_probe.validate_available();
+  const auto version_probe = create_stockfish_engine(settings.engine_id);
+  version_probe->validate_available();
   if (auto reusable = reusable_analysis(game_id, settings, ply);
       reusable.has_value() && reusable->status == "complete") {
     rebuild_classification(game_id, reusable->config_hash);
@@ -1826,7 +2179,7 @@ std::string AnalysisService::start_move_refinement_json(
       ? 1
       : static_cast<int>(game->moves.size());
   auto persisted = database_.prepare_analysis(
-      game_id, config_hash, version_probe.version(), public_total_plies,
+      game_id, config_hash, version_probe->version(), public_total_plies,
       settings.depth, settings.multi_pv, settings.time_limit_seconds,
       settings.adaptive_early_stop);
 
@@ -1896,7 +2249,7 @@ std::string AnalysisService::start_move_refinement_json(
   }
 
   auto job = std::make_shared<AnalysisJob>();
-  job->engine = std::make_shared<StockfishEngine>();
+  job->engine = create_stockfish_engine(settings.engine_id);
   job->config_hash = config_hash;
   if (auto published = reusable_analysis(game_id, preanalysis_budget_settings());
       published.has_value()) {
@@ -2018,7 +2371,7 @@ void AnalysisService::stop_all_mainline_analysis_jobs() noexcept {
 
 void AnalysisService::stop_all_variation_jobs(const bool stop_engine) noexcept {
   std::vector<std::shared_ptr<VariationJob>> stale_jobs;
-  std::shared_ptr<StockfishEngine> engine_to_stop;
+  std::shared_ptr<ChessEngine> engine_to_stop;
   {
     std::lock_guard lock(variation_jobs_mutex_);
     for (auto& [job_id, job] : variation_jobs_) {
@@ -2039,6 +2392,17 @@ void AnalysisService::stop_all_variation_jobs(const bool stop_engine) noexcept {
     if (stale->worker.joinable()) stale->worker.join();
   }
   if (engine_to_stop != nullptr) engine_to_stop->stop();
+}
+
+void AnalysisService::prepare_for_engine_change() noexcept {
+  // Engine selection is an execution concern only. Keep every persisted
+  // analysis/cache row intact so switching back to a previously used engine
+  // can still reuse its compatible results. Only live workers must be stopped
+  // before the setting changes; otherwise a worker created with the previous
+  // engine could continue while later status/cache lookups observe the new
+  // engine setting.
+  stop_all_mainline_analysis_jobs();
+  stop_all_variation_jobs(true);
 }
 
 void AnalysisService::reap_finished_variation_jobs() {
@@ -2117,14 +2481,28 @@ std::string AnalysisService::start_variation_job_json(
   job->played_san = applied.san;
   job->fen_before = fen;
   job->fen = applied.fen_after;
+  job->visible_multi_pv = settings.multi_pv;
   {
     std::lock_guard lock(variation_jobs_mutex_);
-    if (variation_engine_ == nullptr) {
-      variation_engine_ = std::make_shared<StockfishEngine>();
+    if (variation_engine_ == nullptr || variation_engine_->id() != settings.engine_id) {
+      if (variation_engine_ != nullptr) variation_engine_->stop();
+      variation_position_results_.clear();
+      variation_engine_ = create_stockfish_engine(settings.engine_id);
       variation_engine_->validate_available();
     }
     job->engine = variation_engine_;
   }
+
+  // SF19 sideline engines are intentionally reused across consecutive moves to
+  // preserve their expensive TT/NNUE state. Its public live snapshot belongs
+  // to exactly one root position, though. Clear only that transient snapshot
+  // before publishing the new job so the first status response can never show
+  // PV/eval/bestmove data from the previous sideline position. SF18 keeps its
+  // established behavior because its adapter uses the default no-op method.
+  if (job->engine->id() == "stockfish19") {
+    job->engine->clear_live_result();
+  }
+
   job->worker = std::thread([this, job, settings = std::move(settings)] {
     try {
       if (job->cancel_requested) throw std::runtime_error("Variation analysis cancelled");
@@ -2133,7 +2511,27 @@ std::string AnalysisService::start_variation_job_json(
       // Keep the live UX unchanged: first analyze the position AFTER the
       // sideline move so evaluation/PV immediately correspond to the board the
       // user is looking at. Classification is finalized afterwards.
-      auto after_request = analysis_request(job->fen, settings);
+      //
+      // SF19 must use the same root search width for the arrow shown now and
+      // for classification if the user follows that arrow on the next ply. A
+      // MultiPV-1 arrow followed by a separate MultiPV-4 classifier search can
+      // legitimately produce a different rank-1 move at the same depth. Keep
+      // the extra SF19 lines internal; variation_analysis_status_json() still
+      // exposes only the user's requested MultiPV count. SF18 intentionally
+      // retains its established search behavior.
+      auto after_settings = settings;
+      if (job->engine->id() == "stockfish19") {
+        const auto after_context = position_context(job->fen);
+        if (after_context.legal_move_count > 0) {
+          after_settings.multi_pv = std::max(
+              settings.multi_pv,
+              std::min(after_context.legal_move_count, kClassificationMultiPv));
+        }
+      }
+      auto after_request = analysis_request(job->fen, after_settings);
+      if (job->engine->id() == "stockfish19") {
+        after_request.require_exact_multipv_snapshot = true;
+      }
       after_request.cancel_requested = &job->cancel_requested;
       auto after = job->engine->analyze(after_request);
       {
@@ -2151,7 +2549,8 @@ std::string AnalysisService::start_variation_job_json(
       // This cache is in-memory only and is cleared when variation mode ends.
       {
         std::lock_guard lock(variation_jobs_mutex_);
-        variation_position_results_[variation_position_cache_key(job->fen, settings)] = after;
+        variation_position_results_[variation_position_cache_key(
+            job->fen, settings, job->engine->cache_identity())] = after;
       }
 
       // A move category compares the played move with the best alternatives in
@@ -2160,10 +2559,14 @@ std::string AnalysisService::start_variation_job_json(
       auto before_settings = settings;
       const auto before_context = position_context(job->fen_before);
       before_settings.multi_pv = std::max(
-          1, std::min({settings.multi_pv, before_context.legal_move_count, 2}));
+          1,
+          std::min(
+              before_context.legal_move_count,
+              std::max(settings.multi_pv, kClassificationMultiPv)));
 
       std::optional<AnalysisResult> before;
-      const auto before_key = variation_position_cache_key(job->fen_before, before_settings);
+      const auto before_key = variation_position_cache_key(
+          job->fen_before, before_settings, job->engine->cache_identity());
       {
         std::lock_guard lock(variation_jobs_mutex_);
         const auto cached = variation_position_results_.find(before_key);
@@ -2178,7 +2581,7 @@ std::string AnalysisService::start_variation_job_json(
         before = database_.compatible_position_analysis(
             canonical_position_cache_fen(job->fen_before),
             position_cache_engine_identity(
-                job->engine->version(), before_settings.adaptive_early_stop),
+                *job->engine, before_settings.adaptive_early_stop),
             before_settings);
       }
 
@@ -2188,6 +2591,9 @@ std::string AnalysisService::start_variation_job_json(
         // the completed after-position PV until classification is ready.
         job->expose_live_result = false;
         auto before_request = analysis_request(job->fen_before, before_settings);
+        if (job->engine->id() == "stockfish19") {
+          before_request.require_exact_multipv_snapshot = true;
+        }
         before_request.cancel_requested = &job->cancel_requested;
         before = job->engine->analyze(before_request);
         if (job->cancel_requested || before->interrupted) {
@@ -2207,7 +2613,8 @@ std::string AnalysisService::start_variation_job_json(
         theory = opening_theory_->lookup(job->fen_before, job->played_move);
       }
       const auto category = classify_variation_move(
-          job->fen_before, job->played_move, job->fen, *before, after, theory);
+          job->fen_before, job->played_move, job->fen, *before, after, theory,
+          job->engine->id() == "stockfish19");
       {
         std::lock_guard lock(job->state_mutex);
         job->classification = category;
@@ -2278,6 +2685,7 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
       {"position", nlohmann::json::parse(position_view_json(job->fen))},
       {"error", error.empty() ? nlohmann::json(nullptr) : nlohmann::json(error)},
       {"bestMove", result.best_move},
+      {"engineVersion", job->engine->version()},
       {"liveDepth", result.reached_depth},
       {"moverEvaluationCp", nullptr},
       {"moverMateIn", nullptr},
@@ -2292,8 +2700,15 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
     }
     if (principal.mate_in.has_value()) json["moverMateIn"] = -*principal.mate_in;
   }
-  for (const auto& line : result.lines) {
+  const auto visible_line_count = std::min(
+      result.lines.size(),
+      static_cast<std::size_t>(std::max(1, job->visible_multi_pv)));
+  for (std::size_t index = 0; index < visible_line_count; ++index) {
+    const auto& line = result.lines[index];
     const bool line_is_white = white_to_move(job->fen);
+    const auto evaluation_bar_white_permille = job->engine->id() == "stockfish19"
+        ? sf19_evaluation_bar_white_permille(line, line_is_white)
+        : std::nullopt;
     nlohmann::json line_json{
         {"rank", line.rank},
         {"depth", line.depth},
@@ -2302,6 +2717,9 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
             : nlohmann::json(nullptr)},
         {"mateIn", line.mate_in.has_value()
             ? nlohmann::json(line_is_white ? *line.mate_in : -*line.mate_in)
+            : nlohmann::json(nullptr)},
+        {"evaluationBarWhitePermille", evaluation_bar_white_permille.has_value()
+            ? nlohmann::json(*evaluation_bar_white_permille)
             : nlohmann::json(nullptr)},
         {"nodes", line.nodes},
         {"moves", line.moves},
@@ -2331,7 +2749,7 @@ void AnalysisService::cancel_variation_analysis(const std::string& job_id) {
     job->engine->cancel();
   }
   if (job->worker.joinable()) job->worker.join();
-  std::shared_ptr<StockfishEngine> engine_to_stop;
+  std::shared_ptr<ChessEngine> engine_to_stop;
   {
     std::lock_guard lock(variation_jobs_mutex_);
     const auto found = variation_jobs_.find(job_id);

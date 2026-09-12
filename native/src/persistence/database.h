@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Persistence records and database interface
+// -----------------------------------------------------------------------------
+
 #pragma once
 
 #include <filesystem>
@@ -85,8 +89,10 @@ struct GameRecord {
 };
 
 // Minimal per-game fields for statistics aggregation. Deliberately excludes the
-// PGN and analysis joins so a full-library overview stays cheap.
+// PGN and per-move analysis so a full-library overview stays cheap; `analysed`
+// is a single indexed EXISTS against analysis_runs.
 struct GameStatRow {
+  std::string game_id;
   std::string provider_outcome;   // win | loss | draw | unknown (profile perspective)
   std::string result;             // 1-0 | 0-1 | 1/2-1/2 | *
   std::string white_name;
@@ -94,6 +100,19 @@ struct GameStatRow {
   std::string time_control_type;  // bullet | blitz | rapid | classical | daily | ...
   std::string opening_eco;        // empty when the game has no named opening
   std::string opening_name;       // empty when unclassified or no named opening
+  std::optional<int> opening_ply; // ply the named line ends at; null if unclassified
+  bool analysed{false};           // a finished (classified) engine analysis exists
+};
+
+// One move the engine flagged (miss, mistake or blunder) in a game's latest
+// finished analysis, with the position it was played from.
+struct GameMoveErrorRow {
+  std::string game_id;
+  int ply{0};                     // 0-based, 0 is White's first move
+  std::string category;
+  std::string san;
+  std::string fen_before;
+  std::string recommended_move;   // engine's move in notation; may be empty
 };
 
 // Minimal per-game fields for the game-phase ("phase of death") breakdown:
@@ -105,6 +124,54 @@ struct GamePhaseRow {
   std::string white_name;
   std::string black_name;
   int max_ply{-1};
+};
+
+struct BotGameMoveRecord {
+  int ply{0};
+  std::string uci;
+  std::string san;
+  std::string fen_after;
+};
+
+struct BotGameRecord {
+  std::string id;
+  int bot_elo{1500};
+  std::string player_color{"white"};
+  std::string bot_color{"black"};
+  std::string status{"active"};
+  std::string result{"*"};
+  std::string starting_fen;
+  std::string current_fen;
+  std::int64_t created_at{0};
+  std::int64_t updated_at{0};
+  bool show_eval_bar{false};
+  std::optional<std::string> analysis_game_id;
+  std::vector<BotGameMoveRecord> moves;
+};
+
+struct BotGameSummaryRecord {
+  std::string id;
+  int bot_elo{1500};
+  std::string player_color{"white"};
+  std::string bot_color{"black"};
+  std::string status{"active"};
+  std::string result{"*"};
+  std::int64_t created_at{0};
+  std::int64_t updated_at{0};
+  int move_count{0};
+  std::optional<std::string> analysis_game_id;
+};
+
+struct TrainingProgressRecord {
+  std::string exercise_id;
+  bool mastered{false};
+  int success_streak{0};
+  int success_count{0};
+  int attempt_count{0};
+  // Deepest an opening drill has ever run for this exercise, in answered book
+  // moves. Stays zero for exercises that are not drilled by depth.
+  int best_depth{0};
+  std::optional<std::int64_t> last_attempt_at;
 };
 
 struct FavoriteCollectionRecord {
@@ -214,9 +281,35 @@ class Database {
   std::vector<GameRecord> games(const std::string& profile_id) const;
   std::vector<GameRecord> favorite_games() const;
   std::optional<GameRecord> game(const std::string& game_id) const;
+  BotGameRecord create_bot_game(int bot_elo, const std::string& starting_fen);
+  std::optional<BotGameRecord> active_bot_game() const;
+  std::optional<BotGameRecord> bot_game(const std::string& game_id) const;
+  std::vector<BotGameSummaryRecord> bot_games() const;
+  void append_bot_game_move(
+      const std::string& game_id,
+      int base_ply,
+      const std::string& expected_fen_before,
+      const BotGameMoveRecord& move);
+  void finish_bot_game(
+      const std::string& game_id,
+      const std::string& status,
+      const std::string& result);
+  void delete_bot_game(const std::string& game_id);
+  void set_bot_game_show_eval_bar(const std::string& game_id, bool enabled);
+  void set_bot_game_analysis_game_id(
+      const std::string& game_id, const std::string& analysis_game_id);
+
+  std::vector<TrainingProgressRecord> training_progress() const;
+  void put_training_progress(const TrainingProgressRecord& progress);
 
   // Lightweight rows for statistics, newest game first (by end/creation time).
   std::vector<GameStatRow> games_for_statistics(const std::string& profile_id) const;
+
+  // Flagged moves (miss/mistake/blunder) before before_ply in each of the
+  // profile's games, from that game's latest classified analysis run. Both
+  // sides' moves are returned; the caller knows which side is the profile's.
+  std::vector<GameMoveErrorRow> move_errors_for_statistics(
+      const std::string& profile_id, int before_ply) const;
 
   // Outcome + final ply per game, for the game-phase breakdown.
   std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;

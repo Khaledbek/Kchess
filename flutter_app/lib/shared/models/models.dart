@@ -1,3 +1,10 @@
+// -----------------------------------------------------------------------------
+// Section: Application DTOs
+// -----------------------------------------------------------------------------
+
+part 'statistics_details.dart';
+part 'training_models.dart';
+
 enum ProfileType {
   chessCom,
   lichess,
@@ -23,19 +30,11 @@ class AppProfile {
     this.avatarUrl,
     this.avatarFile,
     this.flair,
-    this.joinedAt,
-    this.lastOnlineAt,
-    this.country,
-    this.location,
-    this.publicUrl,
-    this.followers,
     this.fide,
     this.providerGames,
     this.providerWins,
     this.providerLosses,
     this.providerDraws,
-    this.playTimeSeconds,
-    this.providerStatus,
     this.providerDisabled = false,
   });
 
@@ -49,19 +48,11 @@ class AppProfile {
     avatarUrl: json['avatarUrl'] as String?,
     avatarFile: json['avatarFile'] as String?,
     flair: json['flair'] as String?,
-    joinedAt: json['joinedAt'] as int?,
-    lastOnlineAt: json['lastOnlineAt'] as int?,
-    country: json['country'] as String?,
-    location: json['location'] as String?,
-    publicUrl: json['publicUrl'] as String?,
-    followers: json['followers'] as int?,
     fide: json['fide'] as int?,
     providerGames: json['providerGames'] as int?,
     providerWins: json['providerWins'] as int?,
     providerLosses: json['providerLosses'] as int?,
     providerDraws: json['providerDraws'] as int?,
-    playTimeSeconds: json['playTimeSeconds'] as int?,
-    providerStatus: json['providerStatus'] as String?,
     providerDisabled: json['providerDisabled'] as bool? ?? false,
   );
 
@@ -74,19 +65,11 @@ class AppProfile {
   final String? avatarUrl;
   final String? avatarFile;
   final String? flair;
-  final int? joinedAt;
-  final int? lastOnlineAt;
-  final String? country;
-  final String? location;
-  final String? publicUrl;
-  final int? followers;
   final int? fide;
   final int? providerGames;
   final int? providerWins;
   final int? providerLosses;
   final int? providerDraws;
-  final int? playTimeSeconds;
-  final String? providerStatus;
   final bool providerDisabled;
 }
 
@@ -94,46 +77,28 @@ class ProviderPerformance {
   const ProviderPerformance({
     required this.key,
     this.currentRating,
-    this.bestRating,
-    this.lowestRating,
-    this.ratingProgress,
     this.games,
     this.wins,
     this.losses,
     this.draws,
-    this.winRate,
-    this.lossRate,
-    this.drawRate,
   });
 
   factory ProviderPerformance.fromJson(Map<String, Object?> json) =>
       ProviderPerformance(
         key: json['key']! as String,
         currentRating: json['currentRating'] as int?,
-        bestRating: json['bestRating'] as int?,
-        lowestRating: json['lowestRating'] as int?,
-        ratingProgress: json['ratingProgress'] as int?,
         games: json['games'] as int?,
         wins: json['wins'] as int?,
         losses: json['losses'] as int?,
         draws: json['draws'] as int?,
-        winRate: (json['winRate'] as num?)?.toDouble(),
-        lossRate: (json['lossRate'] as num?)?.toDouble(),
-        drawRate: (json['drawRate'] as num?)?.toDouble(),
       );
 
   final String key;
   final int? currentRating;
-  final int? bestRating;
-  final int? lowestRating;
-  final int? ratingProgress;
   final int? games;
   final int? wins;
   final int? losses;
   final int? draws;
-  final double? winRate;
-  final double? lossRate;
-  final double? drawRate;
 }
 
 class ProviderOverview {
@@ -141,8 +106,6 @@ class ProviderOverview {
     required this.profile,
     required this.stats,
     required this.availableMonths,
-    required this.offlineReady,
-    required this.retryAfterSeconds,
   });
 
   factory ProviderOverview.fromJson(Map<String, Object?> json) =>
@@ -154,15 +117,11 @@ class ProviderOverview {
             .toList(growable: false),
         availableMonths: (json['availableMonths'] as List<Object?>? ?? const [])
             .cast<String>(),
-        offlineReady: json['offlineReady'] as bool? ?? false,
-        retryAfterSeconds: json['retryAfterSeconds'] as int? ?? 0,
       );
 
   final AppProfile profile;
   final List<ProviderPerformance> stats;
   final List<String> availableMonths;
-  final bool offlineReady;
-  final int retryAfterSeconds;
 }
 
 /// A win/draw/loss tally from the profile's perspective, with derived rates.
@@ -173,8 +132,8 @@ class StatTally {
     this.wins = 0,
     this.draws = 0,
     this.losses = 0,
-    this.undecided = 0,
     this.winRate,
+    this.winShare,
     this.scorePercent,
   });
 
@@ -183,8 +142,8 @@ class StatTally {
     wins: json['wins'] as int? ?? 0,
     draws: json['draws'] as int? ?? 0,
     losses: json['losses'] as int? ?? 0,
-    undecided: json['undecided'] as int? ?? 0,
     winRate: (json['winRate'] as num?)?.toDouble(),
+    winShare: (json['winShare'] as num?)?.toDouble(),
     scorePercent: (json['scorePercent'] as num?)?.toDouble(),
   );
 
@@ -192,11 +151,9 @@ class StatTally {
   final int wins;
   final int draws;
   final int losses;
-  final int undecided;
   final double? winRate;
+  final double? winShare;
   final double? scorePercent;
-
-  int get decided => wins + draws + losses;
 }
 
 /// One time-control bucket (bullet, blitz, rapid, ...) with its tally.
@@ -222,7 +179,6 @@ class StatisticsOverview {
     this.white = const StatTally(),
     this.black = const StatTally(),
     this.byTimeControl = const [],
-    this.recentForm = const [],
   });
 
   factory StatisticsOverview.fromJson(Map<String, Object?> json) {
@@ -243,8 +199,6 @@ class StatisticsOverview {
           .cast<Map<String, Object?>>()
           .map(StatTimeControl.fromJson)
           .toList(growable: false),
-      recentForm: (json['recentForm'] as List<Object?>? ?? const [])
-          .cast<String>(),
     );
   }
 
@@ -254,7 +208,6 @@ class StatisticsOverview {
   final StatTally white;
   final StatTally black;
   final List<StatTimeControl> byTimeControl;
-  final List<String> recentForm;
 
   bool get isEmpty => totalGames == 0;
 }
@@ -290,10 +243,12 @@ class OpeningFamily {
     required this.color,
     required this.tally,
     required this.variations,
+    this.hasDistinctVariations = false,
   });
 
   factory OpeningFamily.fromJson(Map<String, Object?> json) => OpeningFamily(
     familyName: json['family'] as String? ?? '',
+    hasDistinctVariations: json['hasDistinctVariations'] as bool? ?? false,
     baseEco: json['eco'] as String? ?? '',
     color: json['color'] as String? ?? 'unknown',
     tally: StatTally.fromJson(json),
@@ -309,9 +264,7 @@ class OpeningFamily {
   final StatTally tally;
   final List<OpeningVariation> variations;
 
-  bool get hasDistinctVariations =>
-      variations.length > 1 ||
-      (variations.length == 1 && variations.first.name != familyName);
+  final bool hasDistinctVariations;
 }
 
 /// Opening families for the active profile, grouped and most played first.
@@ -319,29 +272,151 @@ class OpeningsStats {
   const OpeningsStats({
     this.hasProfile = false,
     this.gamesWithOpening = 0,
-    this.gamesWithoutOpening = 0,
-    this.distinctFamilies = 0,
+    this.bestWinRateFamilies = const [],
+    this.nemesis,
+    this.defaultColor = 'white',
     this.families = const [],
+    this.weaknesses = const [],
+    this.analysedOpeningGames = 0,
   });
 
   factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
     hasProfile: json['hasProfile'] as bool? ?? false,
     gamesWithOpening: json['gamesWithOpening'] as int? ?? 0,
-    gamesWithoutOpening: json['gamesWithoutOpening'] as int? ?? 0,
-    distinctFamilies: json['distinctFamilies'] as int? ?? 0,
+    defaultColor: json['defaultColor'] as String? ?? 'white',
+    bestWinRateFamilies:
+        (json['bestWinRateFamilies'] as List<Object?>? ?? const [])
+            .cast<Map<String, Object?>>()
+            .map(OpeningFamily.fromJson)
+            .toList(growable: false),
+    nemesis: json['nemesis'] == null
+        ? null
+        : OpeningFamily.fromJson(json['nemesis']! as Map<String, Object?>),
     families: (json['families'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>()
         .map(OpeningFamily.fromJson)
         .toList(growable: false),
+    weaknesses: (json['weaknesses'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(OpeningWeakness.fromJson)
+        .toList(growable: false),
+    analysedOpeningGames: json['analysedOpeningGames'] as int? ?? 0,
   );
 
   final bool hasProfile;
   final int gamesWithOpening;
-  final int gamesWithoutOpening;
-  final int distinctFamilies;
+  final String defaultColor;
+  final List<OpeningFamily> bestWinRateFamilies;
+  final OpeningFamily? nemesis;
   final List<OpeningFamily> families;
 
+  /// Lines the profile keeps losing or keeps misplaying, worst first, as native
+  /// judged them.
+  final List<OpeningWeakness> weaknesses;
+
+  /// Games in a named opening that have a finished engine analysis; the
+  /// move-level warnings can only come from these.
+  final int analysedOpeningGames;
+
   bool get isEmpty => gamesWithOpening == 0;
+}
+
+/// An opening line that needs training, with the evidence native found.
+class OpeningWeakness {
+  const OpeningWeakness({
+    required this.level,
+    required this.name,
+    required this.family,
+    required this.eco,
+    required this.color,
+    required this.tally,
+    this.analysedGames = 0,
+    this.gamesWithOpeningErrors = 0,
+    this.openingErrors = 0,
+    this.poorResults = false,
+    this.frequentErrors = false,
+    this.recurringMistake,
+  });
+
+  factory OpeningWeakness.fromJson(Map<String, Object?> json) => OpeningWeakness(
+    level: json['level'] as String? ?? 'variation',
+    name: json['name'] as String? ?? '',
+    family: json['family'] as String? ?? '',
+    eco: json['eco'] as String? ?? '',
+    color: json['color'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+    analysedGames: json['analysedGames'] as int? ?? 0,
+    gamesWithOpeningErrors: json['gamesWithOpeningErrors'] as int? ?? 0,
+    openingErrors: json['openingErrors'] as int? ?? 0,
+    poorResults: json['poorResults'] as bool? ?? false,
+    frequentErrors: json['frequentErrors'] as bool? ?? false,
+    recurringMistake: switch (json['recurringMistake']) {
+      final Map<String, Object?> mistake => RecurringOpeningMistake.fromJson(mistake),
+      _ => null,
+    },
+  );
+
+  /// `variation` for one named line, `family` when losses spread over a family.
+  final String level;
+
+  /// The variation's full name, or the family name for a family entry.
+  final String name;
+  final String family;
+  final String eco;
+
+  /// Side the profile played it with: `white` | `black`.
+  final String color;
+  final StatTally tally;
+  final int analysedGames;
+  final int gamesWithOpeningErrors;
+  final int openingErrors;
+  final bool poorResults;
+  final bool frequentErrors;
+  final RecurringOpeningMistake? recurringMistake;
+}
+
+/// The same flagged move in the same position, played in several games.
+class RecurringOpeningMistake {
+  const RecurringOpeningMistake({
+    required this.san,
+    required this.moveNumber,
+    required this.side,
+    required this.count,
+    this.recommended,
+    this.category = 'mistake',
+    this.fen = '',
+  });
+
+  factory RecurringOpeningMistake.fromJson(Map<String, Object?> json) =>
+      RecurringOpeningMistake(
+        san: json['san'] as String? ?? '',
+        moveNumber: json['moveNumber'] as int? ?? 1,
+        side: json['side'] as String? ?? 'white',
+        count: json['count'] as int? ?? 0,
+        recommended: json['recommended'] as String?,
+        category: json['category'] as String? ?? 'mistake',
+        fen: json['fen'] as String? ?? '',
+      );
+
+  final String san;
+  final int moveNumber;
+  final String side;
+
+  /// Games it happened in.
+  final int count;
+
+  /// The engine's move in notation, when the analysis recorded one.
+  final String? recommended;
+
+  /// `miss` | `mistake` | `blunder`, the worst verdict it was given.
+  final String category;
+
+  /// Position before the move (placement, side, castling, en passant).
+  final String fen;
+
+  /// `6. Nxf7` for White, `5... Nxd5` for Black.
+  String notation(String move) =>
+      side == 'white' ? '$moveNumber. $move' : '$moveNumber... $move';
 }
 
 /// One game-termination bucket (checkmate, resignation, timeout, draw, other)
@@ -368,11 +443,17 @@ class TerminationStats {
     this.hasProfile = false,
     this.totalGames = 0,
     this.terminations = const [],
+    this.spotlight,
   });
 
   factory TerminationStats.fromJson(Map<String, Object?> json) =>
       TerminationStats(
         hasProfile: json['hasProfile'] as bool? ?? false,
+        spotlight: json['spotlight'] == null
+            ? null
+            : TerminationSpotlight.fromJson(
+                json['spotlight']! as Map<String, Object?>,
+              ),
         totalGames: json['totalGames'] as int? ?? 0,
         terminations: (json['terminations'] as List<Object?>? ?? const [])
             .cast<Map<String, Object?>>()
@@ -383,6 +464,7 @@ class TerminationStats {
   final bool hasProfile;
   final int totalGames;
   final List<GameTermination> terminations;
+  final TerminationSpotlight? spotlight;
 
   bool get isEmpty => terminations.isEmpty;
 }
@@ -408,6 +490,7 @@ class PhaseStats {
     this.hasProfile = false,
     this.totalGames = 0,
     this.classified = 0,
+    this.overall = const StatTally(),
     this.phases = const [],
   });
 
@@ -415,6 +498,9 @@ class PhaseStats {
     hasProfile: json['hasProfile'] as bool? ?? false,
     totalGames: json['totalGames'] as int? ?? 0,
     classified: json['classified'] as int? ?? 0,
+    overall: StatTally.fromJson(
+      json['overall'] as Map<String, Object?>? ?? const {},
+    ),
     phases: (json['phases'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>()
         .map(GamePhase.fromJson)
@@ -424,6 +510,7 @@ class PhaseStats {
   final bool hasProfile;
   final int totalGames;
   final int classified;
+  final StatTally overall;
   final List<GamePhase> phases;
 
   bool get isEmpty => classified == 0;
@@ -468,12 +555,16 @@ class ScoutReport {
     this.byTimeControl = const [],
     this.terminations = const [],
     this.openings = const [],
+    this.comparison = const PlayerComparison(),
   });
 
   factory ScoutReport.fromJson(Map<String, Object?> json) {
     final byColor = json['byColor'] as Map<String, Object?>? ?? const {};
     return ScoutReport(
       hasProfile: json['hasProfile'] as bool? ?? false,
+      comparison: PlayerComparison.fromJson(
+        json['comparison'] as Map<String, Object?>? ?? const {},
+      ),
       profile: AppProfile.fromJson(json['profile']! as Map<String, Object?>),
       stats: (json['stats'] as List<Object?>? ?? const [])
           .cast<Map<String, Object?>>()
@@ -516,6 +607,7 @@ class ScoutReport {
   final List<StatTimeControl> byTimeControl;
   final List<GameTermination> terminations;
   final List<ScoutOpening> openings;
+  final PlayerComparison comparison;
 }
 
 enum AppThemeMode {
@@ -539,6 +631,10 @@ class AppSettings {
     this.threads = 2,
     this.maxThreads = 2,
     this.hashMb = 128,
+    this.sidelineDepth = 18,
+    this.sidelineMultiPv = 3,
+    this.sidelineThreads = 2,
+    this.sidelineHashMb = 128,
     this.showBestMoveArrow = true,
     this.showThreatArrow = true,
     this.showEvaluationBar = true,
@@ -557,6 +653,7 @@ class AppSettings {
     this.diagnosticLogging = true,
     this.themeMode = AppThemeMode.system,
     this.locale = 'de',
+    this.engineId = 'stockfish18',
   });
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
@@ -567,6 +664,15 @@ class AppSettings {
     threads: json['threads'] as int? ?? 2,
     maxThreads: json['maxThreads'] as int? ?? json['threads'] as int? ?? 2,
     hashMb: json['hashMb'] as int? ?? 128,
+    sidelineDepth:
+        json['sidelineDepth'] as int? ??
+        ((json['maxAnalysisDepth'] as int?) ?? (json['depth'] as int?) ?? 18),
+    sidelineMultiPv:
+        json['sidelineMultiPv'] as int? ?? json['multiPv'] as int? ?? 3,
+    sidelineThreads:
+        json['sidelineThreads'] as int? ?? json['threads'] as int? ?? 2,
+    sidelineHashMb:
+        json['sidelineHashMb'] as int? ?? json['hashMb'] as int? ?? 128,
     showBestMoveArrow:
         json['showBestMoveArrow'] as bool? ??
         json['showBoardArrows'] as bool? ??
@@ -588,6 +694,7 @@ class AppSettings {
     diagnosticLogging: json['diagnosticLogging'] as bool? ?? true,
     themeMode: AppThemeMode.fromJson(json['themeMode'] as String? ?? 'system'),
     locale: json['locale'] as String? ?? 'de',
+    engineId: json['engineId'] == 'stockfish19' ? 'stockfish19' : 'stockfish18',
   );
 
   final int minAnalysisDepth;
@@ -597,6 +704,10 @@ class AppSettings {
   final int threads;
   final int maxThreads;
   final int hashMb;
+  final int sidelineDepth;
+  final int sidelineMultiPv;
+  final int sidelineThreads;
+  final int sidelineHashMb;
   final bool showBestMoveArrow;
   final bool showThreatArrow;
   final bool showEvaluationBar;
@@ -615,6 +726,7 @@ class AppSettings {
   final bool diagnosticLogging;
   final AppThemeMode themeMode;
   final String locale;
+  final String engineId;
 
   // Compatibility alias for older widgets/tests while the setting is now
   // presented to users as the Best Move Arrow.
@@ -628,6 +740,10 @@ class AppSettings {
     int? threads,
     int? maxThreads,
     int? hashMb,
+    int? sidelineDepth,
+    int? sidelineMultiPv,
+    int? sidelineThreads,
+    int? sidelineHashMb,
     bool? showBestMoveArrow,
     bool? showBoardArrows,
     bool? showThreatArrow,
@@ -647,6 +763,7 @@ class AppSettings {
     bool? diagnosticLogging,
     AppThemeMode? themeMode,
     String? locale,
+    String? engineId,
   }) => AppSettings(
     minAnalysisDepth: minAnalysisDepth ?? this.minAnalysisDepth,
     depth: depth ?? this.depth,
@@ -655,6 +772,10 @@ class AppSettings {
     threads: threads ?? this.threads,
     maxThreads: maxThreads ?? this.maxThreads,
     hashMb: hashMb ?? this.hashMb,
+    sidelineDepth: sidelineDepth ?? this.sidelineDepth,
+    sidelineMultiPv: sidelineMultiPv ?? this.sidelineMultiPv,
+    sidelineThreads: sidelineThreads ?? this.sidelineThreads,
+    sidelineHashMb: sidelineHashMb ?? this.sidelineHashMb,
     showBestMoveArrow:
         showBestMoveArrow ?? showBoardArrows ?? this.showBestMoveArrow,
     showThreatArrow: showThreatArrow ?? this.showThreatArrow,
@@ -676,6 +797,7 @@ class AppSettings {
     diagnosticLogging: diagnosticLogging ?? this.diagnosticLogging,
     themeMode: themeMode ?? this.themeMode,
     locale: locale ?? this.locale,
+    engineId: engineId ?? this.engineId,
   );
 }
 
@@ -684,7 +806,6 @@ class FavoriteCollection {
     required this.id,
     required this.name,
     required this.gameCount,
-    required this.createdAt,
   });
 
   factory FavoriteCollection.fromJson(Map<String, Object?> json) =>
@@ -692,13 +813,11 @@ class FavoriteCollection {
         id: json['id']! as String,
         name: json['name']! as String,
         gameCount: json['gameCount'] as int? ?? 0,
-        createdAt: json['createdAt'] as int? ?? 0,
       );
 
   final String id;
   final String name;
   final int gameCount;
-  final int createdAt;
 }
 
 class GameSummary {
@@ -709,29 +828,24 @@ class GameSummary {
     required this.blackName,
     required this.result,
     required this.timeControl,
-    required this.startingFen,
     this.whiteRating,
     this.blackRating,
     this.event = '',
     this.date = '',
-    this.isFixture = false,
     this.providerGameId,
-    this.providerUrl,
     this.profileColor = 'unknown',
     this.openingEco,
     this.openingName,
-    this.openingPly,
     this.providerOutcome = 'unknown',
     this.timeControlType = 'unknown',
-    this.providerAccuracy,
     this.localAccuracy,
     this.accuracy,
-    this.accuracySource = 'none',
     this.favorite = false,
     this.favoriteCollectionId,
     this.downloaded = false,
     this.analyzed = false,
     this.termination = 'unknown',
+    this.statisticsOutcome = 'unknown',
     this.endedAt = 0,
   });
 
@@ -746,25 +860,20 @@ class GameSummary {
     event: json['event'] as String? ?? '',
     date: json['date'] as String? ?? '',
     timeControl: json['timeControl'] as String? ?? '',
-    startingFen: json['startingFen'] as String? ?? '',
-    isFixture: json['isFixture'] as bool? ?? false,
     providerGameId: json['providerGameId'] as String?,
-    providerUrl: json['providerUrl'] as String?,
     profileColor: json['profileColor'] as String? ?? 'unknown',
     openingEco: json['openingEco'] as String?,
     openingName: json['openingName'] as String?,
-    openingPly: json['openingPly'] as int?,
     providerOutcome: json['providerOutcome'] as String? ?? 'unknown',
     timeControlType: json['timeControlType'] as String? ?? 'unknown',
-    providerAccuracy: (json['providerAccuracy'] as num?)?.toDouble(),
     localAccuracy: (json['localAccuracy'] as num?)?.toDouble(),
     accuracy: (json['accuracy'] as num?)?.toDouble(),
-    accuracySource: json['accuracySource'] as String? ?? 'none',
     favorite: json['favorite'] as bool? ?? false,
     favoriteCollectionId: json['favoriteCollectionId'] as String?,
     downloaded: json['downloaded'] as bool? ?? false,
     analyzed: json['analyzed'] as bool? ?? false,
     termination: json['termination'] as String? ?? 'unknown',
+    statisticsOutcome: json['statisticsOutcome'] as String? ?? 'unknown',
     endedAt: json['endedAt'] as int? ?? 0,
   );
 
@@ -778,25 +887,21 @@ class GameSummary {
   final String event;
   final String date;
   final String timeControl;
-  final String startingFen;
-  final bool isFixture;
   final String? providerGameId;
-  final String? providerUrl;
   final String profileColor;
   final String? openingEco;
   final String? openingName;
-  final int? openingPly;
   final String providerOutcome;
   final String timeControlType;
-  final double? providerAccuracy;
   final double? localAccuracy;
   final double? accuracy;
-  final String accuracySource;
   final bool favorite;
   final String? favoriteCollectionId;
   final bool downloaded;
   final bool analyzed;
-  final String termination; // checkmate | resignation | timeout | draw | other | unknown
+  final String statisticsOutcome;
+  final String
+  termination; // checkmate | resignation | timeout | draw | other | unknown
   final int endedAt;
 }
 
@@ -805,6 +910,8 @@ class GameQuery {
     this.search = '',
     this.outcome = 'all',
     this.color = 'all',
+    this.openingName,
+    this.statisticsOutcome = 'all',
     this.timeControls = const <String>[],
     this.sort = 'newest',
     this.month,
@@ -815,6 +922,8 @@ class GameQuery {
   final String search;
   final String outcome;
   final String color;
+  final String? openingName;
+  final String statisticsOutcome;
   final List<String> timeControls;
   final String sort;
   final String? month;
@@ -825,6 +934,8 @@ class GameQuery {
     'search': search,
     'outcome': outcome,
     'color': color,
+    if (openingName != null) 'openingName': openingName,
+    if (statisticsOutcome != 'all') 'statisticsOutcome': statisticsOutcome,
     'timeControls': timeControls,
     'sort': sort,
     // Only send `month` when set: the native query reads it with a string
@@ -843,9 +954,8 @@ class ParsedMove {
     required this.sideToMove,
     required this.san,
     required this.uci,
-    required this.fenBefore,
     required this.fenAfter,
-    this.positionBefore = BoardPosition.empty,
+    this.clockMillis,
     this.positionAfter = BoardPosition.empty,
   });
 
@@ -855,11 +965,8 @@ class ParsedMove {
     sideToMove: json['sideToMove']! as String,
     san: json['san']! as String,
     uci: json['uci']! as String,
-    fenBefore: json['fenBefore']! as String,
     fenAfter: json['fenAfter']! as String,
-    positionBefore: BoardPosition.fromJson(
-      json['positionBefore']! as Map<String, Object?>,
-    ),
+    clockMillis: json['clockMillis'] as int?,
     positionAfter: BoardPosition.fromJson(
       json['positionAfter']! as Map<String, Object?>,
     ),
@@ -870,9 +977,8 @@ class ParsedMove {
   final String sideToMove;
   final String san;
   final String uci;
-  final String fenBefore;
   final String fenAfter;
-  final BoardPosition positionBefore;
+  final int? clockMillis;
   final BoardPosition positionAfter;
 }
 
@@ -980,6 +1086,9 @@ class BoardMoveResolution {
     required this.fenAfter,
     required this.positionAfter,
     this.mainLinePly,
+    this.terminal = false,
+    this.checkmate = false,
+    this.result = '*',
   });
 
   factory BoardMoveResolution.fromJson(Map<String, Object?> json) =>
@@ -991,6 +1100,9 @@ class BoardMoveResolution {
           json['positionAfter']! as Map<String, Object?>,
         ),
         mainLinePly: json['mainLinePly'] as int?,
+        terminal: json['terminal'] as bool? ?? false,
+        checkmate: json['checkmate'] as bool? ?? false,
+        result: json['result'] as String? ?? '*',
       );
 
   final String uci;
@@ -998,39 +1110,210 @@ class BoardMoveResolution {
   final String fenAfter;
   final BoardPosition positionAfter;
   final int? mainLinePly;
+  final bool terminal;
+  final bool checkmate;
+  final String result;
 }
 
-/// One legal move in a position, as generated by the native core.
-///
-/// The training arena resolves both a board drag (match [uci]) and a scripted
-/// opponent reply (match [san]) against this list, so no chess rules live in
-/// Dart — [fenAfter] is simply the position the move reaches.
-class BoardMoveOption {
-  const BoardMoveOption({
+// -----------------------------------------------------------------------------
+// Section: Local bot play DTOs
+// -----------------------------------------------------------------------------
+
+class BotGameSummary {
+  const BotGameSummary({
+    required this.gameId,
+    required this.botElo,
+    required this.playerColor,
+    required this.botColor,
+    required this.status,
+    required this.result,
+    required this.outcome,
+    required this.moveCount,
+    required this.createdAt,
+  });
+
+  factory BotGameSummary.fromJson(Map<String, Object?> json) => BotGameSummary(
+    gameId: json['gameId']! as String,
+    botElo: json['botElo']! as int,
+    playerColor: json['playerColor']! as String,
+    botColor: json['botColor']! as String,
+    status: json['status']! as String,
+    result: json['result'] as String? ?? '*',
+    outcome: json['outcome'] as String? ?? 'unfinished',
+    moveCount: json['moveCount'] as int? ?? 0,
+    createdAt: json['createdAt'] as int? ?? 0,
+  );
+
+  final String gameId;
+  final int botElo;
+  final String playerColor;
+  final String botColor;
+  final String status;
+  final String result;
+  final String outcome;
+  final int moveCount;
+  final int createdAt;
+
+  bool get isActive => status == 'active';
+  bool get canAnalyze => !isActive && moveCount > 0;
+}
+
+class BotGameMove {
+  const BotGameMove({
+    required this.ply,
     required this.uci,
     required this.san,
     required this.fenAfter,
   });
 
-  factory BoardMoveOption.fromJson(Map<String, Object?> json) =>
-      BoardMoveOption(
-        uci: json['uci']! as String,
-        san: json['san']! as String,
-        fenAfter: json['fenAfter']! as String,
-      );
+  factory BotGameMove.fromJson(Map<String, Object?> json) => BotGameMove(
+    ply: json['ply']! as int,
+    uci: json['uci']! as String,
+    san: json['san']! as String,
+    fenAfter: json['fenAfter']! as String,
+  );
 
+  final int ply;
   final String uci;
   final String san;
   final String fenAfter;
+}
 
-  /// The `e2e4` prefix a board drag produces, without any promotion suffix.
-  String get squares => uci.length >= 4 ? uci.substring(0, 4) : uci;
+class BotGameSession {
+  const BotGameSession({
+    required this.gameId,
+    required this.botElo,
+    required this.playerColor,
+    required this.botColor,
+    required this.status,
+    required this.result,
+    this.checkmate = false,
+    required this.position,
+    required this.positions,
+    required this.moves,
+    required this.createdAt,
+    required this.showEvaluationBar,
+  });
+
+  factory BotGameSession.fromJson(Map<String, Object?> json) => BotGameSession(
+    gameId: json['gameId']! as String,
+    botElo: json['botElo']! as int,
+    playerColor: json['playerColor']! as String,
+    botColor: json['botColor']! as String,
+    status: json['status']! as String,
+    result: json['result'] as String? ?? '*',
+    checkmate: json['checkmate'] as bool? ?? false,
+    position: BoardPosition.fromJson(json['position']! as Map<String, Object?>),
+    positions: (json['positions'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(BoardPosition.fromJson)
+        .toList(growable: false),
+    moves: (json['moves'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(BotGameMove.fromJson)
+        .toList(growable: false),
+    createdAt: json['createdAt'] as int? ?? 0,
+    showEvaluationBar: json['showEvaluationBar'] as bool? ?? false,
+  );
+
+  final String gameId;
+  final int botElo;
+  final String playerColor;
+  final String botColor;
+  final String status;
+  final String result;
+  final bool checkmate;
+  final BoardPosition position;
+  final List<BoardPosition> positions;
+  final List<BotGameMove> moves;
+  final int createdAt;
+  final bool showEvaluationBar;
+
+  bool get isActive => status == 'active';
+}
+
+class BotMoveSnapshot {
+  const BotMoveSnapshot({
+    required this.jobId,
+    required this.status,
+    required this.engineId,
+    required this.move,
+    required this.bestMove,
+    this.evaluationFen,
+    this.evaluationCp,
+    this.mateIn,
+    this.wdl,
+    this.postMoveEvaluationFen,
+    this.postMoveEvaluationCp,
+    this.postMoveMateIn,
+    this.postMoveWdl,
+    this.san,
+    this.fenAfter,
+    this.positionAfter,
+    this.terminal = false,
+    this.checkmate = false,
+    this.result = '*',
+    this.error,
+  });
+
+  factory BotMoveSnapshot.fromJson(Map<String, Object?> json) => BotMoveSnapshot(
+    jobId: json['jobId']! as String,
+    status: json['status']! as String,
+    engineId: json['engineId']! as String,
+    move: json['move'] as String? ?? '',
+    bestMove: json['bestMove'] as String? ?? '',
+    evaluationFen: json['evaluationFen'] as String?,
+    evaluationCp: json['evaluationCp'] as int?,
+    mateIn: json['mateIn'] as int?,
+    wdl: json['wdl'] == null
+        ? null
+        : WdlScore.fromJson(json['wdl']! as Map<String, Object?>),
+    postMoveEvaluationFen: json['postMoveEvaluationFen'] as String?,
+    postMoveEvaluationCp: json['postMoveEvaluationCp'] as int?,
+    postMoveMateIn: json['postMoveMateIn'] as int?,
+    postMoveWdl: json['postMoveWdl'] == null
+        ? null
+        : WdlScore.fromJson(json['postMoveWdl']! as Map<String, Object?>),
+    san: json['san'] as String?,
+    fenAfter: json['fenAfter'] as String?,
+    positionAfter: json['positionAfter'] == null
+        ? null
+        : BoardPosition.fromJson(json['positionAfter']! as Map<String, Object?>),
+    terminal: json['terminal'] as bool? ?? false,
+    checkmate: json['checkmate'] as bool? ?? false,
+    result: json['result'] as String? ?? '*',
+    error: json['error'] as String?,
+  );
+
+  final String jobId;
+  final String status;
+  final String engineId;
+  final String move;
+  final String bestMove;
+  final String? evaluationFen;
+  final int? evaluationCp;
+  final int? mateIn;
+  final WdlScore? wdl;
+  final String? postMoveEvaluationFen;
+  final int? postMoveEvaluationCp;
+  final int? postMoveMateIn;
+  final WdlScore? postMoveWdl;
+  final String? san;
+  final String? fenAfter;
+  final BoardPosition? positionAfter;
+  final bool terminal;
+  final bool checkmate;
+  final String result;
+  final String? error;
+
+  bool get isComplete => status == 'complete';
+  bool get isRunning => status == 'queued' || status == 'running';
+  bool get isFailed => status == 'failed';
 }
 
 class GameDetail {
   const GameDetail({
     required this.summary,
-    required this.pgn,
     required this.moves,
     this.startingPosition = BoardPosition.empty,
     this.outcome,
@@ -1038,7 +1321,6 @@ class GameDetail {
 
   factory GameDetail.fromJson(Map<String, Object?> json) => GameDetail(
     summary: GameSummary.fromJson(json),
-    pgn: json['pgn'] as String? ?? '',
     moves: (json['moves'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>()
         .map(ParsedMove.fromJson)
@@ -1052,7 +1334,6 @@ class GameDetail {
   );
 
   final GameSummary summary;
-  final String pgn;
   final List<ParsedMove> moves;
   final BoardPosition startingPosition;
   final GameOutcome? outcome;
@@ -1072,10 +1353,12 @@ class GameOutcome {
 
 enum MoveClassification {
   theory,
+  forced,
   brilliant,
   critical,
   best,
   excellent,
+  good,
   okay,
   miss,
   mistake,
@@ -1084,10 +1367,12 @@ enum MoveClassification {
 
   static MoveClassification? fromJson(String? value) => switch (value) {
     'theory' => theory,
+    'forced' => forced,
     'brilliant' => brilliant,
     'critical' => critical,
     'best' => best,
     'excellent' => excellent,
+    'good' => good,
     'okay' => okay,
     'miss' => miss,
     'mistake' => mistake,
@@ -1098,10 +1383,12 @@ enum MoveClassification {
 
   String? get assetPath => switch (this) {
     theory => '../img/move_book.png',
+    forced => '../img/move_force.png',
     brilliant => '../img/move_brilliant.png',
     critical => null,
     best => '../img/move_best.png',
     excellent => '../img/move_excellent.png',
+    good => '../img/move_okay.png',
     okay => '../img/move_okay.png',
     miss => '../img/move_miss.png',
     mistake => '../img/move_mistake.png',
@@ -1113,46 +1400,49 @@ enum MoveClassification {
 class PlayerAnalysisSummary {
   const PlayerAnalysisSummary({
     required this.theory,
+    this.forced = 0,
     required this.brilliant,
     required this.critical,
     required this.best,
     required this.excellent,
+    this.good = 0,
     required this.okay,
     required this.miss,
     required this.mistake,
     required this.blunder,
     required this.totalMoves,
-    required this.analyzedMoves,
     this.localAccuracy,
   });
 
   factory PlayerAnalysisSummary.fromJson(Map<String, Object?> json) =>
       PlayerAnalysisSummary(
         theory: json['theory']! as int,
+        forced: json['forced'] as int? ?? 0,
         brilliant: json['brilliant']! as int,
         critical: json['critical'] as int? ?? 0,
         best: json['best']! as int,
         excellent: json['excellent']! as int,
+        good: json['good'] as int? ?? 0,
         okay: json['okay']! as int,
         miss: json['miss']! as int,
         mistake: json['mistake']! as int,
         blunder: json['blunder']! as int,
         totalMoves: json['totalMoves']! as int,
-        analyzedMoves: json['analyzedMoves']! as int,
         localAccuracy: (json['localAccuracy'] as num?)?.toDouble(),
       );
 
   final int theory;
+  final int forced;
   final int brilliant;
   final int critical;
   final int best;
   final int excellent;
+  final int good;
   final int okay;
   final int miss;
   final int mistake;
   final int blunder;
   final int totalMoves;
-  final int analyzedMoves;
   final double? localAccuracy;
 }
 
@@ -1199,22 +1489,13 @@ class AnalysisSummary {
 class TheoryMoveInfo {
   const TheoryMoveInfo({
     required this.games,
-    required this.whiteWins,
-    required this.draws,
-    required this.blackWins,
   });
 
   factory TheoryMoveInfo.fromJson(Map<String, Object?> json) => TheoryMoveInfo(
     games: json['games']! as int,
-    whiteWins: json['whiteWins']! as int,
-    draws: json['draws']! as int,
-    blackWins: json['blackWins']! as int,
   );
 
   final int games;
-  final int whiteWins;
-  final int draws;
-  final int blackWins;
 }
 
 class WdlScore {
@@ -1244,6 +1525,7 @@ class EngineLine {
     this.evaluationCp,
     this.mateIn,
     this.wdl,
+    this.evaluationBarWhitePermille,
   });
 
   factory EngineLine.fromJson(Map<String, Object?> json) => EngineLine(
@@ -1251,6 +1533,7 @@ class EngineLine {
     depth: json['depth']! as int,
     evaluationCp: json['evaluationCp'] as int?,
     mateIn: json['mateIn'] as int?,
+    evaluationBarWhitePermille: json['evaluationBarWhitePermille'] as int?,
     wdl: json['wdl'] == null
         ? null
         : WdlScore.fromJson(json['wdl']! as Map<String, Object?>),
@@ -1263,6 +1546,8 @@ class EngineLine {
   final int? evaluationCp;
   final int? mateIn;
   final WdlScore? wdl;
+  // Native SF19-only bar projection. Null preserves the legacy SF18 cp scale.
+  final int? evaluationBarWhitePermille;
   final int nodes;
   final List<String> moves;
 
@@ -1319,15 +1604,11 @@ class AnalysisSnapshot {
     required this.bestMove,
     required this.recommendedMove,
     required this.engineVersion,
-    required this.configHash,
+    this.analyzedFen = '',
     required this.lines,
     this.error,
     this.summary,
     this.classification,
-    this.expectedScoreBefore,
-    this.expectedScoreBest,
-    this.expectedScorePlayed,
-    this.expectedScoreLoss,
     this.theory,
     this.classifierVersion = 0,
   });
@@ -1349,16 +1630,12 @@ class AnalysisSnapshot {
         bestMove: json['bestMove'] as String? ?? '',
         recommendedMove: json['recommendedMove'] as String? ?? '',
         engineVersion: json['engineVersion'] as String? ?? '',
-        configHash: json['configHash'] as String? ?? '',
+        analyzedFen: json['analyzedFen'] as String? ?? '',
         error: json['error'] as String?,
         classification: MoveClassification.fromJson(
           json['classification'] as String?,
         ),
         classifierVersion: json['classifierVersion'] as int? ?? 0,
-        expectedScoreBefore: (json['expectedScoreBefore'] as num?)?.toDouble(),
-        expectedScoreBest: (json['expectedScoreBest'] as num?)?.toDouble(),
-        expectedScorePlayed: (json['expectedScorePlayed'] as num?)?.toDouble(),
-        expectedScoreLoss: (json['expectedScoreLoss'] as num?)?.toDouble(),
         theory: json['theory'] == null
             ? null
             : TheoryMoveInfo.fromJson(json['theory']! as Map<String, Object?>),
@@ -1385,16 +1662,12 @@ class AnalysisSnapshot {
   final String bestMove;
   final String recommendedMove;
   final String engineVersion;
-  final String configHash;
+  final String analyzedFen;
   final String? error;
   final List<EngineLine> lines;
   final AnalysisSummary? summary;
   final MoveClassification? classification;
   final int classifierVersion;
-  final double? expectedScoreBefore;
-  final double? expectedScoreBest;
-  final double? expectedScorePlayed;
-  final double? expectedScoreLoss;
   final TheoryMoveInfo? theory;
 
   bool get isComplete => jobState == AnalysisJobState.completed;
@@ -1415,6 +1688,7 @@ class VariationAnalysisSnapshot {
     this.position = BoardPosition.empty,
     required this.bestMove,
     required this.lines,
+    this.engineVersion = '',
     this.liveDepth = 0,
     this.moverEvaluationCp,
     this.moverMateIn,
@@ -1433,6 +1707,7 @@ class VariationAnalysisSnapshot {
           json['position']! as Map<String, Object?>,
         ),
         bestMove: json['bestMove'] as String? ?? '',
+        engineVersion: json['engineVersion'] as String? ?? '',
         liveDepth: json['liveDepth'] as int? ?? 0,
         moverEvaluationCp: json['moverEvaluationCp'] as int?,
         moverMateIn: json['moverMateIn'] as int?,
@@ -1453,6 +1728,7 @@ class VariationAnalysisSnapshot {
   final String fen;
   final BoardPosition position;
   final String bestMove;
+  final String engineVersion;
   final int liveDepth;
   final int? moverEvaluationCp;
   final int? moverMateIn;
@@ -1467,6 +1743,7 @@ class VariationAnalysisSnapshot {
   VariationAnalysisSnapshot copyWith({
     String? status,
     String? bestMove,
+    String? engineVersion,
     int? liveDepth,
     int? moverEvaluationCp,
     int? moverMateIn,
@@ -1481,6 +1758,7 @@ class VariationAnalysisSnapshot {
     fen: fen,
     position: position,
     bestMove: bestMove ?? this.bestMove,
+    engineVersion: engineVersion ?? this.engineVersion,
     liveDepth: liveDepth ?? this.liveDepth,
     moverEvaluationCp: moverEvaluationCp ?? this.moverEvaluationCp,
     moverMateIn: moverMateIn ?? this.moverMateIn,
