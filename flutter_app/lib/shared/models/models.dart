@@ -878,6 +878,23 @@ class BoardPosition {
     this.fullmoveNumber = 1,
   });
 
+  static const initial = BoardPosition(
+    fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    pieces: <String>[
+      'r','n','b','q','k','b','n','r',
+      'p','p','p','p','p','p','p','p',
+      '','','','','','','','',
+      '','','','','','','','',
+      '','','','','','','','',
+      '','','','','','','','',
+      'P','P','P','P','P','P','P','P',
+      'R','N','B','Q','K','B','N','R',
+    ],
+    sideToMove: 'white',
+    draggableColor: 'white',
+    fullmoveNumber: 1,
+  );
+
   static const empty = BoardPosition(
     fen: '8/8/8/8/8/8/8/8 w - - 0 1',
     pieces: <String>[

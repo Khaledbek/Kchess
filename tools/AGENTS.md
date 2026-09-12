@@ -13,6 +13,7 @@ Nur das konkrete Tool und seine Format-/Metadata-Datei lesen. Native oder Flutte
 - `opening_book/` → KCB1
 - `opening_names/` → KCO1
 - `provider_smoke.py` → manueller Provider-Smoke-Check
+- `ai/` → Dataset-Splits, Trainings-Metadaten, Evaluation, Quantisierung und Retrieval-Benchmarks
 
 ## Regeln
 

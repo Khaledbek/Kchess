@@ -43,6 +43,7 @@ Core::Core(std::filesystem::path data_directory)
       opening_names_(std::make_unique<UnavailableOpeningNameIndex>()),
       analysis_service_(database_, *opening_theory_),
       bot_service_(database_),
+      coach_service_(database_, analysis_service_),
       statistics_service_(database_),
       training_service_(database_),
       practice_service_(database_, training_service_, bot_service_) {
@@ -530,6 +531,40 @@ void Core::cancel_bot_move(const std::string& job_id) {
 // Section: Native training facade
 // -----------------------------------------------------------------------------
 
+std::string Core::coach_ask_json(const std::string& request_json) {
+  return coach_service_.ask_json(request_json);
+}
+
+std::string Core::coach_context_json(const std::string& request_json) {
+  return coach_service_.context_json(request_json);
+}
+
+std::string Core::coach_automatic_json(const std::string& request_json) {
+  return coach_service_.automatic_json(request_json);
+}
+
+std::string Core::start_coach_ask_json(const std::string& request_json) {
+  return coach_service_.start_ask_json(request_json);
+}
+
+std::string Core::start_coach_automatic_json(const std::string& request_json) {
+  return coach_service_.start_automatic_json(request_json);
+}
+
+std::string Core::start_coach_hint_json(const std::string& request_json) {
+  return coach_service_.start_hint_json(request_json);
+}
+
+std::string Core::coach_job_status_json(const std::string& job_id) {
+  validate_token(job_id, "coach job id");
+  return coach_service_.job_status_json(job_id);
+}
+
+void Core::cancel_coach_job(const std::string& job_id) {
+  validate_token(job_id, "coach job id");
+  coach_service_.cancel_job(job_id);
+}
+
 std::string Core::training_overview_json() const {
   return practice_service_.overview(training_service_.overview_json());
 }
@@ -552,3 +587,4 @@ std::string Core::play_training_move_json(
 }
 
 }  // namespace kchess
+

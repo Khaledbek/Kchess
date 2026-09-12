@@ -28,6 +28,14 @@
 
 Weitere Build-/Compliance-Details für beide Engines stehen in `docs/LICENSE_COMPLIANCE.md`.
 
+## llama.cpp b10516
+
+- Zweck: lokale GGUF-Inferenz für den AI Chess Coach unter Windows
+- Runtime-Ziel: `third_party/model/runtime/`
+- Upstream: `ggml-org/llama.cpp`, Release `b10516`
+- Lizenz: MIT
+- Die Runtime-Binaries werden vom Update-Installer aus dem offiziellen GitHub-Release geladen; das GGUF-Modell selbst bleibt separat unter `third_party/model/coach/`.
+
 ## SQLite 3.53.4
 
 - Zweck: eingebettete lokale Datenbank

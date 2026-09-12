@@ -67,9 +67,19 @@ std::string StatisticsService::timeline_json(
   bool streak_finished = false;
   std::map<std::string, std::vector<json>> series;
   for (const auto& game : games) {
-    const std::string outcome = game.value("statisticsOutcome", "unknown");
+    std::string outcome = game.value("statisticsOutcome", "unknown");
+    if (outcome == "unknown") {
+      outcome = effective_outcome(
+          game.value("providerOutcome", std::string{"unknown"}),
+          game.value("profileColor", std::string{"unknown"}),
+          game.value("result", std::string{}));
+    }
     if (outcome != "unknown") {
-      if (recent.size() < 15) recent.push_back(game);
+      if (recent.size() < 15) {
+        auto recent_game = game;
+        recent_game["statisticsOutcome"] = outcome;
+        recent.push_back(std::move(recent_game));
+      }
       if (!streak_finished) {
         if (streak_outcome.empty()) streak_outcome = outcome;
         if (outcome == streak_outcome)

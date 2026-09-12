@@ -662,6 +662,21 @@ class _BotGameScreenState extends State<BotGameScreen> {
       appBar: AppBar(
         title: Text(strings.botGameTitle),
         actions: [
+          if (_positions.isNotEmpty)
+            IconButton(
+              key: const Key('open-coach-from-bot-game'),
+              tooltip: strings.coach,
+              onPressed: () => unawaited(
+                openCoachSession(
+                  context,
+                  gateway: widget.gateway,
+                  position: _displayPosition,
+                  surface: CoachSurface.play,
+                  contextId: _start?.gameId,
+                ),
+              ),
+              icon: const Icon(Icons.school_outlined),
+            ),
           IconButton(
             key: const Key('bot-game-settings'),
             tooltip: strings.botGameSettingsTitle,

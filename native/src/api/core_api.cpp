@@ -812,6 +812,86 @@ char* kc_statistics_openings_filtered_json(
   });
 }
 
+char* kc_coach_ask_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Coach request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_ask_json(request_json_utf8);
+  });
+}
+
+char* kc_coach_context_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Coach context request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_context_json(request_json_utf8);
+  });
+}
+
+char* kc_coach_automatic_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Automatic coach request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_automatic_json(request_json_utf8);
+  });
+}
+
+char* kc_start_coach_ask_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Coach request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_coach_ask_json(request_json_utf8);
+  });
+}
+
+char* kc_start_coach_automatic_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Automatic coach request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_coach_automatic_json(request_json_utf8);
+  });
+}
+
+char* kc_start_coach_hint_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr)
+    return invalid_string_argument(core_from(handle), "Coach hint request is required");
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->start_coach_hint_json(request_json_utf8);
+  });
+}
+
+char* kc_coach_job_status_json(
+    const kc_core_handle handle, const char* job_id_utf8) {
+  if (job_id_utf8 == nullptr || job_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Coach job id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_job_status_json(job_id_utf8);
+  });
+}
+
+kc_status kc_cancel_coach_job(
+    const kc_core_handle handle, const char* job_id_utf8) {
+  if (job_id_utf8 == nullptr || job_id_utf8[0] == '\0') {
+    return set_error(
+        core_from(handle), KC_STATUS_INVALID_ARGUMENT, "Coach job id is required");
+  }
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->cancel_coach_job(job_id_utf8);
+  });
+}
+
 char* kc_training_overview_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [=] {
     return core_from(handle)->training_overview_json();

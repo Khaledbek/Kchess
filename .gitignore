@@ -1,4 +1,4 @@
-﻿# =========================================================
+# =========================================================
 # Kchess
 # Keep source code and required runtime assets.
 # Ignore generated builds, caches, local data and secrets.
@@ -93,6 +93,11 @@ temp/
 *.pem
 *.p12
 *.pfx
+
+
+# Local AI provider secrets / usage state
+/secrets/gemini_api_key.txt
+/secrets/gemini_usage.json
 
 # Archives / update packages
 *.zip

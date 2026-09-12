@@ -14,6 +14,7 @@
 #include "persistence/database.h"
 #include "services/analysis_service.h"
 #include "services/bot_service.h"
+#include "services/coach_service.h"
 #include "services/game_library_service.h"
 #include "services/profile_service.h"
 #include "services/provider_service.h"
@@ -145,6 +146,15 @@ class Core {
   std::string bot_move_status_json(const std::string& job_id);
   void cancel_bot_move(const std::string& job_id);
 
+  std::string coach_ask_json(const std::string& request_json);
+  std::string coach_context_json(const std::string& request_json);
+  std::string coach_automatic_json(const std::string& request_json);
+  std::string start_coach_hint_json(const std::string& request_json);
+  std::string start_coach_ask_json(const std::string& request_json);
+  std::string start_coach_automatic_json(const std::string& request_json);
+  std::string coach_job_status_json(const std::string& job_id);
+  void cancel_coach_job(const std::string& job_id);
+
   std::string training_overview_json() const;
   std::string practice_command_json(const std::string& request);
   std::string start_training_attempt_json(const std::string& exercise_id);
@@ -177,6 +187,7 @@ class Core {
   std::unique_ptr<OpeningNameIndex> opening_names_;
   AnalysisService analysis_service_;
   BotService bot_service_;
+  CoachService coach_service_;
   StatisticsService statistics_service_;
   TrainingService training_service_;
   PracticeService practice_service_;

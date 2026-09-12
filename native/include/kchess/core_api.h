@@ -25,7 +25,7 @@ typedef void* kc_core_handle;
 
 // Increment only when the C ABI changes incompatibly. Additive exports may
 // keep the same ABI version. Flutter validates this before creating Core.
-#define KCHESS_CORE_ABI_VERSION 7
+#define KCHESS_CORE_ABI_VERSION 8
 
 typedef enum kc_status {
   KC_STATUS_OK = 0,
@@ -266,6 +266,31 @@ KCHESS_API char* kc_bot_move_status_json(
     kc_core_handle handle,
     const char* job_id_utf8);
 KCHESS_API kc_status kc_cancel_bot_move(
+    kc_core_handle handle,
+    const char* job_id_utf8);
+
+KCHESS_API char* kc_coach_ask_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_coach_context_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_coach_automatic_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_start_coach_ask_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_start_coach_automatic_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_start_coach_hint_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_coach_job_status_json(
+    kc_core_handle handle,
+    const char* job_id_utf8);
+KCHESS_API kc_status kc_cancel_coach_job(
     kc_core_handle handle,
     const char* job_id_utf8);
 

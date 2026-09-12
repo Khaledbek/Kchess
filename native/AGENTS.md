@@ -6,7 +6,8 @@
 
 ## Kontext sparen
 
-- Nächstgelegene `native/src/**/AGENTS.md` lesen.
+- Für AI-Coach-Aufgaben `native/ai/AGENTS.md` bzw. die nächstgelegene Child-`AGENTS.md` lesen.
+- Ansonsten die nächstgelegene `native/src/**/AGENTS.md` lesen.
 - Mit `rg` zuerst Deklaration, Definition und Aufrufer eines Symbols finden.
 - Große Dateien (`core_api.cpp`, `database.cpp`, große Services) nur an relevanten Funktionen öffnen.
 - Nicht automatisch alle Services oder Engine-Dateien lesen.

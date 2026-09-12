@@ -182,7 +182,7 @@ typedef _FreeStringNative = Void Function(Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 
 class FfiCoreGateway implements CoreGateway {
-  static const int _supportedAbiVersion = 7;
+  static const int _supportedAbiVersion = 8;
 
   FfiCoreGateway._(this._library, this._dataDirectory) {
     try {
@@ -376,6 +376,30 @@ class FfiCoreGateway implements CoreGateway {
     );
     _cancelBotMove = _library.lookupFunction<_StatusStringNative, _StatusStringDart>(
       'kc_cancel_bot_move',
+    );
+    _coachAsk = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_coach_ask_json',
+    );
+    _coachContext = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_coach_context_json',
+    );
+    _coachAutomatic = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_coach_automatic_json',
+    );
+    _startCoachAsk = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_start_coach_ask_json',
+    );
+    _startCoachAutomatic = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_start_coach_automatic_json',
+    );
+    _startCoachHint = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_start_coach_hint_json',
+    );
+    _coachJobStatus = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_coach_job_status_json',
+    );
+    _cancelCoachJob = _library.lookupFunction<_StatusStringNative, _StatusStringDart>(
+      'kc_cancel_coach_job',
     );
     _trainingOverview = _library.lookupFunction<
       _StringNoArgsNative,
@@ -596,6 +620,14 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringIntArgDart _startBotMove;
   late final _StringArgDart _botMoveStatus;
   late final _StatusStringDart _cancelBotMove;
+  late final _StringArgDart _coachAsk;
+  late final _StringArgDart _coachContext;
+  late final _StringArgDart _coachAutomatic;
+  late final _StringArgDart _startCoachAsk;
+  late final _StringArgDart _startCoachAutomatic;
+  late final _StringArgDart _startCoachHint;
+  late final _StringArgDart _coachJobStatus;
+  late final _StatusStringDart _cancelCoachJob;
   late final _StringNoArgsDart _trainingOverview;
   late final _StringArgDart _practiceCommand;
   late final _StringArgDart _startTrainingAttempt;
@@ -638,6 +670,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _FreeStringDart _freeString;
   Pointer<Void> _handle = nullptr;
   String? _activeProviderJobId;
+  final Set<String> _activeCoachJobIds = <String>{};
 
   @override
   Future<void> initialize() async {
@@ -1094,6 +1127,39 @@ class FfiCoreGateway implements CoreGateway {
   );
 
   @override
+  Future<Map<String, Object?>> coachAsk(Map<String, Object?> request) async {
+    final started = await _withNativeString(jsonEncode(request), (value) {
+      return _readJson(_startCoachAsk(_handle, value))!
+          as Map<String, Object?>;
+    });
+    return _waitCoachJob(started['jobId']! as String);
+  }
+
+  @override
+  Future<Map<String, Object?>> coachContext(Map<String, Object?> request) =>
+      _withNativeString(jsonEncode(request), (value) {
+        final result = _readJson(_coachContext(_handle, value));
+        return (result! as Map<String, Object?>);
+      });
+
+  @override
+  Future<Map<String, Object?>> coachAutomatic(Map<String, Object?> request) async {
+    final started = await _withNativeString(jsonEncode(request), (value) {
+      return _readJson(_startCoachAutomatic(_handle, value))!
+          as Map<String, Object?>;
+    });
+    return _waitCoachJob(started['jobId']! as String);
+  }
+
+  @override
+  Future<Map<String, Object?>> coachHint(Map<String, Object?> request) async {
+    final started = await _withNativeString(jsonEncode(request), (value) {
+      return _readJson(_startCoachHint(_handle, value))! as Map<String, Object?>;
+    });
+    return _waitCoachJob(started['jobId']! as String);
+  }
+
+  @override
   Future<TrainingOverview> trainingOverview() async {
     final json = _readJson(_trainingOverview(_handle))! as Map<String, Object?>;
     return TrainingOverview.fromJson(json);
@@ -1383,6 +1449,30 @@ class FfiCoreGateway implements CoreGateway {
     }
   }
 
+  Future<Map<String, Object?>> _waitCoachJob(String jobId) async {
+    _activeCoachJobIds.add(jobId);
+    try {
+      while (true) {
+        final status = await _withNativeString(jobId, (value) {
+          return _readJson(_coachJobStatus(_handle, value))!
+              as Map<String, Object?>;
+        });
+        if (status['finished'] as bool? ?? false) {
+          final result = status['result'] as Map<String, Object?>?;
+          if (status['state'] == 'error' || result == null) {
+            throw CoreGatewayException(
+              status['errorMessage'] as String? ?? 'Coach request failed',
+            );
+          }
+          return result;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+      }
+    } finally {
+      _activeCoachJobIds.remove(jobId);
+    }
+  }
+
   Future<ProviderOverview> _waitProviderJob(String jobId) async =>
       ProviderOverview.fromJson(await _waitJobResult(jobId));
 
@@ -1503,6 +1593,15 @@ class FfiCoreGateway implements CoreGateway {
           malloc.free(native);
         }
       }
+      for (final jobId in _activeCoachJobIds.toList(growable: false)) {
+        final native = jobId.toNativeUtf8();
+        try {
+          _cancelCoachJob(_handle, native);
+        } finally {
+          malloc.free(native);
+        }
+      }
+      _activeCoachJobIds.clear();
       _destroy(_handle);
       _handle = nullptr;
     }

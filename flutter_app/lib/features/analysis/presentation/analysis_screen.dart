@@ -12,6 +12,8 @@ import '../../../shared/models/models.dart';
 import '../../../ui/shared/board_endgame_presentation.dart';
 import '../../../ui/shared/promotion_dialog.dart';
 import '../../app/application/app_controller.dart';
+import '../../coach/models/coach_ui_models.dart';
+import '../../coach/presentation/coach_session_screen.dart';
 import 'analysis_arrow_resolver.dart';
 import 'analysis_move_arrow.dart';
 import 'analysis_temporary_bot_game_screen.dart';
@@ -1549,6 +1551,24 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             onPressed: _exportCurrentFen,
             tooltip: strings.exportFen,
             icon: const Icon(Icons.copy_all_outlined),
+          ),
+          IconButton(
+            key: const Key('open-coach-from-analysis'),
+            onPressed: () => unawaited(
+              openCoachSession(
+                context,
+                gateway: widget.gateway,
+                position: position,
+                surface: widget.game.kind == 'fen'
+                    ? CoachSurface.freeBoard
+                    : CoachSurface.analysis,
+                contextId: widget.game.id,
+                contextPly: variation == null ? _currentPly : null,
+                blackAtBottom: blackAtBottom,
+              ),
+            ),
+            tooltip: strings.coach,
+            icon: const Icon(Icons.school_outlined),
           ),
           IconButton(
             key: const Key('continue-analysis-position-against-bot'),

@@ -577,6 +577,35 @@ class FakeCoreGateway implements CoreGateway {
   Future<void> cancelBotMove(String jobId) async {}
 
   @override
+  Future<Map<String, Object?>> coachAsk(Map<String, Object?> request) async =>
+      <String, Object?>{
+        'status': 'provider_unavailable',
+        'accepted': true,
+        'answer': '',
+      };
+
+  @override
+  Future<Map<String, Object?>> coachContext(Map<String, Object?> request) async =>
+      <String, Object?>{
+        'position': <String, Object?>{
+          'fen': BoardPosition.initial.fen,
+          'pieces': BoardPosition.initial.pieces,
+          'sideToMove': BoardPosition.initial.sideToMove,
+          'draggableColor': BoardPosition.initial.draggableColor,
+          'fullmoveNumber': BoardPosition.initial.fullmoveNumber,
+        },
+      };
+
+  @override
+  Future<Map<String, Object?>> coachAutomatic(
+    Map<String, Object?> request,
+  ) async => <String, Object?>{
+    'status': 'skipped',
+    'triggered': false,
+    'reasons': const <Object?>[],
+  };
+
+  @override
   Future<TrainingOverview> trainingOverview() async => const TrainingOverview(
     masteryThreshold: 3,
     exercises: [],

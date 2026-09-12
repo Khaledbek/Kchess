@@ -10,6 +10,23 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get coachShowOnBoard => 'إظهار على الرقعة';
+
+  @override
+  String get coachCompareMoves => 'مقارنة النقلات';
+
+  @override
+  String get coachChallenge => 'أعطني تحديًا';
+
+  @override
+  String get coachCompareRequest =>
+      'قارن النقلات المرشحة التي قدمها المحرك في هذا الوضع. اشرح فكرة كل نقلة ورد الخصم اعتمادًا على الأدلة المتحققة فقط. إذا توفر مرشح واحد فقط، فاشرحه واذكر أن المرشح الثاني المقيّم غير متوفر.';
+
+  @override
+  String get coachChallengeRequest =>
+      'درّبني بسؤال واحد محدد عن هذا الوضع في الشطرنج. دعني أجد الفكرة على الرقعة قبل كشف النقلة. انتظر محاولتي ثم قدم ملاحظات مفيدة.';
+
+  @override
   String get appTitle => 'KChess';
 
   @override
@@ -1365,4 +1382,95 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get practiceSectionQueenMinor => 'وزير ضد قطع خفيفة';
+
+  @override
+  String get coach => 'مدرب الشطرنج بالذكاء الاصطناعي';
+
+  @override
+  String get coachBoardContext => 'سياق الرقعة';
+
+  @override
+  String get coachNoPosition => 'لا توجد وضعية محمّلة';
+
+  @override
+  String get coachTrainerOutput => 'المدرب';
+
+  @override
+  String get coachWelcome => 'اسأل عن الوضعية أو عن أي موضوع شطرنجي.';
+
+  @override
+  String get coachThinking => 'المدرب يفكر…';
+
+  @override
+  String get coachHint => 'تلميح';
+
+  @override
+  String get coachInputHint => 'اكتب سؤالك عن الشطرنج…';
+
+  @override
+  String get coachSend => 'إرسال';
+
+  @override
+  String get coachDepthConcise => 'مختصر';
+
+  @override
+  String get coachDepthBalanced => 'متوازن';
+
+  @override
+  String get coachDepthDeep => 'متعمق';
+
+  @override
+  String get coachUnavailable => 'نموذج اللغة الخاص بالمدرب غير متاح بعد.';
+
+  @override
+  String get coachOffTopic =>
+      'يمكن للمدرب الإجابة عن الأسئلة المتعلقة بالشطرنج فقط.';
+
+  @override
+  String get coachValidationFailed => 'تعذر التحقق من إجابة المدرب بشكل آمن.';
+
+  @override
+  String get coachHintRequest => 'أعطني تلميحًا لهذه الوضعية.';
+
+  @override
+  String get coachFen => 'FEN';
+
+  @override
+  String get coachPgn => 'PGN';
+
+  @override
+  String get coachPasteFen => 'لصق FEN';
+
+  @override
+  String get coachPastePgn => 'لصق PGN';
+
+  @override
+  String get coachChooseGame => 'اختر مباراة من قسم المباريات';
+
+  @override
+  String get coachUseContext => 'استخدام';
+
+  @override
+  String get coachNoGames => 'لا توجد مباريات متاحة.';
+
+  @override
+  String get coachMore => 'المزيد';
+
+  @override
+  String get coachPlayerWhite => 'الأبيض';
+
+  @override
+  String get coachPlayerBlack => 'الأسود';
+
+  @override
+  String get coachHintPieceMessage =>
+      'ابدأ بالقطعة المظللة. فكّر أولًا فيما الذي سيتحسن إذا تحركت هذه القطعة.';
+
+  @override
+  String get coachHintTargetMessage =>
+      'انظر الآن إلى مربع الهدف والسهم المظللَين. حاول اكتشاف الفكرة قبل إظهار الشرح.';
+
+  @override
+  String get coachHintExplainRequest =>
+      'اشرح لماذا نقلة التلميح التي حددها المحرك قوية في هذا الوضع. ركّز على الفكرة الشطرنجية والخطة العملية، لا على أرقام المحرك.';
 }

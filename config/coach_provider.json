@@ -1,0 +1,9 @@
+{
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "freeTierOnly": true,
+  "maxRequestsPer24Hours": 100,
+  "minSecondsBetweenRequests": 0,
+  "maxOutputTokens": 700,
+  "timeoutMs": 45000
+}

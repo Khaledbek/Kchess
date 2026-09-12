@@ -1,5 +1,10 @@
 {
   "@@locale": "de",
+  "coachShowOnBoard": "Auf dem Brett zeigen",
+  "coachCompareMoves": "Züge vergleichen",
+  "coachChallenge": "Stell mir eine Aufgabe",
+  "coachCompareRequest": "Vergleiche die vorliegenden Engine-Kandidaten in dieser Schachstellung. Erkläre für jeden die Idee und die gegnerische Antwort nur anhand geprüfter Belege. Wenn nur ein Kandidat vorliegt, erkläre ihn und sage, dass ein zweiter bewerteter Kandidat fehlt.",
+  "coachChallengeRequest": "Trainiere mit mir anhand einer gezielten Frage zu dieser Schachstellung. Lass mich die Idee auf dem Brett finden, bevor du den Zug verrätst. Warte auf meinen Versuch und gib mir dann hilfreiches Feedback.",
   "appTitle": "KChess",
   "firstRunTitle": "Dein lokaler Schachbereich",
   "chessCom": "Chess.com",
@@ -492,5 +497,34 @@
         "type": "int"
       }
     }
-  }
+  },
+  "coach": "KI-Schachtrainer",
+  "coachBoardContext": "Brettkontext",
+  "coachNoPosition": "Keine Stellung geladen",
+  "coachTrainerOutput": "Trainer",
+  "coachWelcome": "Frage zur Stellung oder zu einem beliebigen Schachthema.",
+  "coachThinking": "Der Trainer denkt nach …",
+  "coachHint": "Hinweis",
+  "coachInputHint": "Stelle deine Schachfrage …",
+  "coachSend": "Senden",
+  "coachDepthConcise": "Kurz",
+  "coachDepthBalanced": "Ausgewogen",
+  "coachDepthDeep": "Tiefgehend",
+  "coachUnavailable": "Das Sprachmodell des Trainers ist noch nicht verfügbar.",
+  "coachOffTopic": "Der Trainer beantwortet ausschließlich Schachfragen.",
+  "coachValidationFailed": "Die Trainerantwort konnte nicht sicher geprüft werden.",
+  "coachHintRequest": "Gib mir einen Hinweis zu dieser Stellung.",
+  "coachFen": "FEN",
+  "coachPgn": "PGN",
+  "coachPasteFen": "FEN einfügen",
+  "coachPastePgn": "PGN einfügen",
+  "coachChooseGame": "Partie aus „Partien“ auswählen",
+  "coachUseContext": "Übernehmen",
+  "coachNoGames": "Keine Partien verfügbar.",
+  "coachMore": "Mehr",
+  "coachPlayerWhite": "Weiß",
+  "coachPlayerBlack": "Schwarz",
+  "coachHintPieceMessage": "Beginne mit der markierten Figur. Überlege zuerst, was sich verbessert, wenn diese Figur zieht.",
+  "coachHintTargetMessage": "Schau jetzt auf das markierte Zielfeld und den Pfeil. Versuche die Idee zu finden, bevor du die Erklärung aufdeckst.",
+  "coachHintExplainRequest": "Erkläre, warum der native Engine-Hinweiszug in dieser Stellung stark ist. Konzentriere dich auf die Schachidee und den praktischen Plan, nicht auf Engine-Zahlen."
 }

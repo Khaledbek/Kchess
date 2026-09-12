@@ -10,6 +10,23 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get coachShowOnBoard => 'Show on board';
+
+  @override
+  String get coachCompareMoves => 'Compare moves';
+
+  @override
+  String get coachChallenge => 'Challenge me';
+
+  @override
+  String get coachCompareRequest =>
+      'Compare the supplied engine candidates in this chess position. Explain the idea and the opponent\'s reply for each, using only verified evidence. If only one candidate is available, explain it and say that a second evaluated candidate is missing.';
+
+  @override
+  String get coachChallengeRequest =>
+      'Coach me with one focused question about this chess position. Let me find the idea on the board before revealing the move. Wait for my attempt, then give useful feedback.';
+
+  @override
   String get appTitle => 'KChess';
 
   @override
@@ -1372,4 +1389,97 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get practiceSectionQueenMinor => 'Queen vs. minor pieces';
+
+  @override
+  String get coach => 'AI Chess Coach';
+
+  @override
+  String get coachBoardContext => 'Board context';
+
+  @override
+  String get coachNoPosition => 'No position loaded';
+
+  @override
+  String get coachTrainerOutput => 'Trainer';
+
+  @override
+  String get coachWelcome => 'Ask about the position or any chess topic.';
+
+  @override
+  String get coachThinking => 'Trainer is thinking…';
+
+  @override
+  String get coachHint => 'Hint';
+
+  @override
+  String get coachInputHint => 'Ask your chess question…';
+
+  @override
+  String get coachSend => 'Send';
+
+  @override
+  String get coachDepthConcise => 'Concise';
+
+  @override
+  String get coachDepthBalanced => 'Balanced';
+
+  @override
+  String get coachDepthDeep => 'Deep';
+
+  @override
+  String get coachUnavailable =>
+      'The coach language model is not available yet.';
+
+  @override
+  String get coachOffTopic =>
+      'The coach can only answer chess-related questions.';
+
+  @override
+  String get coachValidationFailed =>
+      'The coach answer could not be verified safely.';
+
+  @override
+  String get coachHintRequest => 'Give me a hint for this position.';
+
+  @override
+  String get coachFen => 'FEN';
+
+  @override
+  String get coachPgn => 'PGN';
+
+  @override
+  String get coachPasteFen => 'Paste FEN';
+
+  @override
+  String get coachPastePgn => 'Paste PGN';
+
+  @override
+  String get coachChooseGame => 'Choose a game from Games';
+
+  @override
+  String get coachUseContext => 'Use';
+
+  @override
+  String get coachNoGames => 'No games available.';
+
+  @override
+  String get coachMore => 'More';
+
+  @override
+  String get coachPlayerWhite => 'White';
+
+  @override
+  String get coachPlayerBlack => 'Black';
+
+  @override
+  String get coachHintPieceMessage =>
+      'Start with the highlighted piece. Ask yourself what improves if this piece moves.';
+
+  @override
+  String get coachHintTargetMessage =>
+      'Now look at the highlighted target square and arrow. Try to find the idea before revealing the explanation.';
+
+  @override
+  String get coachHintExplainRequest =>
+      'Explain why the native engine hint move is strong in this position. Focus on the chess idea and practical plan, not engine numbers.';
 }

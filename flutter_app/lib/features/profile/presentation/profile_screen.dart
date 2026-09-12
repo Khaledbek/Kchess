@@ -92,6 +92,19 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+                      IconButton(
+                        key: const Key('open-coach-from-profile'),
+                        tooltip: strings.coach,
+                        onPressed: () => unawaited(
+                          openCoachSession(
+                            context,
+                            gateway: controller.gateway,
+                            surface: CoachSurface.profile,
+                            profileId: profile.id,
+                          ),
+                        ),
+                        icon: const Icon(Icons.school_outlined),
+                      ),
                       if (profile.type != ProfileType.localPgnFen)
                         IconButton.filledTonal(
                           tooltip: 'Synchronisieren',

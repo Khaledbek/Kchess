@@ -1,5 +1,10 @@
 {
   "@@locale": "en",
+  "coachShowOnBoard": "Show on board",
+  "coachCompareMoves": "Compare moves",
+  "coachChallenge": "Challenge me",
+  "coachCompareRequest": "Compare the supplied engine candidates in this chess position. Explain the idea and the opponent's reply for each, using only verified evidence. If only one candidate is available, explain it and say that a second evaluated candidate is missing.",
+  "coachChallengeRequest": "Coach me with one focused question about this chess position. Let me find the idea on the board before revealing the move. Wait for my attempt, then give useful feedback.",
   "appTitle": "KChess",
   "firstRunTitle": "Your local chess workspace",
   "chessCom": "Chess.com",
@@ -648,5 +653,34 @@
         "type": "int"
       }
     }
-  }
+  },
+  "coach": "AI Chess Coach",
+  "coachBoardContext": "Board context",
+  "coachNoPosition": "No position loaded",
+  "coachTrainerOutput": "Trainer",
+  "coachWelcome": "Ask about the position or any chess topic.",
+  "coachThinking": "Trainer is thinking…",
+  "coachHint": "Hint",
+  "coachInputHint": "Ask your chess question…",
+  "coachSend": "Send",
+  "coachDepthConcise": "Concise",
+  "coachDepthBalanced": "Balanced",
+  "coachDepthDeep": "Deep",
+  "coachUnavailable": "The coach language model is not available yet.",
+  "coachOffTopic": "The coach can only answer chess-related questions.",
+  "coachValidationFailed": "The coach answer could not be verified safely.",
+  "coachHintRequest": "Give me a hint for this position.",
+  "coachFen": "FEN",
+  "coachPgn": "PGN",
+  "coachPasteFen": "Paste FEN",
+  "coachPastePgn": "Paste PGN",
+  "coachChooseGame": "Choose a game from Games",
+  "coachUseContext": "Use",
+  "coachNoGames": "No games available.",
+  "coachMore": "More",
+  "coachPlayerWhite": "White",
+  "coachPlayerBlack": "Black",
+  "coachHintPieceMessage": "Start with the highlighted piece. Ask yourself what improves if this piece moves.",
+  "coachHintTargetMessage": "Now look at the highlighted target square and arrow. Try to find the idea before revealing the explanation.",
+  "coachHintExplainRequest": "Explain why the native engine hint move is strong in this position. Focus on the chess idea and practical plan, not engine numbers."
 }

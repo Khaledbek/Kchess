@@ -1,5 +1,10 @@
 {
   "@@locale": "ar",
+  "coachShowOnBoard": "إظهار على الرقعة",
+  "coachCompareMoves": "مقارنة النقلات",
+  "coachChallenge": "أعطني تحديًا",
+  "coachCompareRequest": "قارن النقلات المرشحة التي قدمها المحرك في هذا الوضع. اشرح فكرة كل نقلة ورد الخصم اعتمادًا على الأدلة المتحققة فقط. إذا توفر مرشح واحد فقط، فاشرحه واذكر أن المرشح الثاني المقيّم غير متوفر.",
+  "coachChallengeRequest": "درّبني بسؤال واحد محدد عن هذا الوضع في الشطرنج. دعني أجد الفكرة على الرقعة قبل كشف النقلة. انتظر محاولتي ثم قدم ملاحظات مفيدة.",
   "appTitle": "KChess",
   "firstRunTitle": "مساحة الشطرنج المحلية",
   "chessCom": "Chess.com",
@@ -492,5 +497,34 @@
         "type": "int"
       }
     }
-  }
+  },
+  "coach": "مدرب الشطرنج بالذكاء الاصطناعي",
+  "coachBoardContext": "سياق الرقعة",
+  "coachNoPosition": "لا توجد وضعية محمّلة",
+  "coachTrainerOutput": "المدرب",
+  "coachWelcome": "اسأل عن الوضعية أو عن أي موضوع شطرنجي.",
+  "coachThinking": "المدرب يفكر…",
+  "coachHint": "تلميح",
+  "coachInputHint": "اكتب سؤالك عن الشطرنج…",
+  "coachSend": "إرسال",
+  "coachDepthConcise": "مختصر",
+  "coachDepthBalanced": "متوازن",
+  "coachDepthDeep": "متعمق",
+  "coachUnavailable": "نموذج اللغة الخاص بالمدرب غير متاح بعد.",
+  "coachOffTopic": "يمكن للمدرب الإجابة عن الأسئلة المتعلقة بالشطرنج فقط.",
+  "coachValidationFailed": "تعذر التحقق من إجابة المدرب بشكل آمن.",
+  "coachHintRequest": "أعطني تلميحًا لهذه الوضعية.",
+  "coachFen": "FEN",
+  "coachPgn": "PGN",
+  "coachPasteFen": "لصق FEN",
+  "coachPastePgn": "لصق PGN",
+  "coachChooseGame": "اختر مباراة من قسم المباريات",
+  "coachUseContext": "استخدام",
+  "coachNoGames": "لا توجد مباريات متاحة.",
+  "coachMore": "المزيد",
+  "coachPlayerWhite": "الأبيض",
+  "coachPlayerBlack": "الأسود",
+  "coachHintPieceMessage": "ابدأ بالقطعة المظللة. فكّر أولًا فيما الذي سيتحسن إذا تحركت هذه القطعة.",
+  "coachHintTargetMessage": "انظر الآن إلى مربع الهدف والسهم المظللَين. حاول اكتشاف الفكرة قبل إظهار الشرح.",
+  "coachHintExplainRequest": "اشرح لماذا نقلة التلميح التي حددها المحرك قوية في هذا الوضع. ركّز على الفكرة الشطرنجية والخطة العملية، لا على أرقام المحرك."
 }

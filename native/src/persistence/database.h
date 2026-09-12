@@ -111,6 +111,33 @@ struct GamePhaseRow {
   int max_ply{-1};
 };
 
+
+
+struct PlayerOpeningLearningStat {
+  std::string eco;
+  std::string name;
+  int games{0};
+  int wins{0};
+  int draws{0};
+  int losses{0};
+};
+
+struct PlayerLearningStats {
+  int games{0};
+  int analyzed_moves{0};
+  std::optional<int> average_rating;
+  std::optional<double> average_accuracy;
+  int theory{0};
+  int brilliant{0};
+  int critical{0};
+  int best{0};
+  int excellent{0};
+  int miss{0};
+  int mistake{0};
+  int blunder{0};
+  std::vector<PlayerOpeningLearningStat> openings;
+};
+
 struct BotGameMoveRecord {
   int ply{0};
   std::string uci;
@@ -289,6 +316,12 @@ class Database {
 
   // Outcome + final ply per game, for the game-phase breakdown.
   std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;
+
+  PlayerLearningStats player_learning_stats(const std::string& profile_id) const;
+  std::optional<std::string> ai_chess_profile_payload(
+      const std::string& profile_id) const;
+  void set_ai_chess_profile_payload(
+      const std::string& profile_id, const std::string& payload_json);
 
   // Opening classification. games_needing_opening returns (game_id, pgn) for
   // games not yet classified (opening_ply IS NULL); limit <= 0 returns all.

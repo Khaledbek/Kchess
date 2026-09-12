@@ -100,6 +100,36 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
+  /// No description provided for @coachShowOnBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on board'**
+  String get coachShowOnBoard;
+
+  /// No description provided for @coachCompareMoves.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare moves'**
+  String get coachCompareMoves;
+
+  /// No description provided for @coachChallenge.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenge me'**
+  String get coachChallenge;
+
+  /// No description provided for @coachCompareRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare the supplied engine candidates in this chess position. Explain the idea and the opponent\'s reply for each, using only verified evidence. If only one candidate is available, explain it and say that a second evaluated candidate is missing.'**
+  String get coachCompareRequest;
+
+  /// No description provided for @coachChallengeRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Coach me with one focused question about this chess position. Let me find the idea on the board before revealing the move. Wait for my attempt, then give useful feedback.'**
+  String get coachChallengeRequest;
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
@@ -2624,6 +2654,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Queen vs. minor pieces'**
   String get practiceSectionQueenMinor;
+
+  /// No description provided for @coach.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Chess Coach'**
+  String get coach;
+
+  /// No description provided for @coachBoardContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Board context'**
+  String get coachBoardContext;
+
+  /// No description provided for @coachNoPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'No position loaded'**
+  String get coachNoPosition;
+
+  /// No description provided for @coachTrainerOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Trainer'**
+  String get coachTrainerOutput;
+
+  /// No description provided for @coachWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about the position or any chess topic.'**
+  String get coachWelcome;
+
+  /// No description provided for @coachThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Trainer is thinking…'**
+  String get coachThinking;
+
+  /// No description provided for @coachHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint'**
+  String get coachHint;
+
+  /// No description provided for @coachInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask your chess question…'**
+  String get coachInputHint;
+
+  /// No description provided for @coachSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get coachSend;
+
+  /// No description provided for @coachDepthConcise.
+  ///
+  /// In en, this message translates to:
+  /// **'Concise'**
+  String get coachDepthConcise;
+
+  /// No description provided for @coachDepthBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get coachDepthBalanced;
+
+  /// No description provided for @coachDepthDeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Deep'**
+  String get coachDepthDeep;
+
+  /// No description provided for @coachUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The coach language model is not available yet.'**
+  String get coachUnavailable;
+
+  /// No description provided for @coachOffTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'The coach can only answer chess-related questions.'**
+  String get coachOffTopic;
+
+  /// No description provided for @coachValidationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The coach answer could not be verified safely.'**
+  String get coachValidationFailed;
+
+  /// No description provided for @coachHintRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Give me a hint for this position.'**
+  String get coachHintRequest;
+
+  /// No description provided for @coachFen.
+  ///
+  /// In en, this message translates to:
+  /// **'FEN'**
+  String get coachFen;
+
+  /// No description provided for @coachPgn.
+  ///
+  /// In en, this message translates to:
+  /// **'PGN'**
+  String get coachPgn;
+
+  /// No description provided for @coachPasteFen.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste FEN'**
+  String get coachPasteFen;
+
+  /// No description provided for @coachPastePgn.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste PGN'**
+  String get coachPastePgn;
+
+  /// No description provided for @coachChooseGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a game from Games'**
+  String get coachChooseGame;
+
+  /// No description provided for @coachUseContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get coachUseContext;
+
+  /// No description provided for @coachNoGames.
+  ///
+  /// In en, this message translates to:
+  /// **'No games available.'**
+  String get coachNoGames;
+
+  /// No description provided for @coachMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get coachMore;
+
+  /// No description provided for @coachPlayerWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get coachPlayerWhite;
+
+  /// No description provided for @coachPlayerBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get coachPlayerBlack;
+
+  /// No description provided for @coachHintPieceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with the highlighted piece. Ask yourself what improves if this piece moves.'**
+  String get coachHintPieceMessage;
+
+  /// No description provided for @coachHintTargetMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Now look at the highlighted target square and arrow. Try to find the idea before revealing the explanation.'**
+  String get coachHintTargetMessage;
+
+  /// No description provided for @coachHintExplainRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain why the native engine hint move is strong in this position. Focus on the chess idea and practical plan, not engine numbers.'**
+  String get coachHintExplainRequest;
 }
 
 class _AppLocalizationsDelegate

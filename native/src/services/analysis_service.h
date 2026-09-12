@@ -49,6 +49,7 @@ class AnalysisService {
       int hash_mb);
   std::string variation_analysis_status_json(const std::string& job_id);
   void cancel_variation_analysis(const std::string& job_id);
+  std::string coach_hint_json(const std::string& fen);
 
  private:
   enum class AnalysisJobState {
@@ -141,6 +142,7 @@ class AnalysisService {
       std::vector<int> completed_position_slots,
       const std::shared_ptr<AnalysisJob>& job) noexcept;
   void reap_finished_variation_jobs();
+  std::shared_ptr<ChessEngine> acquire_variation_engine(const std::string& engine_id);
   void stop_all_variation_jobs(bool stop_engine) noexcept;
   void stop_all_mainline_analysis_jobs() noexcept;
   std::string start_variation_job_json(

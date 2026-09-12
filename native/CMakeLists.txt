@@ -142,6 +142,42 @@ target_compile_definitions(kchess_sqlite PRIVATE
 set_target_properties(kchess_sqlite PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(kchess_core SHARED
+  ai/automatic/automatic_coach_trigger.cpp
+  ai/candidate_move_system.cpp
+  ai/coach_orchestrator.cpp
+  ai/context_builder.cpp
+  ai/concepts/concept_catalog.cpp
+  ai/concepts/concept_catalog_data.cpp
+  ai/concepts/concept_retriever.cpp
+  ai/conversation/coach_session.cpp
+  ai/domain_router.cpp
+  ai/engine_budget.cpp
+  ai/evidence_retriever.cpp
+  ai/position/exploitation_planner.cpp
+  ai/position/plan_generator.cpp
+  ai/position/position_features.cpp
+  ai/position/position_structure_features.cpp
+  ai/position/position_weakness_facts.cpp
+  ai/position/tactical_detector.cpp
+  ai/position/tactical_line_motifs.cpp
+  ai/position/tactical_move_motifs.cpp
+  ai/position/tactical_pattern_motifs.cpp
+  ai/position/weakness_analyzer.cpp
+  ai/practicality/player_practicality.cpp
+  ai/practicality/practicality_engine.cpp
+  ai/practicality/practicality_metrics.cpp
+  ai/profile/chess_profile.cpp
+  ai/profile/profile_updater.cpp
+  ai/models/model_versions.cpp
+  ai/models/small_models.cpp
+  ai/optimization/provider_input_optimizer.cpp
+  ai/providers/gemini_config.cpp
+  ai/providers/gemini_provider.cpp
+  ai/providers/llm_provider.cpp
+  ai/providers/remote_provider.cpp
+  ai/query_planner.cpp
+  ai/validation/chess_validator.cpp
+  ai/validation/response_validator.cpp
   src/api/core_api.cpp
   src/analysis/accuracy.cpp
   src/analysis/move_classifier.cpp
@@ -170,6 +206,8 @@ add_library(kchess_core SHARED
   src/providers/provider_request_scheduler.cpp
   src/services/analysis_service.cpp
   src/services/bot_service.cpp
+  src/services/coach_profile_bridge.cpp
+  src/services/coach_service.cpp
   src/services/game_library_service.cpp
   src/services/profile_service.cpp
   src/services/provider_service.cpp
@@ -187,10 +225,14 @@ add_library(kchess_core SHARED
   src/theory/position_key.cpp
 )
 target_compile_features(kchess_core PUBLIC cxx_std_20)
-target_compile_definitions(kchess_core PRIVATE KCHESS_CORE_BUILD)
+target_compile_definitions(kchess_core PRIVATE
+  KCHESS_CORE_BUILD
+  KCHESS_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.."
+)
 target_include_directories(kchess_core
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
 )

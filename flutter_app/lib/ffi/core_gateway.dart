@@ -97,6 +97,10 @@ abstract interface class CoreGateway {
   });
   Future<BotMoveSnapshot> botMoveStatus(String jobId);
   Future<void> cancelBotMove(String jobId);
+  Future<Map<String, Object?>> coachAsk(Map<String, Object?> request);
+  Future<Map<String, Object?>> coachContext(Map<String, Object?> request);
+  Future<Map<String, Object?>> coachAutomatic(Map<String, Object?> request);
+  Future<Map<String, Object?>> coachHint(Map<String, Object?> request);
   Future<TrainingOverview> trainingOverview();
   Future<Object?> practiceCommand(Map<String, Object?> request);
   Future<TrainingAttempt> startTrainingAttempt(String exerciseId);

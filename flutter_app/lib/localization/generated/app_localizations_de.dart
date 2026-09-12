@@ -10,6 +10,23 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
+  String get coachShowOnBoard => 'Auf dem Brett zeigen';
+
+  @override
+  String get coachCompareMoves => 'Züge vergleichen';
+
+  @override
+  String get coachChallenge => 'Stell mir eine Aufgabe';
+
+  @override
+  String get coachCompareRequest =>
+      'Vergleiche die vorliegenden Engine-Kandidaten in dieser Schachstellung. Erkläre für jeden die Idee und die gegnerische Antwort nur anhand geprüfter Belege. Wenn nur ein Kandidat vorliegt, erkläre ihn und sage, dass ein zweiter bewerteter Kandidat fehlt.';
+
+  @override
+  String get coachChallengeRequest =>
+      'Trainiere mit mir anhand einer gezielten Frage zu dieser Schachstellung. Lass mich die Idee auf dem Brett finden, bevor du den Zug verrätst. Warte auf meinen Versuch und gib mir dann hilfreiches Feedback.';
+
+  @override
   String get appTitle => 'KChess';
 
   @override
@@ -1379,4 +1396,98 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get practiceSectionQueenMinor => 'Dame gegen Leichtfiguren';
+
+  @override
+  String get coach => 'KI-Schachtrainer';
+
+  @override
+  String get coachBoardContext => 'Brettkontext';
+
+  @override
+  String get coachNoPosition => 'Keine Stellung geladen';
+
+  @override
+  String get coachTrainerOutput => 'Trainer';
+
+  @override
+  String get coachWelcome =>
+      'Frage zur Stellung oder zu einem beliebigen Schachthema.';
+
+  @override
+  String get coachThinking => 'Der Trainer denkt nach …';
+
+  @override
+  String get coachHint => 'Hinweis';
+
+  @override
+  String get coachInputHint => 'Stelle deine Schachfrage …';
+
+  @override
+  String get coachSend => 'Senden';
+
+  @override
+  String get coachDepthConcise => 'Kurz';
+
+  @override
+  String get coachDepthBalanced => 'Ausgewogen';
+
+  @override
+  String get coachDepthDeep => 'Tiefgehend';
+
+  @override
+  String get coachUnavailable =>
+      'Das Sprachmodell des Trainers ist noch nicht verfügbar.';
+
+  @override
+  String get coachOffTopic =>
+      'Der Trainer beantwortet ausschließlich Schachfragen.';
+
+  @override
+  String get coachValidationFailed =>
+      'Die Trainerantwort konnte nicht sicher geprüft werden.';
+
+  @override
+  String get coachHintRequest => 'Gib mir einen Hinweis zu dieser Stellung.';
+
+  @override
+  String get coachFen => 'FEN';
+
+  @override
+  String get coachPgn => 'PGN';
+
+  @override
+  String get coachPasteFen => 'FEN einfügen';
+
+  @override
+  String get coachPastePgn => 'PGN einfügen';
+
+  @override
+  String get coachChooseGame => 'Partie aus „Partien“ auswählen';
+
+  @override
+  String get coachUseContext => 'Übernehmen';
+
+  @override
+  String get coachNoGames => 'Keine Partien verfügbar.';
+
+  @override
+  String get coachMore => 'Mehr';
+
+  @override
+  String get coachPlayerWhite => 'Weiß';
+
+  @override
+  String get coachPlayerBlack => 'Schwarz';
+
+  @override
+  String get coachHintPieceMessage =>
+      'Beginne mit der markierten Figur. Überlege zuerst, was sich verbessert, wenn diese Figur zieht.';
+
+  @override
+  String get coachHintTargetMessage =>
+      'Schau jetzt auf das markierte Zielfeld und den Pfeil. Versuche die Idee zu finden, bevor du die Erklärung aufdeckst.';
+
+  @override
+  String get coachHintExplainRequest =>
+      'Erkläre, warum der native Engine-Hinweiszug in dieser Stellung stark ist. Konzentriere dich auf die Schachidee und den praktischen Plan, nicht auf Engine-Zahlen.';
 }

@@ -19,6 +19,8 @@ import 'shared/board_endgame_presentation.dart';
 import 'shared/promotion_dialog.dart';
 import '../features/app/application/app_controller.dart';
 import '../features/analysis/presentation/analysis_screen.dart';
+import '../features/coach/models/coach_ui_models.dart';
+import '../features/coach/presentation/coach_session_screen.dart';
 import '../features/training/models/opening_training_request.dart';
 import '../features/training/presentation/training_arena_screen.dart';
 import '../features/training/presentation/training_navigation.dart';
@@ -127,6 +129,7 @@ class _HomeShellState extends State<HomeShell> {
         Icons.insights_outlined,
         Icons.insights,
       ),
+      _Destination(strings.coach, Icons.school_outlined, Icons.school),
       _Destination(strings.settings, Icons.settings_outlined, Icons.settings),
     ];
     final content = switch (_selectedIndex) {
@@ -138,7 +141,13 @@ class _HomeShellState extends State<HomeShell> {
       ),
       3 => FavoritesScreen(controller: widget.controller),
       4 => StatisticsScreen(controller: widget.controller),
-      5 => SettingsScreen(controller: widget.controller),
+      5 => CoachSessionScreen(
+        gateway: widget.controller.gateway,
+        profileId: widget.controller.activeProfile?.id,
+        embedded: true,
+        onExit: () => _select(0),
+      ),
+      6 => SettingsScreen(controller: widget.controller),
       _ => _EmptySection(title: destinations[_selectedIndex].label),
     };
 
@@ -152,7 +161,9 @@ class _HomeShellState extends State<HomeShell> {
 
     return TrainingNavigator(
       openTraining: _openTraining,
-      child: LayoutBuilder(
+      child: _selectedIndex == 5
+          ? content
+          : LayoutBuilder(
         builder: (context, constraints) {
         if (constraints.maxWidth >= 900) {
           return Scaffold(

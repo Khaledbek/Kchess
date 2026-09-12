@@ -2428,6 +2428,17 @@ std::string AnalysisService::start_variation_analysis_json(
   return start_variation_job_json(fen, uci, database_.settings());
 }
 
+std::shared_ptr<ChessEngine> AnalysisService::acquire_variation_engine(const std::string& engine_id) {
+  std::lock_guard lock(variation_jobs_mutex_);
+  if (variation_engine_ == nullptr || variation_engine_->id() != engine_id) {
+    if (variation_engine_ != nullptr) variation_engine_->stop();
+    variation_position_results_.clear();
+    variation_engine_ = create_stockfish_engine(engine_id);
+    variation_engine_->validate_available();
+  }
+  return variation_engine_;
+}
+
 std::string AnalysisService::start_variation_analysis_with_settings_json(
     const std::string& fen,
     const std::string& uci,
@@ -2482,16 +2493,7 @@ std::string AnalysisService::start_variation_job_json(
   job->fen_before = fen;
   job->fen = applied.fen_after;
   job->visible_multi_pv = settings.multi_pv;
-  {
-    std::lock_guard lock(variation_jobs_mutex_);
-    if (variation_engine_ == nullptr || variation_engine_->id() != settings.engine_id) {
-      if (variation_engine_ != nullptr) variation_engine_->stop();
-      variation_position_results_.clear();
-      variation_engine_ = create_stockfish_engine(settings.engine_id);
-      variation_engine_->validate_available();
-    }
-    job->engine = variation_engine_;
-  }
+  job->engine = acquire_variation_engine(settings.engine_id);
 
   // SF19 sideline engines are intentionally reused across consecutive moves to
   // preserve their expensive TT/NNUE state. Its public live snapshot belongs
@@ -2735,6 +2737,115 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
     json["lines"].push_back(std::move(line_json));
   }
   return json.dump();
+}
+
+
+// -----------------------------------------------------------------------------
+// Section: Lightweight coach hint analysis
+// -----------------------------------------------------------------------------
+
+std::string AnalysisService::coach_hint_json(const std::string& fen) {
+  // Hints are explicit user actions. Keep them bounded and single-engine so a
+  // local machine is never running a hidden analysis worker beside the hint.
+  stop_all_mainline_analysis_jobs();
+  stop_all_variation_jobs(true);
+
+  auto settings = database_.settings();
+  settings.depth = std::clamp(settings.sideline_depth, 8, 16);
+  settings.multi_pv = std::clamp(std::max(2, settings.sideline_multi_pv), 2, 3);
+  settings.threads = std::clamp(settings.sideline_threads, 1, maximum_worker_threads());
+  settings.hash_mb = std::clamp(settings.sideline_hash_mb, 16, 512);
+
+  // Coach hints run through AnalysisService but must not borrow the shared
+  // variation engine: the UI can cancel a variation while a hint is running,
+  // which can stop that shared engine between start() and analyze().  Own this
+  // bounded engine for the duration of the hint instead.
+  auto engine = create_stockfish_engine(settings.engine_id);
+  engine->validate_available();
+  engine->start();
+  auto request = analysis_request(fen, settings);
+  request.multi_pv = settings.multi_pv;
+  request.dynamic_early_stop = true;
+  request.early_stop_min_depth = std::min(settings.depth, 10);
+  request.early_stop_stable_iterations = 2;
+  request.early_stop_eval_tolerance_cp = 12;
+  request.early_stop_score_gap_cp = 90;
+  AnalysisResult result;
+  try {
+    result = engine->analyze(request);
+  } catch (...) {
+    engine->stop();
+    throw;
+  }
+  const auto engine_version = engine->version();
+  const auto engine_id = engine->id();
+  engine->stop();
+  nlohmann::json output{
+      {"status", "ok"},
+      {"fen", fen},
+      {"engineVersion", engine_version},
+      {"depth", result.reached_depth},
+      {"moves", nlohmann::json::array()},
+      {"candidates", nlohmann::json::array()},
+      {"line", nullptr},
+  };
+  if (result.lines.empty()) return output.dump();
+
+  const bool line_is_white = white_to_move(fen);
+  const auto serialize_line = [&](const EngineLine& line) {
+    const auto bar = engine_id == "stockfish19"
+        ? sf19_evaluation_bar_white_permille(line, line_is_white)
+        : std::nullopt;
+    nlohmann::json value{
+        {"rank", line.rank},
+        {"depth", line.depth},
+        {"evaluationCp", line.evaluation_cp.has_value()
+            ? nlohmann::json(line_is_white ? *line.evaluation_cp : -*line.evaluation_cp)
+            : nlohmann::json(nullptr)},
+        {"mateIn", line.mate_in.has_value()
+            ? nlohmann::json(line_is_white ? *line.mate_in : -*line.mate_in)
+            : nlohmann::json(nullptr)},
+        {"evaluationBarWhitePermille", bar.has_value()
+            ? nlohmann::json(*bar) : nlohmann::json(nullptr)},
+        {"nodes", line.nodes},
+        {"moves", line.moves},
+        {"wdl", nullptr},
+    };
+    if (line.wdl.has_value()) {
+      value["wdl"] = {
+          {"wins", line_is_white ? line.wdl->wins : line.wdl->losses},
+          {"draws", line.wdl->draws},
+          {"losses", line_is_white ? line.wdl->losses : line.wdl->wins},
+      };
+    }
+    return value;
+  };
+
+  output["line"] = serialize_line(result.lines.front());
+  const auto& best = result.lines.front();
+  const auto equivalent = [&best](const EngineLine& candidate) {
+    if (candidate.best_move().empty()) return false;
+    if (candidate.rank == best.rank) return true;
+    if (best.mate_in.has_value() || candidate.mate_in.has_value()) {
+      return best.mate_in.has_value() && candidate.mate_in.has_value()
+          && ((*best.mate_in > 0) == (*candidate.mate_in > 0))
+          && std::abs(std::abs(*best.mate_in) - std::abs(*candidate.mate_in)) <= 1;
+    }
+    return best.evaluation_cp.has_value() && candidate.evaluation_cp.has_value()
+        && std::abs(*best.evaluation_cp - *candidate.evaluation_cp) <= 15;
+  };
+
+  for (const auto& line : result.lines) {
+    const auto serialized = serialize_line(line);
+    const nlohmann::json candidate{
+        {"uci", line.best_move()}, {"rank", line.rank}, {"pv", line.moves},
+        {"evaluationCp", serialized["evaluationCp"]}, {"mateIn", serialized["mateIn"]}};
+    if (output["candidates"].size() < 3 && !line.best_move().empty())
+      output["candidates"].push_back(candidate);
+    if (output["moves"].size() >= 2 || !equivalent(line)) continue;
+    output["moves"].push_back(candidate);
+  }
+  return output.dump();
 }
 
 void AnalysisService::cancel_variation_analysis(const std::string& job_id) {

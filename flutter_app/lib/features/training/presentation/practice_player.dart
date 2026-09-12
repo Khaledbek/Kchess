@@ -11,6 +11,8 @@ import '../../../shared/widgets/chess_board_view.dart';
 import '../../../shared/widgets/evaluation_bar.dart';
 import '../../../shared/models/models.dart';
 import '../../../ui/shared/promotion_dialog.dart';
+import '../../coach/models/coach_ui_models.dart';
+import '../../coach/presentation/coach_session_screen.dart';
 import '../models/practice_models.dart';
 
 class PracticePlayer extends StatefulWidget {
@@ -167,7 +169,29 @@ class _PracticePlayerState extends State<PracticePlayer> {
         ? strings.trainingWrongMove
         : strings.trainingYourMove;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          if (current != null)
+            IconButton(
+              key: const Key('open-coach-from-training'),
+              tooltip: strings.coach,
+              onPressed: () => unawaited(
+                openCoachSession(
+                  context,
+                  gateway: widget.gateway,
+                  position: current.position,
+                  surface: widget.request['kind'] == 'opening'
+                      ? CoachSurface.opening
+                      : CoachSurface.training,
+                  contextId: current.id,
+                  blackAtBottom: current.solverColor == 'black',
+                ),
+              ),
+              icon: const Icon(Icons.school_outlined),
+            ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 660),

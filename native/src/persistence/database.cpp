@@ -880,6 +880,19 @@ PRAGMA user_version = 20;
 )sql";
 
 
+// AI chess profiles are compact learned overlays keyed by the existing KChess
+// profile. The JSON payload is versioned by native/ai/profile so persistence
+// does not duplicate the AI schema.
+constexpr const char* kMigration21 = R"sql(
+CREATE TABLE ai_chess_profiles (
+  profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  payload_json TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+PRAGMA user_version = 21;
+)sql";
+
+
 }  // namespace
 
 Database::Database(std::filesystem::path data_directory)
@@ -933,6 +946,7 @@ void Database::open_and_migrate() {
     if (version < 18) execute(kMigration18);
     if (version < 19) execute(kMigration19);
     if (version < 20) execute(kMigration20);
+    if (version < 21) execute(kMigration21);
 
     // Older builds could leave several completed/cancelled analysis_runs for
     // the same game. At process startup there are no live workers, so collapse
@@ -2247,6 +2261,112 @@ std::vector<GamePhaseRow> Database::games_for_phases(
     });
   }
   return result;
+}
+
+
+PlayerLearningStats Database::player_learning_stats(
+    const std::string& profile_id) const {
+  PlayerLearningStats result;
+
+  auto overview = prepare(
+      db_,
+      "SELECT count(*),"
+      "CAST(round(avg(CASE "
+      "WHEN lower(trim(g.white_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
+      "THEN g.white_rating "
+      "WHEN lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
+      "THEN g.black_rating END)) AS INTEGER),"
+      "avg(CASE "
+      "WHEN lower(trim(g.white_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
+      "THEN (SELECT ar.white_local_accuracy FROM analysis_runs ar "
+      "WHERE ar.game_id=g.id AND ar.status='complete' AND ar.white_local_accuracy IS NOT NULL "
+      "ORDER BY COALESCE(ar.completed_at,0) DESC,ar.started_at DESC LIMIT 1) "
+      "WHEN lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
+      "THEN (SELECT ar.black_local_accuracy FROM analysis_runs ar "
+      "WHERE ar.game_id=g.id AND ar.status='complete' AND ar.black_local_accuracy IS NOT NULL "
+      "ORDER BY COALESCE(ar.completed_at,0) DESC,ar.started_at DESC LIMIT 1) END) "
+      "FROM games g JOIN profiles p ON p.id=g.profile_id WHERE g.profile_id=?;");
+  sqlite3_bind_text(overview.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(overview.get()) == SQLITE_ROW) {
+    result.games = sqlite3_column_int(overview.get(), 0);
+    result.average_rating = optional_int_column(overview.get(), 1);
+    result.average_accuracy = optional_double_column(overview.get(), 2);
+  }
+
+  auto categories = prepare(
+      db_,
+      "SELECT ma.category,count(*) FROM move_analysis ma "
+      "JOIN analysis_runs ar ON ar.id=ma.analysis_run_id AND ar.status='complete' "
+      "JOIN games g ON g.id=ar.game_id "
+      "JOIN profiles p ON p.id=g.profile_id "
+      "JOIN game_moves gm ON gm.game_id=g.id AND gm.ply_index=ma.ply "
+      "WHERE g.profile_id=? AND ma.classifier_version IS NOT NULL AND ("
+      "(lower(trim(g.white_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
+      "AND gm.side_to_move='white') OR "
+      "(lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
+      "AND gm.side_to_move='black')) "
+      "GROUP BY ma.category;");
+  sqlite3_bind_text(categories.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  while (sqlite3_step(categories.get()) == SQLITE_ROW) {
+    const auto category = parse_category(text_column(categories.get(), 0));
+    const int count = sqlite3_column_int(categories.get(), 1);
+    result.analyzed_moves += count;
+    switch (category) {
+      case MoveCategory::theory: result.theory += count; break;
+      case MoveCategory::brilliant: result.brilliant += count; break;
+      case MoveCategory::critical: result.critical += count; break;
+      case MoveCategory::best: result.best += count; break;
+      case MoveCategory::excellent: result.excellent += count; break;
+      case MoveCategory::miss: result.miss += count; break;
+      case MoveCategory::mistake: result.mistake += count; break;
+      case MoveCategory::blunder: result.blunder += count; break;
+      default: break;
+    }
+  }
+
+  auto openings = prepare(
+      db_,
+      "SELECT COALESCE(opening_eco,''),COALESCE(opening_name,''),count(*),"
+      "sum(CASE WHEN provider_outcome='win' THEN 1 ELSE 0 END),"
+      "sum(CASE WHEN provider_outcome='draw' THEN 1 ELSE 0 END),"
+      "sum(CASE WHEN provider_outcome='loss' THEN 1 ELSE 0 END) "
+      "FROM games WHERE profile_id=? AND "
+      "(COALESCE(opening_eco,'')<>'' OR COALESCE(opening_name,'')<>'') "
+      "GROUP BY opening_eco,opening_name ORDER BY count(*) DESC LIMIT 8;");
+  sqlite3_bind_text(openings.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  while (sqlite3_step(openings.get()) == SQLITE_ROW) {
+    result.openings.push_back(PlayerOpeningLearningStat{
+        .eco = text_column(openings.get(), 0),
+        .name = text_column(openings.get(), 1),
+        .games = sqlite3_column_int(openings.get(), 2),
+        .wins = sqlite3_column_int(openings.get(), 3),
+        .draws = sqlite3_column_int(openings.get(), 4),
+        .losses = sqlite3_column_int(openings.get(), 5),
+    });
+  }
+  return result;
+}
+
+std::optional<std::string> Database::ai_chess_profile_payload(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_, "SELECT payload_json FROM ai_chess_profiles WHERE profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
+  return text_column(statement.get(), 0);
+}
+
+void Database::set_ai_chess_profile_payload(
+    const std::string& profile_id, const std::string& payload_json) {
+  auto statement = prepare(
+      db_,
+      "INSERT INTO ai_chess_profiles(profile_id,payload_json,updated_at) VALUES(?,?,?) "
+      "ON CONFLICT(profile_id) DO UPDATE SET "
+      "payload_json=excluded.payload_json,updated_at=excluded.updated_at;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, payload_json.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 3, unix_time_seconds());
+  check(sqlite3_step(statement.get()), db_, "persist ai chess profile");
 }
 
 void Database::delete_local_game(
