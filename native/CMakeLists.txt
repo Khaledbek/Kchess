@@ -184,6 +184,8 @@ add_library(kchess_core SHARED
   src/training/practice_session.cpp
   src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
+  src/theory/polyglot.cpp
+  src/theory/polyglot_arrays.cpp
   src/theory/position_key.cpp
 )
 target_compile_features(kchess_core PUBLIC cxx_std_20)
@@ -406,6 +408,28 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   )
   target_link_libraries(kchess_training_tests PRIVATE kchess_core)
   add_test(NAME kchess_training_tests COMMAND kchess_training_tests)
+
+  # Drives the opening drill end to end; skips itself when the untracked
+  # PolyGlot book is not on disk.
+  add_executable(kchess_opening_drill_tests tests/opening_drill_tests.cpp)
+  target_compile_features(kchess_opening_drill_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_opening_drill_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  target_link_libraries(kchess_opening_drill_tests PRIVATE kchess_core)
+  add_test(NAME kchess_opening_drill_tests COMMAND kchess_opening_drill_tests)
+
+  add_executable(kchess_polyglot_tests
+    tests/polyglot_tests.cpp
+    src/theory/polyglot.cpp
+    src/theory/polyglot_arrays.cpp
+  )
+  target_compile_features(kchess_polyglot_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_polyglot_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_polyglot_tests COMMAND kchess_polyglot_tests)
 
   add_executable(kchess_bot_move_selector_tests
     tests/bot_move_selector_tests.cpp

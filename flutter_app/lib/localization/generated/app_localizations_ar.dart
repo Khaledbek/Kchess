@@ -1074,6 +1074,95 @@ class AppLocalizationsAr extends AppLocalizations {
       'انقر على بطاقة لفتح تنويعاتها، أو درّب الخط مباشرة.';
 
   @override
+  String get trainingOpeningIncorrectMove => 'نقلة خاطئة';
+
+  @override
+  String get trainingOpeningTryAgain => 'حاول مرة أخرى.';
+
+  @override
+  String trainingOpeningPlayInstead(String move) {
+    return 'النقلة الصحيحة كانت $move';
+  }
+
+  @override
+  String get trainingOpeningScenariosTitle => 'سيناريوهات الافتتاح';
+
+  @override
+  String get trainingOpeningScenariosCaption =>
+      'العب نقلة الكتاب أمام كل رد يعرفه الكتاب.';
+
+  @override
+  String trainingOpeningScenarioDepth(int done, int total) {
+    return 'إتقان العمق: $done/$total نقلات';
+  }
+
+  @override
+  String get trainingOpeningPlayAs => 'العب بـ';
+
+  @override
+  String trainingOpeningOpponentPlayed(String move) {
+    return 'لعب الخصم $move.';
+  }
+
+  @override
+  String trainingOpeningScenarioReady(String move) {
+    return 'الوضعية بعد $move.';
+  }
+
+  @override
+  String get trainingOpeningFindBest => 'اعثر على أفضل رد للمحرك.';
+
+  @override
+  String trainingOpeningCurrentDepth(int done, int total) {
+    return 'العمق الحالي: النقلة $done / $total';
+  }
+
+  @override
+  String trainingOpeningCorrect(String move) {
+    return '$move — هذه نقلة الكتاب.';
+  }
+
+  @override
+  String trainingOpeningAlternative(String move, int rank) {
+    return '$move صحيحة أيضًا — الخيار رقم $rank في الكتاب.';
+  }
+
+  @override
+  String trainingOpeningDepthReached(int depth) {
+    return 'تم الوصول إلى العمق $depth';
+  }
+
+  @override
+  String get trainingOpeningBookExhausted =>
+      'ينتهي الكتاب هنا — لقد أجبت عن كل ما يعرفه.';
+
+  @override
+  String get trainingOpeningNoBook =>
+      'لا يحتوي كتاب الافتتاحيات على نقلات لهذه الوضعية.';
+
+  @override
+  String get trainingOpeningDrillClean =>
+      'بلا أخطاء — هذه المحاولة تُحتسب نحو الإتقان.';
+
+  @override
+  String get trainingOpeningDrillWithErrors =>
+      'انتهت مع تصحيحات. المحاولة الخالية من الأخطاء فقط تُحتسب نحو الإتقان.';
+
+  @override
+  String get trainingOpeningDrillAgain => 'تدرّب مجددًا';
+
+  @override
+  String trainingOpeningBookChoices(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'واحد من $count ردود في الكتاب',
+      one: 'رد الكتاب الوحيد',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get playAgainstBot => 'اللعب ضد بوت';
 
   @override

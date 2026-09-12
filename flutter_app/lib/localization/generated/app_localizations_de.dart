@@ -1085,6 +1085,95 @@ class AppLocalizationsDe extends AppLocalizations {
       'Tippe auf eine Karte, um ihre Varianten aufzuklappen — oder trainiere die Linie direkt.';
 
   @override
+  String get trainingOpeningIncorrectMove => 'Falscher Zug';
+
+  @override
+  String get trainingOpeningTryAgain => 'Versuch es erneut.';
+
+  @override
+  String trainingOpeningPlayInstead(String move) {
+    return 'Richtig war $move';
+  }
+
+  @override
+  String get trainingOpeningScenariosTitle => 'Eröffnungs-Szenarien';
+
+  @override
+  String get trainingOpeningScenariosCaption =>
+      'Spiele den Buchzug gegen jede Antwort, die das Buch kennt.';
+
+  @override
+  String trainingOpeningScenarioDepth(int done, int total) {
+    return 'Tiefe gemeistert: $done/$total Züge';
+  }
+
+  @override
+  String get trainingOpeningPlayAs => 'Spielen als';
+
+  @override
+  String trainingOpeningOpponentPlayed(String move) {
+    return 'Der Gegner spielte $move.';
+  }
+
+  @override
+  String trainingOpeningScenarioReady(String move) {
+    return 'Stellung nach $move.';
+  }
+
+  @override
+  String get trainingOpeningFindBest => 'Finde die beste Engine-Antwort.';
+
+  @override
+  String trainingOpeningCurrentDepth(int done, int total) {
+    return 'Aktuelle Tiefe: Zug $done / $total';
+  }
+
+  @override
+  String trainingOpeningCorrect(String move) {
+    return '$move — das ist der Buchzug.';
+  }
+
+  @override
+  String trainingOpeningAlternative(String move, int rank) {
+    return '$move geht auch — Buchwahl Nr. $rank.';
+  }
+
+  @override
+  String trainingOpeningDepthReached(int depth) {
+    return 'Tiefe $depth erreicht';
+  }
+
+  @override
+  String get trainingOpeningBookExhausted =>
+      'Hier endet das Buch — du hast alles beantwortet, was es kennt.';
+
+  @override
+  String get trainingOpeningNoBook =>
+      'Das Eröffnungsbuch kennt für diese Stellung keine Züge.';
+
+  @override
+  String get trainingOpeningDrillClean =>
+      'Ohne Fehler — dieser Durchgang zählt zur Meisterschaft.';
+
+  @override
+  String get trainingOpeningDrillWithErrors =>
+      'Mit Korrekturen beendet. Nur ein fehlerfreier Durchgang zählt zur Meisterschaft.';
+
+  @override
+  String get trainingOpeningDrillAgain => 'Nochmal trainieren';
+
+  @override
+  String trainingOpeningBookChoices(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'eine von $count Buchantworten',
+      one: 'die einzige Buchantwort',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get playAgainstBot => 'Gegen einen Bot spielen';
 
   @override

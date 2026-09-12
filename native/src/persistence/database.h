@@ -153,6 +153,9 @@ struct TrainingProgressRecord {
   int success_streak{0};
   int success_count{0};
   int attempt_count{0};
+  // Deepest an opening drill has ever run for this exercise, in answered book
+  // moves. Stays zero for exercises that are not drilled by depth.
+  int best_depth{0};
   std::optional<std::int64_t> last_attempt_at;
 };
 

@@ -125,7 +125,10 @@ const ParsedGame& PracticeCatalog::line(int id) {
 nlohmann::json PracticeCatalog::opening(int id) {
   const auto& game = line(id);
   const auto& value = openings_.at(id - 1);
-  return {{"id", id}, {"name", value.name}, {"eco", value.eco},
+  // The setup line in notation: a scenario card shows the moves it starts from.
+  std::vector<std::string> moves;
+  for (const auto& move : game.moves) moves.push_back(move.san);
+  return {{"id", id}, {"name", value.name}, {"eco", value.eco}, {"moves", moves},
           {"fen", game.moves.back().fen_after},
           {"position", nlohmann::json::parse(position_view_json(game.moves.back().fen_after))}};
 }

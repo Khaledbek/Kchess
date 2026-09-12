@@ -367,6 +367,33 @@
   "trainingOpeningTreeZoomOut": "Verkleinern",
   "trainingOpeningTreeFit": "Baum einpassen",
   "trainingOpeningTreeHint": "Tippe auf eine Karte, um ihre Varianten aufzuklappen — oder trainiere die Linie direkt.",
+  "trainingOpeningIncorrectMove": "Falscher Zug",
+  "trainingOpeningTryAgain": "Versuch es erneut.",
+  "trainingOpeningPlayInstead": "Richtig war {move}",
+  "@trainingOpeningPlayInstead": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenariosTitle": "Eröffnungs-Szenarien",
+  "trainingOpeningScenariosCaption": "Spiele den Buchzug gegen jede Antwort, die das Buch kennt.",
+  "trainingOpeningScenarioDepth": "Tiefe gemeistert: {done}/{total} Züge",
+  "trainingOpeningPlayAs": "Spielen als",
+  "trainingOpeningOpponentPlayed": "Der Gegner spielte {move}.",
+  "trainingOpeningScenarioReady": "Stellung nach {move}.",
+  "trainingOpeningFindBest": "Finde die beste Engine-Antwort.",
+  "trainingOpeningCurrentDepth": "Aktuelle Tiefe: Zug {done} / {total}",
+  "trainingOpeningCorrect": "{move} — das ist der Buchzug.",
+  "trainingOpeningAlternative": "{move} geht auch — Buchwahl Nr. {rank}.",
+  "trainingOpeningDepthReached": "Tiefe {depth} erreicht",
+  "trainingOpeningBookExhausted": "Hier endet das Buch — du hast alles beantwortet, was es kennt.",
+  "trainingOpeningNoBook": "Das Eröffnungsbuch kennt für diese Stellung keine Züge.",
+  "trainingOpeningDrillClean": "Ohne Fehler — dieser Durchgang zählt zur Meisterschaft.",
+  "trainingOpeningDrillWithErrors": "Mit Korrekturen beendet. Nur ein fehlerfreier Durchgang zählt zur Meisterschaft.",
+  "trainingOpeningDrillAgain": "Nochmal trainieren",
+  "trainingOpeningBookChoices": "{count, plural, =1{die einzige Buchantwort} other{eine von {count} Buchantworten}}",
   "playAgainstBot": "Gegen einen Bot spielen",
   "continueAgainstBot": "Gegen Bot weiterspielen",
   "botPlayerColor": "Deine Farbe",

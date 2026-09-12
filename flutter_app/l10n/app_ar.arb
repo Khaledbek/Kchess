@@ -367,6 +367,33 @@
   "trainingOpeningTreeZoomOut": "تصغير",
   "trainingOpeningTreeFit": "ملاءمة الشجرة",
   "trainingOpeningTreeHint": "انقر على بطاقة لفتح تنويعاتها، أو درّب الخط مباشرة.",
+  "trainingOpeningIncorrectMove": "نقلة خاطئة",
+  "trainingOpeningTryAgain": "حاول مرة أخرى.",
+  "trainingOpeningPlayInstead": "النقلة الصحيحة كانت {move}",
+  "@trainingOpeningPlayInstead": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenariosTitle": "سيناريوهات الافتتاح",
+  "trainingOpeningScenariosCaption": "العب نقلة الكتاب أمام كل رد يعرفه الكتاب.",
+  "trainingOpeningScenarioDepth": "إتقان العمق: {done}/{total} نقلات",
+  "trainingOpeningPlayAs": "العب بـ",
+  "trainingOpeningOpponentPlayed": "لعب الخصم {move}.",
+  "trainingOpeningScenarioReady": "الوضعية بعد {move}.",
+  "trainingOpeningFindBest": "اعثر على أفضل رد للمحرك.",
+  "trainingOpeningCurrentDepth": "العمق الحالي: النقلة {done} / {total}",
+  "trainingOpeningCorrect": "{move} — هذه نقلة الكتاب.",
+  "trainingOpeningAlternative": "{move} صحيحة أيضًا — الخيار رقم {rank} في الكتاب.",
+  "trainingOpeningDepthReached": "تم الوصول إلى العمق {depth}",
+  "trainingOpeningBookExhausted": "ينتهي الكتاب هنا — لقد أجبت عن كل ما يعرفه.",
+  "trainingOpeningNoBook": "لا يحتوي كتاب الافتتاحيات على نقلات لهذه الوضعية.",
+  "trainingOpeningDrillClean": "بلا أخطاء — هذه المحاولة تُحتسب نحو الإتقان.",
+  "trainingOpeningDrillWithErrors": "انتهت مع تصحيحات. المحاولة الخالية من الأخطاء فقط تُحتسب نحو الإتقان.",
+  "trainingOpeningDrillAgain": "تدرّب مجددًا",
+  "trainingOpeningBookChoices": "{count, plural, =1{رد الكتاب الوحيد} other{واحد من {count} ردود في الكتاب}}",
   "playAgainstBot": "اللعب ضد بوت",
   "continueAgainstBot": "متابعة اللعب ضد البوت",
   "botPlayerColor": "لونك",

@@ -879,6 +879,13 @@ CREATE TABLE training_progress (
 PRAGMA user_version = 20;
 )sql";
 
+// An opening drill has no fixed line to finish, so its progress is how deep the
+// user has ever answered the book for that opening. Mastery still comes from
+// the streak; this column is what the depth meter on a scenario card reads.
+constexpr const char* kMigration21 = R"sql(
+ALTER TABLE training_progress ADD COLUMN best_depth INTEGER NOT NULL DEFAULT 0;
+PRAGMA user_version = 21;
+)sql";
 
 }  // namespace
 
@@ -933,6 +940,7 @@ void Database::open_and_migrate() {
     if (version < 18) execute(kMigration18);
     if (version < 19) execute(kMigration19);
     if (version < 20) execute(kMigration20);
+    if (version < 21) execute(kMigration21);
 
     // Older builds could leave several completed/cancelled analysis_runs for
     // the same game. At process startup there are no live workers, so collapse
@@ -2598,7 +2606,7 @@ std::vector<TrainingProgressRecord> Database::training_progress() const {
   auto statement = prepare(
       db_,
       "SELECT exercise_id,mastered,success_streak,success_count,attempt_count,"
-      "last_attempt_at FROM training_progress ORDER BY exercise_id;");
+      "best_depth,last_attempt_at FROM training_progress ORDER BY exercise_id;");
   std::vector<TrainingProgressRecord> result;
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
     result.push_back(TrainingProgressRecord{
@@ -2607,7 +2615,8 @@ std::vector<TrainingProgressRecord> Database::training_progress() const {
         .success_streak = sqlite3_column_int(statement.get(), 2),
         .success_count = sqlite3_column_int(statement.get(), 3),
         .attempt_count = sqlite3_column_int(statement.get(), 4),
-        .last_attempt_at = optional_int64_column(statement.get(), 5),
+        .best_depth = sqlite3_column_int(statement.get(), 5),
+        .last_attempt_at = optional_int64_column(statement.get(), 6),
     });
   }
   return result;
@@ -2617,20 +2626,22 @@ void Database::put_training_progress(const TrainingProgressRecord& progress) {
   auto statement = prepare(
       db_,
       "INSERT INTO training_progress(exercise_id,mastered,success_streak,"
-      "success_count,attempt_count,last_attempt_at) VALUES(?,?,?,?,?,?) "
+      "success_count,attempt_count,best_depth,last_attempt_at) VALUES(?,?,?,?,?,?,?) "
       "ON CONFLICT(exercise_id) DO UPDATE SET mastered=excluded.mastered,"
       "success_streak=excluded.success_streak,success_count=excluded.success_count,"
-      "attempt_count=excluded.attempt_count,last_attempt_at=excluded.last_attempt_at;");
+      "attempt_count=excluded.attempt_count,best_depth=excluded.best_depth,"
+      "last_attempt_at=excluded.last_attempt_at;");
   sqlite3_bind_text(
       statement.get(), 1, progress.exercise_id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_int(statement.get(), 2, progress.mastered ? 1 : 0);
   sqlite3_bind_int(statement.get(), 3, progress.success_streak);
   sqlite3_bind_int(statement.get(), 4, progress.success_count);
   sqlite3_bind_int(statement.get(), 5, progress.attempt_count);
+  sqlite3_bind_int(statement.get(), 6, progress.best_depth);
   if (progress.last_attempt_at.has_value()) {
-    sqlite3_bind_int64(statement.get(), 6, *progress.last_attempt_at);
+    sqlite3_bind_int64(statement.get(), 7, *progress.last_attempt_at);
   } else {
-    sqlite3_bind_null(statement.get(), 6);
+    sqlite3_bind_null(statement.get(), 7);
   }
   check(sqlite3_step(statement.get()), db_, "persist training progress");
 }

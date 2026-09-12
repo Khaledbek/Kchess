@@ -2079,6 +2079,126 @@ abstract class AppLocalizations {
   /// **'Tap a card to unfold its variations, or train the line right away.'**
   String get trainingOpeningTreeHint;
 
+  /// No description provided for @trainingOpeningIncorrectMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect move'**
+  String get trainingOpeningIncorrectMove;
+
+  /// No description provided for @trainingOpeningTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again.'**
+  String get trainingOpeningTryAgain;
+
+  /// No description provided for @trainingOpeningPlayInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'The move was {move}'**
+  String trainingOpeningPlayInstead(String move);
+
+  /// No description provided for @trainingOpeningScenariosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening scenarios'**
+  String get trainingOpeningScenariosTitle;
+
+  /// No description provided for @trainingOpeningScenariosCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the book move against every reply the book can throw at you.'**
+  String get trainingOpeningScenariosCaption;
+
+  /// No description provided for @trainingOpeningScenarioDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth mastery: {done}/{total} moves'**
+  String trainingOpeningScenarioDepth(int done, int total);
+
+  /// No description provided for @trainingOpeningPlayAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Play as'**
+  String get trainingOpeningPlayAs;
+
+  /// No description provided for @trainingOpeningOpponentPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent played {move}.'**
+  String trainingOpeningOpponentPlayed(String move);
+
+  /// No description provided for @trainingOpeningScenarioReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Position after {move}.'**
+  String trainingOpeningScenarioReady(String move);
+
+  /// No description provided for @trainingOpeningFindBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the best engine response.'**
+  String get trainingOpeningFindBest;
+
+  /// No description provided for @trainingOpeningCurrentDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Current depth: move {done} / {total}'**
+  String trainingOpeningCurrentDepth(int done, int total);
+
+  /// No description provided for @trainingOpeningCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} — that is the book move.'**
+  String trainingOpeningCorrect(String move);
+
+  /// No description provided for @trainingOpeningAlternative.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} works too — book choice #{rank}.'**
+  String trainingOpeningAlternative(String move, int rank);
+
+  /// No description provided for @trainingOpeningDepthReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth {depth} reached'**
+  String trainingOpeningDepthReached(int depth);
+
+  /// No description provided for @trainingOpeningBookExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'The book ends here — you answered everything it knows.'**
+  String get trainingOpeningBookExhausted;
+
+  /// No description provided for @trainingOpeningNoBook.
+  ///
+  /// In en, this message translates to:
+  /// **'The opening book has no moves for this position.'**
+  String get trainingOpeningNoBook;
+
+  /// No description provided for @trainingOpeningDrillClean.
+  ///
+  /// In en, this message translates to:
+  /// **'No slips — this run counts towards mastery.'**
+  String get trainingOpeningDrillClean;
+
+  /// No description provided for @trainingOpeningDrillWithErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished with corrections. Only a clean run counts towards mastery.'**
+  String get trainingOpeningDrillWithErrors;
+
+  /// No description provided for @trainingOpeningDrillAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Drill again'**
+  String get trainingOpeningDrillAgain;
+
+  /// No description provided for @trainingOpeningBookChoices.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{the only book reply} other{one of {count} book replies}}'**
+  String trainingOpeningBookChoices(int count);
+
   /// No description provided for @playAgainstBot.
   ///
   /// In en, this message translates to:

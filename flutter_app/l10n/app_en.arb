@@ -523,6 +523,98 @@
   "trainingOpeningTreeZoomOut": "Zoom out",
   "trainingOpeningTreeFit": "Fit the tree",
   "trainingOpeningTreeHint": "Tap a card to unfold its variations, or train the line right away.",
+  "trainingOpeningIncorrectMove": "Incorrect move",
+  "trainingOpeningTryAgain": "Try again.",
+  "trainingOpeningPlayInstead": "The move was {move}",
+  "@trainingOpeningPlayInstead": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenariosTitle": "Opening scenarios",
+  "trainingOpeningScenariosCaption": "Play the book move against every reply the book can throw at you.",
+  "trainingOpeningScenarioDepth": "Depth mastery: {done}/{total} moves",
+  "@trainingOpeningScenarioDepth": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningPlayAs": "Play as",
+  "trainingOpeningOpponentPlayed": "Opponent played {move}.",
+  "@trainingOpeningOpponentPlayed": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenarioReady": "Position after {move}.",
+  "@trainingOpeningScenarioReady": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningFindBest": "Find the best engine response.",
+  "trainingOpeningCurrentDepth": "Current depth: move {done} / {total}",
+  "@trainingOpeningCurrentDepth": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningCorrect": "{move} — that is the book move.",
+  "@trainingOpeningCorrect": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningAlternative": "{move} works too — book choice #{rank}.",
+  "@trainingOpeningAlternative": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "rank": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningDepthReached": "Depth {depth} reached",
+  "@trainingOpeningDepthReached": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      }
+    }
+  },
+  "trainingOpeningBookExhausted": "The book ends here — you answered everything it knows.",
+  "trainingOpeningNoBook": "The opening book has no moves for this position.",
+  "trainingOpeningDrillClean": "No slips — this run counts towards mastery.",
+  "trainingOpeningDrillWithErrors": "Finished with corrections. Only a clean run counts towards mastery.",
+  "trainingOpeningDrillAgain": "Drill again",
+  "trainingOpeningBookChoices": "{count, plural, =1{the only book reply} other{one of {count} book replies}}",
+  "@trainingOpeningBookChoices": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "playAgainstBot": "Play against a bot",
   "continueAgainstBot": "Continue against bot",
   "botPlayerColor": "Your color",

@@ -117,3 +117,6 @@ __pycache__/
 /Kchess/
 /flutter_app/flutter_app/
 
+
+# PolyGlot opening book for the opening drill (~170 MB, too large for GitHub)
+native/src/training/data/Cerebellum3Merge.bin
