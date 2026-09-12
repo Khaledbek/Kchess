@@ -3,6 +3,7 @@
 // -----------------------------------------------------------------------------
 #include "training/practice_catalog.h"
 #include <algorithm>
+#include <set>
 #include <cctype>
 #include <sstream>
 #include <stdexcept>
@@ -155,6 +156,32 @@ nlohmann::json PracticeCatalog::openings(int parent, const std::string& query) {
       return nodes_[a].children.size() > nodes_[b].children.size();
     return nodes_[a].name < nodes_[b].name;
   });
+  return describe(selected);
+}
+
+nlohmann::json PracticeCatalog::families() {
+  load_openings();
+  std::vector<int> selected;
+  for (const int first_move : nodes_[0].children) {
+    const auto& children = nodes_[first_move].children;
+    selected.insert(selected.end(), children.begin(), children.end());
+  }
+  std::stable_sort(selected.begin(), selected.end(), [&](int a, int b) {
+    if (nodes_[a].children.size() != nodes_[b].children.size())
+      return nodes_[a].children.size() > nodes_[b].children.size();
+    return nodes_[a].name < nodes_[b].name;
+  });
+  // One family can follow several first moves (English Opening after c4 and
+  // Nf3); the biggest branch, first after sorting, stands for it.
+  std::set<std::string> seen;
+  std::vector<int> unique;
+  for (const int id : selected) {
+    if (seen.insert(nodes_[id].name).second) unique.push_back(id);
+  }
+  return describe(unique);
+}
+
+nlohmann::json PracticeCatalog::describe(const std::vector<int>& selected) {
   auto result = nlohmann::json::array();
   for (int id : selected) {
     const auto& node = nodes_[id];

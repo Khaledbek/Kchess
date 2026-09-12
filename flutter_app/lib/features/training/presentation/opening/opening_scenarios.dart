@@ -59,7 +59,8 @@ class OpeningScenarioPage extends StatelessWidget {
 
 /// The scenarios under one catalogue node, each a card that starts its drill.
 ///
-/// [parent] 0 lists the opening families; any other node lists its variations.
+/// A null [parent] lists every named opening family; a node id lists the
+/// variations below it.
 /// Progress is re-read whenever a drill or a variation list is closed, so the
 /// depth meters always show what native stored.
 class OpeningScenarioList extends StatefulWidget {
@@ -68,12 +69,12 @@ class OpeningScenarioList extends StatefulWidget {
     required this.parent,
     required this.color,
     this.header,
-    this.emphasis,
+    this.weakFamilies = const {},
     super.key,
   });
 
   final CoreGateway gateway;
-  final int parent;
+  final int? parent;
 
   /// The side the user drills: `white` or `black`.
   final String color;
@@ -81,9 +82,9 @@ class OpeningScenarioList extends StatefulWidget {
   /// Shown above the cards, e.g. the colour choice.
   final Widget? header;
 
-  /// A scenario to call out — the user's statistical nemesis — by name, with
-  /// the line the callout shows.
-  final ({String name, String label})? emphasis;
+  /// Lower-cased names of the openings the statistics flagged for this colour;
+  /// their cards carry a weak-spot badge.
+  final Set<String> weakFamilies;
 
   @override
   State<OpeningScenarioList> createState() => _OpeningScenarioListState();
@@ -102,10 +103,10 @@ class _OpeningScenarioListState extends State<OpeningScenarioList> {
 
   Future<void> _load() async {
     try {
-      final result = await widget.gateway.practiceCommand({
-        'op': 'nodes',
-        'parent': widget.parent,
-      });
+      final parent = widget.parent;
+      final result = await widget.gateway.practiceCommand(
+        parent == null ? {'op': 'families'} : {'op': 'nodes', 'parent': parent},
+      );
       final nodes = (result! as List<Object?>)
           .cast<Map<String, Object?>>()
           .map(OpeningTreeNode.fromJson)
@@ -178,22 +179,11 @@ class _OpeningScenarioListState extends State<OpeningScenarioList> {
     final nodes = _nodes;
     if (nodes == null) return const Center(child: CircularProgressIndicator());
 
-    final emphasis = widget.emphasis;
-    final emphasised = emphasis == null
-        ? null
-        : nodes
-              .where((node) => node.name.toLowerCase() == emphasis.name.toLowerCase())
-              .firstOrNull;
-
     return ListView(
       key: const Key('opening-scenarios'),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
         ?widget.header,
-        if (emphasised != null && emphasis != null) ...[
-          _NemesisCallout(label: emphasis.label, onDrill: () => _drill(emphasised)),
-          const SizedBox(height: 14),
-        ],
         if (nodes.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 48),
@@ -208,7 +198,7 @@ class _OpeningScenarioListState extends State<OpeningScenarioList> {
             padding: const EdgeInsets.only(bottom: 14),
             child: OpeningScenarioCard(
               node: node,
-              emphasised: identical(node, emphasised),
+              weakSpot: widget.weakFamilies.contains(node.name.toLowerCase()),
               onTap: () => _drill(node),
               onVariations: node.childCount > 0 ? () => _variations(node) : null,
             ),
@@ -225,7 +215,7 @@ class OpeningScenarioCard extends StatelessWidget {
     required this.node,
     required this.onTap,
     this.onVariations,
-    this.emphasised = false,
+    this.weakSpot = false,
     super.key,
   });
 
@@ -234,7 +224,9 @@ class OpeningScenarioCard extends StatelessWidget {
 
   /// Opens the scenarios below this one; null when it has none.
   final VoidCallback? onVariations;
-  final bool emphasised;
+
+  /// The statistics say the user keeps losing or misplaying this opening.
+  final bool weakSpot;
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +244,7 @@ class OpeningScenarioCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: emphasised
+          color: weakSpot
               ? OpeningStudio.danger.withValues(alpha: 0.7)
               : OpeningStudio.hairline,
         ),
@@ -296,6 +288,36 @@ class OpeningScenarioCard extends StatelessWidget {
                         color: OpeningStudio.textPrimary,
                       ),
                     ),
+                    if (weakSpot) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        key: const Key('opening-scenario-weak-spot'),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: OpeningStudio.danger.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 13,
+                              color: OpeningStudio.danger,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              strings.trainingWeakSpotBadge,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: OpeningStudio.danger,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (description.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
@@ -396,44 +418,4 @@ class OpeningScenarioCard extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The opening the user's games say they struggle with, one tap from a drill.
-class _NemesisCallout extends StatelessWidget {
-  const _NemesisCallout({required this.label, required this.onDrill});
-
-  final String label;
-  final VoidCallback onDrill;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('opening-scenarios-nemesis'),
-    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-    decoration: BoxDecoration(
-      color: OpeningStudio.danger.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: OpeningStudio.danger.withValues(alpha: 0.5)),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.warning_amber_rounded, color: OpeningStudio.danger),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: OpeningStudio.textPrimary,
-            ),
-          ),
-        ),
-        IconButton(
-          onPressed: onDrill,
-          color: OpeningStudio.danger,
-          icon: const Icon(Icons.play_arrow_rounded),
-        ),
-      ],
-    ),
-  );
 }

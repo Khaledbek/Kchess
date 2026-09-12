@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "services/opening_weakness.h"
 #include "services/statistics_domain.h"
 #include "services/termination.h"
 
@@ -20,19 +21,52 @@ namespace {
 
 using namespace statistics;
 
-// Base opening family: everything before the first ':' or ',' (trimmed).
-// "Scandinavian Defense: Mieses-Kotroc Variation" -> "Scandinavian Defense".
-std::string opening_family(const std::string& name) {
-  const auto pos = name.find_first_of(":,");
-  std::string base = pos == std::string::npos ? name : name.substr(0, pos);
-  const auto last = base.find_last_not_of(" \t");
-  if (last == std::string::npos) return {};
-  base.erase(last + 1);
-  return base.substr(base.find_first_not_of(" \t"));
-}
-
 constexpr int kNemesisMinimumGames = 5;
 constexpr double kNemesisMaximumWinRate = 0.45;
+constexpr std::size_t kMaxWeaknesses = 6;
+
+// The first four FEN fields: the position, whatever the move clocks say.
+std::string position_key(const std::string& fen) {
+  std::string key;
+  int fields = 0;
+  for (const char c : fen) {
+    if (c == ' ' && ++fields == 4) break;
+    key += c;
+  }
+  return key;
+}
+
+nlohmann::json weakness_json(const OpeningWeakness& weakness) {
+  nlohmann::json node = tally_json(weakness.tally);
+  node["level"] = weakness.level;
+  node["name"] = weakness.name;
+  node["family"] = weakness.family;
+  node["eco"] = weakness.eco;
+  node["color"] = weakness.color;
+  node["analysedGames"] = weakness.analysed_games;
+  node["gamesWithOpeningErrors"] = weakness.games_with_errors;
+  node["openingErrors"] = weakness.errors;
+  node["openingBlunders"] = weakness.blunders;
+  node["poorResults"] = weakness.poor_results;
+  node["frequentErrors"] = weakness.frequent_errors;
+  node["severity"] = weakness.severity;
+  if (weakness.recurring) {
+    const auto& mistake = *weakness.recurring;
+    node["recurringMistake"] = {
+        {"fen", mistake.position},
+        {"san", mistake.san},
+        {"recommended", mistake.recommended.empty()
+                            ? nlohmann::json(nullptr)
+                            : nlohmann::json(mistake.recommended)},
+        {"category", mistake.category},
+        {"moveNumber", mistake.move_number},
+        {"side", mistake.side},
+        {"count", mistake.count}};
+  } else {
+    node["recurringMistake"] = nullptr;
+  }
+  return node;
+}
 
 }  // namespace
 
@@ -146,6 +180,17 @@ std::string StatisticsService::openings_json(
   // the card's own totals describe the filtered set rather than the library.
   const bool filtered = time_control != "all" && !time_control.empty();
 
+  // The profile's own flagged opening moves, grouped by game. The query is
+  // bounded by the widest opening phase; each game is cut to its own below.
+  const auto move_errors = database_.move_errors_for_statistics(
+      profile->id, kOpeningPhaseMaxPly);
+  std::map<std::string, std::vector<const GameMoveErrorRow*>> errors_by_game;
+  for (const auto& error : move_errors) {
+    errors_by_game[error.game_id].push_back(&error);
+  }
+  std::vector<OpeningGameEvidence> evidence;
+  int analysed_opening_games = 0;
+
   for (const auto& row : rows) {
     if (filtered && row.time_control_type != time_control) continue;
     if (row.opening_name.empty()) {
@@ -157,6 +202,27 @@ std::string StatisticsService::openings_json(
         game_color(username, row.white_name, row.black_name);
     const std::string outcome =
         effective_outcome(row.provider_outcome, color, row.result);
+
+    if (row.analysed) analysed_opening_games += 1;
+    OpeningGameEvidence game{.eco = row.opening_eco,
+                             .name = row.opening_name,
+                             .color = color,
+                             .outcome = outcome,
+                             .analysed = row.analysed};
+    const auto found = errors_by_game.find(row.game_id);
+    if (found != errors_by_game.end() && (color == "white" || color == "black")) {
+      const int end_ply = opening_phase_end_ply(row.opening_ply);
+      const int own_parity = color == "white" ? 0 : 1;
+      for (const auto* error : found->second) {
+        if (error->ply >= end_ply || error->ply % 2 != own_parity) continue;
+        game.errors.push_back({.ply = error->ply,
+                               .category = error->category,
+                               .san = error->san,
+                               .position = position_key(error->fen_before),
+                               .recommended = error->recommended_move});
+      }
+    }
+    evidence.push_back(std::move(game));
     const std::string family_name = opening_family(row.opening_name);
 
     auto& family = families[family_name + '\x1f' + color];
@@ -265,6 +331,13 @@ std::string StatisticsService::openings_json(
     }
   }
 
+  // Lines the profile keeps losing or keeps misplaying, for the statistics
+  // warning and the training tab's weak spots.
+  nlohmann::json weaknesses = nlohmann::json::array();
+  for (const auto& weakness : find_opening_weaknesses(evidence, kMaxWeaknesses)) {
+    weaknesses.push_back(weakness_json(weakness));
+  }
+
   nlohmann::json root{
       {"hasProfile", true},
       {"gamesWithOpening", games_with_opening},
@@ -274,6 +347,8 @@ std::string StatisticsService::openings_json(
       {"bestWinRateFamilies", ranked},
       {"nemesis", nemesis == nullptr ? nlohmann::json(nullptr)
                                       : family_json(*nemesis)},
+      {"weaknesses", weaknesses},
+      {"analysedOpeningGames", analysed_opening_games},
       {"defaultColor", default_color},
   };
   return root.dump();

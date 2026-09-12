@@ -20,6 +20,7 @@ import 'shared/promotion_dialog.dart';
 import '../features/app/application/app_controller.dart';
 import '../features/analysis/presentation/analysis_screen.dart';
 import '../features/training/models/opening_training_request.dart';
+import '../features/training/presentation/opening/opening_weakness_tile.dart';
 import '../features/training/presentation/training_arena_screen.dart';
 import '../features/training/presentation/training_navigation.dart';
 

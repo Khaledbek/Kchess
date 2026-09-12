@@ -176,6 +176,7 @@ add_library(kchess_core SHARED
   src/services/settings_service.cpp
   src/services/statistics_service.cpp
   src/services/statistics_details.cpp
+  src/services/opening_weakness.cpp
   src/training/training_catalog.cpp
   src/training/training_service.cpp
   src/training/practice_catalog.cpp
@@ -430,6 +431,17 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
   add_test(NAME kchess_polyglot_tests COMMAND kchess_polyglot_tests)
+
+  add_executable(kchess_opening_weakness_tests
+    tests/opening_weakness_tests.cpp
+    src/services/opening_weakness.cpp
+  )
+  target_compile_features(kchess_opening_weakness_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_opening_weakness_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  add_test(NAME kchess_opening_weakness_tests COMMAND kchess_opening_weakness_tests)
 
   add_executable(kchess_bot_move_selector_tests
     tests/bot_move_selector_tests.cpp

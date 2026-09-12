@@ -2214,13 +2214,16 @@ std::vector<GameStatRow> Database::games_for_statistics(
   auto statement = prepare(
       db_,
       "SELECT provider_outcome,result,white_name,black_name,time_control_type,"
-      "opening_eco,opening_name "
+      "opening_eco,opening_name,id,opening_ply,"
+      "EXISTS(SELECT 1 FROM analysis_runs r WHERE r.game_id=games.id "
+      "AND r.classifier_version>0) "
       "FROM games WHERE profile_id=? "
       "ORDER BY provider_ended_at DESC, created_at DESC;");
   sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   std::vector<GameStatRow> result;
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
     result.push_back(GameStatRow{
+        .game_id = text_column(statement.get(), 7),
         .provider_outcome = text_column(statement.get(), 0),
         .result = text_column(statement.get(), 1),
         .white_name = text_column(statement.get(), 2),
@@ -2228,6 +2231,40 @@ std::vector<GameStatRow> Database::games_for_statistics(
         .time_control_type = text_column(statement.get(), 4),
         .opening_eco = text_column(statement.get(), 5),
         .opening_name = text_column(statement.get(), 6),
+        .opening_ply = optional_int_column(statement.get(), 8),
+        .analysed = sqlite3_column_int(statement.get(), 9) != 0,
+    });
+  }
+  return result;
+}
+
+std::vector<GameMoveErrorRow> Database::move_errors_for_statistics(
+    const std::string& profile_id, const int before_ply) const {
+  // A game can hold several runs (other engine settings); only the latest
+  // classified one speaks for it, so a re-analysis replaces old verdicts.
+  auto statement = prepare(
+      db_,
+      "SELECT g.id,m.ply,m.category,gm.san,gm.fen_before,"
+      "COALESCE(m.recommended_move,'') "
+      "FROM games g "
+      "JOIN analysis_runs r ON r.id=(SELECT id FROM analysis_runs "
+      "  WHERE game_id=g.id AND classifier_version>0 "
+      "  ORDER BY completed_at DESC LIMIT 1) "
+      "JOIN move_analysis m ON m.analysis_run_id=r.id AND m.ply<? "
+      "  AND m.category IN ('miss','mistake','blunder') "
+      "JOIN game_moves gm ON gm.game_id=g.id AND gm.ply_index=m.ply "
+      "WHERE g.profile_id=? ORDER BY g.id,m.ply;");
+  sqlite3_bind_int(statement.get(), 1, before_ply);
+  sqlite3_bind_text(statement.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GameMoveErrorRow> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back(GameMoveErrorRow{
+        .game_id = text_column(statement.get(), 0),
+        .ply = sqlite3_column_int(statement.get(), 1),
+        .category = text_column(statement.get(), 2),
+        .san = text_column(statement.get(), 3),
+        .fen_before = text_column(statement.get(), 4),
+        .recommended_move = text_column(statement.get(), 5),
     });
   }
   return result;

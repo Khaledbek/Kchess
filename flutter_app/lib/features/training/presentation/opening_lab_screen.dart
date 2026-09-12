@@ -13,6 +13,7 @@ import '../models/opening_training_request.dart';
 import 'opening/opening_scenarios.dart';
 import 'opening/opening_trainer_panels.dart';
 import 'opening/opening_trainer_screen.dart';
+import 'opening/opening_weakness_tile.dart';
 
 class OpeningLabScreen extends StatefulWidget {
   const OpeningLabScreen({required this.gateway, this.request, super.key});
@@ -36,8 +37,8 @@ class _OpeningLabScreenState extends State<OpeningLabScreen> {
     });
   }
 
-  /// The statistics only decide which scenario to call out; the dashboard
-  /// works without them.
+  /// The statistics only decide which lines to warn about; the dashboard works
+  /// without them.
   Future<void> _loadStats() async {
     try {
       final stats = await widget.gateway.openingsStats();
@@ -49,11 +50,21 @@ class _OpeningLabScreenState extends State<OpeningLabScreen> {
   Future<void> _openRequest() async {
     final request = widget.request;
     if (request == null) return;
+    await _drillLine(name: request.openingName, eco: request.eco, color: _color);
+  }
+
+  /// Resolves a named line against the catalogue natively and drills it with
+  /// the side the user plays it with.
+  Future<void> _drillLine({
+    required String name,
+    required String eco,
+    required String color,
+  }) async {
     try {
       final match = (await widget.gateway.practiceCommand({
         'op': 'match',
-        'eco': request.eco,
-        'name': request.openingName,
+        'eco': eco,
+        'name': name,
       }))! as Map<String, Object?>;
       final id = match['id']! as int;
       if (!mounted) return;
@@ -65,8 +76,12 @@ class _OpeningLabScreenState extends State<OpeningLabScreen> {
         MaterialPageRoute<void>(
           builder: (_) => OpeningTrainerScreen(
             gateway: widget.gateway,
-            title: request.openingName,
-            request: {'kind': 'opening', 'id': id, 'color': _color},
+            title: name,
+            request: {
+              'kind': 'opening',
+              'id': id,
+              'color': color == 'black' ? 'black' : 'white',
+            },
           ),
         ),
       );
@@ -86,24 +101,19 @@ class _OpeningLabScreenState extends State<OpeningLabScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
-    final nemesis = _stats?.nemesis;
+    final weaknesses = _stats?.weaknesses ?? const <OpeningWeakness>[];
     return OpeningScenarioPage(
       title: strings.trainingOpeningScenariosTitle,
       body: OpeningScenarioList(
         // A new colour is a different drill, so the list starts fresh with it.
         key: ValueKey('opening-scenarios-$_color'),
         gateway: widget.gateway,
-        parent: 0,
+        parent: null,
         color: _color,
-        emphasis: nemesis == null
-            ? null
-            : (
-                name: nemesis.familyName,
-                label: strings.trainingNemesisBadge(
-                  nemesis.familyName,
-                  '${((nemesis.tally.winRate ?? 0) * 100).round()}%',
-                ),
-              ),
+        weakFamilies: {
+          for (final weakness in weaknesses)
+            if (weakness.color == _color) weakness.family.toLowerCase(),
+        },
         header: Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Column(
@@ -156,10 +166,70 @@ class _OpeningLabScreenState extends State<OpeningLabScreen> {
                   ),
                 ],
               ),
+              if (weaknesses.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                _WeakSpots(
+                  weaknesses: weaknesses,
+                  onDrill: (weakness) => _drillLine(
+                    name: weakness.name,
+                    eco: weakness.eco,
+                    color: weakness.color,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The lines the statistics flagged, above the scenario cards: whatever the
+/// colour toggle says, each drills with the side it was lost with.
+class _WeakSpots extends StatelessWidget {
+  const _WeakSpots({required this.weaknesses, required this.onDrill});
+
+  static const _maxRows = 3;
+
+  final List<OpeningWeakness> weaknesses;
+  final ValueChanged<OpeningWeakness> onDrill;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    return Column(
+      key: const Key('opening-weak-spots'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.healing_rounded, size: 18, color: OpeningStudio.danger),
+            const SizedBox(width: 8),
+            Text(
+              strings.trainingWeakSpotsTitle.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.9,
+                color: OpeningStudio.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        for (final weakness in weaknesses.take(_maxRows)) ...[
+          OpeningWeaknessTile(
+            weakness: weakness,
+            colorLabel: weakness.color == 'white'
+                ? strings.statsCompareColorWhite
+                : strings.statsCompareColorBlack,
+            trainLabel: strings.statsTrainOpening,
+            onTrain: () => onDrill(weakness),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ],
     );
   }
 }

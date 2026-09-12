@@ -2199,6 +2199,72 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{the only book reply} other{one of {count} book replies}}'**
   String trainingOpeningBookChoices(int count);
 
+  /// No description provided for @openingWeaknessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Openings that need training'**
+  String get openingWeaknessTitle;
+
+  /// No description provided for @openingWeaknessCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines you keep losing or keep getting wrong, worst first.'**
+  String get openingWeaknessCaption;
+
+  /// No description provided for @openingWeaknessLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost {losses} of {games} games'**
+  String openingWeaknessLost(int losses, int games);
+
+  /// No description provided for @openingWeaknessErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening mistakes in {count} of {analysed} analysed games'**
+  String openingWeaknessErrors(int count, int analysed);
+
+  /// No description provided for @openingWeaknessRecurring.
+  ///
+  /// In en, this message translates to:
+  /// **'You played {move} here {count} times — the engine prefers {better}.'**
+  String openingWeaknessRecurring(String move, int count, String better);
+
+  /// No description provided for @openingWeaknessRecurringFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'You played {move} here {count} times, and the engine flagged it every time.'**
+  String openingWeaknessRecurringFlagged(String move, int count);
+
+  /// No description provided for @openingWeaknessAnalyseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse your games to also catch the moves that go wrong, not just the results.'**
+  String get openingWeaknessAnalyseHint;
+
+  /// No description provided for @openingWeaknessFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Across the whole family'**
+  String get openingWeaknessFamily;
+
+  /// No description provided for @trainingWeakSpotsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your weak spots'**
+  String get trainingWeakSpotsTitle;
+
+  /// No description provided for @trainingWeakSpotBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot'**
+  String get trainingWeakSpotBadge;
+
+  /// No description provided for @trainingWeakSpotMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot: {opening}'**
+  String trainingWeakSpotMetric(String opening);
+
   /// No description provided for @playAgainstBot.
   ///
   /// In en, this message translates to:

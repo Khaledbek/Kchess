@@ -100,8 +100,10 @@ std::string PracticeService::command(const std::string& request) {
   const auto json = nlohmann::json::parse(request);
   const auto op = json.at("op").get<std::string>();
   if (op == "catalog") return catalog().dump();
-  if (op == "nodes") {
-    auto nodes = content_.openings(json.value("parent", 0), json.value("query", std::string{}));
+  if (op == "nodes" || op == "families") {
+    auto nodes = op == "families"
+        ? content_.families()
+        : content_.openings(json.value("parent", 0), json.value("query", std::string{}));
     const auto stored = database_.training_progress();
     const auto index = index_progress(stored);
     for (auto& node : nodes) {

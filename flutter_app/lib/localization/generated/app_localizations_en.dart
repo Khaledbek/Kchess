@@ -1168,6 +1168,51 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get openingWeaknessTitle => 'Openings that need training';
+
+  @override
+  String get openingWeaknessCaption =>
+      'Lines you keep losing or keep getting wrong, worst first.';
+
+  @override
+  String openingWeaknessLost(int losses, int games) {
+    return 'Lost $losses of $games games';
+  }
+
+  @override
+  String openingWeaknessErrors(int count, int analysed) {
+    return 'Opening mistakes in $count of $analysed analysed games';
+  }
+
+  @override
+  String openingWeaknessRecurring(String move, int count, String better) {
+    return 'You played $move here $count times — the engine prefers $better.';
+  }
+
+  @override
+  String openingWeaknessRecurringFlagged(String move, int count) {
+    return 'You played $move here $count times, and the engine flagged it every time.';
+  }
+
+  @override
+  String get openingWeaknessAnalyseHint =>
+      'Analyse your games to also catch the moves that go wrong, not just the results.';
+
+  @override
+  String get openingWeaknessFamily => 'Across the whole family';
+
+  @override
+  String get trainingWeakSpotsTitle => 'Your weak spots';
+
+  @override
+  String get trainingWeakSpotBadge => 'Weak spot';
+
+  @override
+  String trainingWeakSpotMetric(String opening) {
+    return 'Weak spot: $opening';
+  }
+
+  @override
   String get playAgainstBot => 'Play against a bot';
 
   @override

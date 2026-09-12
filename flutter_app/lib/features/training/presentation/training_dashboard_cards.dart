@@ -182,6 +182,16 @@ class _OpeningMetric extends StatelessWidget {
         if (snapshot.connectionState != ConnectionState.done) {
           return const _MetricPlaceholder();
         }
+        // The worst line the statistics flagged, from results and analysed
+        // moves alike; the older win-rate nemesis only covers families.
+        final weaknesses = snapshot.data?.weaknesses ?? const <OpeningWeakness>[];
+        if (weaknesses.isNotEmpty) {
+          return _Metric(
+            icon: Icons.warning_amber_rounded,
+            label: strings.trainingWeakSpotMetric(weaknesses.first.name),
+            emphasised: true,
+          );
+        }
         final nemesis = snapshot.data?.nemesis;
         if (nemesis == null) {
           return _Metric(

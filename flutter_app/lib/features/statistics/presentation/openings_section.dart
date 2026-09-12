@@ -75,6 +75,106 @@ class _OpeningsCard extends StatelessWidget {
   }
 }
 
+/// The warning at the top of the tab: openings the profile keeps losing or
+/// keeps misplaying, each one tap from its drill. Takes no room at all when
+/// native found nothing to warn about, or while the numbers are loading.
+class _OpeningWeaknessCard extends StatelessWidget {
+  const _OpeningWeaknessCard({required this.future});
+
+  final Future<OpeningsStats> future;
+
+  static const _maxRows = 4;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<OpeningsStats>(
+    future: future,
+    builder: (context, snapshot) {
+      final stats = snapshot.data;
+      if (stats == null || stats.weaknesses.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      final strings = AppLocalizations.of(context);
+      final theme = Theme.of(context);
+      final canTrain = TrainingNavigator.maybeOf(context) != null;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Card(
+          key: const Key('stats-opening-weaknesses'),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.healing_rounded, color: theme.colorScheme.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        strings.openingWeaknessTitle,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  strings.openingWeaknessCaption,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                for (final weakness in stats.weaknesses.take(_maxRows)) ...[
+                  OpeningWeaknessTile(
+                    weakness: weakness,
+                    colorLabel: weakness.color == 'white'
+                        ? strings.statsOpeningsWhite
+                        : strings.statsOpeningsBlack,
+                    trainLabel: strings.statsTrainOpening,
+                    onTrain: canTrain
+                        ? () => _trainOpening(
+                            context,
+                            OpeningTrainingRequest(
+                              openingName: weakness.name,
+                              eco: weakness.eco,
+                              color: weakness.color,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (stats.analysedOpeningGames == 0)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.insights_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          strings.openingWeaknessAnalyseHint,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 enum _OpeningSort { mostPlayed, bestWinRate }
 
 class _OpeningsContent extends StatefulWidget {

@@ -276,6 +276,8 @@ class OpeningsStats {
     this.nemesis,
     this.defaultColor = 'white',
     this.families = const [],
+    this.weaknesses = const [],
+    this.analysedOpeningGames = 0,
   });
 
   factory OpeningsStats.fromJson(Map<String, Object?> json) => OpeningsStats(
@@ -294,6 +296,11 @@ class OpeningsStats {
         .cast<Map<String, Object?>>()
         .map(OpeningFamily.fromJson)
         .toList(growable: false),
+    weaknesses: (json['weaknesses'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(OpeningWeakness.fromJson)
+        .toList(growable: false),
+    analysedOpeningGames: json['analysedOpeningGames'] as int? ?? 0,
   );
 
   final bool hasProfile;
@@ -303,7 +310,113 @@ class OpeningsStats {
   final OpeningFamily? nemesis;
   final List<OpeningFamily> families;
 
+  /// Lines the profile keeps losing or keeps misplaying, worst first, as native
+  /// judged them.
+  final List<OpeningWeakness> weaknesses;
+
+  /// Games in a named opening that have a finished engine analysis; the
+  /// move-level warnings can only come from these.
+  final int analysedOpeningGames;
+
   bool get isEmpty => gamesWithOpening == 0;
+}
+
+/// An opening line that needs training, with the evidence native found.
+class OpeningWeakness {
+  const OpeningWeakness({
+    required this.level,
+    required this.name,
+    required this.family,
+    required this.eco,
+    required this.color,
+    required this.tally,
+    this.analysedGames = 0,
+    this.gamesWithOpeningErrors = 0,
+    this.openingErrors = 0,
+    this.poorResults = false,
+    this.frequentErrors = false,
+    this.recurringMistake,
+  });
+
+  factory OpeningWeakness.fromJson(Map<String, Object?> json) => OpeningWeakness(
+    level: json['level'] as String? ?? 'variation',
+    name: json['name'] as String? ?? '',
+    family: json['family'] as String? ?? '',
+    eco: json['eco'] as String? ?? '',
+    color: json['color'] as String? ?? 'unknown',
+    tally: StatTally.fromJson(json),
+    analysedGames: json['analysedGames'] as int? ?? 0,
+    gamesWithOpeningErrors: json['gamesWithOpeningErrors'] as int? ?? 0,
+    openingErrors: json['openingErrors'] as int? ?? 0,
+    poorResults: json['poorResults'] as bool? ?? false,
+    frequentErrors: json['frequentErrors'] as bool? ?? false,
+    recurringMistake: switch (json['recurringMistake']) {
+      final Map<String, Object?> mistake => RecurringOpeningMistake.fromJson(mistake),
+      _ => null,
+    },
+  );
+
+  /// `variation` for one named line, `family` when losses spread over a family.
+  final String level;
+
+  /// The variation's full name, or the family name for a family entry.
+  final String name;
+  final String family;
+  final String eco;
+
+  /// Side the profile played it with: `white` | `black`.
+  final String color;
+  final StatTally tally;
+  final int analysedGames;
+  final int gamesWithOpeningErrors;
+  final int openingErrors;
+  final bool poorResults;
+  final bool frequentErrors;
+  final RecurringOpeningMistake? recurringMistake;
+}
+
+/// The same flagged move in the same position, played in several games.
+class RecurringOpeningMistake {
+  const RecurringOpeningMistake({
+    required this.san,
+    required this.moveNumber,
+    required this.side,
+    required this.count,
+    this.recommended,
+    this.category = 'mistake',
+    this.fen = '',
+  });
+
+  factory RecurringOpeningMistake.fromJson(Map<String, Object?> json) =>
+      RecurringOpeningMistake(
+        san: json['san'] as String? ?? '',
+        moveNumber: json['moveNumber'] as int? ?? 1,
+        side: json['side'] as String? ?? 'white',
+        count: json['count'] as int? ?? 0,
+        recommended: json['recommended'] as String?,
+        category: json['category'] as String? ?? 'mistake',
+        fen: json['fen'] as String? ?? '',
+      );
+
+  final String san;
+  final int moveNumber;
+  final String side;
+
+  /// Games it happened in.
+  final int count;
+
+  /// The engine's move in notation, when the analysis recorded one.
+  final String? recommended;
+
+  /// `miss` | `mistake` | `blunder`, the worst verdict it was given.
+  final String category;
+
+  /// Position before the move (placement, side, castling, en passant).
+  final String fen;
+
+  /// `6. Nxf7` for White, `5... Nxd5` for Black.
+  String notation(String move) =>
+      side == 'white' ? '$moveNumber. $move' : '$moveNumber... $move';
 }
 
 /// One game-termination bucket (checkmate, resignation, timeout, draw, other)

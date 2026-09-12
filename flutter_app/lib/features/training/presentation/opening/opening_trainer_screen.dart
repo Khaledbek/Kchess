@@ -3,24 +3,29 @@
 // -----------------------------------------------------------------------------
 
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../ffi/core_gateway.dart';
 import '../../../../localization/generated/app_localizations.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/chess_board_view.dart';
 import '../../../analysis/presentation/analysis_move_arrow.dart';
 import '../../models/practice_models.dart';
 import 'opening_trainer_panels.dart';
 
-/// A distraction-free drill over one native opening session.
+/// A calm drill over one native opening session, laid out like the app's other
+/// training boards.
 ///
 /// Native owns the whole scenario: it plays a weighted book reply for the
 /// opponent, judges every user move against the book for the position actually
-/// on the board, and reveals the answer only after a miss. This screen announces
+/// on the board, and reveals the answer only after a miss. This screen names
 /// the reply, forwards drags, and paints what the snapshot says.
+///
+/// Nothing around the board changes size between moves, and nothing animates
+/// on its own: the prompt, the status line and the depth meter keep fixed
+/// heights, busy state shows inside the status line, and hints are still
+/// square tints and one arrow, as on the analysis board.
 class OpeningTrainerScreen extends StatefulWidget {
   const OpeningTrainerScreen({
     required this.gateway,
@@ -35,23 +40,13 @@ class OpeningTrainerScreen extends StatefulWidget {
   State<OpeningTrainerScreen> createState() => _OpeningTrainerScreenState();
 }
 
-class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
-    with SingleTickerProviderStateMixin {
+class _OpeningTrainerScreenState extends State<OpeningTrainerScreen> {
+  /// The last-move tint the bot and analysis boards use.
+  static const _lastMoveTint = Color(0xFF82A9C5);
+
   PracticeSnapshot? _snapshot;
   bool _busy = true, _error = false;
   int _generation = 0;
-
-  /// Answers found in a row without a miss — the drill's own scoreboard.
-  int _streak = 0;
-
-  /// Flashes the board frame green for one beat after an accepted answer.
-  bool _applause = false;
-
-  /// Drives the halo on the piece the user should have moved.
-  late final AnimationController _hintPulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
 
   @override
   void initState() {
@@ -62,7 +57,6 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
   @override
   void dispose() {
     ++_generation;
-    _hintPulse.dispose();
     final id = _snapshot?.id;
     if (id != null) unawaited(_cancel(id));
     super.dispose();
@@ -88,7 +82,6 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
     setState(() {
       _busy = true;
       _error = false;
-      _streak = 0;
     });
     final previous = _snapshot?.id;
     if (previous != null) await _cancel(previous);
@@ -98,7 +91,10 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
         await _cancel(result.id);
         return;
       }
-      _adopt(result);
+      setState(() {
+        _snapshot = result;
+        _busy = false;
+      });
     } catch (_) {
       if (mounted && generation == _generation) {
         setState(() {
@@ -107,14 +103,6 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
         });
       }
     }
-  }
-
-  void _adopt(PracticeSnapshot result) {
-    setState(() {
-      _snapshot = result;
-      _busy = false;
-    });
-    _syncHintPulse(result);
   }
 
   Future<void> _drop(String source, String target) async {
@@ -135,8 +123,10 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
         result = await _command({...request, 'promotion': 'q'});
       }
       if (!mounted || generation != _generation) return;
-      _score(current, result);
-      _adopt(result);
+      setState(() {
+        _snapshot = result;
+        _busy = false;
+      });
     } catch (_) {
       if (mounted && generation == _generation) {
         setState(() {
@@ -147,39 +137,12 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
     }
   }
 
-  /// Keeps the streak and flashes the frame on an accepted answer. An illegal
-  /// drop is refused too, but only a judged miss raises the attempt count.
-  void _score(PracticeSnapshot before, PracticeSnapshot after) {
-    if (after.accepted == true) {
-      _streak++;
-      _applause = true;
-      unawaited(HapticFeedback.selectionClick());
-      Future<void>.delayed(const Duration(milliseconds: 640), () {
-        if (mounted) setState(() => _applause = false);
-      });
-    } else if ((after.drill?.attempts ?? 0) > (before.drill?.attempts ?? 0)) {
-      _streak = 0;
-      unawaited(HapticFeedback.mediumImpact());
-    }
-  }
-
-  /// Runs the halo pulse exactly while native reveals a missed answer.
-  void _syncHintPulse(PracticeSnapshot snapshot) {
-    if (_hintMove(snapshot) == null) {
-      _hintPulse
-        ..stop()
-        ..value = 0;
-    } else if (!_hintPulse.isAnimating) {
-      unawaited(_hintPulse.repeat(reverse: true));
-    }
-  }
-
   // ---------------------------------------------------------------------------
   // Section: Snapshot reading
   // ---------------------------------------------------------------------------
 
-  static String? _hintMove(PracticeSnapshot snapshot) {
-    final hint = snapshot.drill?.hint;
+  static String? _hintMove(OpeningDrillState drill) {
+    final hint = drill.hint;
     return hint != null && hint.length >= 4 ? hint : null;
   }
 
@@ -207,269 +170,436 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen>
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
-    return Theme(
-      data: openingStudioTheme(),
-      child: OpeningStudioBackdrop(
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            systemOverlayStyle: SystemUiOverlayStyle.light,
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            centerTitle: true,
-            foregroundColor: OpeningStudio.textPrimary,
-            title: Text(
-              widget.title,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
-              ),
-            ),
-            actions: [
-              IconButton(
-                key: const Key('opening-trainer-restart'),
-                tooltip: strings.trainingRestart,
-                onPressed: _busy ? null : _restart,
-                icon: const Icon(Icons.restart_alt_rounded),
-              ),
-              const SizedBox(width: 4),
-            ],
-            bottom: _busy
-                ? const PreferredSize(
-                    preferredSize: Size.fromHeight(2),
-                    child: LinearProgressIndicator(
-                      minHeight: 2,
-                      backgroundColor: Colors.transparent,
-                    ),
-                  )
-                : null,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            key: const Key('opening-trainer-restart'),
+            tooltip: strings.trainingRestart,
+            onPressed: _busy ? null : _restart,
+            icon: const Icon(Icons.restart_alt_rounded),
           ),
-          body: SafeArea(child: _buildBody(strings)),
-        ),
+        ],
       ),
+      body: SafeArea(child: _buildBody(strings)),
     );
   }
 
   Widget _buildBody(AppLocalizations strings) {
-    if (_error) return _buildError(strings);
+    if (_error) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _DrillMessage(
+            icon: Icons.error_outline,
+            text: strings.trainingOpeningTreeLoadFailed,
+            action: TextButton(onPressed: _restart, child: Text(strings.trainingRestart)),
+          ),
+        ),
+      );
+    }
     final current = _snapshot;
     final drill = current?.drill;
     if (current == null || drill == null) {
       return const Center(child: CircularProgressIndicator());
     }
     final finished = _finished(current);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Room the banner and the depth meter want around the board.
-        const chrome = 132.0 + 76.0 + 56.0;
-        final width = math.min(constraints.maxWidth, 560.0);
-        final boardSide = math.max(
-          240.0,
-          math.min(width - 32, constraints.maxHeight - chrome),
-        );
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: math.max(boardSide, width - 32)),
-              child: Column(
+    return Center(
+      child: ConstrainedBox(
+        // The same column the endgame player uses: the board's size follows
+        // the width alone, so nothing below it can nudge it.
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            _buildPrompt(strings, current, drill),
+            const SizedBox(height: 12),
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                key: const Key('opening-trainer-board'),
+                fit: StackFit.expand,
                 children: [
-                  _buildBanner(strings, current, drill),
-                  const SizedBox(height: 18),
-                  OpeningBoardFrame(
-                    side: boardSide,
-                    accent: _applause ? OpeningStudio.success : null,
-                    child: _buildBoardStack(current, drill),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _buildBoard(current, drill),
                   ),
-                  const SizedBox(height: 18),
-                  OpeningDepthMeter(
-                    depth: drill.depth,
-                    targetDepth: drill.targetDepth,
-                    finished: finished,
-                    streak: _streak,
-                  ),
-                  if (finished) ...[
-                    const SizedBox(height: 14),
-                    OpeningDrillResultCard(
+                  if (finished)
+                    _DrillFinishedOverlay(
                       depth: drill.depth,
                       clean: current.clean,
                       bookExhausted: drill.bookExhausted,
                       onDrillAgain: _restart,
                     ),
-                  ],
                 ],
               ),
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 12),
+            _buildStatus(strings, current, drill),
+            const SizedBox(height: 12),
+            _DepthMeter(
+              depth: drill.depth,
+              targetDepth: drill.targetDepth,
+              finished: finished,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildError(AppLocalizations strings) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 42,
-            color: OpeningStudio.textMuted,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            strings.trainingOpeningTreeLoadFailed,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: OpeningStudio.textPrimary),
-          ),
-          const SizedBox(height: 22),
-          FilledButton.icon(
-            onPressed: _restart,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: Text(strings.trainingRestart),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _buildBanner(
+  /// What just happened and what to do, in two lines that never change height.
+  Widget _buildPrompt(
     AppLocalizations strings,
     PracticeSnapshot current,
     OpeningDrillState drill,
   ) {
-    final hintSan = drill.hintSan ?? drill.hint;
-    if (_hintMove(current) != null && hintSan != null) {
-      return OpeningDrillBanner(
-        tone: OpeningBannerTone.miss,
-        headline: strings.trainingOpeningPlayInstead(hintSan),
-        highlight: hintSan,
-        instruction:
-            '${strings.trainingOpeningIncorrectMove}. ${strings.trainingOpeningTryAgain}',
-      );
-    }
-
+    final scheme = Theme.of(context).colorScheme;
     final setup = _setupMove(drill);
-    if (_finished(current)) {
+    final reply = drill.opponentMove;
+    final hintSan = drill.hintSan ?? drill.hint;
+
+    final String headline;
+    final String? move;
+    final String instruction;
+    var missed = false;
+    if (_hintMove(drill) != null && hintSan != null) {
+      headline = strings.trainingOpeningPlayInstead(hintSan);
+      move = hintSan;
+      instruction = '${strings.trainingOpeningIncorrectMove}. ${strings.trainingOpeningTryAgain}';
+      missed = true;
+    } else if (_finished(current)) {
       final nothingAsked = drill.bookExhausted && drill.depth == 0;
-      final answer = drill.answer;
-      return OpeningDrillBanner(
-        tone: OpeningBannerTone.done,
-        headline: nothingAsked && setup != null
-            ? strings.trainingOpeningScenarioReady(setup)
-            : strings.trainingOpeningDepthReached(drill.depth),
-        highlight: nothingAsked ? setup : null,
-        instruction: nothingAsked
-            ? strings.trainingOpeningNoBook
-            : drill.bookExhausted
-            ? strings.trainingOpeningBookExhausted
-            : answer != null
-            ? _answerVerdict(strings, answer)
-            : strings.trainingOpeningDrillClean,
-      );
+      headline = nothingAsked && setup != null
+          ? strings.trainingOpeningScenarioReady(setup)
+          : strings.trainingOpeningDepthReached(drill.depth);
+      move = nothingAsked ? setup : null;
+      instruction = nothingAsked
+          ? strings.trainingOpeningNoBook
+          : drill.bookExhausted
+          ? strings.trainingOpeningBookExhausted
+          : current.clean
+          ? strings.trainingOpeningDrillClean
+          : strings.trainingOpeningDrillWithErrors;
+    } else if (reply != null) {
+      headline = strings.trainingOpeningOpponentPlayed(reply.notation);
+      move = reply.notation;
+      instruction = strings.trainingOpeningFindBest;
+    } else {
+      headline = setup == null
+          ? strings.trainingYourMove
+          : strings.trainingOpeningScenarioReady(setup);
+      move = setup;
+      instruction = strings.trainingOpeningFindBest;
     }
 
-    final reply = drill.opponentMove;
-    final answer = drill.answer;
-    if (reply != null) {
-      return OpeningDrillBanner(
-        tone: OpeningBannerTone.prompt,
-        headline: strings.trainingOpeningOpponentPlayed(reply.notation),
-        highlight: reply.notation,
-        instruction: strings.trainingOpeningFindBest,
-        footnote: answer == null ? null : '✓ ${_answerVerdict(strings, answer)}',
-      );
-    }
-    return OpeningDrillBanner(
-      tone: OpeningBannerTone.prompt,
-      headline: setup == null
-          ? strings.trainingYourMove
-          : strings.trainingOpeningScenarioReady(setup),
-      highlight: setup,
-      instruction: strings.trainingOpeningFindBest,
+    return _DrillMessage(
+      key: const Key('opening-trainer-banner'),
+      icon: missed ? Icons.close_rounded : Icons.menu_book_outlined,
+      iconColor: missed ? scheme.error : scheme.primary,
+      headline: _PromptHeadline(
+        text: headline,
+        move: move,
+        moveColor: missed ? scheme.error : scheme.primary,
+      ),
+      text: instruction,
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Section: Board layers
-  // ---------------------------------------------------------------------------
-
-  Widget _buildBoardStack(PracticeSnapshot current, OpeningDrillState drill) {
+  Widget _buildBoard(PracticeSnapshot current, OpeningDrillState drill) {
+    final scheme = Theme.of(context).colorScheme;
     final blackAtBottom = current.solverColor == 'black';
-    final hint = _hintMove(current);
-    // The opponent's reply stays marked until the user answers or misses.
-    final reply = hint == null && !_finished(current) ? drill.opponentMove : null;
-
+    final hint = _hintMove(drill);
+    final reply = drill.opponentMove;
     final tints = <String, Color>{
       if (hint != null) ...{
-        hint.substring(0, 2): OpeningStudio.success.withValues(alpha: 0.34),
-        hint.substring(2, 4): OpeningStudio.success.withValues(alpha: 0.22),
-      } else if (reply != null) ...{
-        reply.uci.substring(0, 2): OpeningStudio.accent.withValues(alpha: 0.18),
-        reply.uci.substring(2, 4): OpeningStudio.accent.withValues(alpha: 0.30),
+        hint.substring(0, 2): scheme.primaryContainer.withValues(alpha: 0.78),
+        hint.substring(2, 4): scheme.secondaryContainer.withValues(alpha: 0.96),
+      } else if (reply != null && reply.uci.length >= 4) ...{
+        reply.uci.substring(0, 2): _lastMoveTint,
+        reply.uci.substring(2, 4): _lastMoveTint,
       },
     };
-
     return Stack(
-      key: const Key('opening-trainer-board'),
       fit: StackFit.expand,
       children: [
         ChessBoardView(
           position: current.position,
           blackAtBottom: blackAtBottom,
           interactive: !_busy && current.status == 'active',
-          squareTint: tints.isEmpty
-              ? null
-              : (square, base) {
-                  final tint = tints[square];
-                  return tint == null ? base : Color.alphaBlend(tint, base);
-                },
+          squareTint: tints.isEmpty ? null : (square, base) => tints[square] ?? base,
           onSquareTap: (_) {},
-          onPieceDrop: _drop,
+          onPieceDrop: (source, target) => unawaited(_drop(source, target)),
         ),
-        if (reply != null && reply.uci.length >= 4) ...[
-          OpeningSquareGlow(
-            key: const Key('opening-trainer-reply-glow'),
-            squares: {reply.uci.substring(2, 4): OpeningStudio.accent},
-            blackAtBottom: blackAtBottom,
-          ),
-          AnalysisMoveArrow(
-            move: reply.uci,
-            color: Colors.white.withValues(alpha: 0.62),
-            blackAtBottom: blackAtBottom,
-            thickness: 0.12,
-            paintKey: ValueKey('opening-reply-${reply.uci}'),
-          ),
-        ],
-        if (hint != null) ...[
-          // The piece that should move breathes; its square and target glow.
-          AnimatedBuilder(
-            animation: _hintPulse,
-            builder: (context, _) => OpeningSquareGlow(
-              key: const Key('opening-trainer-hint-glow'),
-              squares: {
-                hint.substring(0, 2): OpeningStudio.success.withValues(
-                  alpha: 0.5 + 0.5 * _hintPulse.value,
-                ),
-                hint.substring(2, 4): OpeningStudio.success.withValues(alpha: 0.7),
-              },
-              blackAtBottom: blackAtBottom,
-            ),
-          ),
+        if (hint != null)
           AnalysisMoveArrow(
             move: hint,
-            color: OpeningStudio.success,
+            color: scheme.tertiary,
             blackAtBottom: blackAtBottom,
-            thickness: 0.22,
-            glow: 0.2,
             paintKey: ValueKey('opening-hint-$hint'),
           ),
-        ],
       ],
+    );
+  }
+
+  /// One line under the board, always the same height: busy, the verdict on
+  /// the last answer, the miss, or whose move it is.
+  Widget _buildStatus(
+    AppLocalizations strings,
+    PracticeSnapshot current,
+    OpeningDrillState drill,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final answer = drill.answer;
+    final missed = _hintMove(drill) != null;
+    final (IconData icon, Color color, String text) = missed
+        ? (Icons.close_rounded, scheme.error, strings.trainingOpeningIncorrectMove)
+        : answer != null
+        ? (Icons.check_circle_outline, AppTheme.success, _answerVerdict(strings, answer))
+        : (Icons.touch_app_outlined, scheme.onSurfaceVariant, strings.trainingYourMove);
+    return SizedBox(
+      key: const Key('opening-trainer-status'),
+      height: 24,
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 18,
+            child: _busy
+                ? const CircularProgressIndicator(strokeWidth: 2)
+                : Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Section: Drill widgets
+// -----------------------------------------------------------------------------
+
+/// The app's training message box, with room for exactly two lines.
+class _DrillMessage extends StatelessWidget {
+  const _DrillMessage({
+    required this.icon,
+    required this.text,
+    this.headline,
+    this.iconColor,
+    this.action,
+    super.key,
+  });
+
+  final IconData icon;
+  final Widget? headline;
+  final String text;
+  final Color? iconColor;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final body = Text(
+      text,
+      key: const Key('opening-trainer-banner-instruction'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: iconColor ?? scheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: headline == null
+                ? body
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [headline!, const SizedBox(height: 2), body],
+                  ),
+          ),
+          ?action,
+        ],
+      ),
+    );
+  }
+}
+
+/// The prompt's first line, with the move itself picked out.
+class _PromptHeadline extends StatelessWidget {
+  const _PromptHeadline({required this.text, required this.move, required this.moveColor});
+
+  final String text;
+  final String? move;
+  final Color moveColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.titleSmall?.copyWith(
+      fontWeight: FontWeight.w700,
+    );
+    final at = move == null || move!.isEmpty ? -1 : text.indexOf(move!);
+    final span = at < 0
+        ? TextSpan(text: text)
+        : TextSpan(
+            children: [
+              TextSpan(text: text.substring(0, at)),
+              // Notation reads left to right even inside an Arabic sentence.
+              TextSpan(
+                text: '\u2066$move\u2069',
+                style: TextStyle(color: moveColor, fontWeight: FontWeight.w800),
+              ),
+              TextSpan(text: text.substring(at + move!.length)),
+            ],
+          );
+    return Text.rich(
+      span,
+      key: const Key('opening-trainer-banner-headline'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+  }
+}
+
+/// "Current depth: move 2 / 10" over a segmented bar.
+class _DepthMeter extends StatelessWidget {
+  const _DepthMeter({
+    required this.depth,
+    required this.targetDepth,
+    required this.finished,
+  });
+
+  final int depth;
+  final int targetDepth;
+
+  /// Once the run is over the meter reports what was reached, not what is next.
+  final bool finished;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final total = targetDepth < 1 ? 1 : targetDepth;
+    final current = finished ? depth.clamp(0, total) : (depth + 1).clamp(1, total);
+    return Column(
+      key: const Key('opening-trainer-progress'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          strings.trainingOpeningCurrentDepth(current, total),
+          key: const Key('opening-trainer-depth-label'),
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        OpeningSegmentedMeter(
+          done: depth,
+          total: total,
+          color: theme.colorScheme.primary,
+          trackColor: theme.colorScheme.surfaceContainerHighest,
+          glow: false,
+        ),
+      ],
+    );
+  }
+}
+
+/// End of the run, laid over the board like the endgame player's solved
+/// overlay, so the layout below does not move when it appears.
+class _DrillFinishedOverlay extends StatelessWidget {
+  const _DrillFinishedOverlay({
+    required this.depth,
+    required this.clean,
+    required this.bookExhausted,
+    required this.onDrillAgain,
+  });
+
+  final int depth;
+  final bool clean;
+  final bool bookExhausted;
+  final VoidCallback onDrillAgain;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final nothingAsked = bookExhausted && depth == 0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        key: const Key('opening-trainer-completed'),
+        alignment: Alignment.center,
+        color: scheme.surface.withValues(alpha: 0.88),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              nothingAsked ? Icons.menu_book_outlined : Icons.emoji_events_rounded,
+              size: 44,
+              color: nothingAsked
+                  ? scheme.onSurfaceVariant
+                  : clean
+                  ? AppTheme.success
+                  : scheme.tertiary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              nothingAsked
+                  ? strings.trainingOpeningNoBook
+                  : strings.trainingOpeningDepthReached(depth),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            if (!nothingAsked) ...[
+              const SizedBox(height: 6),
+              Text(
+                clean
+                    ? strings.trainingOpeningDrillClean
+                    : strings.trainingOpeningDrillWithErrors,
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(strings.trainingOpeningLabBackToOverview),
+                ),
+                FilledButton.icon(
+                  key: const Key('opening-trainer-practise-again'),
+                  onPressed: onDrillAgain,
+                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  label: Text(strings.trainingOpeningDrillAgain),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

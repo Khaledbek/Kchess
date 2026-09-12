@@ -193,6 +193,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       onRetry: _reloadAll,
     );
     final phase = _PhaseCard(future: _phases, onRetry: _reloadAll);
+    // First thing on the tab, so a line that keeps going wrong is not buried
+    // under the charts; it collapses to nothing when there is no warning.
+    final weaknesses = _OpeningWeaknessCard(future: _openings);
     final openings = _OpeningsCard(
       future: _openings,
       onRetry: _reloadAll,
@@ -206,6 +209,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              weaknesses,
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -242,6 +246,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            weaknesses,
             overview,
             const SizedBox(height: 20),
             termination,

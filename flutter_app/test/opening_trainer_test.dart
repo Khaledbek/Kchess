@@ -35,7 +35,7 @@ class _PracticeGateway implements CoreGateway {
     commands.add(request);
     return switch (request['op']) {
       'cancel' => <String, Object?>{},
-      'nodes' => nodes,
+      'nodes' || 'families' => nodes,
       'move' => move,
       _ => start,
     };
@@ -136,17 +136,21 @@ void main() {
 
     expect(_headline(tester), 'Opponent played 1... e5.');
     expect(find.text('Find the best engine response.'), findsOneWidget);
-    expect(find.text('CURRENT DEPTH: MOVE 2 / 10'), findsOneWidget);
+    expect(find.text('Current depth: move 2 / 10'), findsOneWidget);
 
-    // Exactly one arrow: the reply, not an answer.
-    final arrow = tester.widget<AnalysisMoveArrow>(find.byType(AnalysisMoveArrow));
-    expect(arrow.move, 'e7e5');
-    expect(find.byKey(const Key('opening-trainer-hint-glow')), findsNothing);
+    // The reply is marked like a last move on the other boards: two tinted
+    // squares, no arrow.
+    expect(find.byType(AnalysisMoveArrow), findsNothing);
+    final board = tester.widget<ChessBoardView>(find.byType(ChessBoardView));
+    const base = Color(0xFF000000);
+    expect(board.squareTint!('e7', base), isNot(base));
+    expect(board.squareTint!('e5', base), isNot(base));
+    expect(board.squareTint!('d4', base), base);
 
     // Banner, board and meter stack top to bottom and all really render: the
     // board stays square inside the page padding on a 375x812 phone.
     final banner = tester.getRect(find.byKey(const Key('opening-trainer-banner')));
-    final frame = tester.getRect(find.byKey(const Key('opening-trainer-board-frame')));
+    final frame = tester.getRect(find.byKey(const Key('opening-trainer-board')));
     final meter = tester.getRect(find.byKey(const Key('opening-trainer-progress')));
     expect(banner.height, greaterThan(40));
     expect(frame.width, frame.height);
@@ -191,17 +195,19 @@ void main() {
     expect(_headline(tester), 'The move was Nf3');
     expect(find.text('Incorrect move. Try again.'), findsOneWidget);
 
-    // The reply arrow gives way to one green arrow for the answer, and the
-    // piece to move glows.
+    // One arrow for the answer, and the piece to move and its square tinted.
     final arrow = tester.widget<AnalysisMoveArrow>(find.byType(AnalysisMoveArrow));
     expect(arrow.move, 'g1f3');
-    expect(arrow.color, OpeningStudio.success);
-    expect(find.byKey(const Key('opening-trainer-hint-glow')), findsOneWidget);
+    final board = tester.widget<ChessBoardView>(find.byType(ChessBoardView));
+    const base = Color(0xFF000000);
+    expect(board.squareTint!('g1', base), isNot(base));
+    expect(board.squareTint!('f3', base), isNot(base));
 
     // Same position, still the user's move: the board takes another try.
     expect(tester.widget<ChessBoardView>(find.byType(ChessBoardView)).interactive, isTrue);
     expect(find.byKey(const Key('opening-trainer-completed')), findsNothing);
-    expect(find.text('CURRENT DEPTH: MOVE 2 / 10'), findsOneWidget);
+    expect(find.text('Current depth: move 2 / 10'), findsOneWidget);
+    expect(find.text('Incorrect move'), findsOneWidget);
   });
 
   testWidgets('a finished drill reports its depth and offers another run', (
@@ -219,7 +225,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_headline(tester), 'Depth 10 reached');
-    expect(find.text('CURRENT DEPTH: MOVE 10 / 10'), findsOneWidget);
+    expect(find.text('Current depth: move 10 / 10'), findsOneWidget);
     expect(find.byKey(const Key('opening-trainer-completed')), findsOneWidget);
     expect(tester.widget<ChessBoardView>(find.byType(ChessBoardView)).interactive, isFalse);
 

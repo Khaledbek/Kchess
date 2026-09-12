@@ -89,8 +89,10 @@ struct GameRecord {
 };
 
 // Minimal per-game fields for statistics aggregation. Deliberately excludes the
-// PGN and analysis joins so a full-library overview stays cheap.
+// PGN and per-move analysis so a full-library overview stays cheap; `analysed`
+// is a single indexed EXISTS against analysis_runs.
 struct GameStatRow {
+  std::string game_id;
   std::string provider_outcome;   // win | loss | draw | unknown (profile perspective)
   std::string result;             // 1-0 | 0-1 | 1/2-1/2 | *
   std::string white_name;
@@ -98,6 +100,19 @@ struct GameStatRow {
   std::string time_control_type;  // bullet | blitz | rapid | classical | daily | ...
   std::string opening_eco;        // empty when the game has no named opening
   std::string opening_name;       // empty when unclassified or no named opening
+  std::optional<int> opening_ply; // ply the named line ends at; null if unclassified
+  bool analysed{false};           // a finished (classified) engine analysis exists
+};
+
+// One move the engine flagged (miss, mistake or blunder) in a game's latest
+// finished analysis, with the position it was played from.
+struct GameMoveErrorRow {
+  std::string game_id;
+  int ply{0};                     // 0-based, 0 is White's first move
+  std::string category;
+  std::string san;
+  std::string fen_before;
+  std::string recommended_move;   // engine's move in notation; may be empty
 };
 
 // Minimal per-game fields for the game-phase ("phase of death") breakdown:
@@ -289,6 +304,12 @@ class Database {
 
   // Lightweight rows for statistics, newest game first (by end/creation time).
   std::vector<GameStatRow> games_for_statistics(const std::string& profile_id) const;
+
+  // Flagged moves (miss/mistake/blunder) before before_ply in each of the
+  // profile's games, from that game's latest classified analysis run. Both
+  // sides' moves are returned; the caller knows which side is the profile's.
+  std::vector<GameMoveErrorRow> move_errors_for_statistics(
+      const std::string& profile_id, int before_ply) const;
 
   // Outcome + final ply per game, for the game-phase breakdown.
   std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;

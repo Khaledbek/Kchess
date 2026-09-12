@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -96,6 +97,23 @@ void test_drill(Core& core) {
   expect(root.at("targetDepth").get<int>() > 0, "Scenario cards carry a target depth");
   expect(root.at("progress").contains("bestDepth"), "Progress reports the best depth");
   const int opening = root.at("openingId").get<int>();
+
+  // The dashboard lists named openings, not the first moves the tree hangs
+  // them from, and each name once.
+  const auto families = core.practice({{"op", "families"}});
+  expect(families.is_array() && families.size() > 50, "Opening families are listed");
+  std::set<std::string> names;
+  bool sicilian = false;
+  for (const auto& family : families) {
+    const auto name = family.at("name").get<std::string>();
+    expect(names.insert(name).second, "Family listed twice: " + name);
+    expect(name != "e4" && name != "d4" && name != "Nf3", "A first move is not a family");
+    sicilian = sicilian || name == "Sicilian Defense";
+  }
+  expect(sicilian, "The Sicilian Defense is a family card");
+  expect(families.front().at("childCount").get<int>() >=
+             families.back().at("childCount").get<int>(),
+      "Families with the most variations come first");
 
   auto first = start(core, opening, "white", 3);
   if (first.at("bookExhausted").get<bool>() && first.at("depth").get<int>() == 0) {

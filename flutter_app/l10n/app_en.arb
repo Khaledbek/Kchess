@@ -615,6 +615,67 @@
       }
     }
   },
+  "openingWeaknessTitle": "Openings that need training",
+  "openingWeaknessCaption": "Lines you keep losing or keep getting wrong, worst first.",
+  "openingWeaknessLost": "Lost {losses} of {games} games",
+  "@openingWeaknessLost": {
+    "placeholders": {
+      "losses": {
+        "type": "int"
+      },
+      "games": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessErrors": "Opening mistakes in {count} of {analysed} analysed games",
+  "@openingWeaknessErrors": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "analysed": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessRecurring": "You played {move} here {count} times — the engine prefers {better}.",
+  "@openingWeaknessRecurring": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "better": {
+        "type": "String"
+      }
+    }
+  },
+  "openingWeaknessRecurringFlagged": "You played {move} here {count} times, and the engine flagged it every time.",
+  "@openingWeaknessRecurringFlagged": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessAnalyseHint": "Analyse your games to also catch the moves that go wrong, not just the results.",
+  "openingWeaknessFamily": "Across the whole family",
+  "trainingWeakSpotsTitle": "Your weak spots",
+  "trainingWeakSpotBadge": "Weak spot",
+  "trainingWeakSpotMetric": "Weak spot: {opening}",
+  "@trainingWeakSpotMetric": {
+    "placeholders": {
+      "opening": {
+        "type": "String"
+      }
+    }
+  },
   "playAgainstBot": "Play against a bot",
   "continueAgainstBot": "Continue against bot",
   "botPlayerColor": "Your color",
