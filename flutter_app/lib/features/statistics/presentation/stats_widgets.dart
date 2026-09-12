@@ -284,57 +284,6 @@ class _StatTileGrid extends StatelessWidget {
   }
 }
 
-/// One circular result indicator in the "Aktuelle Form" strip.
-class _StatResultChip extends StatelessWidget {
-  const _StatResultChip({required this.outcome, required this.onTap});
-
-  final String outcome; // win | loss | draw
-  final VoidCallback onTap;
-
-  static const double size = 34;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (color, icon, label) = switch (outcome) {
-      'win' => (
-        AppTheme.success,
-        Icons.check_rounded,
-        _statsLabels(context).wins,
-      ),
-      'loss' => (
-        scheme.error,
-        Icons.close_rounded,
-        _statsLabels(context).losses,
-      ),
-      _ => (
-        scheme.onSurfaceVariant,
-        Icons.remove_rounded,
-        _statsLabels(context).draws,
-      ),
-    };
-    return Semantics(
-      label: label,
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(size),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.16),
-            shape: BoxShape.circle,
-            border: Border.all(color: color.withValues(alpha: 0.55)),
-          ),
-          alignment: Alignment.center,
-          child: Icon(icon, size: size * 0.56, color: color),
-        ),
-      ),
-    );
-  }
-}
-
 // Native outcome DTO; Flutter only chooses the matching visual.
 String _statGameOutcome(GameSummary game) => game.statisticsOutcome;
 

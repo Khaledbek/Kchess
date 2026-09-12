@@ -401,6 +401,8 @@
   "openingWeaknessRecurring": "لعبت {move} هنا {count} مرات — المحرك يفضل {better}.",
   "openingWeaknessRecurringFlagged": "لعبت {move} هنا {count} مرات، ووضع المحرك عليها علامة في كل مرة.",
   "openingWeaknessAnalyseHint": "حلّل مبارياتك لاكتشاف النقلات الخاطئة أيضًا، وليس النتائج فقط.",
+  "openingWeaknessShowAll": "عرض الكل ({count})",
+  "openingWeaknessShowFewer": "عرض أقل",
   "openingWeaknessFamily": "عبر عائلة الافتتاح كاملة",
   "trainingWeakSpotsTitle": "نقاط ضعفك",
   "trainingWeakSpotBadge": "نقطة ضعف",

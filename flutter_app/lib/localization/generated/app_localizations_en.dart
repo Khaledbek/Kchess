@@ -1199,6 +1199,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Analyse your games to also catch the moves that go wrong, not just the results.';
 
   @override
+  String openingWeaknessShowAll(int count) {
+    return 'Show all $count';
+  }
+
+  @override
+  String get openingWeaknessShowFewer => 'Show fewer';
+
+  @override
   String get openingWeaknessFamily => 'Across the whole family';
 
   @override

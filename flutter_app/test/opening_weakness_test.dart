@@ -68,6 +68,32 @@ Map<String, Object?> _openingsJson() => <String, Object?>{
       'poorResults': true,
       'recurringMistake': null,
     },
+    <String, Object?>{
+      'level': 'variation',
+      'name': 'French Defense: Advance Variation',
+      'family': 'French Defense',
+      'eco': 'C02',
+      'color': 'black',
+      'games': 5,
+      'wins': 1,
+      'draws': 0,
+      'losses': 4,
+      'poorResults': true,
+      'recurringMistake': null,
+    },
+    <String, Object?>{
+      'level': 'family',
+      'name': 'Englund Gambit',
+      'family': 'Englund Gambit',
+      'eco': 'A40',
+      'color': 'white',
+      'games': 4,
+      'wins': 0,
+      'draws': 0,
+      'losses': 4,
+      'poorResults': true,
+      'recurringMistake': null,
+    },
   ],
 };
 
@@ -157,13 +183,13 @@ Widget _app(Widget home) => MaterialApp(
 void main() {
   test('native weaknesses parse with their evidence', () {
     final stats = OpeningsStats.fromJson(_openingsJson());
-    expect(stats.weaknesses, hasLength(2));
+    expect(stats.weaknesses, hasLength(4));
     final friedLiver = stats.weaknesses.first;
     expect(friedLiver.name, _friedLiver);
     expect(friedLiver.color, 'black');
     expect(friedLiver.tally.losses, 5);
     expect(friedLiver.recurringMistake!.notation('Nxd5'), '5... Nxd5');
-    expect(stats.weaknesses.last.recurringMistake, isNull);
+    expect(stats.weaknesses[1].recurringMistake, isNull);
     expect(stats.analysedOpeningGames, 3);
     // Older native builds send neither field.
     expect(OpeningsStats.fromJson(const {'hasProfile': true}).weaknesses, isEmpty);
@@ -184,7 +210,7 @@ void main() {
               'Lost 5 of 6 games',
             ]);
             // Results alone still explain themselves.
-            expect(openingWeaknessReasons(strings, stats.weaknesses.last), [
+            expect(openingWeaknessReasons(strings, stats.weaknesses[1]), [
               'Lost 6 of 8 games',
             ]);
             return const SizedBox();
@@ -194,8 +220,10 @@ void main() {
     );
   });
 
-  testWidgets('statistics warns about the weak line and trains it', (tester) async {
-    tester.view.physicalSize = const Size(900, 1600);
+  testWidgets('statistics warns compactly where recent form used to be', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -211,26 +239,37 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // The recent-form card is gone.
+    expect(find.text('Recent form'), findsNothing);
+
     final card = find.byKey(const Key('stats-opening-weaknesses'));
     expect(card, findsOneWidget);
     expect(find.text('Openings that need training'), findsOneWidget);
-    // The warning sits above every other statistics card.
-    final cardTop = tester.getTopLeft(card).dy;
-    for (final other in find.byType(Card).evaluate()) {
-      final box = other.renderObject! as RenderBox;
-      if (other.widget.key == const Key('stats-opening-weaknesses')) continue;
-      expect(box.localToGlobal(Offset.zero).dy, greaterThan(cardTop));
-    }
+
+    // It sits in the right column's first slot: the top row of cards, right of
+    // the middle.
+    final rect = tester.getRect(card);
+    final tops = find
+        .byType(Card)
+        .evaluate()
+        .map((element) => (element.renderObject! as RenderBox).localToGlobal(Offset.zero).dy);
+    expect(rect.top, tops.reduce((a, b) => a < b ? a : b));
+    expect(rect.left, greaterThan(1200 / 2 - 40));
+
+    // Three dense rows and a way to the rest, in far less room than a chart.
+    expect(find.byType(OpeningWeaknessRow), findsNWidgets(3));
+    expect(rect.height, lessThan(300));
     expect(
       find.descendant(
         of: card,
-        matching: find.text(
-          'You played 5... Nxd5 here 3 times — the engine prefers 5... Na5.',
-        ),
+        matching: find.textContaining('You played 5... Nxd5 here 3 times', findRichText: true),
       ),
       findsOneWidget,
     );
-    expect(tester.getSize(card).height, greaterThan(150));
+    await tester.tap(find.byKey(const Key('stats-opening-weaknesses-more')));
+    await tester.pumpAndSettle();
+    expect(find.byType(OpeningWeaknessRow), findsNWidgets(4));
+    expect(find.text('Show fewer'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey('opening-weakness-train-$_friedLiver-black')),

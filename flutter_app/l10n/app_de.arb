@@ -401,6 +401,8 @@
   "openingWeaknessRecurring": "Du hast hier {count}-mal {move} gespielt — die Engine bevorzugt {better}.",
   "openingWeaknessRecurringFlagged": "Du hast hier {count}-mal {move} gespielt, und die Engine hat es jedes Mal markiert.",
   "openingWeaknessAnalyseHint": "Analysiere deine Partien, um auch die Züge zu finden, die schiefgehen — nicht nur die Ergebnisse.",
+  "openingWeaknessShowAll": "Alle {count} zeigen",
+  "openingWeaknessShowFewer": "Weniger zeigen",
   "openingWeaknessFamily": "Über die ganze Eröffnungsfamilie",
   "trainingWeakSpotsTitle": "Deine Schwachstellen",
   "trainingWeakSpotBadge": "Schwachstelle",

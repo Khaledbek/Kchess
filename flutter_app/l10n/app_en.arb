@@ -665,6 +665,15 @@
     }
   },
   "openingWeaknessAnalyseHint": "Analyse your games to also catch the moves that go wrong, not just the results.",
+  "openingWeaknessShowAll": "Show all {count}",
+  "@openingWeaknessShowAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "openingWeaknessShowFewer": "Show fewer",
   "openingWeaknessFamily": "Across the whole family",
   "trainingWeakSpotsTitle": "Your weak spots",
   "trainingWeakSpotBadge": "Weak spot",

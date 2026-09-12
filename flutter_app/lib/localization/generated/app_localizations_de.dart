@@ -1205,6 +1205,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Analysiere deine Partien, um auch die Züge zu finden, die schiefgehen — nicht nur die Ergebnisse.';
 
   @override
+  String openingWeaknessShowAll(int count) {
+    return 'Alle $count zeigen';
+  }
+
+  @override
+  String get openingWeaknessShowFewer => 'Weniger zeigen';
+
+  @override
   String get openingWeaknessFamily => 'Über die ganze Eröffnungsfamilie';
 
   @override

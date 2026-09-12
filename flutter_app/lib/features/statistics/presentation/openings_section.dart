@@ -75,19 +75,26 @@ class _OpeningsCard extends StatelessWidget {
   }
 }
 
-/// The warning at the top of the tab: openings the profile keeps losing or
-/// keeps misplaying, each one tap from its drill. Takes no room at all when
-/// native found nothing to warn about, or while the numbers are loading.
-class _OpeningWeaknessCard extends StatelessWidget {
+/// Openings the profile keeps losing or keeps misplaying, one dense row each
+/// and one tap from its drill. Takes no room at all when native found nothing
+/// to warn about, or while the numbers are loading.
+class _OpeningWeaknessCard extends StatefulWidget {
   const _OpeningWeaknessCard({required this.future});
 
   final Future<OpeningsStats> future;
 
-  static const _maxRows = 4;
+  @override
+  State<_OpeningWeaknessCard> createState() => _OpeningWeaknessCardState();
+}
+
+class _OpeningWeaknessCardState extends State<_OpeningWeaknessCard> {
+  static const _collapsedRows = 3;
+
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<OpeningsStats>(
-    future: future,
+    future: widget.future,
     builder: (context, snapshot) {
       final stats = snapshot.data;
       if (stats == null || stats.weaknesses.isEmpty) {
@@ -96,78 +103,89 @@ class _OpeningWeaknessCard extends StatelessWidget {
       final strings = AppLocalizations.of(context);
       final theme = Theme.of(context);
       final canTrain = TrainingNavigator.maybeOf(context) != null;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Card(
-          key: const Key('stats-opening-weaknesses'),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.healing_rounded, color: theme.colorScheme.error),
-                    const SizedBox(width: 8),
-                    Expanded(
+      final weaknesses = stats.weaknesses;
+      final visible = _expanded
+          ? weaknesses
+          : weaknesses.take(_collapsedRows).toList(growable: false);
+      return Card(
+        key: const Key('stats-opening-weaknesses'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.healing_rounded,
+                    size: 20,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Tooltip(
+                      message: strings.openingWeaknessCaption,
                       child: Text(
                         strings.openingWeaknessTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  strings.openingWeaknessCaption,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ),
-                const SizedBox(height: 14),
-                for (final weakness in stats.weaknesses.take(_maxRows)) ...[
-                  OpeningWeaknessTile(
-                    weakness: weakness,
-                    colorLabel: weakness.color == 'white'
-                        ? strings.statsOpeningsWhite
-                        : strings.statsOpeningsBlack,
-                    trainLabel: strings.statsTrainOpening,
-                    onTrain: canTrain
-                        ? () => _trainOpening(
-                            context,
-                            OpeningTrainingRequest(
-                              openingName: weakness.name,
-                              eco: weakness.eco,
-                              color: weakness.color,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                if (stats.analysedOpeningGames == 0)
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.insights_rounded,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          strings.openingWeaknessAnalyseHint,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                  // Move-level warnings need analysed games; say so quietly.
+                  if (stats.analysedOpeningGames == 0)
+                    Tooltip(
+                      message: strings.openingWeaknessAnalyseHint,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              for (final (index, weakness) in visible.indexed) ...[
+                if (index > 0) const Divider(height: 1),
+                OpeningWeaknessRow(
+                  weakness: weakness,
+                  colorLabel: weakness.color == 'white'
+                      ? strings.statsOpeningsWhite
+                      : strings.statsOpeningsBlack,
+                  trainLabel: strings.statsTrainOpening,
+                  onTrain: canTrain
+                      ? () => _trainOpening(
+                          context,
+                          OpeningTrainingRequest(
+                            openingName: weakness.name,
+                            eco: weakness.eco,
+                            color: weakness.color,
+                          ),
+                        )
+                      : null,
+                ),
               ],
-            ),
+              if (weaknesses.length > _collapsedRows)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    key: const Key('stats-opening-weaknesses-more'),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    child: Text(
+                      _expanded
+                          ? strings.openingWeaknessShowFewer
+                          : strings.openingWeaknessShowAll(weaknesses.length),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       );

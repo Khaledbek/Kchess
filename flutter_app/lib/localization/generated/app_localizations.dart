@@ -2241,6 +2241,18 @@ abstract class AppLocalizations {
   /// **'Analyse your games to also catch the moves that go wrong, not just the results.'**
   String get openingWeaknessAnalyseHint;
 
+  /// No description provided for @openingWeaknessShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String openingWeaknessShowAll(int count);
+
+  /// No description provided for @openingWeaknessShowFewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Show fewer'**
+  String get openingWeaknessShowFewer;
+
   /// No description provided for @openingWeaknessFamily.
   ///
   /// In en, this message translates to:

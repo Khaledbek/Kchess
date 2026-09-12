@@ -1194,6 +1194,14 @@ class AppLocalizationsAr extends AppLocalizations {
       'حلّل مبارياتك لاكتشاف النقلات الخاطئة أيضًا، وليس النتائج فقط.';
 
   @override
+  String openingWeaknessShowAll(int count) {
+    return 'عرض الكل ($count)';
+  }
+
+  @override
+  String get openingWeaknessShowFewer => 'عرض أقل';
+
+  @override
   String get openingWeaknessFamily => 'عبر عائلة الافتتاح كاملة';
 
   @override

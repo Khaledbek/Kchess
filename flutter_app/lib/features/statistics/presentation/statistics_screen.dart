@@ -177,12 +177,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       timeControl: _timeControl,
       onRetry: _reloadAll,
     );
-    final form = _RecentFormCard(
-      controller: widget.controller,
-      future: _games,
-      timeControl: _timeControl,
-      onRetry: _reloadGames,
-    );
     final rating = _RatingTrendCard(
       future: _games,
       timeControl: _timeControl,
@@ -193,9 +187,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       onRetry: _reloadAll,
     );
     final phase = _PhaseCard(future: _phases, onRetry: _reloadAll);
-    // First thing on the tab, so a line that keeps going wrong is not buried
-    // under the charts; it collapses to nothing when there is no warning.
+    // Where the recent-form strip used to be; it collapses to nothing, gap
+    // included, when there is no warning.
     final weaknesses = _OpeningWeaknessCard(future: _openings);
+    final weaknessesGap = FutureBuilder<OpeningsStats>(
+      future: _openings,
+      builder: (context, snapshot) => SizedBox(
+        height: (snapshot.data?.weaknesses.isNotEmpty ?? false) ? 20 : 0,
+      ),
+    );
     final openings = _OpeningsCard(
       future: _openings,
       onRetry: _reloadAll,
@@ -209,7 +209,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              weaknesses,
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -228,8 +227,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        form,
-                        const SizedBox(height: 20),
+                        weaknesses,
+                        weaknessesGap,
                         rating,
                         const SizedBox(height: 20),
                         phase,
@@ -246,15 +245,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            weaknesses,
             overview,
             const SizedBox(height: 20),
             termination,
             const SizedBox(height: 20),
             phase,
             const SizedBox(height: 20),
-            form,
-            const SizedBox(height: 20),
+            weaknesses,
+            weaknessesGap,
             rating,
             const SizedBox(height: 20),
             openings,

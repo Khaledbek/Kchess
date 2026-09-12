@@ -39,7 +39,6 @@ part '../features/profile/presentation/profile_screen.dart';
 part '../features/statistics/presentation/statistics_screen.dart';
 part '../features/statistics/presentation/stats_widgets.dart';
 part '../features/statistics/presentation/overview_section.dart';
-part '../features/statistics/presentation/form_section.dart';
 part '../features/statistics/presentation/rating_section.dart';
 part '../features/statistics/presentation/termination_section.dart';
 part '../features/statistics/presentation/phase_section.dart';
