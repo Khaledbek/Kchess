@@ -12,6 +12,12 @@
 #include "../dto/evidence.h"
 #include "../dto/query_plan.h"
 #include "../dto/structured_coach_response.h"
+#include "../teaching/teaching_plan.h"
+
+namespace kchess::ai {
+struct ProviderInputOptimizationStats;
+}
+
 
 namespace kchess::ai {
 
@@ -28,13 +34,22 @@ struct LLMProviderRequest {
   std::optional<std::string> position_fen;
   std::optional<std::string> player_color;
   std::optional<std::string> hint_move_uci;
+  std::optional<std::string> teaching_target;
+  TeachingPlan teaching_plan;
   std::string session_summary;
   std::string pgn_excerpt;
   std::vector<EvidenceItem> evidence;
   std::size_t input_token_budget{0};
-  std::string response_schema_version{"coach_response.v2"};
+  bool automatic_turn{false};
+  // Set by the native session after a completed legal move answered an open
+  // question. Never infer this state from prior answer prose.
+  bool has_verified_learner_feedback{false};
+  std::string response_schema_version{"coach_response.v4"};
   std::optional<StructuredCoachContent> repair_candidate;
   std::vector<std::string> validation_feedback;
+  QueryFamily query_family{QueryFamily::unknown};
+  bool needs_profile{false};
+  ProfileQueryScope profile_scope;
 };
 
 enum class LLMProviderStatus {
@@ -73,6 +88,8 @@ class LLMProvider {
     const CoachRequest& request,
     const CoachContext& context,
     const QueryPlan& plan,
-    const std::vector<EvidenceItem>& evidence);
+    const TeachingPlan& teaching_plan,
+    const std::vector<EvidenceItem>& evidence,
+    ProviderInputOptimizationStats* optimization_stats = nullptr);
 
 }  // namespace kchess::ai

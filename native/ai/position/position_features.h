@@ -13,8 +13,17 @@ namespace kchess::ai {
 // Section: Position feature DTOs
 // -----------------------------------------------------------------------------
 
+struct PieceCountFeatures {
+  int pawns{0};
+  int knights{0};
+  int bishops{0};
+  int rooks{0};
+  int queens{0};
+};
+
 struct SidePositionFeatures {
   int material_cp{0};
+  PieceCountFeatures pieces;
   int minor_pieces_off_home{0};
   int mobility_squares{0};
   int activity_squares{0};

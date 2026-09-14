@@ -149,9 +149,10 @@ TrainingProgressRecord TrainingService::complete_attempt(const Attempt& attempt)
 }
 
 TrainingProgressRecord TrainingService::record_completion(
-    const std::string& exercise_id, const bool success) {
+    const std::string& exercise_id, const bool success, const int reached_depth) {
   auto progress = progress_for(exercise_id);
   progress.attempt_count += 1;
+  progress.best_depth = std::max(progress.best_depth, reached_depth);
   progress.last_attempt_at = unix_time_seconds();
   if (success) {
     progress.success_count += 1;

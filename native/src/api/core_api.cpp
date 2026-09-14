@@ -91,7 +91,7 @@ extern "C" {
 
 int32_t kc_abi_version(void) { return KCHESS_CORE_ABI_VERSION; }
 
-const char* kc_core_version(void) { return "0.6.0-phase6-function-fixes"; }
+const char* kc_core_version(void) { return "0.7.0-player-profile"; }
 
 int32_t kc_smoke_test(const int32_t value) { return value + 1; }
 
@@ -186,6 +186,11 @@ char* kc_active_profile_json(const kc_core_handle handle) {
       core_from(handle), [handle] { return core_from(handle)->active_profile_json(); });
 }
 
+char* kc_player_profile_json(const kc_core_handle handle) {
+  return string_call(
+      core_from(handle), [handle] { return core_from(handle)->player_profile_json(); });
+}
+
 char* kc_app_settings_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [handle] { return core_from(handle)->settings_json(); });
 }
@@ -260,6 +265,12 @@ kc_status kc_set_engine_id(const kc_core_handle handle, const char* engine_id_ut
 
 char* kc_games_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [handle] { return core_from(handle)->games_json(); });
+}
+
+char* kc_initial_games_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [handle] {
+    return core_from(handle)->initial_games_json();
+  });
 }
 
 char* kc_games_query_json(
@@ -822,6 +833,12 @@ char* kc_coach_ask_json(
   });
 }
 
+char* kc_coach_performance_diagnostics_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_performance_diagnostics_json();
+  });
+}
+
 char* kc_coach_context_json(
     const kc_core_handle handle, const char* request_json_utf8) {
   if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
@@ -889,6 +906,46 @@ kc_status kc_cancel_coach_job(
   }
   return status_call(core_from(handle), [=] {
     core_from(handle)->cancel_coach_job(job_id_utf8);
+  });
+}
+
+char* kc_knowledge_inspector_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr) {
+    return invalid_string_argument(
+        core_from(handle), "Knowledge inspector request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->knowledge_inspector_json(request_json_utf8);
+  });
+}
+
+char* kc_statistics_accuracy_json(
+    const kc_core_handle handle, const char* time_control_utf8) {
+  if (time_control_utf8 == nullptr || time_control_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Time-control filter is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->statistics_accuracy_json(time_control_utf8);
+  });
+}
+
+kc_status kc_start_background_analysis(const kc_core_handle handle) {
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->start_background_analysis();
+  });
+}
+
+char* kc_background_analysis_status_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->background_analysis_status_json();
+  });
+}
+
+kc_status kc_set_background_analysis_enabled(
+    const kc_core_handle handle, const int32_t enabled) {
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->set_background_analysis_enabled(enabled != 0);
   });
 }
 

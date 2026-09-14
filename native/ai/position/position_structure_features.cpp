@@ -86,6 +86,7 @@ PawnStructureFeatures pawn_features(const Stockfish::Position& position,
        square <= Stockfish::SQ_H8; ++square) {
     if (position.piece_on(square) != pawn) continue;
     ++pawns_per_file[square_file(square)];
+    result.pawn_squares.push_back(static_cast<int>(square));
     if (!has_adjacent_pawn(position, square, color, false)) {
       ++result.isolated_pawns;
     }

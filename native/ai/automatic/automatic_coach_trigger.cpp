@@ -108,7 +108,48 @@ AutomaticCoachDecision AutomaticCoachTrigger::decide(
     add_reason(decision, AutomaticCoachReason::repeated_personal_mistake, 0.78);
   }
 
-  decision.trigger = event.previous_fen.has_value() && event.current_fen.has_value();
+  // A quiet move is useful conversation context, but does not justify an
+  // unsolicited provider call. A single weak phase transition is likewise
+  // below the teaching threshold; stronger, independent signals can combine.
+  double combined = 0.0;
+  for (const auto reason : decision.reasons) {
+    if (reason == AutomaticCoachReason::phase_transition) combined += 0.05;
+    else if (reason == AutomaticCoachReason::new_motif) combined += 0.22;
+    else if (reason == AutomaticCoachReason::repeated_personal_mistake) combined += 0.25;
+  }
+  decision.objective_importance =
+      std::min(1.0, decision.priority + combined);
+  decision.personal_relevance =
+      event.repeated_personal_mistake ? 1.0 : 0.0;
+  decision.practice_relevance =
+      std::clamp(event.due_practice_relevance, 0.0, 1.0);
+
+  // Repeated unsolicited interruptions should be rarer than one-off teaching
+  // events. A severe objective event still clears the gate; weaker events can
+  // be deferred when the Coach spoke very recently. The state is supplied by
+  // CoachService and is intentionally process/session local.
+  if (event.seconds_since_last_automatic) {
+    const auto seconds = std::max<std::int64_t>(0,
+        *event.seconds_since_last_automatic);
+    if (seconds < 15) {
+      decision.interruption_cost = 0.20;
+    } else if (seconds < 45) {
+      decision.interruption_cost = 0.12;
+    } else if (seconds < 120) {
+      decision.interruption_cost = 0.06;
+    }
+  }
+
+  decision.teaching_value = std::clamp(
+      decision.objective_importance +
+          0.08 * decision.personal_relevance +
+          0.06 * decision.practice_relevance -
+          decision.interruption_cost,
+      0.0, 1.0);
+  decision.priority = decision.teaching_value;
+  decision.trigger = event.previous_fen.has_value() &&
+                     event.current_fen.has_value() &&
+                     decision.teaching_value >= 0.62;
   return decision;
 }
 

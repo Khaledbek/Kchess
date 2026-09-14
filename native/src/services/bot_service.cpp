@@ -474,6 +474,8 @@ std::string BotService::start_move_json(
   const auto validation = validate_fen(fen);
   if (!validation.valid) throw std::invalid_argument(validation.error);
   const auto profile = bot_difficulty_profile(requested_elo);
+  last_activity_ = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
 
   reap_finished_jobs();
 
@@ -513,6 +515,8 @@ std::string BotService::start_move_json(
 }
 
 std::string BotService::move_status_json(const std::string& job_id) const {
+  last_activity_ = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
   std::shared_ptr<BotJob> job;
   {
     std::lock_guard lock(jobs_mutex_);

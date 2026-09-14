@@ -176,6 +176,7 @@ class _AnalysisPreparationDialogState
   late AnalysisSnapshot _snapshot;
   Timer? _timer;
   Object? _error;
+  bool _cancelling = false;
 
   @override
   void initState() {
@@ -204,6 +205,27 @@ class _AnalysisPreparationDialogState
     });
   }
 
+  Future<void> _cancelAnalysis() async {
+    if (_cancelling || !_snapshot.isRunning) return;
+    _timer?.cancel();
+    setState(() {
+      _cancelling = true;
+      _error = null;
+    });
+    try {
+      await widget.gateway.cancelAnalysis(widget.game.id);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _cancelling = false;
+        _error = error;
+      });
+      _schedulePoll();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
@@ -224,10 +246,26 @@ class _AnalysisPreparationDialogState
         _snapshot.status == 'error' ||
         _error != null;
     return PopScope(
-      canPop: canClose,
+      canPop: canClose || _cancelling,
       child: AlertDialog(
         key: const Key('analysis-preparation-modal'),
-        title: Text(strings.analyzingGame),
+        title: Row(
+          children: [
+            Expanded(child: Text(strings.analyzingGame)),
+            if (_snapshot.isRunning)
+              IconButton(
+                key: const Key('cancel-analysis-preparation'),
+                onPressed: _cancelling ? null : _cancelAnalysis,
+                tooltip: strings.cancelAnalysis,
+                icon: _cancelling
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.close_rounded),
+              ),
+          ],
+        ),
         content: SizedBox(
           width: 620,
           child: SingleChildScrollView(
@@ -1539,13 +1577,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       appBar: AppBar(
         title: Text(strings.analysis),
         actions: [
-          if (snapshot?.isRunning == true)
-            IconButton(
-              key: const Key('cancel-analysis'),
-              onPressed: _controller.cancel,
-              tooltip: strings.cancelAnalysis,
-              icon: const Icon(Icons.stop_circle_outlined),
-            ),
           IconButton(
             key: const Key('export-fen-from-analysis'),
             onPressed: _exportCurrentFen,
@@ -1676,6 +1707,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               label: Text(strings.summary),
             ),
           ],
+          if (snapshot?.isRunning == true)
+            IconButton(
+              key: const Key('cancel-analysis'),
+              onPressed: _controller.cancel,
+              tooltip: strings.cancelAnalysis,
+              icon: const Icon(Icons.close_rounded),
+            ),
         ],
       ),
       body: Column(

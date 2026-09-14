@@ -14,6 +14,7 @@ struct PawnStructureFeatures {
   int isolated_pawns{0};
   int doubled_pawns{0};
   int connected_pawns{0};
+  std::vector<int> pawn_squares;
   std::vector<int> passed_pawn_squares;
 };
 

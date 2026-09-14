@@ -24,6 +24,7 @@ enum class EvidenceKind {
   chess_concepts,
   candidate_moves,
   practicality,
+  move_contrast,
 };
 
 struct EvidenceItem {

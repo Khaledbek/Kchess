@@ -6,8 +6,13 @@ set(KCHESS_STOCKFISH_CACHE_VERSION "sf18-sf19-v1")
 set(KCHESS_STOCKFISH_PREBUILT_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/windows/x64/${KCHESS_STOCKFISH_CACHE_VERSION}"
 )
+include("${CMAKE_CURRENT_LIST_DIR}/windows_build_cache_root.cmake")
+kchess_resolve_windows_build_cache_root(
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  KCHESS_WINDOWS_BUILD_CACHE_ROOT
+)
 set(KCHESS_STOCKFISH_CACHE_BUILD_DIR
-  "${CMAKE_CURRENT_SOURCE_DIR}/.stockfish_build_cache/windows/x64/${KCHESS_STOCKFISH_CACHE_VERSION}"
+  "${KCHESS_WINDOWS_BUILD_CACHE_ROOT}/stockfish/windows-x64/${KCHESS_STOCKFISH_CACHE_VERSION}"
 )
 set(KCHESS_STOCKFISH_CACHE_SOURCE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/stockfish_windows_cache"
@@ -38,7 +43,7 @@ set(_kchess_stockfish19_release_lib
 
 # Update 23 can reuse the libraries from the user's current Debug build before
 # the first `flutter clean`. This avoids an otherwise unnecessary one-time
-# rebuild while moving the libraries into the persistent source-adjacent cache.
+# rebuild while moving the libraries into the persistent prebuilt library area.
 set(_kchess_flutter_windows_build
   "${CMAKE_CURRENT_SOURCE_DIR}/../flutter_app/build/windows/x64"
 )

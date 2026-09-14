@@ -23,14 +23,21 @@ class ResponseValidator {
   [[nodiscard]] ResponseValidationReport validate(
       const StructuredCoachContent& content,
       const std::optional<std::string>& position_fen,
-      const std::vector<EvidenceItem>& evidence) const;
+      const std::vector<EvidenceItem>& evidence,
+      const std::vector<EvidenceItem>* supplied_evidence = nullptr,
+      bool profile_requested = false,
+      bool require_grounded_segments = false,
+      bool position_relevant = false) const;
 
-  // Removes only invalid structured board/move metadata from an already
-  // repaired provider response. The natural-language answer is left intact.
+  // Removes only invalid optional board/move metadata from an already repaired
+  // provider response. Profile grounding failures remain fatal because dropping
+  // metadata cannot make unsupported personal prose truthful.
   [[nodiscard]] ResponseValidationReport sanitize_metadata(
       StructuredCoachContent& content,
       const std::optional<std::string>& position_fen,
-      const std::vector<EvidenceItem>& evidence) const;
+      const std::vector<EvidenceItem>& evidence,
+      const std::vector<EvidenceItem>* supplied_evidence = nullptr,
+      bool profile_requested = false) const;
 };
 
 }  // namespace kchess::ai

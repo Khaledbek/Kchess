@@ -2,6 +2,7 @@
 
 #include "coach_types.h"
 #include "dto/coach_request.h"
+#include "dto/query_plan.h"
 
 namespace kchess::ai {
 struct CoachSessionState;
@@ -20,6 +21,9 @@ struct DomainRoute {
   bool chess_domain{false};
   bool follow_up{false};
   CoachIntent context_intent{CoachIntent::unknown};
+  QueryFamily inherited_query_family{QueryFamily::unknown};
+  ProfileQueryScope inherited_profile_scope;
+  bool inherited_needs_profile{false};
 };
 
 // -----------------------------------------------------------------------------

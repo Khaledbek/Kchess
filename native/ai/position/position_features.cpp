@@ -18,6 +18,17 @@ namespace {
 // Section: Board metrics
 // -----------------------------------------------------------------------------
 
+PieceCountFeatures piece_counts(const Stockfish::Position& position,
+                                Stockfish::Color color) {
+  return {
+      .pawns = position.count<Stockfish::PAWN>(color),
+      .knights = position.count<Stockfish::KNIGHT>(color),
+      .bishops = position.count<Stockfish::BISHOP>(color),
+      .rooks = position.count<Stockfish::ROOK>(color),
+      .queens = position.count<Stockfish::QUEEN>(color),
+  };
+}
+
 int material_cp(const Stockfish::Position& position, Stockfish::Color color) {
   return 100 * position.count<Stockfish::PAWN>(color)
       + 320 * position.count<Stockfish::KNIGHT>(color)
@@ -129,6 +140,7 @@ SidePositionFeatures side_features(const Stockfish::Position& position,
   const auto activity = active_attacks(position, color) & ~own;
   return {
       .material_cp = material_cp(position, color),
+      .pieces = piece_counts(position, color),
       .minor_pieces_off_home = minor_pieces_off_home(position, color),
       .mobility_squares = Stockfish::popcount(attacks),
       .activity_squares = Stockfish::popcount(activity),
@@ -144,6 +156,13 @@ nlohmann::json side_json(const SidePositionFeatures& side) {
   const auto& strategic = side.strategic;
   return {
       {"materialCp", side.material_cp},
+      {"pieceCounts", {
+          {"pawns", side.pieces.pawns},
+          {"knights", side.pieces.knights},
+          {"bishops", side.pieces.bishops},
+          {"rooks", side.pieces.rooks},
+          {"queens", side.pieces.queens},
+      }},
       {"minorPiecesOffHome", side.minor_pieces_off_home},
       {"mobilitySquares", side.mobility_squares},
       {"activitySquares", side.activity_squares},
@@ -154,6 +173,7 @@ nlohmann::json side_json(const SidePositionFeatures& side) {
           {"isolated", strategic.pawns.isolated_pawns},
           {"doubled", strategic.pawns.doubled_pawns},
           {"connected", strategic.pawns.connected_pawns},
+          {"pawnSquares", strategic.pawns.pawn_squares},
           {"passedSquares", strategic.pawns.passed_pawn_squares},
       }},
       {"weakSquareCandidates", strategic.weak_square_candidates},

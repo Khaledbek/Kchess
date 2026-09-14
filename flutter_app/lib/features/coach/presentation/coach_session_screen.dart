@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../ffi/core_gateway.dart';
 import '../../../localization/generated/app_localizations.dart';
@@ -8,6 +9,7 @@ import '../../../shared/models/models.dart';
 import '../../../ui/shared/promotion_dialog.dart';
 import '../models/coach_ui_models.dart';
 import 'coach_context_dialogs.dart';
+import 'coach_diagnostics_dialog.dart';
 import 'coach_screen.dart';
 
 // -----------------------------------------------------------------------------
@@ -57,6 +59,8 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
   final List<BoardPosition> _sideLinePositions = [];
   final List<String> _sideLineMoves = [];
   int _sideLineIndex = -1;
+  final List<BoardPosition> _freeLinePositions = [];
+  int _freeLineIndex = 0;
   CoachResponseDepth _depth = CoachResponseDepth.balanced;
   String _playerColor = 'white';
   EngineLine? _evaluationLine;
@@ -75,38 +79,56 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
   bool _loading = false;
   bool _boardMovePending = false;
   final Set<String> _automaticRequestedPositions = <String>{};
+  final Set<String> _automaticReadyAfterRequest = <String>{};
   int _automaticGeneration = 0;
+  String? _completedMoveFenBefore;
+  String? _completedMoveUci;
+  String? _completedMoveFenAfter;
   String? _selectedSquare;
   String? _error;
 
   bool get _hasPgn => _mainLinePositions != null;
   bool get _onSideLine => _sideLineIndex >= 0;
   int get _maximumMainLinePly => (_mainLinePositions?.length ?? 1) - 2;
-  bool get _canFirst => _hasPgn && (_onSideLine || _mainLinePly >= 0);
+  bool get _canFirst => _hasPgn
+      ? (_onSideLine || _mainLinePly >= 0)
+      : _freeLineIndex > 0;
   bool get _canPrevious => _canFirst;
   bool get _canNext =>
-      _hasPgn &&
-      (_onSideLine
+      _hasPgn
+      ? (_onSideLine
           ? _sideLineIndex + 1 < _sideLinePositions.length
-          : _mainLinePly < _maximumMainLinePly);
+          : _mainLinePly < _maximumMainLinePly)
+      : _freeLineIndex + 1 < _freeLinePositions.length;
   bool get _canLast =>
-      _hasPgn &&
-      (_onSideLine
+      _hasPgn
+      ? (_onSideLine
           ? _sideLineIndex + 1 < _sideLinePositions.length
-          : _mainLinePly < _maximumMainLinePly);
+          : _mainLinePly < _maximumMainLinePly)
+      : _freeLineIndex + 1 < _freeLinePositions.length;
   bool get _hintEnabled => true;
   Set<String> get _hintSourceSquares => _hintStage >= 1
       ? _hintMoves
             .where((move) => move.length >= 4)
             .map((move) => move.substring(0, 2))
             .toSet()
-      : _coachFocusSquares;
+      : {
+          ..._coachFocusSquares,
+          ..._coachBoardMoves
+              .where((move) => move.length >= 4)
+              .map((move) => move.substring(0, 2)),
+        };
   Set<String> get _hintTargetSquares => _hintStage >= 2
       ? _hintMoves
             .where((move) => move.length >= 4)
             .map((move) => move.substring(2, 4))
             .toSet()
-      : const <String>{};
+      : _hintStage == 1
+      ? const <String>{}
+      : _coachBoardMoves
+            .where((move) => move.length >= 4)
+            .map((move) => move.substring(2, 4))
+            .toSet();
   List<String> get _visibleArrowMoves =>
       _hintStage >= 2 && _hintMoves.isNotEmpty
       ? _hintMoves
@@ -121,6 +143,7 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     _position = widget.position.fen == BoardPosition.empty.fen
         ? BoardPosition.initial
         : widget.position;
+    _freeLinePositions.add(_position);
     _surface = widget.surface;
     _playerColor = widget.blackAtBottom ? 'black' : 'white';
     _contextId = widget.contextId;
@@ -138,6 +161,10 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
       _position = widget.position.fen == BoardPosition.empty.fen
           ? BoardPosition.initial
           : widget.position;
+      _freeLinePositions
+        ..clear()
+        ..add(_position);
+      _freeLineIndex = 0;
       positionChanged = true;
     }
     if (oldWidget.surface != widget.surface) _surface = widget.surface;
@@ -164,7 +191,12 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
 
   @override
   void dispose() {
+    _cancelInFlightCoachJobs();
     super.dispose();
+  }
+
+  void _cancelInFlightCoachJobs() {
+    unawaited(widget.gateway.cancelCoachSessionJobs(_sessionId).catchError((_) {}));
   }
 
   Future<void> _initializeContext() async {
@@ -199,6 +231,8 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
   }
 
   String? _automaticPositionKey() {
+    if (_completedMoveFenBefore == null || _completedMoveUci == null ||
+        _completedMoveFenAfter != _position.fen) return null;
     if (_variationCoachJobId != null)
       return 'variation:$_variationCoachJobId:${_position.fen}';
     final contextId = _contextId;
@@ -208,9 +242,9 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
   }
 
   void _scheduleAutomaticCoach() {
-    _cancelScheduledAutomaticCoach();
     final key = _automaticPositionKey();
     if (key == null || _automaticRequestedPositions.contains(key)) return;
+    _cancelScheduledAutomaticCoach();
     final generation = _automaticGeneration;
     if (!mounted || generation != _automaticGeneration) return;
     unawaited(_requestAutomaticCoach(key, generation));
@@ -225,13 +259,17 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     final contextId = _contextId;
     final contextPly = _contextPly;
     if (_variationCoachJobId == null &&
-        (contextId == null || contextPly == null))
+        (contextId == null || contextPly == null)) {
+      _automaticRequestedPositions.remove(key);
       return;
+    }
     try {
       final reply = await widget.gateway.coachAutomatic({
         'locale': Localizations.localeOf(context).languageCode,
         'surface': _surface.wireName,
         'sessionId': _sessionId,
+        'playedMoveFenBefore': _completedMoveFenBefore,
+        'playedMoveUci': _completedMoveUci,
         if (_variationCoachJobId != null)
           'variationJobId': _variationCoachJobId,
         if (_variationPreviousFen != null) 'previousFen': _variationPreviousFen,
@@ -240,10 +278,28 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
         'playerColor': _playerColor,
         if (widget.profileId != null) 'profileId': widget.profileId!,
       });
-      if (!mounted || generation != _automaticGeneration) return;
-      if (key != _automaticPositionKey() || reply['status'] != 'ok') return;
+      if (!mounted || generation != _automaticGeneration ||
+          key != _automaticPositionKey()) {
+        _automaticRequestedPositions.remove(key);
+        _automaticReadyAfterRequest.remove(key);
+        return;
+      }
+      final readyAfterRequest = _automaticReadyAfterRequest.remove(key);
+      if (reply['status'] != 'ok') {
+        // A pending native analysis may have skipped this attempt. A later
+        // completed-analysis notification is allowed to ask for this FEN.
+        _automaticRequestedPositions.remove(key);
+        if (reply['status'] == 'skipped' && readyAfterRequest &&
+            key == _automaticPositionKey()) {
+          _scheduleAutomaticCoach();
+        }
+        return;
+      }
       final answer = (reply['answer'] as String? ?? '').trim();
-      if (answer.isEmpty) return;
+      if (answer.isEmpty) {
+        _automaticRequestedPositions.remove(key);
+        return;
+      }
       setState(() {
         final message = CoachUiMessage.fromReply(reply);
         _messages.add(message);
@@ -260,6 +316,7 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     String mode = 'answer',
     bool echo = true,
     String? hintMoveUci,
+    bool personalTraining = false,
   }) async {
     if (_loading || text.trim().isEmpty) return;
     final question = text.trim();
@@ -297,22 +354,45 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
         if (_contextId != null) 'contextId': _contextId!,
         if (_contextPly != null) 'contextPly': _contextPly!,
         if (widget.profileId != null) 'profileId': widget.profileId!,
+        if (personalTraining) 'personalTraining': true,
       });
       if (!mounted) return;
       if (revision != _positionRevision ||
-          reply['positionFen'] != _position.fen) {
-        setState(() => _loading = false);
+          (!personalTraining && reply['positionFen'] != _position.fen)) {
         return;
       }
       final strings = AppLocalizations.of(context);
       final status = reply['status'] as String? ?? 'provider_unavailable';
       final answer = (reply['answer'] as String? ?? '').trim();
+      CoachUiMessage? acceptedMessage;
       setState(() {
         _loading = false;
         if (status == 'ok' && answer.isNotEmpty) {
           final message = CoachUiMessage.fromReply(reply);
+          acceptedMessage = message;
           _messages.add(message);
           _applyBoardMessageOverlay(message);
+        } else if (status == 'safe_fallback') {
+          final fallbackKind = reply['safeFallbackKind'] as String? ?? '';
+          final localizedReply = Map<String, Object?>.from(reply);
+          if (fallbackKind == 'quiz_question') {
+            localizedReply['answer'] = strings.coachSafeQuizFallbackAnswer;
+            localizedReply['followUpQuestion'] =
+                strings.coachSafeQuizFallbackQuestion;
+          } else if (fallbackKind == 'hint_prompt') {
+            localizedReply['answer'] = strings.coachSafeHintFallbackAnswer;
+            localizedReply['followUpQuestion'] = '';
+          }
+          final fallbackAnswer =
+              (localizedReply['answer'] as String? ?? '').trim();
+          if (fallbackAnswer.isNotEmpty) {
+            final message = CoachUiMessage.fromReply(localizedReply);
+            acceptedMessage = message;
+            _messages.add(message);
+            _applyBoardMessageOverlay(message);
+          } else {
+            _error = strings.coachValidationFailed;
+          }
         } else if (status == 'off_topic') {
           _error = strings.coachOffTopic;
         } else if (status == 'validation_failed') {
@@ -321,11 +401,14 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
           _error = strings.coachUnavailable;
         }
       });
+      if (personalTraining && acceptedMessage != null) {
+        await _adoptPersonalTrainingPosition(acceptedMessage!);
+      }
     } catch (caught) {
-      if (!mounted) return;
+      if (!mounted || revision != _positionRevision) return;
       setState(() {
         _loading = false;
-        if (revision == _positionRevision) _error = caught.toString();
+        _error = caught.toString();
       });
     }
   }
@@ -337,6 +420,31 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
   void _applyBoardMessageOverlay(CoachUiMessage message) {
     _coachBoardMoves = message.boardMoves;
     _coachFocusSquares = message.focusSquares.toSet();
+  }
+
+  Future<void> _adoptPersonalTrainingPosition(CoachUiMessage message) async {
+    final fen = message.positionFen?.trim();
+    if (fen == null || fen.isEmpty || fen == _position.fen) return;
+    try {
+      final result = await widget.gateway.coachContext({'fen': fen});
+      final rawPosition = result['position'];
+      if (!mounted || rawPosition is! Map<String, Object?>) return;
+      final position = BoardPosition.fromJson(rawPosition);
+      setState(() {
+        _position = position;
+        _surface = CoachSurface.freeBoard;
+        _contextId = null;
+        _contextPly = null;
+        _gamePgn = null;
+        _clearPgnNavigation();
+        _selectedSquare = null;
+        _resetHintForPosition();
+        _clearBoardAnalysis();
+        _applyBoardMessageOverlay(message);
+      });
+    } catch (_) {
+      // The Coach answer remains usable even if a stale training FEN cannot be shown.
+    }
   }
 
   Future<void> _showBoardMessage(CoachUiMessage message) async {
@@ -381,8 +489,24 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
       return;
     }
 
-    // Free-board/FEN conversations have no PGN navigation history. Resolve the
-    // message FEN natively so older coach messages can still be shown safely.
+    if (!_hasPgn) {
+      final freeIndex = _freeLinePositions.indexWhere(
+        (position) => position.fen == fen,
+      );
+      if (freeIndex >= 0) {
+        setState(() {
+          _freeLineIndex = freeIndex;
+          _position = _freeLinePositions[freeIndex];
+          _selectedSquare = null;
+          _resetHintForPosition();
+          _clearBoardAnalysis();
+          _applyBoardMessageOverlay(message);
+        });
+        return;
+      }
+    }
+
+    // Resolve older free-board message positions through the native board DTO.
     if (_hasPgn) return;
     try {
       final result = await widget.gateway.coachContext({'fen': fen});
@@ -391,6 +515,10 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
       final position = BoardPosition.fromJson(rawPosition);
       setState(() {
         _position = position;
+        _freeLinePositions
+          ..clear()
+          ..add(position);
+        _freeLineIndex = 0;
         _contextPly = null;
         _selectedSquare = null;
         _resetHintForPosition();
@@ -422,7 +550,29 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     );
   }
 
+  Future<void> _requestPersonalTraining() async {
+    if (_loading || _hintBusy || _boardMovePending || widget.profileId == null) {
+      return;
+    }
+    final strings = AppLocalizations.of(context);
+    _cancelScheduledAutomaticCoach();
+    await _submit(
+      strings.coachPersonalTrainingRequest,
+      mode: 'quiz',
+      echo: false,
+      personalTraining: true,
+    );
+  }
+
   void _resetHintForPosition() {
+    _cancelScheduledAutomaticCoach();
+    _cancelInFlightCoachJobs();
+    _automaticRequestedPositions.clear();
+    _automaticReadyAfterRequest.clear();
+    _completedMoveFenBefore = null;
+    _completedMoveUci = null;
+    _completedMoveFenAfter = null;
+    _loading = false;
     _variationCoachJobId = null;
     _variationPreviousFen = null;
     _positionRevision++;
@@ -469,6 +619,16 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
             ? move.substring(2, 4)
             : null;
       });
+      // Native may have skipped an in-flight request just before this saved
+      // classification became available; retry it once after that reply.
+      final key = _automaticPositionKey();
+      if (snapshot.classification != null && key != null &&
+          _automaticRequestedPositions.contains(key)) {
+        _automaticReadyAfterRequest.add(key);
+      }
+      // A pending quiz answer can be verified from the completed move before
+      // classification finishes. Native decides whether feedback is due.
+      _scheduleAutomaticCoach();
     } catch (_) {
       if (!mounted || generation != _boardAnalysisGeneration) return;
       if (fallbackFenBefore != null &&
@@ -704,12 +864,39 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
 
     _position = positionAfter;
     _contextPly = null;
+    if (_freeLineIndex + 1 < _freeLinePositions.length) {
+      _freeLinePositions.removeRange(
+        _freeLineIndex + 1,
+        _freeLinePositions.length,
+      );
+    }
+    _freeLinePositions.add(positionAfter);
+    _freeLineIndex = _freeLinePositions.length - 1;
     if (_contextId == null && _gamePgn == null) {
       _surface = CoachSurface.freeBoard;
     }
   }
 
-  Future<void> _playBoardMove(String source, String target) async {
+  Future<void> _playCoachMove(CoachUiMessage message) async {
+    if (_boardMovePending || message.boardMoves.isEmpty) return;
+    final fen = message.positionFen;
+    if (fen == null || fen.isEmpty) return;
+    if (fen != _position.fen) await _showBoardMessage(message);
+    if (!mounted || fen != _position.fen) return;
+    final move = message.boardMoves.first;
+    if (move.length < 4) return;
+    await _playBoardMove(
+      move.substring(0, 2),
+      move.substring(2, 4),
+      promotion: move.length > 4 ? move.substring(4, 5) : null,
+    );
+  }
+
+  Future<void> _playBoardMove(
+    String source,
+    String target, {
+    String? promotion,
+  }) async {
     if (_boardMovePending || source == target) return;
     final fenBefore = _position.fen;
     setState(() {
@@ -724,12 +911,14 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
       );
       var resolvedTarget = target;
       if (promotionOptions.isNotEmpty) {
-        final promotion = await showPromotionChoiceDialog(
-          context: context,
-          options: promotionOptions,
-          sideToMove: _position.sideToMove,
-        );
-        if (!mounted || promotion == null) {
+        final selectedPromotion = promotionOptions.contains(promotion)
+            ? promotion
+            : await showPromotionChoiceDialog(
+                context: context,
+                options: promotionOptions,
+                sideToMove: _position.sideToMove,
+              );
+        if (!mounted || selectedPromotion == null) {
           if (mounted) {
             setState(() {
               _boardMovePending = false;
@@ -738,7 +927,7 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
           }
           return;
         }
-        resolvedTarget = '$target$promotion';
+        resolvedTarget = '$target$selectedPromotion';
       }
       final resolved = await widget.gateway.resolveFreeBoardMove(
         fen: _position.fen,
@@ -752,6 +941,9 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
         _boardMovePending = false;
         _resetHintForPosition();
         _clearBoardAnalysis();
+        _completedMoveFenBefore = fenBefore;
+        _completedMoveUci = resolved.uci;
+        _completedMoveFenAfter = resolved.positionAfter.fen;
       });
       final contextPly = _contextPly;
       if (contextPly != null) {
@@ -833,10 +1025,29 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     _scheduleAutomaticCoach();
   }
 
-  void _navigateFirst() => _selectMainLinePly(-1);
+  void _selectFreeLineIndex(int index) {
+    if (index < 0 || index >= _freeLinePositions.length ||
+        index == _freeLineIndex) return;
+    setState(() {
+      _freeLineIndex = index;
+      _position = _freeLinePositions[index];
+      _selectedSquare = null;
+      _error = null;
+      _resetHintForPosition();
+      _clearBoardAnalysis();
+    });
+  }
+
+  void _navigateFirst() => _hasPgn
+      ? _selectMainLinePly(-1)
+      : _selectFreeLineIndex(0);
 
   void _navigatePrevious() {
     _cancelScheduledAutomaticCoach();
+    if (!_hasPgn) {
+      _selectFreeLineIndex(_freeLineIndex - 1);
+      return;
+    }
     if (_onSideLine) {
       if (_sideLineIndex > 0) {
         setState(() {
@@ -857,6 +1068,10 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
 
   void _navigateNext() {
     _cancelScheduledAutomaticCoach();
+    if (!_hasPgn) {
+      _selectFreeLineIndex(_freeLineIndex + 1);
+      return;
+    }
     if (_onSideLine) {
       if (_sideLineIndex + 1 < _sideLinePositions.length) {
         setState(() {
@@ -875,6 +1090,10 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
 
   void _navigateLast() {
     _cancelScheduledAutomaticCoach();
+    if (!_hasPgn) {
+      _selectFreeLineIndex(_freeLinePositions.length - 1);
+      return;
+    }
     if (_onSideLine) {
       setState(() {
         _sideLineIndex = _sideLinePositions.length - 1;
@@ -901,6 +1120,10 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     _sideLinePositions.clear();
     _sideLineMoves.clear();
     _sideLineIndex = -1;
+    _freeLinePositions
+      ..clear()
+      ..add(_position);
+    _freeLineIndex = 0;
   }
 
   void _installPgnLine(List<BoardPosition> positions, List<String> moves) {
@@ -1017,6 +1240,25 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     }
   }
 
+  Future<void> _copyConversation() async {
+    if (_messages.isEmpty) return;
+    final strings = AppLocalizations.of(context);
+    final text = StringBuffer();
+    for (final message in _messages) {
+      if (text.length > 0) text.writeln();
+      text.writeln(message.role == CoachMessageRole.user
+          ? '${strings.coachConversationYou}:'
+          : '${strings.coachTrainerOutput}:');
+      if (message.text.isNotEmpty) text.writeln(message.text);
+      if (message.question.isNotEmpty) text.writeln(message.question);
+    }
+    await Clipboard.setData(ClipboardData(text: text.toString().trimRight()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(strings.coachConversationCopied)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => CoachScreen(
     position: _position,
@@ -1028,8 +1270,16 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     depth: _depth,
     onSubmit: (value) => unawaited(_submit(value)),
     onShowBoard: (message) => unawaited(_showBoardMessage(message)),
+    onPlayMove: (message) => unawaited(_playCoachMove(message)),
+    onCopyConversation: () => unawaited(_copyConversation()),
+    onDiagnostics: () => unawaited(
+      showCoachDiagnosticsDialog(context, widget.gateway),
+    ),
     onCompare: () => unawaited(_requestBoardLesson('compare')),
     onQuiz: () => unawaited(_requestBoardLesson('quiz')),
+    onPersonalTraining: widget.profileId == null
+        ? null
+        : () => unawaited(_requestPersonalTraining()),
     onHintRequested: () => unawaited(_advanceHint()),
     hintEnabled: _hintEnabled,
     hintBusy: _hintBusy,
@@ -1047,7 +1297,7 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     classification: _classification,
     classificationSquare: _classificationSquare,
     boardBusy: _boardMovePending,
-    showPgnControls: _hasPgn,
+    showBoardControls: true,
     onFirstMove: _canFirst ? _navigateFirst : null,
     onPreviousMove: _canPrevious ? _navigatePrevious : null,
     onNextMove: _canNext ? _navigateNext : null,

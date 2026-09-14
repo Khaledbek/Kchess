@@ -24,3 +24,8 @@
 - Update 44 augments the existing lexical `ConceptRetriever`; it does not create a second taxonomy.
 - Strong lexical matches skip embedding inference to reduce latency. Weak lexical queries may use the optional `EmbeddingModel`, with cached concept vectors keyed by model id/version.
 - Embedding similarity is retrieval evidence only and must never be treated as objective chess truth.
+
+## Update 163 - runtime embedding source
+
+- Semantic concept ranking continues to use the existing `EmbeddingModel` hook from Update 44. The default Coach runtime may now provide that hook through `models/portable_small_models.*`; no second semantic retriever or concept index is permitted.
+- Strong lexical matches still skip embedding inference. If the optional model has no vocabulary coverage for a query/concept, retrieval falls back to lexical scoring without error.

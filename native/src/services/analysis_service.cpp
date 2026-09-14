@@ -778,6 +778,92 @@ MoveCategory classify_variation_move(
       use_sf19_classifier).category;
 }
 
+struct ClassifiedPersistedMove {
+  MoveClassificationRecord record;
+  AccuracyMove accuracy;
+};
+
+ClassifiedPersistedMove classify_persisted_move(
+    Database& database,
+    OpeningTheoryProvider& opening_theory,
+    const std::string& game_id,
+    const std::string& config_hash,
+    const ParsedMove& move,
+    const OpeningBookMetadata& book_metadata,
+    const bool use_sf19_classifier,
+    const int classifier_version) {
+  // A move becomes decidable as soon as its before/after position slots exist.
+  // Read the two adjacent position slots through one focused persistence query;
+  // callers that need a final game-wide accuracy pass deliberately invoke this
+  // helper once per move only at completion.
+  const auto [before, after] =
+      database.adjacent_analysis_results(game_id, config_hash, move.ply_index);
+
+  TheoryMoveInfo theory;
+  if (book_metadata.max_ply > 0
+      && static_cast<std::uint32_t>(move.ply_index) < book_metadata.max_ply) {
+    theory = opening_theory.lookup(move.fen_before, move.uci);
+  }
+  const auto assessment = assess_move(
+      move.fen_before,
+      move.uci,
+      move.fen_after,
+      before.has_value() ? &before->lines : nullptr,
+      before.has_value() ? &before->best_move : nullptr,
+      after.has_value() ? &after->lines : nullptr,
+      theory,
+      use_sf19_classifier);
+
+  std::string recommended_move = assessment.recommended_move_uci;
+  if (usable_engine_move(recommended_move)) {
+    recommended_move = apply_legal_uci_move(move.fen_before, recommended_move).san;
+  } else {
+    recommended_move.clear();
+  }
+
+  {
+    std::ostringstream log_message;
+    log_message << "game=" << game_id << " ply=" << move.ply_index
+                << " category=" << move_category_name(assessment.category);
+    if (assessment.loss.has_value()) {
+      log_message << " loss=" << std::fixed << std::setprecision(4)
+                  << *assessment.loss;
+    }
+    diagnostics::debug("classifier", log_message.str());
+  }
+
+  return {
+      .record = {
+          .ply = move.ply_index,
+          .classification = assessment.category,
+          .classifier_version = classifier_version,
+          .expected_score_before = assessment.best_expected,
+          .expected_score_best = assessment.best_expected,
+          .expected_score_played = assessment.played_expected,
+          .expected_score_loss = assessment.loss,
+          .recommended_move = std::move(recommended_move),
+          .theory = theory,
+          .move_accuracy = assessment.accuracy.theory
+              ? std::nullopt : move_accuracy(assessment.accuracy),
+          .accuracy_weight = assessment.accuracy.theory
+              ? 0.0 : move_accuracy_weight(assessment.accuracy),
+      },
+      .accuracy = assessment.accuracy,
+  };
+}
+
+const ParsedMove* move_at_ply(const GameRecord& game, const int ply) {
+  if (ply < 0) return nullptr;
+  const auto index = static_cast<std::size_t>(ply);
+  if (index < game.moves.size() && game.moves[index].ply_index == ply) {
+    return &game.moves[index];
+  }
+  const auto found = std::find_if(
+      game.moves.begin(), game.moves.end(),
+      [ply](const ParsedMove& move) { return move.ply_index == ply; });
+  return found == game.moves.end() ? nullptr : &*found;
+}
+
 }  // namespace
 
 AnalysisService::AnalysisService(
@@ -812,7 +898,6 @@ AnalysisService::~AnalysisService() {
   for (const auto& job : refinement_jobs) {
     if (job->worker.joinable()) job->worker.join();
   }
-
   stop_all_variation_jobs(true);
 }
 
@@ -821,9 +906,51 @@ void AnalysisService::set_opening_theory_provider(
   opening_theory_ = &opening_theory;
 }
 
+void AnalysisService::set_profile_analysis_observer(
+    std::function<void(const std::string& game_id)> observer) {
+  std::lock_guard lock(profile_analysis_observer_mutex_);
+  profile_analysis_observer_ = std::move(observer);
+}
+
+void AnalysisService::notify_profile_analysis_observer(
+    const std::string& game_id) noexcept {
+  try {
+    std::lock_guard lock(profile_analysis_observer_mutex_);
+    if (profile_analysis_observer_) profile_analysis_observer_(game_id);
+  } catch (...) {
+    // Analysis completion must never fail because a secondary wake observer
+    // rejected notification. Persistent DB state remains authoritative.
+  }
+}
+
 void AnalysisService::clear_engine_cache() {
   database_.clear_global_position_cache();
   diagnostics::info("cache", "global position cache cleared");
+}
+
+bool AnalysisService::has_active_work() const {
+  {
+    std::lock_guard lock(jobs_mutex_);
+    for (const auto& [game_id, job] : jobs_) {
+      (void)game_id;
+      if (job != nullptr && !job->finished.load()) return true;
+    }
+  }
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    for (const auto& [game_id, job] : refinement_jobs_) {
+      (void)game_id;
+      if (job != nullptr && !job->finished.load()) return true;
+    }
+  }
+  {
+    std::lock_guard lock(variation_jobs_mutex_);
+    for (const auto& [job_id, job] : variation_jobs_) {
+      (void)job_id;
+      if (job != nullptr && !job->finished.load()) return true;
+    }
+  }
+  return false;
 }
 
 void AnalysisService::cancel_jobs_for_games(
@@ -932,7 +1059,7 @@ std::string AnalysisService::analysis_config_hash(const AppSettings& settings) c
   return "phase7-" + fnv1a_hex(config);
 }
 
-std::optional<PersistedAnalysis> AnalysisService::reusable_analysis(
+std::optional<PersistedAnalysis> AnalysisService::shared_cached_analysis(
     const std::string& game_id,
     const AppSettings& settings,
     const int requested_ply) const {
@@ -1044,7 +1171,8 @@ std::string AnalysisService::analysis_json(
   json << ",\"currentPly\":" << live_current_slot
        << ",\"liveDepth\":" << live_depth
        << ",\"qualityComplete\":" << (quality_complete ? "true" : "false")
-       << ",\"bestMove\":\"" << escape_json(analysis.best_move)
+       << ",\"bestMove\":\"" << escape_json(
+              ranked_best_move(analysis.lines, analysis.best_move))
        << "\",\"engineVersion\":\"" << escape_json(analysis.engine_version)
        << "\",\"configHash\":\"" << escape_json(analysis.config_hash)
        << "\",\"error\":";
@@ -1174,11 +1302,45 @@ std::string AnalysisService::analysis_json(
   return json.str();
 }
 
+void AnalysisService::update_classification_for_ply(
+    const GameRecord& game,
+    const std::string& game_id,
+    const std::string& config_hash,
+    const std::string& engine_version,
+    const int ply) {
+  const ParsedMove* move = move_at_ply(game, ply);
+  if (move == nullptr) return;
+
+  const auto started = std::chrono::steady_clock::now();
+  classification_requests_.fetch_add(1, std::memory_order_relaxed);
+  classification_incremental_updates_.fetch_add(1, std::memory_order_relaxed);
+  const bool use_sf19_classifier = uses_stockfish19_classifier(engine_version);
+  const int classifier_version = classifier_version_for_engine(engine_version);
+  const auto book_metadata = opening_theory_->metadata();
+  const auto classified = classify_persisted_move(
+      database_, *opening_theory_, game_id, config_hash, *move, book_metadata,
+      use_sf19_classifier, classifier_version);
+  database_.persist_classifications(
+      game_id, config_hash, {classified.record}, std::nullopt, std::nullopt,
+      classifier_version, AccuracyConfig::version, opening_theory_->source_version(),
+      false);
+
+  const auto elapsed = static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - started)
+          .count());
+  classification_moves_processed_.fetch_add(1, std::memory_order_relaxed);
+  classification_sqlite_reads_.fetch_add(1, std::memory_order_relaxed);
+  classification_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
+  classification_incremental_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
+  classification_last_ms_.store(elapsed, std::memory_order_relaxed);
+}
+
 void AnalysisService::rebuild_classification(
     const std::string& game_id,
     const std::string& config_hash,
-    const bool force,
-    const int through_ply) {
+    const bool force) {
+  classification_requests_.fetch_add(1, std::memory_order_relaxed);
   const std::string book_version = opening_theory_->source_version();
   const auto run_metadata = database_.analysis(game_id, config_hash);
   const std::string engine_version = run_metadata.has_value()
@@ -1189,71 +1351,83 @@ void AnalysisService::rebuild_classification(
   if (!force && database_.classification_is_current(
           game_id, config_hash, classifier_version,
           AccuracyConfig::version, book_version)) {
+    classification_current_hits_.fetch_add(1, std::memory_order_relaxed);
     return;
   }
+
+  const auto rebuild_started = std::chrono::steady_clock::now();
+  classification_rebuilds_.fetch_add(1, std::memory_order_relaxed);
   const auto game = database_.game(game_id);
-  if (!game.has_value()) throw std::runtime_error("Game not found during classification");
+  if (!game.has_value()) {
+    throw std::runtime_error("Game not found during classification");
+  }
+
+  const auto book_metadata = opening_theory_->metadata();
   std::vector<MoveClassificationRecord> records;
   std::vector<AccuracyMove> white_moves;
   std::vector<AccuracyMove> black_moves;
-  const auto book_metadata = opening_theory_->metadata();
+  records.reserve(game->moves.size());
+  white_moves.reserve((game->moves.size() + 1) / 2);
+  black_moves.reserve(game->moves.size() / 2);
+
   for (const auto& move : game->moves) {
-    if (through_ply >= 0 && move.ply_index > through_ply) break;
-    // Position slot i is the position before move i; slot i+1 is the
-    // resulting position after that move.  This makes move 0 identical to
-    // every other move and gives it a real Stockfish "before" evaluation.
-    const auto before = database_.analysis(game_id, config_hash, move.ply_index);
-    const auto after = database_.analysis(game_id, config_hash, move.ply_index + 1);
-    TheoryMoveInfo theory;
-    if (book_metadata.max_ply > 0
-        && static_cast<std::uint32_t>(move.ply_index) < book_metadata.max_ply) {
-      theory = opening_theory_->lookup(move.fen_before, move.uci);
-    }
-    const auto assessment = assess_move(
-        move.fen_before,
-        move.uci,
-        move.fen_after,
-        before.has_value() ? &before->lines : nullptr,
-        before.has_value() ? &before->best_move : nullptr,
-        after.has_value() ? &after->lines : nullptr,
-        theory,
-        use_sf19_classifier);
-
-    std::string recommended_move = assessment.recommended_move_uci;
-    if (usable_engine_move(recommended_move)) {
-      recommended_move = apply_legal_uci_move(move.fen_before, recommended_move).san;
-    } else {
-      recommended_move.clear();
-    }
-
-    records.push_back({
-        .ply = move.ply_index,
-        .classification = assessment.category,
-        .classifier_version = classifier_version,
-        .expected_score_before = assessment.best_expected,
-        .expected_score_best = assessment.best_expected,
-        .expected_score_played = assessment.played_expected,
-        .expected_score_loss = assessment.loss,
-        .recommended_move = recommended_move,
-        .theory = theory,
-    });
-    {
-      std::ostringstream log_message;
-      log_message << "game=" << game_id << " ply=" << move.ply_index
-                  << " category=" << move_category_name(assessment.category);
-      if (assessment.loss.has_value()) {
-        log_message << " loss=" << std::fixed << std::setprecision(4)
-                    << *assessment.loss;
-      }
-      diagnostics::debug("classifier", log_message.str());
-    }
+    auto classified = classify_persisted_move(
+        database_, *opening_theory_, game_id, config_hash, move, book_metadata,
+        use_sf19_classifier, classifier_version);
+    records.push_back(std::move(classified.record));
     auto& accuracy_moves = move.side_to_move == "black" ? black_moves : white_moves;
-    accuracy_moves.push_back(assessment.accuracy);
+    accuracy_moves.push_back(std::move(classified.accuracy));
   }
+
   database_.persist_classifications(
       game_id, config_hash, records, game_accuracy(white_moves), game_accuracy(black_moves),
-      classifier_version, AccuracyConfig::version, book_version,
-      through_ply < 0);
+      classifier_version, AccuracyConfig::version, book_version, true);
+  const auto elapsed = static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - rebuild_started)
+          .count());
+  const auto processed_moves = static_cast<std::uint64_t>(game->moves.size());
+  classification_moves_processed_.fetch_add(processed_moves, std::memory_order_relaxed);
+  classification_sqlite_reads_.fetch_add(processed_moves, std::memory_order_relaxed);
+  classification_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
+  classification_full_rebuild_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
+  classification_last_ms_.store(elapsed, std::memory_order_relaxed);
+}
+
+std::string AnalysisService::performance_diagnostics_json() const {
+  const auto requests = classification_requests_.load(std::memory_order_relaxed);
+  const auto hits = classification_current_hits_.load(std::memory_order_relaxed);
+  const auto rebuilds = classification_rebuilds_.load(std::memory_order_relaxed);
+  const auto incremental =
+      classification_incremental_updates_.load(std::memory_order_relaxed);
+  const auto full_requests = requests >= incremental ? requests - incremental : 0;
+  const auto total_ms = classification_total_ms_.load(std::memory_order_relaxed);
+  const auto full_ms =
+      classification_full_rebuild_total_ms_.load(std::memory_order_relaxed);
+  const auto incremental_ms =
+      classification_incremental_total_ms_.load(std::memory_order_relaxed);
+  return nlohmann::json({
+      {"schema", "analysis.performance.v1"},
+      {"classification", {
+          {"requests", requests},
+          {"fullRebuildRequests", full_requests},
+          {"currentCacheHits", hits},
+          {"rebuilds", rebuilds},
+          {"incrementalUpdates", incremental},
+          {"cacheHitRate",
+           full_requests > 0 ? static_cast<double>(hits) / full_requests : 0.0},
+          {"movesProcessed", classification_moves_processed_.load(std::memory_order_relaxed)},
+          {"sqliteAnalysisReads", classification_sqlite_reads_.load(std::memory_order_relaxed)},
+          {"lastDurationMs", classification_last_ms_.load(std::memory_order_relaxed)},
+          {"totalDurationMs", total_ms},
+          {"fullRebuildDurationMs", full_ms},
+          {"incrementalDurationMs", incremental_ms},
+          {"averageRebuildDurationMs",
+           rebuilds > 0 ? static_cast<double>(full_ms) / rebuilds : 0.0},
+          {"averageIncrementalDurationMs",
+           incremental > 0 ? static_cast<double>(incremental_ms) / incremental : 0.0},
+      }},
+  }).dump();
 }
 
 void AnalysisService::run_analysis(
@@ -1264,6 +1438,13 @@ void AnalysisService::run_analysis(
     std::vector<int> completed_position_slots,
     const std::shared_ptr<AnalysisJob>& job,
     const int preferred_slot) noexcept {
+  struct ForegroundPriorityRelease final {
+    std::shared_ptr<AnalysisJob> job;
+    ~ForegroundPriorityRelease() {
+      if (job) job->foreground_sqlite_priority.reset();
+    }
+  } foreground_priority_release{job};
+
   try {
     if (job->cancel_requested) {
       job->state = AnalysisJobState::cancelled;
@@ -1290,21 +1471,45 @@ void AnalysisService::run_analysis(
     std::unordered_set<int> completed_slots(
         completed_position_slots.begin(), completed_position_slots.end());
     const bool is_fen_position_only = positions.size() == 1;
+    std::optional<GameRecord> analysis_game;
+    std::string classification_engine_version;
+    std::unordered_set<int> incrementally_classified_plies;
+
+    // Load the PGN/game record once for the whole worker. The old per-prefix
+    // rebuild path reopened the same full game repeatedly while positions were
+    // arriving. Classification now uses this stable in-memory move list and
+    // touches SQLite only for the two engine slots of a newly decidable move.
+    if (!is_fen_position_only) {
+      analysis_game = database_.game(game_id);
+      if (!analysis_game.has_value()) {
+        throw std::runtime_error("Game not found during analysis classification");
+      }
+      classification_engine_version = job->engine->version();
+    }
+
+    auto classify_ready_ply = [&](const int move_ply) {
+      if (is_fen_position_only || !analysis_game.has_value() || move_ply < 0) return;
+      if (!completed_slots.contains(move_ply)
+          || !completed_slots.contains(move_ply + 1)) {
+        return;
+      }
+      if (!incrementally_classified_plies.insert(move_ply).second) return;
+      update_classification_for_ply(
+          *analysis_game, game_id, config_hash, classification_engine_version, move_ply);
+    };
 
     // For PGN preparation, slot i is the position before move i. Keep the
     // actually played move beside that slot so the adaptive scheduler can
     // decide whether the cheap two-line root search already contains enough
     // information for classification.
     std::vector<std::string> played_move_by_slot(positions.size());
-    if (!is_fen_position_only) {
-      if (const auto game = database_.game(game_id); game.has_value()) {
-        for (const auto& move : game->moves) {
-          if (move.ply_index < 0
-              || move.ply_index >= static_cast<int>(played_move_by_slot.size())) {
-            continue;
-          }
-          played_move_by_slot[static_cast<std::size_t>(move.ply_index)] = move.uci;
+    if (analysis_game.has_value()) {
+      for (const auto& move : analysis_game->moves) {
+        if (move.ply_index < 0
+            || move.ply_index >= static_cast<int>(played_move_by_slot.size())) {
+          continue;
         }
+        played_move_by_slot[static_cast<std::size_t>(move.ply_index)] = move.uci;
       }
     }
 
@@ -1332,26 +1537,24 @@ void AnalysisService::run_analysis(
     // opening move count, so an early amateur deviation immediately resumes
     // normal engine analysis.
     std::vector<int> theory_skipped_slots;
-    if (!is_fen_position_only) {
-      if (const auto game = database_.game(game_id); game.has_value()) {
-        std::vector<bool> theory_moves(game->moves.size(), false);
-        const auto metadata = opening_theory_->metadata();
-        for (std::size_t index = 0; index < game->moves.size(); ++index) {
-          const auto& move = game->moves[index];
-          if (metadata.max_ply > 0
-              && static_cast<std::uint32_t>(move.ply_index) < metadata.max_ply) {
-            theory_moves[index] =
-                opening_theory_->lookup(move.fen_before, move.uci).is_theory;
-          }
+    if (analysis_game.has_value()) {
+      std::vector<bool> theory_moves(analysis_game->moves.size(), false);
+      const auto metadata = opening_theory_->metadata();
+      for (std::size_t index = 0; index < analysis_game->moves.size(); ++index) {
+        const auto& move = analysis_game->moves[index];
+        if (metadata.max_ply > 0
+            && static_cast<std::uint32_t>(move.ply_index) < metadata.max_ply) {
+          theory_moves[index] =
+              opening_theory_->lookup(move.fen_before, move.uci).is_theory;
         }
-        for (int slot = 0; slot < static_cast<int>(positions.size()); ++slot) {
-          const bool previous_requires_engine = slot > 0
-              && !theory_moves[static_cast<std::size_t>(slot - 1)];
-          const bool next_requires_engine = slot < static_cast<int>(theory_moves.size())
-              && !theory_moves[static_cast<std::size_t>(slot)];
-          if (!previous_requires_engine && !next_requires_engine) {
-            theory_skipped_slots.push_back(slot);
-          }
+      }
+      for (int slot = 0; slot < static_cast<int>(positions.size()); ++slot) {
+        const bool previous_requires_engine = slot > 0
+            && !theory_moves[static_cast<std::size_t>(slot - 1)];
+        const bool next_requires_engine = slot < static_cast<int>(theory_moves.size())
+            && !theory_moves[static_cast<std::size_t>(slot)];
+        if (!previous_requires_engine && !next_requires_engine) {
+          theory_skipped_slots.push_back(slot);
         }
       }
     }
@@ -1376,11 +1579,10 @@ void AnalysisService::run_analysis(
       database_.persist_engine_result(
           game_id, config_hash, slot, contiguous_completed_moves(),
           skipped_result, unix_time_seconds());
+      classify_ready_ply(slot - 1);
+      classify_ready_ply(slot);
     }
     job->completed_moves = contiguous_completed_moves();
-    if (!theory_skipped_slots.empty()) {
-      rebuild_classification(game_id, config_hash, true, job->completed_moves - 1);
-    }
 
     std::vector<int> analysis_order;
     analysis_order.reserve(positions.size());
@@ -1657,20 +1859,18 @@ void AnalysisService::run_analysis(
           "analysis", "game=" + game_id + " slot=" + std::to_string(ply)
               + " completedMoves=" + std::to_string(completed_moves));
 
-      if (!is_fen_position_only && preferred_slot >= 0
-          && completed_slots.contains(preferred_slot)
-          && completed_slots.contains(preferred_slot + 1)) {
-        rebuild_classification(game_id, config_hash, true, preferred_slot);
-      } else if (!is_fen_position_only && completed_moves > 0) {
-        rebuild_classification(
-            game_id, config_hash, true, completed_moves - 1);
-      }
+      // Only the two moves adjacent to a newly persisted position can become
+      // newly decidable. The set suppresses repeats when preferred-slot work
+      // arrives out of order and the later sequential sweep reaches it again.
+      classify_ready_ply(ply - 1);
+      classify_ready_ply(ply);
     }
     rebuild_classification(game_id, config_hash, true);
     database_.set_analysis_status(game_id, config_hash, "complete");
     // This completed run supersedes every older/lower saved run for the game.
     // Position-cache entries remain available independently.
     database_.prune_game_analyses_except(game_id, config_hash);
+    database_.notify_ai_profile_analysis_changed(game_id);
     job->state = AnalysisJobState::completed;
     diagnostics::info("analysis", "game=" + game_id + " completed");
     job->current_position_slot = static_cast<int>(positions.size()) - 1;
@@ -1704,6 +1904,7 @@ void AnalysisService::run_analysis(
     job->engine->stop();
     job->finished = true;
   }
+  notify_profile_analysis_observer(game_id);
 }
 
 
@@ -1714,6 +1915,13 @@ void AnalysisService::run_refinement_queue(
     std::vector<std::string> positions,
     std::vector<int> completed_position_slots,
     const std::shared_ptr<AnalysisJob>& job) noexcept {
+  struct ForegroundPriorityRelease final {
+    std::shared_ptr<AnalysisJob> job;
+    ~ForegroundPriorityRelease() {
+      if (job) job->foreground_sqlite_priority.reset();
+    }
+  } foreground_priority_release{job};
+
   try {
     job->state = AnalysisJobState::running;
     // There is exactly one live Stockfish instance. Respect the user-selected
@@ -1891,6 +2099,7 @@ void AnalysisService::run_refinement_queue(
       rebuild_classification(game_id, config_hash, true);
       database_.set_analysis_status(game_id, config_hash, "complete");
       database_.prune_game_analyses_except(game_id, config_hash);
+      database_.notify_ai_profile_analysis_changed(game_id);
       job->state = AnalysisJobState::completed;
       diagnostics::info("analysis", "game=" + game_id + " refinement queue completed");
     }
@@ -1922,10 +2131,97 @@ void AnalysisService::run_refinement_queue(
   job->current_position_slot = -1;
   job->engine->stop();
   job->finished = true;
+  notify_profile_analysis_observer(game_id);
 }
 
 std::string AnalysisService::start_analysis_json(const std::string& game_id) {
+  return start_analysis_with_settings_json(
+      game_id, preanalysis_budget_settings(), false);
+}
+
+AnalysisService::SharedProfileAnalysisRequestResult
+AnalysisService::ensure_shared_profile_analysis(
+    const std::string& game_id,
+    const int requested_depth,
+    const int requested_multi_pv,
+    const int requested_threads,
+    const int requested_hash_mb) {
   validate_token(game_id, "game id");
+
+  // Profile preparation deliberately does not inherit user Analysis settings.
+  // A settings snapshot is used only as the carrier for the existing shared
+  // analysis/cache machinery; every engine-relevant field is overwritten by
+  // the private profile contract below. This keeps one authoritative cache
+  // while making profile quality stable if the user changes Analysis settings
+  // mid-run. Stockfish 18 is fixed for profile evidence comparability.
+  auto settings = database_.settings();
+  settings.engine_id = std::string(kStockfish18Id);
+  settings.depth = std::clamp(
+      requested_depth, AppSettings::min_depth, AppSettings::max_depth);
+  settings.multi_pv = std::clamp(
+      requested_multi_pv, AppSettings::min_multi_pv, AppSettings::max_multi_pv);
+  settings.threads = std::clamp(
+      requested_threads, kThreadsSetting.min_int, kThreadsSetting.max_int);
+  settings.hash_mb = std::clamp(
+      requested_hash_mb, kHashMbSetting.min_int, kHashMbSetting.max_int);
+  settings.time_limit_seconds = 0;
+  settings.adaptive_early_stop = true;
+
+  if (auto cached = shared_cached_analysis(game_id, settings);
+      cached.has_value() && cached->status == "complete") {
+    rebuild_classification(game_id, cached->config_hash);
+    database_.prune_game_analyses_except(game_id, cached->config_hash);
+    return SharedProfileAnalysisRequestResult::cache_ready;
+  }
+  if (has_active_work()) {
+    return SharedProfileAnalysisRequestResult::deferred;
+  }
+  (void)start_analysis_with_settings_json(game_id, settings, true);
+  return SharedProfileAnalysisRequestResult::started;
+}
+
+int AnalysisService::refresh_cached_accuracy_for_statistics(
+    const std::string& profile_id, const int maximum_games) {
+  if (maximum_games <= 0) return 0;
+  std::lock_guard lock(statistics_accuracy_refresh_mutex_);
+  int refreshed = 0;
+  const int scan_limit = std::min(
+      128, maximum_games + static_cast<int>(statistics_accuracy_failed_runs_.size()));
+  for (const auto& row : database_.statistics_games_missing_move_accuracy(
+           profile_id, scan_limit)) {
+    const auto run_key = row.game_id + ':' + row.config_hash;
+    if (statistics_accuracy_failed_runs_.contains(run_key)) continue;
+    // The original analysis is complete. Rebuild only its derived move
+    // classification and weights; never request a new engine run here.
+    try {
+      rebuild_classification(row.game_id, row.config_hash, true);
+      if (++refreshed >= maximum_games) break;
+    } catch (const std::exception& error) {
+      // A damaged old run must not break Statistics or spin the profile
+      // worker. The user can still start a normal analysis of that game.
+      statistics_accuracy_failed_runs_.insert(run_key);
+      diagnostics::warning("analysis", std::string("cached accuracy refresh failed: ")
+          + error.what());
+    }
+  }
+  return refreshed;
+}
+
+std::string AnalysisService::start_analysis_with_settings_json(
+    const std::string& game_id,
+    const AppSettings& settings,
+    const bool background_profile_request) {
+  validate_token(game_id, "game id");
+  // A user-started main-line analysis owns SQLite write priority for the whole
+  // job, not merely for individual cache writes. This prevents the Knowledge
+  // Graph's separate SQLite connections from repeatedly reacquiring the WAL
+  // writer slot between engine positions. Profile-triggered shared analysis is
+  // background work and deliberately does not acquire this lease.
+  std::shared_ptr<persistence::ForegroundSqlitePriorityLease> foreground_priority;
+  if (!background_profile_request) {
+    foreground_priority =
+        std::make_shared<persistence::ForegroundSqlitePriorityLease>();
+  }
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
   std::vector<std::string> positions;
@@ -1943,14 +2239,15 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
   }
   if (positions.empty()) throw std::invalid_argument("Game has no analyzable positions");
 
-  // A main-line analysis owns the Stockfish work slot. If a sideline engine
-  // is still resident, release it before starting or resuming this worker.
+  // A persisted main-line run owns the Stockfish work slot. Foreground calls
+  // may preempt a sideline. Background profile maintenance only reaches this
+  // helper after has_active_work() is false, so releasing an idle variation
+  // engine here cannot steal active foreground work.
   stop_all_variation_jobs(true);
 
-  const auto settings = preanalysis_budget_settings();
   const auto version_probe = create_stockfish_engine(settings.engine_id);
   const auto config_hash = analysis_config_hash(settings);
-  if (auto reusable = reusable_analysis(game_id, settings);
+  if (auto reusable = shared_cached_analysis(game_id, settings);
       reusable.has_value() && reusable->status == "complete") {
     diagnostics::info("cache", "game=" + game_id + " complete analysis reused");
     rebuild_classification(game_id, reusable->config_hash);
@@ -1987,6 +2284,7 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
     if (existing == jobs_.end()) {
       auto job = std::make_shared<AnalysisJob>();
       job->engine = create_stockfish_engine(settings.engine_id);
+      job->foreground_sqlite_priority = foreground_priority;
       job->config_hash = config_hash;
       // Resume is position-exact, not progress-counter based. Persisted
       // engine rows survive cancellation/errors, and only missing position
@@ -2025,7 +2323,7 @@ std::string AnalysisService::analysis_status_json(const std::string& game_id) {
   }
   if (!result.has_value()) {
     const auto minimum_settings = preanalysis_budget_settings();
-    result = reusable_analysis(game_id, minimum_settings);
+    result = shared_cached_analysis(game_id, minimum_settings);
   }
   if (!result.has_value()) throw std::runtime_error("Analysis job not found");
   return analysis_json(game_id, *result, live_job.get());
@@ -2054,7 +2352,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
   }
 
   auto maximum_settings = database_.settings();
-  if (auto refined = reusable_analysis(game_id, maximum_settings, ply);
+  if (auto refined = shared_cached_analysis(game_id, maximum_settings, ply);
       refined.has_value() && (!refined->lines.empty() || refined->latest_ply == ply)) {
     auto visible = stable_live_classification_snapshot(
         game_id, ply, std::move(*refined), refinement_job.get());
@@ -2073,7 +2371,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
   }
   if (!result.has_value()) {
     const auto minimum_settings = preanalysis_budget_settings();
-    result = reusable_analysis(game_id, minimum_settings, ply);
+    result = shared_cached_analysis(game_id, minimum_settings, ply);
   }
   if (!result.has_value() && refinement_job != nullptr) {
     result = database_.analysis(game_id, refinement_job->config_hash, ply);
@@ -2139,6 +2437,8 @@ std::string AnalysisService::start_move_refinement_json(
     const std::string& game_id, const int ply) {
   validate_token(game_id, "game id");
   if (ply < 0) throw std::invalid_argument("ply must be non-negative");
+  auto foreground_priority =
+      std::make_shared<persistence::ForegroundSqlitePriorityLease>();
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
 
@@ -2168,7 +2468,7 @@ std::string AnalysisService::start_move_refinement_json(
 
   const auto version_probe = create_stockfish_engine(settings.engine_id);
   version_probe->validate_available();
-  if (auto reusable = reusable_analysis(game_id, settings, ply);
+  if (auto reusable = shared_cached_analysis(game_id, settings, ply);
       reusable.has_value() && reusable->status == "complete") {
     rebuild_classification(game_id, reusable->config_hash);
     database_.prune_game_analyses_except(game_id, reusable->config_hash);
@@ -2230,6 +2530,9 @@ std::string AnalysisService::start_move_refinement_json(
   }
 
   if (active != nullptr) {
+    if (!active->foreground_sqlite_priority) {
+      active->foreground_sqlite_priority = foreground_priority;
+    }
     active->requested_position_slot = ply;
     active->target_generation.fetch_add(1);
     // Preempt the old position immediately. The worker persists any partial
@@ -2250,8 +2553,9 @@ std::string AnalysisService::start_move_refinement_json(
 
   auto job = std::make_shared<AnalysisJob>();
   job->engine = create_stockfish_engine(settings.engine_id);
+  job->foreground_sqlite_priority = foreground_priority;
   job->config_hash = config_hash;
-  if (auto published = reusable_analysis(game_id, preanalysis_budget_settings());
+  if (auto published = shared_cached_analysis(game_id, preanalysis_budget_settings());
       published.has_value()) {
     job->published_classification_config_hash = published->config_hash;
   } else {
@@ -2686,7 +2990,7 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
       {"fen", job->fen},
       {"position", nlohmann::json::parse(position_view_json(job->fen))},
       {"error", error.empty() ? nlohmann::json(nullptr) : nlohmann::json(error)},
-      {"bestMove", result.best_move},
+      {"bestMove", ranked_best_move(result.lines, result.best_move)},
       {"engineVersion", job->engine->version()},
       {"liveDepth", result.reached_depth},
       {"moverEvaluationCp", nullptr},
@@ -2839,7 +3143,8 @@ std::string AnalysisService::coach_hint_json(const std::string& fen) {
     const auto serialized = serialize_line(line);
     const nlohmann::json candidate{
         {"uci", line.best_move()}, {"rank", line.rank}, {"pv", line.moves},
-        {"evaluationCp", serialized["evaluationCp"]}, {"mateIn", serialized["mateIn"]}};
+        {"evaluationCp", serialized["evaluationCp"]},
+        {"mateIn", serialized["mateIn"]}, {"wdl", serialized["wdl"]}};
     if (output["candidates"].size() < 3 && !line.best_move().empty())
       output["candidates"].push_back(candidate);
     if (output["moves"].size() >= 2 || !equivalent(line)) continue;

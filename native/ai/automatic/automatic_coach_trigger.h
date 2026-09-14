@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -29,11 +30,23 @@ struct AutomaticCoachEvent {
   std::optional<std::string> previous_fen;
   std::optional<std::string> current_fen;
   bool repeated_personal_mistake{false};
+
+  // Learner-state scheduling signals are supplied by CoachService from the
+  // existing native practice store. They are bounded policy inputs only; they
+  // never become chess evidence or player-strength claims.
+  double due_practice_relevance{0.0};
+  std::optional<std::int64_t> seconds_since_last_automatic;
 };
 
 struct AutomaticCoachDecision {
   bool trigger{false};
+  // Backward-compatible aggregate priority; equal to teaching_value.
   double priority{0.0};
+  double objective_importance{0.0};
+  double personal_relevance{0.0};
+  double practice_relevance{0.0};
+  double interruption_cost{0.0};
+  double teaching_value{0.0};
   std::vector<AutomaticCoachReason> reasons;
 };
 

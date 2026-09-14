@@ -21,7 +21,11 @@ class TrainingService {
 
   std::string overview_json() const;
   std::string start_attempt_json(const std::string& exercise_id);
-  TrainingProgressRecord record_completion(const std::string& exercise_id, bool clean);
+  // Records one finished attempt. reached_depth is how far an opening drill
+  // ran before it stopped, in answered book moves; pass 0 for exercises that
+  // are not drilled by depth, which leaves the stored best depth alone.
+  TrainingProgressRecord record_completion(
+      const std::string& exercise_id, bool clean, int reached_depth = 0);
   std::string play_move_json(
       const std::string& attempt_id,
       const std::string& source,

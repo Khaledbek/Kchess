@@ -25,7 +25,7 @@ typedef void* kc_core_handle;
 
 // Increment only when the C ABI changes incompatibly. Additive exports may
 // keep the same ABI version. Flutter validates this before creating Core.
-#define KCHESS_CORE_ABI_VERSION 8
+#define KCHESS_CORE_ABI_VERSION 9
 
 typedef enum kc_status {
   KC_STATUS_OK = 0,
@@ -63,6 +63,7 @@ KCHESS_API kc_status kc_merge_local_profile(
     const char* source_profile_id_utf8,
     const char* target_profile_id_utf8);
 KCHESS_API char* kc_active_profile_json(kc_core_handle handle);
+KCHESS_API char* kc_player_profile_json(kc_core_handle handle);
 
 KCHESS_API char* kc_app_settings_json(kc_core_handle handle);
 KCHESS_API kc_status kc_set_engine_settings(
@@ -94,6 +95,7 @@ KCHESS_API kc_status kc_set_engine_id(
     const char* engine_id_utf8);
 
 KCHESS_API char* kc_games_json(kc_core_handle handle);
+KCHESS_API char* kc_initial_games_json(kc_core_handle handle);
 KCHESS_API char* kc_games_query_json(
     kc_core_handle handle,
     const char* query_json_utf8);
@@ -157,6 +159,17 @@ KCHESS_API char* kc_statistics_openings_filtered_json(
     kc_core_handle handle,
     const char* time_control_utf8);
 KCHESS_API char* kc_statistics_terminations_json(kc_core_handle handle);
+// Accuracy over analysed games; time_control is "all" or one bucket.
+KCHESS_API char* kc_statistics_accuracy_json(
+    kc_core_handle handle,
+    const char* time_control_utf8);
+// Background analysis of the active profile's games. Start once after
+// initialisation; the saved on/off setting decides whether it works.
+KCHESS_API kc_status kc_start_background_analysis(kc_core_handle handle);
+KCHESS_API char* kc_background_analysis_status_json(kc_core_handle handle);
+KCHESS_API kc_status kc_set_background_analysis_enabled(
+    kc_core_handle handle,
+    int32_t enabled);
 KCHESS_API char* kc_statistics_phases_json(kc_core_handle handle);
 // Returns owned UTF-8 JSON; release with kc_string_free, as for other JSON calls.
 KCHESS_API char* kc_statistics_timeline_json(kc_core_handle handle, const char* query_utf8);
@@ -272,6 +285,7 @@ KCHESS_API kc_status kc_cancel_bot_move(
 KCHESS_API char* kc_coach_ask_json(
     kc_core_handle handle,
     const char* request_json_utf8);
+KCHESS_API char* kc_coach_performance_diagnostics_json(kc_core_handle handle);
 KCHESS_API char* kc_coach_context_json(
     kc_core_handle handle,
     const char* request_json_utf8);
@@ -293,6 +307,9 @@ KCHESS_API char* kc_coach_job_status_json(
 KCHESS_API kc_status kc_cancel_coach_job(
     kc_core_handle handle,
     const char* job_id_utf8);
+KCHESS_API char* kc_knowledge_inspector_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
 
 KCHESS_API char* kc_training_overview_json(kc_core_handle handle);
 // Returned UTF-8 JSON is owned by the caller; release with kc_string_free.

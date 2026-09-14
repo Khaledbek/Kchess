@@ -18,6 +18,12 @@ double clamp01(double value) {
   return std::clamp(value, 0.0, 1.0);
 }
 
+std::optional<double> expected_score_gap(const CandidateMove& best,
+                                         const CandidateMove& other) {
+  if (!best.expected_score || !other.expected_score) return std::nullopt;
+  return std::clamp(*best.expected_score - *other.expected_score, 0.0, 1.0);
+}
+
 std::optional<int> evaluation_gap_cp(const CandidateMove& best,
                                      const CandidateMove& other) {
   if (best.evaluation_cp && other.evaluation_cp) {
@@ -106,7 +112,14 @@ PracticalityMetrics build_metrics(
   int large_gaps = 0;
   int max_gap = 0;
   std::optional<int> nearest_gap;
+  std::optional<double> nearest_expected_gap;
   for (const auto& alternative : candidates.alternatives) {
+    const auto expected_gap = expected_score_gap(best, alternative);
+    if (expected_gap) {
+      nearest_expected_gap = nearest_expected_gap
+          ? std::min(*nearest_expected_gap, *expected_gap)
+          : *expected_gap;
+    }
     const auto gap = evaluation_gap_cp(best, alternative);
     if (!gap) continue;
     ++known_gaps;
@@ -116,6 +129,7 @@ PracticalityMetrics build_metrics(
   }
 
   metrics.evaluation_loss_if_inaccurate_cp = nearest_gap;
+  metrics.expected_score_loss_if_inaccurate = nearest_expected_gap;
   if (known_gaps > 0) {
     metrics.only_move_density =
         static_cast<double>(large_gaps) / static_cast<double>(known_gaps);
@@ -163,10 +177,13 @@ PracticalityAssessment aggregate(PracticalityMetrics metrics) {
   result.metrics = std::move(metrics);
 
   const std::optional<double> evaluation_risk =
-      result.metrics.evaluation_loss_if_inaccurate_cp
+      result.metrics.expected_score_loss_if_inaccurate
           ? std::optional<double>(clamp01(
-                *result.metrics.evaluation_loss_if_inaccurate_cp / 250.0))
-          : std::nullopt;
+                *result.metrics.expected_score_loss_if_inaccurate / 0.20))
+          : result.metrics.evaluation_loss_if_inaccurate_cp
+              ? std::optional<double>(clamp01(
+                    *result.metrics.evaluation_loss_if_inaccurate_cp / 250.0))
+              : std::nullopt;
 
   WeightedScore difficulty;
   difficulty.add(result.metrics.only_move_density, 0.20);
@@ -199,7 +216,8 @@ PracticalityAssessment aggregate(PracticalityMetrics metrics) {
   }
 
   int known = 0;
-  known += result.metrics.evaluation_loss_if_inaccurate_cp.has_value();
+  known += result.metrics.expected_score_loss_if_inaccurate.has_value() ||
+      result.metrics.evaluation_loss_if_inaccurate_cp.has_value();
   known += result.metrics.only_move_density.has_value();
   known += result.metrics.evaluation_volatility.has_value();
   known += result.metrics.branching_complexity.has_value();

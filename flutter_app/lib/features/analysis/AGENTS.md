@@ -23,3 +23,7 @@ Flutter zeigt native Evaluation, WDL, MultiPV, Best-Move-Pfeile, Klassifikation,
 - FFI-Vertrag → `flutter_app/lib/ffi/` + exaktes Symbol in `native/src/api/core_api.cpp`
 
 Keine SF18/SF19-Korrekturlogik in Dart hinzufügen. Side-Lines bleiben flüchtig.
+
+## Update 152 - explicit analysis cancellation
+
+Starting analysis remains a native AnalysisService job. The preparation modal and a running AnalysisScreen expose an upper-right close (`X`) action that calls the existing `CoreGateway.cancelAnalysis` contract; Flutter must not simulate cancellation by merely closing the route.

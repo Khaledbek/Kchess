@@ -9,9 +9,10 @@ namespace kchess::ai::router_terms {
 // -----------------------------------------------------------------------------
 
 inline constexpr std::string_view follow_up[]{
-    "why", "why not", "what about", "and then", "instead", "that move",
-    "this move", "warum", "wieso", "weshalb", "und dann", "stattdessen",
-    "dieser zug", "der zug", "لماذا", "وماذا", "بدلا"};
+    "why", "why not", "what about", "and then", "and in", "and for",
+    "show examples", "instead", "that move", "this move", "warum", "wieso",
+    "weshalb", "woher", "und dann", "und im", "und bei", "zeig beispiele",
+    "stattdessen", "dieser zug", "der zug", "لماذا", "وماذا", "بدلا"};
 
 // -----------------------------------------------------------------------------
 // Section: Chess-domain anchors
@@ -22,6 +23,10 @@ inline constexpr std::string_view chess[]{
     "mate", "matt", "stalemate", "patt", "king", "queen", "rook", "bishop",
     "knight", "pawn", "könig", "dame", "turm", "läufer", "springer", "bauer",
     "ملك", "وزير", "رخ", "فيل", "حصان", "بيدق", "elo", "rating", "uci"};
+
+inline constexpr std::string_view profile_data[]{
+    "statistik", "statistics", "siegquote", "win rate", "partien",
+    "games", "resultate", "results", "repertoire", "spielstil", "play style"};
 
 inline constexpr std::string_view player_names[]{
     "carlsen", "kasparov", "fischer", "capablanca", "tal", "anand",
@@ -49,7 +54,7 @@ inline constexpr std::string_view tactic[]{
     "überlastung", "zwischenzug", "تكتيك", "شوكة", "تثبيت", "تضحية"};
 
 inline constexpr std::string_view opening[]{
-    "opening", "debut", "gambit", "sicilian", "french defense", "caro-kann",
+    "opening", "openning", "debut", "gambit", "sicilian", "french defense", "caro-kann",
     "queens gambit", "king's indian", "opening theory", "eröffnung", "gambit",
     "sizilian", "französisch", "caro-kann", "eröffnungstheorie", "افتتاح", "غامبيت"};
 
@@ -71,8 +76,18 @@ inline constexpr std::string_view history[]{
 
 inline constexpr std::string_view development[]{
     "improve my chess", "improve my game", "my rating", "my elo", "my weakness",
-    "my strengths", "get better", "verbessern", "mein elo", "meine elo",
-    "meine schwäche", "meine stärke", "besser werden", "أطور لعبي", "تصنيفي"};
+    "my weaknesses", "my strength", "my strengths", "my style", "play style",
+    "my games", "my profile", "my blitz", "my rapid", "my bullet", "my progress",
+    "why do i lose", "why do i keep", "am i improving", "my time management",
+    "what kind of player am i", "how do i play", "get better", "verbessern",
+    "mein elo", "meine elo", "meine schwäche", "meine schwächen", "meine stärke",
+    "welche elo habe ich", "wie hoch ist mein elo", "meine eröffnung",
+    "welche eröffnung spiele ich", "welche opening spiele ich",
+    "meine stärken", "mein spielstil", "meinen spielstil", "wie spiele ich",
+    "was für ein spieler bin ich", "habe ich mich verbessert", "besser werden",
+    "meine partien", "mein profil", "mein blitz", "mein rapid", "mein fortschritt",
+    "warum verliere ich", "mein zeitmanagement", "meine zeitnot",
+    "أطور لعبي", "تصنيفي"};
 
 inline constexpr std::string_view game_review[]{
     "review my game", "analyze my game", "game review", "analyse my game",

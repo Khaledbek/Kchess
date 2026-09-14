@@ -85,15 +85,25 @@ flutter_app/l10n/app_ar.arb
 
 ## Bauen und testen
 
-Flutter:
+Windows-Entwicklung verwendet den persistenten inkrementellen Native-Build:
+
+```powershell
+.\tools\build_dev.ps1
+```
+
+Die großen CMake/MSBuild-Zwischenstände liegen außerhalb des Projekts unter
+`%LOCALAPPDATA%\KChess\build-cache`. Für einen gezielten kompletten Neuaufbau
+des KChess-C++-Cores gibt es `rebuild_native.ps1`. `flutter clean` bleibt der
+normale Flutter-Clean und kann vor einem Transport-ZIP verwendet werden. Die
+genaue Bedienung steht in [`BUILD.md`](BUILD.md).
+
+Weitere Flutter-Befehle:
 
 ```powershell
 cd flutter_app
-flutter pub get
 flutter gen-l10n
 flutter analyze
 flutter test
-flutter build windows --debug
 flutter build apk --debug --target-platform android-arm64
 ```
 
@@ -110,6 +120,7 @@ Python-Tools werden separat ausgeführt; sie sind keine Runtime-Abhängigkeit de
 ## Wichtige Dokumente
 
 - `AGENTS.md` – verbindliche Repository-Regeln
+- `BUILD.md` – Windows-Buildbefehle und persistenter Native-Cache
 - `flutter_app/AGENTS.md` – Flutter-Regeln
 - `native/AGENTS.md` – Native-Regeln
 - `tools/AGENTS.md` – Python-/Tooling-Regeln

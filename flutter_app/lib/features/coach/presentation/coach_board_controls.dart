@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../localization/generated/app_localizations.dart';
 
 // -----------------------------------------------------------------------------
-// Section: PGN board navigation
+// Section: Board-history navigation
 // -----------------------------------------------------------------------------
 
 class CoachBoardControls extends StatelessWidget {

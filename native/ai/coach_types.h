@@ -17,6 +17,13 @@ enum class CoachMode {
   teach,
 };
 
+enum class QueryFamily {
+  unknown,
+  personal_chess,
+  general_chess,
+  position,
+};
+
 enum class CoachIntent {
   unknown,
   position,

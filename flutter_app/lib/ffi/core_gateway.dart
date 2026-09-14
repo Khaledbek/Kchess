@@ -8,6 +8,7 @@ abstract interface class CoreGateway {
   Future<void> initialize();
   Future<List<AppProfile>> profiles();
   Future<AppProfile?> activeProfile();
+  Future<Map<String, Object?>?> playerProfile();
   Future<AppProfile> createProfile({
     required ProfileType type,
     required String displayName,
@@ -27,6 +28,15 @@ abstract interface class CoreGateway {
   Future<ScoutReport> scoutReport(String username);
   Future<StatisticsOverview> statisticsOverview();
   Future<OpeningsStats> openingsStats({String timeControl = 'all'});
+
+  /// Accuracy over the profile's analysed games, including whether it improves.
+  Future<AccuracyStats> accuracyStats({String timeControl = 'all'});
+
+  /// Background analysis of the profile's games: start it once per launch, read
+  /// its progress, and switch it on or off (the choice is saved natively).
+  Future<void> startBackgroundAnalysis();
+  Future<BackgroundAnalysisStatus> backgroundAnalysisStatus();
+  Future<void> setBackgroundAnalysisEnabled(bool enabled);
   Future<TerminationStats> terminationStats();
   Future<PhaseStats> phaseStats();
   Future<StatisticsTimeline> statisticsTimeline(GameQuery query);
@@ -58,6 +68,7 @@ abstract interface class CoreGateway {
   Future<void> setLocale(String locale);
   Future<void> setEngineId(String engineId);
   Future<List<GameSummary>> games();
+  Future<GameMonthSnapshot> initialGames();
   Future<List<GameSummary>> queryGames(GameQuery query);
   Future<List<GameSummary>> favoriteGames();
   Future<GameDetail> game(String gameId);
@@ -98,9 +109,12 @@ abstract interface class CoreGateway {
   Future<BotMoveSnapshot> botMoveStatus(String jobId);
   Future<void> cancelBotMove(String jobId);
   Future<Map<String, Object?>> coachAsk(Map<String, Object?> request);
+  Future<Map<String, Object?>> coachPerformanceDiagnostics();
   Future<Map<String, Object?>> coachContext(Map<String, Object?> request);
   Future<Map<String, Object?>> coachAutomatic(Map<String, Object?> request);
+  Future<void> cancelCoachSessionJobs(String sessionId);
   Future<Map<String, Object?>> coachHint(Map<String, Object?> request);
+  Future<Map<String, Object?>> knowledgeInspector(Map<String, Object?> request);
   Future<TrainingOverview> trainingOverview();
   Future<Object?> practiceCommand(Map<String, Object?> request);
   Future<TrainingAttempt> startTrainingAttempt(String exerciseId);

@@ -75,6 +75,124 @@ class _OpeningsCard extends StatelessWidget {
   }
 }
 
+/// Openings the profile keeps losing or keeps misplaying, one dense row each
+/// and one tap from its drill. Takes no room at all when native found nothing
+/// to warn about, or while the numbers are loading.
+class _OpeningWeaknessCard extends StatefulWidget {
+  const _OpeningWeaknessCard({required this.future});
+
+  final Future<OpeningsStats> future;
+
+  @override
+  State<_OpeningWeaknessCard> createState() => _OpeningWeaknessCardState();
+}
+
+class _OpeningWeaknessCardState extends State<_OpeningWeaknessCard> {
+  static const _collapsedRows = 3;
+
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<OpeningsStats>(
+    future: widget.future,
+    builder: (context, snapshot) {
+      final stats = snapshot.data;
+      if (stats == null || stats.weaknesses.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      final strings = AppLocalizations.of(context);
+      final theme = Theme.of(context);
+      final canTrain = TrainingNavigator.maybeOf(context) != null;
+      final weaknesses = stats.weaknesses;
+      final visible = _expanded
+          ? weaknesses
+          : weaknesses.take(_collapsedRows).toList(growable: false);
+      return Card(
+        key: const Key('stats-opening-weaknesses'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.healing_rounded,
+                    size: 20,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Tooltip(
+                      message: strings.openingWeaknessCaption,
+                      child: Text(
+                        strings.openingWeaknessTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Move-level warnings need analysed games; say so quietly.
+                  if (stats.analysedOpeningGames == 0)
+                    Tooltip(
+                      message: strings.openingWeaknessAnalyseHint,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              for (final (index, weakness) in visible.indexed) ...[
+                if (index > 0) const Divider(height: 1),
+                OpeningWeaknessRow(
+                  weakness: weakness,
+                  colorLabel: weakness.color == 'white'
+                      ? strings.statsOpeningsWhite
+                      : strings.statsOpeningsBlack,
+                  trainLabel: strings.statsTrainOpening,
+                  onTrain: canTrain
+                      ? () => _trainOpening(
+                          context,
+                          OpeningTrainingRequest(
+                            openingName: weakness.name,
+                            eco: weakness.eco,
+                            color: weakness.color,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
+              if (weaknesses.length > _collapsedRows)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    key: const Key('stats-opening-weaknesses-more'),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    child: Text(
+                      _expanded
+                          ? strings.openingWeaknessShowFewer
+                          : strings.openingWeaknessShowAll(weaknesses.length),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 enum _OpeningSort { mostPlayed, bestWinRate }
 
 class _OpeningsContent extends StatefulWidget {

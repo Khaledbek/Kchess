@@ -30,7 +30,13 @@ void Stockfish19ExactSnapshotAccumulator::observe(
     candidate_depth_ = line.depth;
   }
 
-  if (!exact || candidate_depth_ != line.depth || line.rank != next_rank_) {
+  const auto& move = line.best_move();
+  const bool duplicate_move = std::any_of(
+      candidate_.begin(), candidate_.end(), [&](const EngineLine& previous) {
+        return previous.best_move() == move;
+      });
+  if (!exact || candidate_depth_ != line.depth || line.rank != next_rank_
+      || !usable_stockfish19_engine_move(move) || duplicate_move) {
     reset_candidate();
     return;
   }

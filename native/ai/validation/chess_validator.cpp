@@ -1,5 +1,6 @@
 #include "chess_validator.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <exception>
@@ -19,7 +20,7 @@ namespace {
 // Section: Evidence helpers
 // -----------------------------------------------------------------------------
 
-bool engine_contradicts(const CoachClaim& claim, const std::vector<EvidenceItem>& evidence) {
+bool engine_value_supported(const CoachClaim& claim, const std::vector<EvidenceItem>& evidence) {
   for (const auto& item : evidence) {
     if (item.kind != EvidenceKind::candidate_moves) continue;
     try {
@@ -30,12 +31,41 @@ bool engine_contradicts(const CoachClaim& claim, const std::vector<EvidenceItem>
       for (const auto& candidate : candidates) {
         if (candidate.value("move_uci", "") == claim.subject &&
             candidate.contains("evaluation_cp") && candidate["evaluation_cp"].is_number_integer()) {
-          return std::to_string(candidate["evaluation_cp"].get<int>()) != claim.value;
+          return std::to_string(candidate["evaluation_cp"].get<int>()) == claim.value;
         }
       }
     } catch (...) { continue; }
   }
-  return false; // No comparable engine value: unknown, not contradicted.
+  return false;
+}
+
+bool motif_supported(const CoachClaim& claim, const std::vector<EvidenceItem>& evidence) {
+  for (const auto& item : evidence) {
+    if (item.kind != EvidenceKind::tactical_motifs) continue;
+    try {
+      const auto payload = nlohmann::json::parse(item.payload);
+      if (!payload.is_object()) continue;
+      for (const auto& motif : payload.value("motifs", nlohmann::json::array())) {
+        if (motif.is_object() && motif.value("kind", "") == claim.subject &&
+            motif.value("confidence", 0.0) >= 0.85) return true;
+      }
+    } catch (...) {
+      continue;
+    }
+  }
+  return false;
+}
+
+bool opening_supported(const CoachClaim& claim, const std::vector<EvidenceItem>& evidence) {
+  if (claim.subject != "eco" && claim.subject != "name") return false;
+  for (const auto& item : evidence) {
+    if (item.kind != EvidenceKind::opening && item.kind != EvidenceKind::theory) continue;
+    const auto payload = nlohmann::json::parse(item.payload, nullptr, false);
+    if (payload.is_object() && payload.contains(claim.subject) &&
+        payload[claim.subject].is_string() &&
+        payload[claim.subject].get<std::string>() == claim.value) return true;
+  }
+  return false;
 }
 // -----------------------------------------------------------------------------
 // Section: Board helpers
@@ -134,12 +164,21 @@ ChessValidationResult ChessValidator::validate_claim(
                    ? ChessValidationResult{}
                    : ChessValidationResult{false, "claim_piece_location_false"};
       case CoachClaimKind::tactical_motif:
-        return {}; // Missing heuristic evidence is not a refutation.
+        return motif_supported(claim, evidence) ? ChessValidationResult{}
+            : ChessValidationResult{false, "claim_motif_not_supported"};
       case CoachClaimKind::engine_evaluation:
-        return !engine_contradicts(claim, evidence)
+        return engine_value_supported(claim, evidence)
                    ? ChessValidationResult{}
-                   : ChessValidationResult{false, "claim_engine_contradicted"};
-      case CoachClaimKind::opening_fact: return {};
+                   : ChessValidationResult{false, "claim_engine_value_not_supported"};
+      case CoachClaimKind::opening_fact:
+        return opening_supported(claim, evidence) ? ChessValidationResult{}
+            : ChessValidationResult{false, "claim_opening_not_supported"};
+      case CoachClaimKind::profile_fact:
+      case CoachClaimKind::profile_inference:
+      case CoachClaimKind::position_contrast_fact:
+        // Personal grounding requires the exact provider-visible profile
+        // context. ResponseValidator owns that check.
+        return {false, "claim_profile_context_required"};
     }
   } catch (...) {
     return {false, "claim_validation_error"};
@@ -157,8 +196,22 @@ ChessValidationResult ChessValidator::validate_recommendation(
   } catch (...) {
     return {false, "recommendation_move_illegal"};
   }
-
-  return {};
+  for (const auto& item : evidence) {
+    if (item.kind != EvidenceKind::candidate_moves) continue;
+    try {
+      const auto payload = nlohmann::json::parse(item.payload);
+      if (!payload.is_object()) continue;
+      if (payload.contains("best") && payload["best"].is_object() &&
+          payload["best"].value("move_uci", "") == recommendation.move_uci) return {};
+      for (const auto& candidate : payload.value("alternatives", nlohmann::json::array())) {
+        if (candidate.is_object() &&
+            candidate.value("move_uci", "") == recommendation.move_uci) return {};
+      }
+    } catch (...) {
+      continue;
+    }
+  }
+  return {false, "recommendation_move_not_supported"};
 }
 
 }  // namespace kchess::ai

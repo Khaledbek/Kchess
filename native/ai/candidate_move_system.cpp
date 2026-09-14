@@ -19,6 +19,7 @@ CandidateMove to_candidate(const CandidateLineInput& line) {
       .pv_uci = line.pv_uci,
       .evaluation_cp = line.evaluation_cp,
       .mate_in = line.mate_in,
+      .expected_score = line.expected_score,
   };
 }
 
@@ -64,6 +65,7 @@ nlohmann::json candidate_json(const CandidateMove& candidate) {
   };
   if (candidate.evaluation_cp) out["evaluation_cp"] = *candidate.evaluation_cp;
   if (candidate.mate_in) out["mate_in"] = *candidate.mate_in;
+  if (candidate.expected_score) out["expected_score"] = *candidate.expected_score;
   return out;
 }
 

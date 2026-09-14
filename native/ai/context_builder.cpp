@@ -35,9 +35,10 @@ std::size_t token_budget(const QueryPlan& plan) {
 std::string trim_to_tokens(std::string text, std::size_t tokens) {
   const std::size_t max_chars = tokens * kCharsPerEstimatedToken;
   if (text.size() <= max_chars) return text;
-  if (max_chars <= 3) return text.substr(0, max_chars);
-  text.resize(max_chars - 3);
-  text += "...";
+  std::size_t end = max_chars > 3 ? max_chars - 3 : max_chars;
+  while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xc0) == 0x80) --end;
+  text.resize(end);
+  if (max_chars > 3) text += "...";
   return text;
 }
 
@@ -65,8 +66,16 @@ std::string summarize_session(const CoachSessionState* session,
   std::ostringstream out;
   append_field(out, "coach_question_waiting_for_learner", session->unresolved_question);
   append_field(out, "question_original_board_not_current_evidence", session->question_board);
+  append_field(out, "verified_learner_move_feedback", session->last_attempt_status);
+  append_field(out, "verified_native_move_classification",
+               session->last_attempt_classification);
+  if (!session->last_attempt_status.empty()) {
+    append_field(out, "original_question_engine_candidate", session->expected_move);
+    if (session->last_attempt_status == "verified_best_candidate_found")
+      append_field(out, "original_question_candidate_opponent_reply", session->expected_reply);
+  }
   append_field(out, "goal", session->current_goal);
-  append_field(out, "last_claim", session->last_claim);
+  append_field(out, "previous_answer_not_authoritative_evidence", session->last_claim);
   append_field(out, "last_recommendation", session->last_recommendation);
   append_field(out, "concept", session->referenced_concept);
   return trim_to_tokens(out.str(), max_tokens);
@@ -166,7 +175,7 @@ CoachContext ContextBuilder::build(const CoachRequest& request,
   context.input_token_budget = token_budget(plan);
   context.locale = trim_to_tokens(request.locale, 16);
   context.user_text = trim_to_tokens(request.user_text, 600);
-  if (request.position_fen) {
+  if (plan.needs_position && request.position_fen) {
     context.position_fen = trim_to_tokens(*request.position_fen, 128);
   }
 
@@ -176,14 +185,20 @@ CoachContext ContextBuilder::build(const CoachRequest& request,
           ? context.input_token_budget - base_tokens
           : 0;
   const std::size_t session_budget = std::min<std::size_t>(available / 3, 240);
-  context.session_summary = summarize_session(session, session_budget);
+  if (plan.has_conversation_context) {
+    context.session_summary = summarize_session(session, session_budget);
+  }
 
   const std::size_t after_session = used_tokens(context);
-  const std::size_t pgn_budget =
+  const std::size_t remaining =
       after_session < context.input_token_budget
           ? context.input_token_budget - after_session
           : 0;
-  if (request.game_pgn) {
+  // Leave room for retrieved facts; PGN must not consume the provider budget
+  // before selected profile/engine evidence can be included.
+  const std::size_t pgn_budget =
+      std::min(remaining, context.input_token_budget / 3);
+  if (plan.needs_position && request.game_pgn) {
     context.pgn_excerpt =
         reduce_pgn(*request.game_pgn, pgn_budget, context.pgn_truncated);
   }

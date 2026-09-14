@@ -1,15 +1,17 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "chess_profile.h"
+#include "profile_evidence_adapter.h"
 
 namespace kchess::ai {
 
 // -----------------------------------------------------------------------------
-// Section: Aggregated KChess observations
+// Section: Aggregated KChess observations (legacy/fallback bridge)
 // -----------------------------------------------------------------------------
 
 struct ProfileOpeningObservation {
@@ -43,6 +45,15 @@ class ChessProfileUpdater {
   [[nodiscard]] ChessProfile update(
       const ChessProfileObservation& observation,
       const std::optional<ChessProfile>& previous = std::nullopt) const;
+
+  [[nodiscard]] ChessProfile update_from_evidence(
+      const std::string& profile_id,
+      const std::optional<int>& rating,
+      const std::vector<ProfileGameEvidence>& games,
+      std::int64_t now_seconds,
+      const ProfileBackgroundProgress& background,
+      const std::optional<ChessProfile>& previous = std::nullopt,
+      const std::vector<ProfileGameEvidence>& library_games = {}) const;
 };
 
 [[nodiscard]] bool repeated_personal_mistake(

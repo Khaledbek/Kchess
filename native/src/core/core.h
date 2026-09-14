@@ -11,12 +11,14 @@
 #include <string>
 
 #include "core/models.h"
+#include "knowledge/knowledge_runtime.h"
 #include "persistence/database.h"
 #include "services/analysis_service.h"
 #include "services/bot_service.h"
 #include "services/coach_service.h"
 #include "services/game_library_service.h"
 #include "services/profile_service.h"
+#include "services/player_profile_service.h"
 #include "services/provider_service.h"
 #include "services/settings_service.h"
 #include "services/statistics_service.h"
@@ -46,6 +48,7 @@ class Core {
   void delete_profile(const std::string& profile_id);
   void merge_local_profile(const std::string& source_profile_id, const std::string& target_profile_id);
   std::string active_profile_json();
+  std::string player_profile_json();
 
   std::string settings_json();
   void set_engine_settings(int depth, int multi_pv, int time_limit_seconds);
@@ -59,6 +62,7 @@ class Core {
   void set_engine_id(const std::string& engine_id);
 
   std::string games_json();
+  std::string initial_games_json();
   std::string query_games_json(const std::string& query_json);
   std::string favorite_games_json();
   std::string game_json(const std::string& game_id);
@@ -101,6 +105,10 @@ class Core {
 
   std::string statistics_overview_json();
   std::string statistics_openings_json(const std::string& time_control = "all");
+  std::string statistics_accuracy_json(const std::string& time_control = "all");
+  void start_background_analysis();
+  std::string background_analysis_status_json();
+  void set_background_analysis_enabled(bool enabled);
   std::string statistics_terminations_json();
   std::string statistics_phases_json();
   std::string statistics_timeline_json(const std::string& query_json);
@@ -147,6 +155,7 @@ class Core {
   void cancel_bot_move(const std::string& job_id);
 
   std::string coach_ask_json(const std::string& request_json);
+  std::string coach_performance_diagnostics_json() const;
   std::string coach_context_json(const std::string& request_json);
   std::string coach_automatic_json(const std::string& request_json);
   std::string start_coach_hint_json(const std::string& request_json);
@@ -154,6 +163,7 @@ class Core {
   std::string start_coach_automatic_json(const std::string& request_json);
   std::string coach_job_status_json(const std::string& job_id);
   void cancel_coach_job(const std::string& job_id);
+  std::string knowledge_inspector_json(const std::string& request_json);
 
   std::string training_overview_json() const;
   std::string practice_command_json(const std::string& request);
@@ -174,7 +184,7 @@ class Core {
   // Classify up to `limit` unclassified stored games (<= 0 means all) with the
   // opening-name index and persist each result. Idempotent and cheap; a single
   // unparseable game is marked processed rather than aborting the sweep.
-  void classify_pending_openings(int limit);
+  int classify_pending_openings(int limit);
   void classify_game_opening(const std::string& game_id);
 
   std::filesystem::path data_directory_;
@@ -186,14 +196,17 @@ class Core {
   std::unique_ptr<OpeningTheoryProvider> opening_theory_;
   std::unique_ptr<OpeningNameIndex> opening_names_;
   AnalysisService analysis_service_;
+  StatisticsService statistics_service_;
+  knowledge::KnowledgeRuntime knowledge_runtime_;
+  PlayerProfileService player_profile_service_;
   BotService bot_service_;
   CoachService coach_service_;
-  StatisticsService statistics_service_;
   TrainingService training_service_;
   PracticeService practice_service_;
   bool initialized_{false};
   int32_t last_status_{0};
   std::string last_error_;
+  std::string startup_diagnostics_json_{"{}"};
 };
 
 }  // namespace kchess

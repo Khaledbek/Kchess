@@ -4,6 +4,22 @@ project(kchess_core VERSION 0.1.0 LANGUAGES C CXX)
 
 option(KCHESS_BUILD_TESTS "Build native unit tests" ON)
 option(KCHESS_WITH_STOCKFISH "Build the official Stockfish engine" ON)
+option(KCHESS_PERSISTENT_WINDOWS_BUILD
+  "Configure the external persistent Flutter Windows native build" OFF)
+
+# The Flutter Windows parent exposes Debug/Profile/Release. Keep the delegated
+# persistent child build configuration-compatible without changing standalone
+# native builds on other platforms or developer test trees.
+if(KCHESS_PERSISTENT_WINDOWS_BUILD AND MSVC)
+  get_property(_kchess_native_is_multiconfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+  if(_kchess_native_is_multiconfig)
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Profile;Release" CACHE STRING "" FORCE)
+  endif()
+  set(CMAKE_EXE_LINKER_FLAGS_PROFILE "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
+  set(CMAKE_SHARED_LINKER_FLAGS_PROFILE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE}")
+  set(CMAKE_C_FLAGS_PROFILE "${CMAKE_C_FLAGS_RELEASE}")
+  set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
+endif()
 
 # -----------------------------------------------------------------------------
 # Section: Stockfish source and runtime assets
@@ -33,7 +49,7 @@ endif()
 set(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE OFF)
 if(KCHESS_WITH_STOCKFISH AND WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
   # Windows Flutter clean removes flutter_app/build, but it does not touch the
-  # source-adjacent persistent cache. The official engines are therefore built
+  # external persistent cache. The official engines are therefore built
   # once per configuration and then linked as stable prebuilt .lib files.
   set(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE ON)
   include(cmake/stockfish_windows_cache.cmake)
@@ -156,6 +172,8 @@ add_library(kchess_core SHARED
   ai/position/exploitation_planner.cpp
   ai/position/plan_generator.cpp
   ai/position/position_features.cpp
+  ai/position/position_analysis_stage.cpp
+  ai/position/move_contrast.cpp
   ai/position/position_structure_features.cpp
   ai/position/position_weakness_facts.cpp
   ai/position/tactical_detector.cpp
@@ -166,16 +184,33 @@ add_library(kchess_core SHARED
   ai/practicality/player_practicality.cpp
   ai/practicality/practicality_engine.cpp
   ai/practicality/practicality_metrics.cpp
+  ai/profile/adaptive_profile_analyzer.cpp
   ai/profile/chess_profile.cpp
+  ai/profile/coach_priority_engine.cpp
+  ai/profile/game_relevance_scorer.cpp
+  ai/profile/hypothesis_manager.cpp
+  ai/profile/missing_evidence_detector.cpp
+  ai/profile/pattern_matcher.cpp
+  ai/profile/profile_evidence_adapter.cpp
+  ai/profile/profile_analysis_funnel.cpp
   ai/profile/profile_updater.cpp
+  ai/profile/sample_builder.cpp
+  ai/profile/trend_engine.cpp
   ai/models/model_versions.cpp
+  ai/models/portable_small_models.cpp
   ai/models/small_models.cpp
   ai/optimization/provider_input_optimizer.cpp
+  ai/optimization/validated_response_cache.cpp
   ai/providers/gemini_config.cpp
   ai/providers/gemini_provider.cpp
   ai/providers/llm_provider.cpp
   ai/providers/remote_provider.cpp
+  ai/query_classifier.cpp
   ai/query_planner.cpp
+  ai/teaching/skill_taxonomy.cpp
+  ai/teaching/personal_training_selector.cpp
+  ai/teaching/spaced_repetition_scheduler.cpp
+  ai/teaching/teaching_planner.cpp
   ai/validation/chess_validator.cpp
   ai/validation/response_validator.cpp
   src/api/core_api.cpp
@@ -196,6 +231,32 @@ add_library(kchess_core SHARED
   src/engine/stockfish_factory.cpp
   src/http/http_client.cpp
   src/http/android_http_client.cpp
+  src/knowledge/knowledge_graph_contract.cpp
+  src/knowledge/graph_store.cpp
+  src/knowledge/dependency_tracker.cpp
+  src/knowledge/chunk_registry.cpp
+  src/knowledge/statistics_graph_projector.cpp
+  src/knowledge/opening_graph_projector.cpp
+  src/knowledge/position_structure_graph_projector.cpp
+  src/knowledge/result_transition_graph_projector.cpp
+  src/knowledge/profile_knowledge_graph_projector.cpp
+  src/knowledge/knowledge_quality.cpp
+  src/knowledge/confidence_engine.cpp
+  src/knowledge/coverage_engine.cpp
+  src/knowledge/knowledge_quality_store.cpp
+  src/knowledge/knowledge_quality_engine.cpp
+  src/knowledge/conflict_resolver.cpp
+  src/knowledge/vector_index.cpp
+  src/knowledge/text_semantic_retrieval.cpp
+  src/knowledge/position_similarity.cpp
+  src/knowledge/entity_extractor.cpp
+  src/knowledge/query_router.cpp
+  src/knowledge/hybrid_retrieval.cpp
+  src/knowledge/retrieval_ranking.cpp
+  src/knowledge/knowledge_gap_engine.cpp
+  src/knowledge/evidence_packet_builder.cpp
+  src/knowledge/query_trace_store.cpp
+  src/knowledge/knowledge_runtime.cpp
   src/http/platform_http_client.cpp
   src/persistence/database.cpp
   src/providers/chess_com_provider.cpp
@@ -210,10 +271,13 @@ add_library(kchess_core SHARED
   src/services/coach_service.cpp
   src/services/game_library_service.cpp
   src/services/profile_service.cpp
+  src/services/player_profile_service.cpp
   src/services/provider_service.cpp
   src/services/settings_service.cpp
   src/services/statistics_service.cpp
   src/services/statistics_details.cpp
+  src/services/opening_weakness.cpp
+  src/services/accuracy_statistics.cpp
   src/training/training_catalog.cpp
   src/training/training_service.cpp
   src/training/practice_catalog.cpp
@@ -222,6 +286,8 @@ add_library(kchess_core SHARED
   src/training/practice_session.cpp
   src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
+  src/theory/polyglot.cpp
+  src/theory/polyglot_arrays.cpp
   src/theory/position_key.cpp
 )
 target_compile_features(kchess_core PUBLIC cxx_std_20)
@@ -276,7 +342,9 @@ if(MSVC)
   # Embedded opening names are UTF-8 on Windows as well as Android.
   set_source_files_properties(src/training/practice_catalog.cpp
     PROPERTIES COMPILE_OPTIONS "/utf-8")
-  target_compile_options(kchess_core PRIVATE /W4 /permissive- /EHsc)
+  # kchess_core contains many independent translation units. /MP lets MSVC
+  # compile them concurrently, which materially reduces a cold/full rebuild.
+  target_compile_options(kchess_core PRIVATE /W4 /permissive- /EHsc /MP /FS)
   target_compile_options(kchess_sqlite PRIVATE /W3)
 
   if(KCHESS_USE_PERSISTENT_WINDOWS_STOCKFISH_CACHE)
@@ -448,6 +516,50 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
   )
   target_link_libraries(kchess_training_tests PRIVATE kchess_core)
   add_test(NAME kchess_training_tests COMMAND kchess_training_tests)
+
+  # Drives the opening drill end to end; skips itself when the untracked
+  # PolyGlot book is not on disk.
+  add_executable(kchess_opening_drill_tests tests/opening_drill_tests.cpp)
+  target_compile_features(kchess_opening_drill_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_opening_drill_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  target_link_libraries(kchess_opening_drill_tests PRIVATE kchess_core)
+  add_test(NAME kchess_opening_drill_tests COMMAND kchess_opening_drill_tests)
+
+  add_executable(kchess_polyglot_tests
+    tests/polyglot_tests.cpp
+    src/theory/polyglot.cpp
+    src/theory/polyglot_arrays.cpp
+  )
+  target_compile_features(kchess_polyglot_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_polyglot_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_polyglot_tests COMMAND kchess_polyglot_tests)
+
+  add_executable(kchess_opening_weakness_tests
+    tests/opening_weakness_tests.cpp
+    src/services/opening_weakness.cpp
+  )
+  target_compile_features(kchess_opening_weakness_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_opening_weakness_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  add_test(NAME kchess_opening_weakness_tests COMMAND kchess_opening_weakness_tests)
+
+  add_executable(kchess_accuracy_statistics_tests
+    tests/accuracy_statistics_tests.cpp
+    src/services/accuracy_statistics.cpp
+    src/analysis/accuracy.cpp
+  )
+  target_compile_features(kchess_accuracy_statistics_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_accuracy_statistics_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_accuracy_statistics_tests COMMAND kchess_accuracy_statistics_tests)
 
   add_executable(kchess_bot_move_selector_tests
     tests/bot_move_selector_tests.cpp

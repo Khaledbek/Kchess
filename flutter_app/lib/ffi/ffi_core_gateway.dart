@@ -10,6 +10,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../diagnostics/app_startup_diagnostics.dart';
 import '../shared/models/models.dart';
 import 'core_gateway.dart';
 
@@ -182,7 +183,7 @@ typedef _FreeStringNative = Void Function(Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 
 class FfiCoreGateway implements CoreGateway {
-  static const int _supportedAbiVersion = 8;
+  static const int _supportedAbiVersion = 9;
 
   FfiCoreGateway._(this._library, this._dataDirectory) {
     try {
@@ -226,6 +227,10 @@ class FfiCoreGateway implements CoreGateway {
     _activeProfile = _library
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_active_profile_json',
+        );
+    _playerProfile = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_player_profile_json',
         );
     _createProfile = _library
         .lookupFunction<_CreateProfileNative, _CreateProfileDart>(
@@ -296,6 +301,22 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_terminations_json',
         );
+    _statisticsAccuracy = _library
+        .lookupFunction<_StringArgNative, _StringArgDart>(
+          'kc_statistics_accuracy_json',
+        );
+    _startBackgroundAnalysis = _library
+        .lookupFunction<_StatusNoArgsNative, _StatusNoArgsDart>(
+          'kc_start_background_analysis',
+        );
+    _backgroundAnalysisStatus = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_background_analysis_status_json',
+        );
+    _setBackgroundAnalysisEnabled = _library
+        .lookupFunction<_StatusIntNative, _StatusIntDart>(
+          'kc_set_background_analysis_enabled',
+        );
     _statisticsPhases = _library
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_phases_json',
@@ -307,6 +328,10 @@ class FfiCoreGateway implements CoreGateway {
     _games = _library.lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
       'kc_games_json',
     );
+    _initialGames = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_initial_games_json',
+        );
     _queryGames = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_games_query_json',
     );
@@ -380,6 +405,10 @@ class FfiCoreGateway implements CoreGateway {
     _coachAsk = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_coach_ask_json',
     );
+    _coachPerformanceDiagnostics = _library.lookupFunction<
+      _StringNoArgsNative,
+      _StringNoArgsDart
+    >('kc_coach_performance_diagnostics_json');
     _coachContext = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_coach_context_json',
     );
@@ -400,6 +429,9 @@ class FfiCoreGateway implements CoreGateway {
     );
     _cancelCoachJob = _library.lookupFunction<_StatusStringNative, _StatusStringDart>(
       'kc_cancel_coach_job',
+    );
+    _knowledgeInspector = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_knowledge_inspector_json',
     );
     _trainingOverview = _library.lookupFunction<
       _StringNoArgsNative,
@@ -532,16 +564,48 @@ class FfiCoreGateway implements CoreGateway {
   }
 
   static Future<FfiCoreGateway> create() async {
+    final diagnostics = AppStartupDiagnostics.instance;
     const configuredPath = String.fromEnvironment('KCHESS_CORE_PATH');
+
+    var stopwatch = Stopwatch()..start();
     final library = configuredPath.isNotEmpty
         ? DynamicLibrary.open(configuredPath)
         : DynamicLibrary.open(
             Platform.isWindows ? 'kchess_core.dll' : 'libkchess_core.so',
           );
+    diagnostics.recordFfiGatewayDuration(
+      'dynamicLibraryOpenMs',
+      stopwatch.elapsedMilliseconds,
+    );
+
+    stopwatch = Stopwatch()..start();
     final directory = await getApplicationSupportDirectory();
+    diagnostics.recordFfiGatewayDuration(
+      'applicationSupportDirectoryMs',
+      stopwatch.elapsedMilliseconds,
+    );
+
+    stopwatch = Stopwatch()..start();
     await _installBundledAsset(directory.path, 'opening_book.kcb');
+    diagnostics.recordFfiGatewayDuration(
+      'openingBookAssetSyncMs',
+      stopwatch.elapsedMilliseconds,
+    );
+
+    stopwatch = Stopwatch()..start();
     await _installBundledAsset(directory.path, 'opening_names.kco');
-    return FfiCoreGateway._(library, directory.path);
+    diagnostics.recordFfiGatewayDuration(
+      'openingNamesAssetSyncMs',
+      stopwatch.elapsedMilliseconds,
+    );
+
+    stopwatch = Stopwatch()..start();
+    final gateway = FfiCoreGateway._(library, directory.path);
+    diagnostics.recordFfiGatewayDuration(
+      'bindingLookupMs',
+      stopwatch.elapsedMilliseconds,
+    );
+    return gateway;
   }
 
   static Future<void> _installBundledAsset(
@@ -585,6 +649,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StatusNoArgsDart _lastStatus;
   late final _StringNoArgsDart _profiles;
   late final _StringNoArgsDart _activeProfile;
+  late final _StringNoArgsDart _playerProfile;
   late final _CreateProfileDart _createProfile;
   late final _StatusStringDart _setActiveProfile;
   late final _StatusStringDart _deleteProfile;
@@ -600,6 +665,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StatusStringDart _setLocale;
   late final _StatusStringDart _setEngineId;
   late final _StringNoArgsDart _games;
+  late final _StringNoArgsDart _initialGames;
   late final _StringArgDart _queryGames;
   late final _StringNoArgsDart _favoriteGames;
   late final _StringArgDart _game;
@@ -621,6 +687,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _botMoveStatus;
   late final _StatusStringDart _cancelBotMove;
   late final _StringArgDart _coachAsk;
+  late final _StringNoArgsDart _coachPerformanceDiagnostics;
   late final _StringArgDart _coachContext;
   late final _StringArgDart _coachAutomatic;
   late final _StringArgDart _startCoachAsk;
@@ -628,6 +695,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _startCoachHint;
   late final _StringArgDart _coachJobStatus;
   late final _StatusStringDart _cancelCoachJob;
+  late final _StringArgDart _knowledgeInspector;
   late final _StringNoArgsDart _trainingOverview;
   late final _StringArgDart _practiceCommand;
   late final _StringArgDart _startTrainingAttempt;
@@ -656,6 +724,10 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringNoArgsDart _statisticsOpenings;
   late final _StringArgDart _statisticsOpeningsFiltered;
   late final _StringNoArgsDart _statisticsTerminations;
+  late final _StringArgDart _statisticsAccuracy;
+  late final _StatusNoArgsDart _startBackgroundAnalysis;
+  late final _StringNoArgsDart _backgroundAnalysisStatus;
+  late final _StatusIntDart _setBackgroundAnalysisEnabled;
   late final _StringNoArgsDart _statisticsPhases;
   late final _StringArgDart _statisticsTimeline;
   late final _StatusStringIntDart _setGameFavorite;
@@ -671,6 +743,7 @@ class FfiCoreGateway implements CoreGateway {
   Pointer<Void> _handle = nullptr;
   String? _activeProviderJobId;
   final Set<String> _activeCoachJobIds = <String>{};
+  final Map<String, String> _coachJobSessions = <String, String>{};
 
   @override
   Future<void> initialize() async {
@@ -704,6 +777,12 @@ class FfiCoreGateway implements CoreGateway {
     return value == null
         ? null
         : AppProfile.fromJson(value as Map<String, Object?>);
+  }
+
+  @override
+  Future<Map<String, Object?>?> playerProfile() async {
+    final value = _readJson(_playerProfile(_handle));
+    return value == null ? null : value as Map<String, Object?>;
   }
 
   @override
@@ -902,6 +981,29 @@ class FfiCoreGateway implements CoreGateway {
   }
 
   @override
+  Future<AccuracyStats> accuracyStats({String timeControl = 'all'}) =>
+      _withNativeString(
+        timeControl.isEmpty ? 'all' : timeControl,
+        (value) => AccuracyStats.fromJson(
+          _readJson(_statisticsAccuracy(_handle, value))! as Map<String, Object?>,
+        ),
+      );
+
+  @override
+  Future<void> startBackgroundAnalysis() async =>
+      _checkStatus(_startBackgroundAnalysis(_handle));
+
+  @override
+  Future<BackgroundAnalysisStatus> backgroundAnalysisStatus() async =>
+      BackgroundAnalysisStatus.fromJson(
+        _readJson(_backgroundAnalysisStatus(_handle))! as Map<String, Object?>,
+      );
+
+  @override
+  Future<void> setBackgroundAnalysisEnabled(bool enabled) async =>
+      _checkStatus(_setBackgroundAnalysisEnabled(_handle, enabled ? 1 : 0));
+
+  @override
   Future<TerminationStats> terminationStats() async =>
       TerminationStats.fromJson(
         _readJson(_statisticsTerminations(_handle))! as Map<String, Object?>,
@@ -928,6 +1030,11 @@ class FfiCoreGateway implements CoreGateway {
   @override
   Future<List<GameSummary>> games() async =>
       _readList(_games(_handle), (json) => GameSummary.fromJson(json));
+
+  @override
+  Future<GameMonthSnapshot> initialGames() async => GameMonthSnapshot.fromJson(
+    _readJson(_initialGames(_handle))! as Map<String, Object?>,
+  );
 
   @override
   Future<List<GameSummary>> queryGames(GameQuery query) => _withNativeString(
@@ -1132,8 +1239,16 @@ class FfiCoreGateway implements CoreGateway {
       return _readJson(_startCoachAsk(_handle, value))!
           as Map<String, Object?>;
     });
-    return _waitCoachJob(started['jobId']! as String);
+    return _waitCoachJob(
+      started['jobId']! as String,
+      sessionId: request['sessionId'] as String?,
+    );
   }
+
+  @override
+  Future<Map<String, Object?>> coachPerformanceDiagnostics() async =>
+      _readJson(_coachPerformanceDiagnostics(_handle))!
+          as Map<String, Object?>;
 
   @override
   Future<Map<String, Object?>> coachContext(Map<String, Object?> request) =>
@@ -1148,7 +1263,10 @@ class FfiCoreGateway implements CoreGateway {
       return _readJson(_startCoachAutomatic(_handle, value))!
           as Map<String, Object?>;
     });
-    return _waitCoachJob(started['jobId']! as String);
+    return _waitCoachJob(
+      started['jobId']! as String,
+      sessionId: request['sessionId'] as String?,
+    );
   }
 
   @override
@@ -1158,6 +1276,14 @@ class FfiCoreGateway implements CoreGateway {
     });
     return _waitCoachJob(started['jobId']! as String);
   }
+
+  @override
+  Future<Map<String, Object?>> knowledgeInspector(
+    Map<String, Object?> request,
+  ) => _withNativeString(jsonEncode(request), (value) {
+    final result = _readJson(_knowledgeInspector(_handle, value));
+    return result! as Map<String, Object?>;
+  });
 
   @override
   Future<TrainingOverview> trainingOverview() async {
@@ -1449,8 +1575,25 @@ class FfiCoreGateway implements CoreGateway {
     }
   }
 
-  Future<Map<String, Object?>> _waitCoachJob(String jobId) async {
+  @override
+  Future<void> cancelCoachSessionJobs(String sessionId) async {
+    final jobs = _coachJobSessions.entries
+        .where((entry) => entry.value == sessionId)
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    for (final jobId in jobs) {
+      await _withNativeString(jobId, (value) {
+        _checkStatus(_cancelCoachJob(_handle, value));
+      });
+    }
+  }
+
+  Future<Map<String, Object?>> _waitCoachJob(
+    String jobId, {
+    String? sessionId,
+  }) async {
     _activeCoachJobIds.add(jobId);
+    if (sessionId != null) _coachJobSessions[jobId] = sessionId;
     try {
       while (true) {
         final status = await _withNativeString(jobId, (value) {
@@ -1470,6 +1613,7 @@ class FfiCoreGateway implements CoreGateway {
       }
     } finally {
       _activeCoachJobIds.remove(jobId);
+      _coachJobSessions.remove(jobId);
     }
   }
 
@@ -1602,6 +1746,7 @@ class FfiCoreGateway implements CoreGateway {
         }
       }
       _activeCoachJobIds.clear();
+      _coachJobSessions.clear();
       _destroy(_handle);
       _handle = nullptr;
     }

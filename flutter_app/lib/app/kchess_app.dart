@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import '../diagnostics/app_startup_diagnostics.dart';
 import '../localization/generated/app_localizations.dart';
 import '../shared/models/models.dart';
 import '../shared/theme/app_theme.dart';
@@ -17,9 +19,17 @@ class KChessApp extends StatefulWidget {
 }
 
 class _KChessAppState extends State<KChessApp> {
+  bool _readyFrameScheduled = false;
+
   @override
   void initState() {
     super.initState();
+    final startup = AppStartupDiagnostics.instance;
+    startup.mark('appInitStateMs');
+    SchedulerBinding.instance.addTimingsCallback(_recordFrameTimings);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      startup.mark('firstFrameMs');
+    });
     widget.controller.addListener(_refresh);
     widget.controller.initialize();
   }
@@ -35,12 +45,30 @@ class _KChessAppState extends State<KChessApp> {
 
   @override
   void dispose() {
+    SchedulerBinding.instance.removeTimingsCallback(_recordFrameTimings);
     widget.controller.removeListener(_refresh);
     widget.controller.dispose();
     super.dispose();
   }
 
-  void _refresh() => setState(() {});
+  void _recordFrameTimings(List<FrameTiming> timings) {
+    final startup = AppStartupDiagnostics.instance;
+    startup.recordFrameTimings(timings);
+    if (startup.frameSamplingComplete) {
+      SchedulerBinding.instance.removeTimingsCallback(_recordFrameTimings);
+    }
+  }
+
+  void _refresh() {
+    setState(() {});
+    if (widget.controller.phase != AppPhase.ready || _readyFrameScheduled) {
+      return;
+    }
+    _readyFrameScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppStartupDiagnostics.instance.mark('firstReadyFrameMs');
+    });
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(

@@ -68,7 +68,7 @@ target_include_directories(stockfish_official PUBLIC ${STOCKFISH_SOURCE_DIR})
 set_target_properties(stockfish_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_definitions(stockfish_official PRIVATE USE_SSE2)
-target_compile_options(stockfish_official PRIVATE /W3 /EHsc /bigobj /FS)
+target_compile_options(stockfish_official PRIVATE /W3 /EHsc /bigobj /FS /MP)
 
 # -----------------------------------------------------------------------------
 # Section: Stockfish 19 static library
@@ -116,7 +116,7 @@ target_include_directories(stockfish19_official PRIVATE ${STOCKFISH19_SOURCE_DIR
 set_target_properties(stockfish19_official PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_definitions(stockfish19_official PRIVATE USE_SSE2)
-target_compile_options(stockfish19_official PRIVATE /W3 /EHsc /bigobj /FS)
+target_compile_options(stockfish19_official PRIVATE /W3 /EHsc /bigobj /FS /MP)
 
 # -----------------------------------------------------------------------------
 # Section: Stable configuration-specific library outputs

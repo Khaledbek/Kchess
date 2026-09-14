@@ -103,6 +103,20 @@ bool valid_month(const std::string& month) {
   return month_number >= 1 && month_number <= 12;
 }
 
+std::string current_utc_month() {
+  const std::time_t now = std::time(nullptr);
+  std::tm utc{};
+#if defined(_WIN32)
+  gmtime_s(&utc, &now);
+#else
+  gmtime_r(&now, &utc);
+#endif
+  std::ostringstream value;
+  value << std::setfill('0') << std::setw(4) << utc.tm_year + 1900
+        << '-' << std::setw(2) << utc.tm_mon + 1;
+  return value.str();
+}
+
 }  // namespace
 
 GameLibraryService::GameLibraryService(Database& database, ProfileService& profile_service)
@@ -231,6 +245,34 @@ std::string GameLibraryService::games_json() const {
   return json.str();
 }
 
+std::string GameLibraryService::initial_games_json() const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) return R"({"month":null,"games":[]})";
+
+  std::optional<std::string> month;
+  std::vector<GameRecord> games;
+  if (profile->type == ProfileType::local_pgn_fen) {
+    games = database_.games(profile->id);
+  } else {
+    const auto current_month = current_utc_month();
+    month = database_.latest_game_month_at_or_before(profile->id, current_month)
+                .value_or(current_month);
+    games = database_.games_for_month(profile->id, *month);
+  }
+
+  std::ostringstream json;
+  json << "{\"month\":";
+  if (month.has_value()) json << '"' << escape_json(*month) << '"';
+  else json << "null";
+  json << ",\"games\":[";
+  for (std::size_t index = 0; index < games.size(); ++index) {
+    if (index != 0) json << ',';
+    json << game_record_json(games[index], false);
+  }
+  json << "]}";
+  return json.str();
+}
+
 std::string GameLibraryService::favorite_games_json() const {
   const auto games = database_.favorite_games();
   std::ostringstream json;
@@ -272,7 +314,12 @@ std::string GameLibraryService::query_games_json(const std::string& query_text) 
 
   const auto identity = lowercase(
       profile->provider_username.value_or(profile->display_name));
-  auto games = database_.games(profile->id);
+  if (apply_month && !month.empty() && !valid_month(month)) {
+    throw std::invalid_argument("Month must use YYYY-MM");
+  }
+  auto games = apply_month && !month.empty()
+      ? database_.games_for_month(profile->id, month)
+      : database_.games(profile->id);
   games.erase(std::remove_if(games.begin(), games.end(), [&](const GameRecord& game) {
     if (favorite_only && !game.favorite) return true;
     if (!search.empty() && lowercase(game.white_name).find(search) == std::string::npos
@@ -286,19 +333,6 @@ std::string GameLibraryService::query_games_json(const std::string& query_text) 
     }
     if (require_analyzed && !game.analyzed) return true;
     if (require_not_analyzed && game.analyzed) return true;
-    if (apply_month && !month.empty() && game.ended_at > 0) {
-      const std::time_t timestamp = static_cast<std::time_t>(game.ended_at);
-      std::tm utc{};
-#if defined(_WIN32)
-      gmtime_s(&utc, &timestamp);
-#else
-      gmtime_r(&timestamp, &utc);
-#endif
-      std::ostringstream value;
-      value << std::setfill('0') << std::setw(4) << utc.tm_year + 1900
-            << '-' << std::setw(2) << utc.tm_mon + 1;
-      if (value.str() != month) return true;
-    }
     return false;
   }), games.end());
 

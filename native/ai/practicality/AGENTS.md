@@ -16,6 +16,12 @@
 ## Player-aware overlay
 
 - `player_practicality.*` consumes objective `PracticalityAssessment`, candidate lines and a compact typed player context; it does not call engines or read persistence directly.
-- Engine rank stays authoritative. A practical alternative is eligible only when its known evaluation loss is at most 80 cp; rank 1 is always eligible.
+- Engine rank stays authoritative. Rank 1 is always eligible. When engine WDL is available, practical alternatives use root-side expected-score loss (<= 0.08) as the primary objective safety gate; the historical <= 80 cp gate remains the fallback when WDL is unavailable.
 - Rating/skill/risk preferences influence fit only among objectively eligible choices. Missing profile signals disable the player-adjusted evidence instead of fabricating a generic player.
 - Keep the persistent/learned user-profile implementation in `native/ai/profile/`; it maps into this existing scoring boundary through `PracticalityPlayerContext` rather than duplicating player-fit logic.
+
+## Update 160 - expected-score-aware practicality v2
+
+- Candidate DTOs carry root-side expected score derived from existing engine WDL; no extra engine search is allowed.
+- Objective risk/forgiveness and player-aware alternative eligibility prefer expected-score loss when available, because equal centipawn gaps can have very different practical result impact. CP remains the compatibility fallback for engines/results without WDL.
+- Practicality v2 does not change engine ranking or allow player preference to promote a result-significantly inferior move.

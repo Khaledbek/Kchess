@@ -34,3 +34,14 @@ Sichtbare Texte nur über ARB (EN/DE/AR gemeinsam). `lib/localization/generated/
 ## Arbeitsweise
 
 Vor DTO-/Widget-Cleanup projektweit nach Aufrufern suchen. Native-JSON nicht nur deshalb ändern, weil Flutter ein Feld nicht konsumiert. Keine automatischen Builds/Tests/Analyzer/Run.
+
+
+## Update 146 - Windows native build integration
+
+- `windows/CMakeLists.txt` delegates the Windows/MSVC x64 `kchess_core` build to the native persistent CMake cache under `%LOCALAPPDATA%\KChess\build-cache\<checkout-id>` and installs the resulting DLL into the normal Flutter bundle. Flutter remains the packaging/UI owner, not the native dependency tracker.
+- Do not restore an in-`flutter_app/build` duplicate `kchess_core` build for Windows while the persistent path is active. Non-Windows/native platform behavior keeps the existing native CMake integration.
+
+## Update 151 - Flutter startup instrumentation
+
+- `lib/diagnostics/app_startup_diagnostics.dart` owns read-only Flutter/bootstrap timing only: `main`, FFI bootstrap phases, controller initialization phases, first frame/first ready frame and a bounded initial frame-timing sample.
+- These measurements are diagnostic presentation data. They must not decide navigation, startup gating, background scheduling, caching, profile work or native resource budgets.

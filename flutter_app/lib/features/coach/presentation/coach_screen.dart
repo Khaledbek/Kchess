@@ -23,8 +23,12 @@ class CoachScreen extends StatefulWidget {
     this.depth = CoachResponseDepth.balanced,
     this.onSubmit,
     this.onShowBoard,
+    this.onPlayMove,
+    this.onCopyConversation,
+    this.onDiagnostics,
     this.onCompare,
     this.onQuiz,
+    this.onPersonalTraining,
     this.onHintRequested,
     this.onDepthChanged,
     this.onFenRequested,
@@ -42,7 +46,7 @@ class CoachScreen extends StatefulWidget {
     this.boardBusy = false,
     this.hintEnabled = true,
     this.hintBusy = false,
-    this.showPgnControls = false,
+    this.showBoardControls = false,
     this.onFirstMove,
     this.onPreviousMove,
     this.onNextMove,
@@ -61,8 +65,12 @@ class CoachScreen extends StatefulWidget {
   final CoachResponseDepth depth;
   final ValueChanged<String>? onSubmit;
   final ValueChanged<CoachUiMessage>? onShowBoard;
+  final ValueChanged<CoachUiMessage>? onPlayMove;
+  final VoidCallback? onCopyConversation;
+  final VoidCallback? onDiagnostics;
   final VoidCallback? onCompare;
   final VoidCallback? onQuiz;
+  final VoidCallback? onPersonalTraining;
   final VoidCallback? onHintRequested;
   final ValueChanged<CoachResponseDepth>? onDepthChanged;
   final VoidCallback? onFenRequested;
@@ -80,7 +88,7 @@ class CoachScreen extends StatefulWidget {
   final bool boardBusy;
   final bool hintEnabled;
   final bool hintBusy;
-  final bool showPgnControls;
+  final bool showBoardControls;
   final VoidCallback? onFirstMove;
   final VoidCallback? onPreviousMove;
   final VoidCallback? onNextMove;
@@ -148,7 +156,7 @@ class _CoachScreenState extends State<CoachScreen> {
           final boardColumn = Column(
             children: [
               Expanded(child: board),
-              if (widget.showPgnControls)
+              if (widget.showBoardControls)
                 CoachBoardControls(
                   onFirst: widget.onFirstMove,
                   onPrevious: widget.onPreviousMove,
@@ -165,6 +173,9 @@ class _CoachScreenState extends State<CoachScreen> {
                   isLoading: widget.isLoading,
                   errorMessage: widget.errorMessage,
                   onShowBoard: widget.onShowBoard,
+                  onPlayMove: widget.boardBusy ? null : widget.onPlayMove,
+                  onCopyConversation: widget.onCopyConversation,
+                  onDiagnostics: widget.onDiagnostics,
                 ),
               ),
               const Divider(height: 1),
@@ -192,6 +203,16 @@ class _CoachScreenState extends State<CoachScreen> {
                       icon: const Icon(Icons.psychology_outlined, size: 18),
                       label: Text(AppLocalizations.of(context).coachChallenge),
                     ),
+                    if (widget.onPersonalTraining != null)
+                      TextButton.icon(
+                        onPressed: widget.isLoading || widget.hintBusy
+                            ? null
+                            : widget.onPersonalTraining,
+                        icon: const Icon(Icons.history_edu_outlined, size: 18),
+                        label: Text(
+                          AppLocalizations.of(context).coachPersonalTraining,
+                        ),
+                      ),
                   ],
                 ),
               ),

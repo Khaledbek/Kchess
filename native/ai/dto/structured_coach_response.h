@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -32,15 +33,29 @@ enum class CoachClaimKind {
   tactical_motif,
   engine_evaluation,
   opening_fact,
+  profile_fact,
+  profile_inference,
+  position_contrast_fact,
 };
 
 struct CoachClaim {
   CoachClaimKind kind{CoachClaimKind::general};
   std::string text;
+  // Exact excerpt from answer/follow_up_question containing this assertion.
+  // Native validation checks the excerpt and the typed source independently.
+  std::string answer_quote;
   std::string subject;
   std::string value;
   std::vector<std::string> evidence_ids;
   double confidence{0.0};
+  // Personal claims copy the provider-visible profile chunk epistemic status.
+  // profile_inference uses this to distinguish a cautious inference from a
+  // hypothesis while exact profile_fact claims mirror the source chunk.
+  std::string epistemic_status;
+  // profile_inference must list the exact profile chunk scalar subjects used
+  // as premises (nodeId#/data/json-pointer). This is grounding metadata, not
+  // natural-language reasoning.
+  std::vector<std::string> support_subjects;
 };
 
 struct CoachConceptReference {
@@ -56,13 +71,28 @@ struct CoachRecommendation {
   double confidence{0.0};
 };
 
+enum class CoachSegmentKind { factual, general, uncertainty, dialogue };
+
+struct CoachAnswerSegment {
+  std::string text;
+  CoachSegmentKind kind{CoachSegmentKind::dialogue};
+  std::vector<std::size_t> claim_indices;
+};
+
 struct StructuredCoachContent {
   std::string answer;
   std::string follow_up_question;
+  std::vector<CoachAnswerSegment> answer_segments;
+  std::vector<CoachAnswerSegment> follow_up_segments;
   std::vector<CoachClaim> claims;
   std::vector<CoachConceptReference> concepts;
   std::vector<CoachRecommendation> recommendations;
   std::vector<std::string> evidence_ids;
+
+  // Explicit provider declaration for personal grounding. Values:
+  // not_used, grounded, insufficient_evidence. Empty remains compatible with
+  // older non-profile callers, but profile requests require an explicit value.
+  std::string profile_status;
 
   [[nodiscard]] bool empty() const { return answer.empty(); }
 };

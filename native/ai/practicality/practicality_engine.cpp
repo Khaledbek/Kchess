@@ -40,6 +40,8 @@ EvidenceItem PracticalityEngine::evidence(
   };
   put_optional(metrics, "evaluationLossIfInaccurateCp",
                assessment.metrics.evaluation_loss_if_inaccurate_cp);
+  put_optional(metrics, "expectedScoreLossIfInaccurate",
+               assessment.metrics.expected_score_loss_if_inaccurate);
   put_optional(metrics, "onlyMoveDensity", assessment.metrics.only_move_density);
   put_optional(metrics, "evaluationVolatility",
                assessment.metrics.evaluation_volatility);
@@ -53,7 +55,7 @@ EvidenceItem PracticalityEngine::evidence(
                assessment.metrics.position_stability);
 
   nlohmann::json payload{
-      {"version", 1},
+      {"version", 2},
       {"metrics", std::move(metrics)},
       {"playerAdjusted", false},
   };
@@ -62,7 +64,7 @@ EvidenceItem PracticalityEngine::evidence(
   put_optional(payload, "forgiveness", assessment.forgiveness);
   put_optional(payload, "clarity", assessment.clarity);
   return {
-      .id = "practicality.objective.v1",
+      .id = "practicality.objective.v2",
       .kind = EvidenceKind::practicality,
       .payload = payload.dump(),
       .confidence = assessment.confidence,

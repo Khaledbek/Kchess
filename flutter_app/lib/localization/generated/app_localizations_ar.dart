@@ -19,6 +19,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get coachChallenge => 'أعطني تحديًا';
 
   @override
+  String get coachPersonalTraining => 'تدرّب من مبارياتي';
+
+  @override
+  String get coachPersonalTrainingRequest =>
+      'أعطني وضعية تدريب شخصية مختارة من مبارياتي المحللة ونقاط الضعف المتعلمة. دعني أجد أفضل نقلة قبل كشفها.';
+
+  @override
   String get coachCompareRequest =>
       'قارن النقلات المرشحة التي قدمها المحرك في هذا الوضع. اشرح فكرة كل نقلة ورد الخصم اعتمادًا على الأدلة المتحققة فقط. إذا توفر مرشح واحد فقط، فاشرحه واذكر أن المرشح الثاني المقيّم غير متوفر.';
 
@@ -573,6 +580,110 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statsPhaseError => 'تعذّر تحميل مراحل اللعب.';
 
   @override
+  String get statsAccuracyTitle => 'الدقة';
+
+  @override
+  String get statsAccuracyAverage => 'متوسط الدقة';
+
+  @override
+  String statsAccuracyBlundersPerGame(String value) {
+    return '$value أخطاء فادحة في المباراة';
+  }
+
+  @override
+  String get statsAccuracyEmpty =>
+      'لا توجد مباريات محللة بعد. تُحلل مبارياتك في الخلفية أثناء فتح التطبيق.';
+
+  @override
+  String get statsAccuracyError => 'تعذر تحميل الدقة.';
+
+  @override
+  String get statsAccuracyImproving => 'في تحسن';
+
+  @override
+  String get statsAccuracySteady => 'مستقر';
+
+  @override
+  String get statsAccuracyDeclining => 'في تراجع';
+
+  @override
+  String get statsAccuracyTrendInsufficient =>
+      'لا توجد مباريات محللة كافية بعد';
+
+  @override
+  String statsAccuracyTrendDetail(int games, String recent, String previous) {
+    return 'آخر $games مباريات: $recent (قبلها: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendBlunders(String recent, String previous) {
+    return 'الأخطاء الفادحة لكل مباراة: $recent (قبلها: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendNeeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مباريات محللة إضافية',
+      one: 'مباراة محللة واحدة إضافية',
+    );
+    return '$_temp0 لمعرفة ما إذا كنت تتحسن.';
+  }
+
+  @override
+  String statsAccuracyErrorsPerGame(String value) {
+    return '$value أخطاء في المباراة';
+  }
+
+  @override
+  String statsAccuracyGames(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مباريات',
+      one: 'مباراة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsAccuracyByColor => 'حسب اللون';
+
+  @override
+  String get statsAccuracyByTimeControl => 'حسب نظام الوقت';
+
+  @override
+  String backgroundAnalysisProgress(int analysed, int total) {
+    return 'تم تجهيز $analysed من $total مباريات ذات صلة بالملف الشخصي';
+  }
+
+  @override
+  String get backgroundAnalysisRunning => 'التحليل يعمل في الخلفية';
+
+  @override
+  String get backgroundAnalysisPaused => 'متوقف مؤقتًا أثناء التحليل أو اللعب';
+
+  @override
+  String get backgroundAnalysisComplete =>
+      'اكتمل تجهيز المباريات ذات الصلة بالملف الشخصي';
+
+  @override
+  String get backgroundAnalysisDisabled =>
+      'التحليل في الخلفية متوقف (الإعدادات)';
+
+  @override
+  String get backgroundAnalysisUnavailable =>
+      'المحرك غير متاح، إعادة المحاولة قريبًا';
+
+  @override
+  String get backgroundAnalysisSetting => 'تجهيز ملف اللاعب في الخلفية';
+
+  @override
+  String get backgroundAnalysisSettingSubtitle =>
+      'يستخدم ذاكرة التحليل المشتركة للمباريات المختارة. للتحليل اليدوي الأولوية.';
+
+  @override
   String get statsPhaseRetry => 'إعادة المحاولة';
 
   @override
@@ -1091,6 +1202,148 @@ class AppLocalizationsAr extends AppLocalizations {
       'انقر على بطاقة لفتح تنويعاتها، أو درّب الخط مباشرة.';
 
   @override
+  String get trainingOpeningIncorrectMove => 'نقلة خاطئة';
+
+  @override
+  String get trainingOpeningTryAgain => 'حاول مرة أخرى.';
+
+  @override
+  String trainingOpeningPlayInstead(String move) {
+    return 'النقلة الصحيحة كانت $move';
+  }
+
+  @override
+  String get trainingOpeningScenariosTitle => 'سيناريوهات الافتتاح';
+
+  @override
+  String get trainingOpeningScenariosCaption =>
+      'العب نقلة الكتاب أمام كل رد يعرفه الكتاب.';
+
+  @override
+  String trainingOpeningScenarioDepth(int done, int total) {
+    return 'إتقان العمق: $done/$total نقلات';
+  }
+
+  @override
+  String get trainingOpeningPlayAs => 'العب بـ';
+
+  @override
+  String trainingOpeningOpponentPlayed(String move) {
+    return 'لعب الخصم $move.';
+  }
+
+  @override
+  String trainingOpeningScenarioReady(String move) {
+    return 'الوضعية بعد $move.';
+  }
+
+  @override
+  String get trainingOpeningFindBest => 'اعثر على أفضل رد للمحرك.';
+
+  @override
+  String trainingOpeningCurrentDepth(int done, int total) {
+    return 'العمق الحالي: النقلة $done / $total';
+  }
+
+  @override
+  String trainingOpeningCorrect(String move) {
+    return '$move — هذه نقلة الكتاب.';
+  }
+
+  @override
+  String trainingOpeningAlternative(String move, int rank) {
+    return '$move صحيحة أيضًا — الخيار رقم $rank في الكتاب.';
+  }
+
+  @override
+  String trainingOpeningDepthReached(int depth) {
+    return 'تم الوصول إلى العمق $depth';
+  }
+
+  @override
+  String get trainingOpeningBookExhausted =>
+      'ينتهي الكتاب هنا — لقد أجبت عن كل ما يعرفه.';
+
+  @override
+  String get trainingOpeningNoBook =>
+      'لا يحتوي كتاب الافتتاحيات على نقلات لهذه الوضعية.';
+
+  @override
+  String get trainingOpeningDrillClean =>
+      'بلا أخطاء — هذه المحاولة تُحتسب نحو الإتقان.';
+
+  @override
+  String get trainingOpeningDrillWithErrors =>
+      'انتهت مع تصحيحات. المحاولة الخالية من الأخطاء فقط تُحتسب نحو الإتقان.';
+
+  @override
+  String get trainingOpeningDrillAgain => 'تدرّب مجددًا';
+
+  @override
+  String trainingOpeningBookChoices(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'واحد من $count ردود في الكتاب',
+      one: 'رد الكتاب الوحيد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get openingWeaknessTitle => 'افتتاحيات تحتاج إلى تدريب';
+
+  @override
+  String get openingWeaknessCaption =>
+      'خطوط تخسرها أو تخطئ فيها باستمرار، الأسوأ أولًا.';
+
+  @override
+  String openingWeaknessLost(int losses, int games) {
+    return 'خسرت $losses من $games مباريات';
+  }
+
+  @override
+  String openingWeaknessErrors(int count, int analysed) {
+    return 'أخطاء افتتاحية في $count من $analysed مباريات محللة';
+  }
+
+  @override
+  String openingWeaknessRecurring(String move, int count, String better) {
+    return 'لعبت $move هنا $count مرات — المحرك يفضل $better.';
+  }
+
+  @override
+  String openingWeaknessRecurringFlagged(String move, int count) {
+    return 'لعبت $move هنا $count مرات، ووضع المحرك عليها علامة في كل مرة.';
+  }
+
+  @override
+  String get openingWeaknessAnalyseHint =>
+      'حلّل مبارياتك لاكتشاف النقلات الخاطئة أيضًا، وليس النتائج فقط.';
+
+  @override
+  String openingWeaknessShowAll(int count) {
+    return 'عرض الكل ($count)';
+  }
+
+  @override
+  String get openingWeaknessShowFewer => 'عرض أقل';
+
+  @override
+  String get openingWeaknessFamily => 'عبر عائلة الافتتاح كاملة';
+
+  @override
+  String get trainingWeakSpotsTitle => 'نقاط ضعفك';
+
+  @override
+  String get trainingWeakSpotBadge => 'نقطة ضعف';
+
+  @override
+  String trainingWeakSpotMetric(String opening) {
+    return 'نقطة ضعف: $opening';
+  }
+
+  @override
   String get playAgainstBot => 'اللعب ضد بوت';
 
   @override
@@ -1396,6 +1649,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get coachTrainerOutput => 'المدرب';
 
   @override
+  String get coachCopyConversation => 'نسخ المحادثة';
+
+  @override
+  String get coachConversationCopied => 'تم نسخ المحادثة إلى الحافظة.';
+
+  @override
+  String get coachConversationYou => 'أنت';
+
+  @override
+  String get coachDiagnostics => 'تشخيص المدرب';
+
+  @override
+  String get coachDiagnosticsRefresh => 'تحديث';
+
+  @override
+  String get coachCopyDiagnostics => 'نسخ التشخيص';
+
+  @override
+  String get coachDiagnosticsUnavailable => 'تشخيص المدرب غير متاح.';
+
+  @override
   String get coachWelcome => 'اسأل عن الوضعية أو عن أي موضوع شطرنجي.';
 
   @override
@@ -1428,6 +1702,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get coachValidationFailed => 'تعذر التحقق من إجابة المدرب بشكل آمن.';
+
+  @override
+  String get coachSafeQuizFallbackAnswer => 'وضعية التدريب جاهزة.';
+
+  @override
+  String get coachSafeQuizFallbackQuestion => 'ما النقلة التي ستلعبها هنا؟';
+
+  @override
+  String get coachSafeHintFallbackAnswer =>
+      'ابدأ بالنقلات القسرية: الكشوف والأخذ والتهديدات المباشرة. أي قطعة لديك يمكن أن تصبح أكثر نشاطًا فورًا؟';
 
   @override
   String get coachHintRequest => 'أعطني تلميحًا لهذه الوضعية.';
@@ -1473,4 +1757,219 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get coachHintExplainRequest =>
       'اشرح لماذا نقلة التلميح التي حددها المحرك قوية في هذا الوضع. ركّز على الفكرة الشطرنجية والخطة العملية، لا على أرقام المحرك.';
+
+  @override
+  String get profileDisabled => 'الملف الشخصي معطّل';
+
+  @override
+  String get profileSync => 'مزامنة';
+
+  @override
+  String get playerProfileTitle => 'ملف اللاعب والمدرب الذكي';
+
+  @override
+  String get playerProfileSubtitle =>
+      'يستخلص KChess الأنماط المتكررة وأولويات التدريب من مبارياتك وتحليلاتك الموجودة.';
+
+  @override
+  String get playerProfileLoading => 'جارٍ بناء ملف اللاعب…';
+
+  @override
+  String get playerProfileUnavailable => 'ملف اللاعب غير متاح مؤقتًا.';
+
+  @override
+  String playerProfileConfidence(int percent) {
+    return 'ثقة الملف: $percent%';
+  }
+
+  @override
+  String get playerProfileBackground => 'معالجة ملف اللاعب';
+
+  @override
+  String playerProfileProgress(int processed, int total) {
+    return 'تمت مراعاة $processed من أصل $total مباراة';
+  }
+
+  @override
+  String playerProfileIndexedProgress(int indexed, int total) {
+    return 'تمت فهرسة المكتبة: $indexed / $total مباراة';
+  }
+
+  @override
+  String playerProfileHistoryProgress(
+    int synced,
+    int available,
+    int discovered,
+    int accounts,
+  ) {
+    return 'تمت مزامنة السجل: $synced / $available شهرًا · الحسابات المكتشفة: $discovered / $accounts';
+  }
+
+  @override
+  String playerProfileHistoryPending(int count) {
+    return 'الأشهر التاريخية المتبقية: $count';
+  }
+
+  @override
+  String playerProfilePipelineFunnel(
+    int scanned,
+    int sampled,
+    int sampleBudget,
+    int interesting,
+    int enginePromoted,
+  ) {
+    return 'مسار من 9 مراحل: $scanned مفحوصة · $sampled / $sampleBudget في العينة التاريخية · $interesting مثيرة للاهتمام · $enginePromoted أُرسلت للمحرك';
+  }
+
+  @override
+  String playerProfileRelevantProgress(int resolved, int relevant) {
+    return 'تمت معالجة المباريات المهمة: $resolved / $relevant';
+  }
+
+  @override
+  String playerProfileQueueProgress(int queued, int enginePending) {
+    return 'قائمة انتظار الملف: $queued بانتظار المعالجة · $enginePending بانتظار التحليل المشترك';
+  }
+
+  @override
+  String playerProfileReusedAnalysis(int count) {
+    return 'تمت إعادة استخدام التحليلات الكاملة الموجودة: $count';
+  }
+
+  @override
+  String get playerProfileStatusEmpty => 'لا توجد مباريات متاحة بعد';
+
+  @override
+  String get playerProfileStatusSyncingHistory =>
+      'جارٍ تحميل المباريات الأقدم في الخلفية';
+
+  @override
+  String get playerProfileStatusAnalyzing => 'جارٍ تحليل الأدلة المهمة';
+
+  @override
+  String get playerProfileStatusComplete => 'عمل الملف في الخلفية محدّث';
+
+  @override
+  String get playerProfileStatusQueued =>
+      'لا تزال هناك مباريات مهمة في قائمة الانتظار';
+
+  @override
+  String get playerProfileMainGoal => 'هدف التدريب الرئيسي';
+
+  @override
+  String get playerProfileSecondaryGoals => 'الأهداف الثانوية';
+
+  @override
+  String get playerProfileStrengths => 'نقاط القوة المستقرة';
+
+  @override
+  String get playerProfileWeaknesses => 'نقاط الضعف المتكررة';
+
+  @override
+  String get playerProfileNoPatterns =>
+      'يحتاج KChess إلى أدلة أكثر قبل تحديد أنماط مستقرة.';
+
+  @override
+  String get playerProfileTrainFromGames => 'التدرب من مبارياتي';
+
+  @override
+  String playerProfileTrainingPosition(int number) {
+    return 'وضعية تدريب $number';
+  }
+
+  @override
+  String get profilePatternBlunderControl => 'تجنب الأخطاء الحاسمة';
+
+  @override
+  String get profilePatternMissedOpportunities => 'اكتشاف الفرص الضائعة';
+
+  @override
+  String get profilePatternCalculationConsistency => 'ثبات الحساب';
+
+  @override
+  String get profilePatternOpeningErrors => 'جودة القرارات في الافتتاح';
+
+  @override
+  String get profilePatternEndgameErrors => 'جودة القرارات في نهاية اللعب';
+
+  @override
+  String get profilePatternTimePressureErrors => 'اتخاذ القرار تحت ضغط الوقت';
+
+  @override
+  String get profilePatternMoveConsistency => 'ثبات جودة النقلات';
+
+  @override
+  String get profilePatternOpeningStability => 'لعب افتتاحي مستقر';
+
+  @override
+  String get profilePatternEndgameStability => 'لعب مستقر في نهاية المباراة';
+
+  @override
+  String get profileTrendImproving => 'يتحسن';
+
+  @override
+  String get profileTrendStable => 'مستقر';
+
+  @override
+  String get profileTrendWorsening => 'يحتاج إلى اهتمام';
+
+  @override
+  String get playerProfileEstimatedStrength => 'القوة التقديرية للعب';
+
+  @override
+  String get playerProfileAverageAccuracy => 'الدقة المقاسة';
+
+  @override
+  String get playerProfileConfidenceShort => 'ثقة الملف';
+
+  @override
+  String get playerProfileCoverageShort => 'تغطية الملف';
+
+  @override
+  String get playerProfileAnalyzedEvidence => 'المباريات المحللة';
+
+  @override
+  String playerProfileStrengthEstimateConfidence(int percent) {
+    return 'ثقة تقدير القوة: $percent%';
+  }
+
+  @override
+  String playerProfileLiveLibrary(int scanned, int total) {
+    return 'المكتبة $scanned/$total';
+  }
+
+  @override
+  String playerProfileLiveSample(int sampled, int budget) {
+    return 'العينة $sampled/$budget';
+  }
+
+  @override
+  String playerProfileLiveInteresting(int count) {
+    return 'مهمة $count';
+  }
+
+  @override
+  String playerProfileLiveEngine(int count) {
+    return 'المحرك $count';
+  }
+
+  @override
+  String playerProfileLiveEvidence(int resolved, int relevant) {
+    return 'الأدلة $resolved/$relevant';
+  }
+
+  @override
+  String playerProfileLiveQueue(int count) {
+    return 'قيد الانتظار $count';
+  }
+
+  @override
+  String playerProfileLiveDepth(int depth, int target) {
+    return 'العمق $depth/$target';
+  }
+
+  @override
+  String playerProfileLiveCurrentGame(int percent) {
+    return 'المباراة الحالية $percent%';
+  }
 }

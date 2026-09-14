@@ -118,6 +118,18 @@ abstract class AppLocalizations {
   /// **'Challenge me'**
   String get coachChallenge;
 
+  /// No description provided for @coachPersonalTraining.
+  ///
+  /// In en, this message translates to:
+  /// **'Train from my games'**
+  String get coachPersonalTraining;
+
+  /// No description provided for @coachPersonalTrainingRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Give me one personalized quiz position selected from my own analyzed games and learned weaknesses. Let me find the best move before revealing it.'**
+  String get coachPersonalTrainingRequest;
+
   /// No description provided for @coachCompareRequest.
   ///
   /// In en, this message translates to:
@@ -1186,6 +1198,150 @@ abstract class AppLocalizations {
   /// **'Could not load game phases.'**
   String get statsPhaseError;
 
+  /// No description provided for @statsAccuracyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accuracy'**
+  String get statsAccuracyTitle;
+
+  /// No description provided for @statsAccuracyAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average accuracy'**
+  String get statsAccuracyAverage;
+
+  /// No description provided for @statsAccuracyBlundersPerGame.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} blunders per game'**
+  String statsAccuracyBlundersPerGame(String value);
+
+  /// No description provided for @statsAccuracyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No analysed games yet. Your games are analysed in the background while the app is open.'**
+  String get statsAccuracyEmpty;
+
+  /// No description provided for @statsAccuracyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load accuracy.'**
+  String get statsAccuracyError;
+
+  /// No description provided for @statsAccuracyImproving.
+  ///
+  /// In en, this message translates to:
+  /// **'Improving'**
+  String get statsAccuracyImproving;
+
+  /// No description provided for @statsAccuracySteady.
+  ///
+  /// In en, this message translates to:
+  /// **'Holding steady'**
+  String get statsAccuracySteady;
+
+  /// No description provided for @statsAccuracyDeclining.
+  ///
+  /// In en, this message translates to:
+  /// **'Declining'**
+  String get statsAccuracyDeclining;
+
+  /// No description provided for @statsAccuracyTrendInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough analysed games yet'**
+  String get statsAccuracyTrendInsufficient;
+
+  /// No description provided for @statsAccuracyTrendDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Last {games} games: {recent} (before: {previous})'**
+  String statsAccuracyTrendDetail(int games, String recent, String previous);
+
+  /// No description provided for @statsAccuracyTrendBlunders.
+  ///
+  /// In en, this message translates to:
+  /// **'Blunders per game: {recent} (before: {previous})'**
+  String statsAccuracyTrendBlunders(String recent, String previous);
+
+  /// No description provided for @statsAccuracyTrendNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more analysed game} other{{count} more analysed games}} to see whether you are improving.'**
+  String statsAccuracyTrendNeeded(int count);
+
+  /// No description provided for @statsAccuracyErrorsPerGame.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} mistakes per game'**
+  String statsAccuracyErrorsPerGame(String value);
+
+  /// No description provided for @statsAccuracyGames.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 game} other{{count} games}}'**
+  String statsAccuracyGames(int count);
+
+  /// No description provided for @statsAccuracyByColor.
+  ///
+  /// In en, this message translates to:
+  /// **'By colour'**
+  String get statsAccuracyByColor;
+
+  /// No description provided for @statsAccuracyByTimeControl.
+  ///
+  /// In en, this message translates to:
+  /// **'By time control'**
+  String get statsAccuracyByTimeControl;
+
+  /// No description provided for @backgroundAnalysisProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepared {analysed} of {total} profile-relevant games'**
+  String backgroundAnalysisProgress(int analysed, int total);
+
+  /// No description provided for @backgroundAnalysisRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysing in the background'**
+  String get backgroundAnalysisRunning;
+
+  /// No description provided for @backgroundAnalysisPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused while you analyse or play'**
+  String get backgroundAnalysisPaused;
+
+  /// No description provided for @backgroundAnalysisComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile-relevant games prepared'**
+  String get backgroundAnalysisComplete;
+
+  /// No description provided for @backgroundAnalysisDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Background analysis is off (Settings)'**
+  String get backgroundAnalysisDisabled;
+
+  /// No description provided for @backgroundAnalysisUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine unavailable, retrying shortly'**
+  String get backgroundAnalysisUnavailable;
+
+  /// No description provided for @backgroundAnalysisSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare player profile in the background'**
+  String get backgroundAnalysisSetting;
+
+  /// No description provided for @backgroundAnalysisSettingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the shared game analysis cache for selected games. Foreground analysis takes priority.'**
+  String get backgroundAnalysisSettingSubtitle;
+
   /// No description provided for @statsPhaseRetry.
   ///
   /// In en, this message translates to:
@@ -2109,6 +2265,204 @@ abstract class AppLocalizations {
   /// **'Tap a card to unfold its variations, or train the line right away.'**
   String get trainingOpeningTreeHint;
 
+  /// No description provided for @trainingOpeningIncorrectMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect move'**
+  String get trainingOpeningIncorrectMove;
+
+  /// No description provided for @trainingOpeningTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again.'**
+  String get trainingOpeningTryAgain;
+
+  /// No description provided for @trainingOpeningPlayInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'The move was {move}'**
+  String trainingOpeningPlayInstead(String move);
+
+  /// No description provided for @trainingOpeningScenariosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening scenarios'**
+  String get trainingOpeningScenariosTitle;
+
+  /// No description provided for @trainingOpeningScenariosCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the book move against every reply the book can throw at you.'**
+  String get trainingOpeningScenariosCaption;
+
+  /// No description provided for @trainingOpeningScenarioDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth mastery: {done}/{total} moves'**
+  String trainingOpeningScenarioDepth(int done, int total);
+
+  /// No description provided for @trainingOpeningPlayAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Play as'**
+  String get trainingOpeningPlayAs;
+
+  /// No description provided for @trainingOpeningOpponentPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Opponent played {move}.'**
+  String trainingOpeningOpponentPlayed(String move);
+
+  /// No description provided for @trainingOpeningScenarioReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Position after {move}.'**
+  String trainingOpeningScenarioReady(String move);
+
+  /// No description provided for @trainingOpeningFindBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the best engine response.'**
+  String get trainingOpeningFindBest;
+
+  /// No description provided for @trainingOpeningCurrentDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Current depth: move {done} / {total}'**
+  String trainingOpeningCurrentDepth(int done, int total);
+
+  /// No description provided for @trainingOpeningCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} — that is the book move.'**
+  String trainingOpeningCorrect(String move);
+
+  /// No description provided for @trainingOpeningAlternative.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} works too — book choice #{rank}.'**
+  String trainingOpeningAlternative(String move, int rank);
+
+  /// No description provided for @trainingOpeningDepthReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth {depth} reached'**
+  String trainingOpeningDepthReached(int depth);
+
+  /// No description provided for @trainingOpeningBookExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'The book ends here — you answered everything it knows.'**
+  String get trainingOpeningBookExhausted;
+
+  /// No description provided for @trainingOpeningNoBook.
+  ///
+  /// In en, this message translates to:
+  /// **'The opening book has no moves for this position.'**
+  String get trainingOpeningNoBook;
+
+  /// No description provided for @trainingOpeningDrillClean.
+  ///
+  /// In en, this message translates to:
+  /// **'No slips — this run counts towards mastery.'**
+  String get trainingOpeningDrillClean;
+
+  /// No description provided for @trainingOpeningDrillWithErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished with corrections. Only a clean run counts towards mastery.'**
+  String get trainingOpeningDrillWithErrors;
+
+  /// No description provided for @trainingOpeningDrillAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Drill again'**
+  String get trainingOpeningDrillAgain;
+
+  /// No description provided for @trainingOpeningBookChoices.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{the only book reply} other{one of {count} book replies}}'**
+  String trainingOpeningBookChoices(int count);
+
+  /// No description provided for @openingWeaknessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Openings that need training'**
+  String get openingWeaknessTitle;
+
+  /// No description provided for @openingWeaknessCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines you keep losing or keep getting wrong, worst first.'**
+  String get openingWeaknessCaption;
+
+  /// No description provided for @openingWeaknessLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost {losses} of {games} games'**
+  String openingWeaknessLost(int losses, int games);
+
+  /// No description provided for @openingWeaknessErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening mistakes in {count} of {analysed} analysed games'**
+  String openingWeaknessErrors(int count, int analysed);
+
+  /// No description provided for @openingWeaknessRecurring.
+  ///
+  /// In en, this message translates to:
+  /// **'You played {move} here {count} times — the engine prefers {better}.'**
+  String openingWeaknessRecurring(String move, int count, String better);
+
+  /// No description provided for @openingWeaknessRecurringFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'You played {move} here {count} times, and the engine flagged it every time.'**
+  String openingWeaknessRecurringFlagged(String move, int count);
+
+  /// No description provided for @openingWeaknessAnalyseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse your games to also catch the moves that go wrong, not just the results.'**
+  String get openingWeaknessAnalyseHint;
+
+  /// No description provided for @openingWeaknessShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String openingWeaknessShowAll(int count);
+
+  /// No description provided for @openingWeaknessShowFewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Show fewer'**
+  String get openingWeaknessShowFewer;
+
+  /// No description provided for @openingWeaknessFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Across the whole family'**
+  String get openingWeaknessFamily;
+
+  /// No description provided for @trainingWeakSpotsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your weak spots'**
+  String get trainingWeakSpotsTitle;
+
+  /// No description provided for @trainingWeakSpotBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot'**
+  String get trainingWeakSpotBadge;
+
+  /// No description provided for @trainingWeakSpotMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak spot: {opening}'**
+  String trainingWeakSpotMetric(String opening);
+
   /// No description provided for @playAgainstBot.
   ///
   /// In en, this message translates to:
@@ -2679,6 +3033,48 @@ abstract class AppLocalizations {
   /// **'Trainer'**
   String get coachTrainerOutput;
 
+  /// No description provided for @coachCopyConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy conversation'**
+  String get coachCopyConversation;
+
+  /// No description provided for @coachConversationCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation copied to clipboard.'**
+  String get coachConversationCopied;
+
+  /// No description provided for @coachConversationYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get coachConversationYou;
+
+  /// No description provided for @coachDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Coach diagnostics'**
+  String get coachDiagnostics;
+
+  /// No description provided for @coachDiagnosticsRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get coachDiagnosticsRefresh;
+
+  /// No description provided for @coachCopyDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get coachCopyDiagnostics;
+
+  /// No description provided for @coachDiagnosticsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Coach diagnostics are unavailable.'**
+  String get coachDiagnosticsUnavailable;
+
   /// No description provided for @coachWelcome.
   ///
   /// In en, this message translates to:
@@ -2744,6 +3140,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The coach answer could not be verified safely.'**
   String get coachValidationFailed;
+
+  /// No description provided for @coachSafeQuizFallbackAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'The training position is ready.'**
+  String get coachSafeQuizFallbackAnswer;
+
+  /// No description provided for @coachSafeQuizFallbackQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'What move would you play here?'**
+  String get coachSafeQuizFallbackQuestion;
+
+  /// No description provided for @coachSafeHintFallbackAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Check forcing moves first: checks, captures, and direct threats. Which of your pieces can become active immediately?'**
+  String get coachSafeHintFallbackAnswer;
 
   /// No description provided for @coachHintRequest.
   ///
@@ -2828,6 +3242,341 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Explain why the native engine hint move is strong in this position. Focus on the chess idea and practical plan, not engine numbers.'**
   String get coachHintExplainRequest;
+
+  /// No description provided for @profileDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile disabled'**
+  String get profileDisabled;
+
+  /// No description provided for @profileSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get profileSync;
+
+  /// No description provided for @playerProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Player profile & AI coach'**
+  String get playerProfileTitle;
+
+  /// No description provided for @playerProfileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'KChess turns your existing game and analysis data into recurring patterns and coaching priorities.'**
+  String get playerProfileSubtitle;
+
+  /// No description provided for @playerProfileLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Building your player profile…'**
+  String get playerProfileLoading;
+
+  /// No description provided for @playerProfileUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The player profile is temporarily unavailable.'**
+  String get playerProfileUnavailable;
+
+  /// No description provided for @playerProfileConfidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile confidence: {percent}%'**
+  String playerProfileConfidence(int percent);
+
+  /// No description provided for @playerProfileBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile processing'**
+  String get playerProfileBackground;
+
+  /// No description provided for @playerProfileProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{processed} of {total} games considered'**
+  String playerProfileProgress(int processed, int total);
+
+  /// No description provided for @playerProfileIndexedProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Library indexed: {indexed} / {total} games'**
+  String playerProfileIndexedProgress(int indexed, int total);
+
+  /// No description provided for @playerProfileHistoryProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'History synchronized: {synced} / {available} months · accounts discovered: {discovered} / {accounts}'**
+  String playerProfileHistoryProgress(
+    int synced,
+    int available,
+    int discovered,
+    int accounts,
+  );
+
+  /// No description provided for @playerProfileHistoryPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Historical months still pending: {count}'**
+  String playerProfileHistoryPending(int count);
+
+  /// No description provided for @playerProfilePipelineFunnel.
+  ///
+  /// In en, this message translates to:
+  /// **'9-stage funnel: {scanned} scanned · {sampled} / {sampleBudget} historical sample · {interesting} interesting · {enginePromoted} engine-promoted'**
+  String playerProfilePipelineFunnel(
+    int scanned,
+    int sampled,
+    int sampleBudget,
+    int interesting,
+    int enginePromoted,
+  );
+
+  /// No description provided for @playerProfileRelevantProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Relevant games resolved: {resolved} / {relevant}'**
+  String playerProfileRelevantProgress(int resolved, int relevant);
+
+  /// No description provided for @playerProfileQueueProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile queue: {queued} waiting · {enginePending} waiting for shared analysis'**
+  String playerProfileQueueProgress(int queued, int enginePending);
+
+  /// No description provided for @playerProfileReusedAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing full analyses reused: {count}'**
+  String playerProfileReusedAnalysis(int count);
+
+  /// No description provided for @playerProfileStatusEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No games available yet'**
+  String get playerProfileStatusEmpty;
+
+  /// No description provided for @playerProfileStatusSyncingHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading older games in the background'**
+  String get playerProfileStatusSyncingHistory;
+
+  /// No description provided for @playerProfileStatusAnalyzing.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing relevant evidence'**
+  String get playerProfileStatusAnalyzing;
+
+  /// No description provided for @playerProfileStatusComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile background work is up to date'**
+  String get playerProfileStatusComplete;
+
+  /// No description provided for @playerProfileStatusQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Relevant games remain in the queue'**
+  String get playerProfileStatusQueued;
+
+  /// No description provided for @playerProfileMainGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Main coaching goal'**
+  String get playerProfileMainGoal;
+
+  /// No description provided for @playerProfileSecondaryGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary goals'**
+  String get playerProfileSecondaryGoals;
+
+  /// No description provided for @playerProfileStrengths.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable strengths'**
+  String get playerProfileStrengths;
+
+  /// No description provided for @playerProfileWeaknesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Recurring weaknesses'**
+  String get playerProfileWeaknesses;
+
+  /// No description provided for @playerProfileNoPatterns.
+  ///
+  /// In en, this message translates to:
+  /// **'More evidence is needed before KChess names stable patterns.'**
+  String get playerProfileNoPatterns;
+
+  /// No description provided for @playerProfileTrainFromGames.
+  ///
+  /// In en, this message translates to:
+  /// **'Train from my games'**
+  String get playerProfileTrainFromGames;
+
+  /// No description provided for @playerProfileTrainingPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Training position {number}'**
+  String playerProfileTrainingPosition(int number);
+
+  /// No description provided for @profilePatternBlunderControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoiding decisive blunders'**
+  String get profilePatternBlunderControl;
+
+  /// No description provided for @profilePatternMissedOpportunities.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognizing missed opportunities'**
+  String get profilePatternMissedOpportunities;
+
+  /// No description provided for @profilePatternCalculationConsistency.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation consistency'**
+  String get profilePatternCalculationConsistency;
+
+  /// No description provided for @profilePatternOpeningErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening decision quality'**
+  String get profilePatternOpeningErrors;
+
+  /// No description provided for @profilePatternEndgameErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Endgame decision quality'**
+  String get profilePatternEndgameErrors;
+
+  /// No description provided for @profilePatternTimePressureErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision process under time pressure'**
+  String get profilePatternTimePressureErrors;
+
+  /// No description provided for @profilePatternMoveConsistency.
+  ///
+  /// In en, this message translates to:
+  /// **'Consistent move quality'**
+  String get profilePatternMoveConsistency;
+
+  /// No description provided for @profilePatternOpeningStability.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable opening play'**
+  String get profilePatternOpeningStability;
+
+  /// No description provided for @profilePatternEndgameStability.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable endgame play'**
+  String get profilePatternEndgameStability;
+
+  /// No description provided for @profileTrendImproving.
+  ///
+  /// In en, this message translates to:
+  /// **'Improving'**
+  String get profileTrendImproving;
+
+  /// No description provided for @profileTrendStable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable'**
+  String get profileTrendStable;
+
+  /// No description provided for @profileTrendWorsening.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention'**
+  String get profileTrendWorsening;
+
+  /// No description provided for @playerProfileEstimatedStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated playing strength'**
+  String get playerProfileEstimatedStrength;
+
+  /// No description provided for @playerProfileAverageAccuracy.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured accuracy'**
+  String get playerProfileAverageAccuracy;
+
+  /// No description provided for @playerProfileConfidenceShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile confidence'**
+  String get playerProfileConfidenceShort;
+
+  /// No description provided for @playerProfileCoverageShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile coverage'**
+  String get playerProfileCoverageShort;
+
+  /// No description provided for @playerProfileAnalyzedEvidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzed games'**
+  String get playerProfileAnalyzedEvidence;
+
+  /// No description provided for @playerProfileStrengthEstimateConfidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength estimate confidence: {percent}%'**
+  String playerProfileStrengthEstimateConfidence(int percent);
+
+  /// No description provided for @playerProfileLiveLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Library {scanned}/{total}'**
+  String playerProfileLiveLibrary(int scanned, int total);
+
+  /// No description provided for @playerProfileLiveSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample {sampled}/{budget}'**
+  String playerProfileLiveSample(int sampled, int budget);
+
+  /// No description provided for @playerProfileLiveInteresting.
+  ///
+  /// In en, this message translates to:
+  /// **'Interesting {count}'**
+  String playerProfileLiveInteresting(int count);
+
+  /// No description provided for @playerProfileLiveEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine {count}'**
+  String playerProfileLiveEngine(int count);
+
+  /// No description provided for @playerProfileLiveEvidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Evidence {resolved}/{relevant}'**
+  String playerProfileLiveEvidence(int resolved, int relevant);
+
+  /// No description provided for @playerProfileLiveQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue {count}'**
+  String playerProfileLiveQueue(int count);
+
+  /// No description provided for @playerProfileLiveDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth {depth}/{target}'**
+  String playerProfileLiveDepth(int depth, int target);
+
+  /// No description provided for @playerProfileLiveCurrentGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Current game {percent}%'**
+  String playerProfileLiveCurrentGame(int percent);
 }
 
 class _AppLocalizationsDelegate

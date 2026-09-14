@@ -52,3 +52,16 @@
 - Plans are candidate strategic directions such as development, activity, space, king safety, outposts, passed pawns and pressure on detected weaknesses.
 - Keep output move-neutral. Concrete legal move candidates are added only by the later Candidate Move System.
 - Limit evidence to a small ranked set per side and preserve confidence so heuristic plans are not presented as engine truth.
+
+## Update 110 Knowledge Graph feature reuse
+
+- `PositionFeatures` now exposes deterministic per-side piece counts and pawn-square lists so the Knowledge Graph can build material/piece/pawn structure identities without reparsing FEN.
+- These fields are factual board-derived DTO data. Keep their extraction in the existing Stockfish-backed position feature pass and do not create a second board scan in `src/knowledge/`.
+
+## Update 174 - completed move contrast
+
+`move_contrast.*` verifies original question FEN + played UCI against the supplied resulting FEN, then reuses `PositionFeatureExtractor` for before/played and an optional previously remembered candidate. Its JSON exposes static material and board-feature deltas only. It must not search Stockfish, label a move objectively better from heuristic counts, persist new analysis or compare unrelated positions.
+
+## Update 175 - optional completed analysis in move contrast
+
+The static before/played/candidate snapshots remain available without engine work. Add `verifiedAnalysis` only when `CoachService` supplies a completed shared-cache record matching the proved persisted game/ply and original FEN. It may expose recorded classification and expected-score values, plus a critical reply only when a saved line begins with the played move. Never infer a reply from an unrelated best line or treat feature proxies as engine outcomes.

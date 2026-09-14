@@ -16,6 +16,8 @@ struct CandidateLineInput {
   std::vector<std::string> pv_uci;
   std::optional<int> evaluation_cp;
   std::optional<int> mate_in;
+  // Root-side expected score in [0,1], derived from engine WDL when available.
+  std::optional<double> expected_score;
 };
 
 struct CandidateMoveSnapshot {
@@ -33,6 +35,8 @@ struct CandidateMove {
   std::vector<std::string> pv_uci;
   std::optional<int> evaluation_cp;
   std::optional<int> mate_in;
+  // Root-side expected score in [0,1], derived from engine WDL when available.
+  std::optional<double> expected_score;
 };
 
 struct CandidateMoveSet {

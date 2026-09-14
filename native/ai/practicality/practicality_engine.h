@@ -15,6 +15,7 @@ namespace kchess::ai {
 
 struct PracticalityMetrics {
   std::optional<int> evaluation_loss_if_inaccurate_cp;
+  std::optional<double> expected_score_loss_if_inaccurate;
   std::optional<double> only_move_density;
   std::optional<double> evaluation_volatility;
   int critical_reply_count{0};

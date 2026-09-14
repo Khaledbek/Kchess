@@ -10,3 +10,4 @@
 - `coach_provider.json` selects the external coach provider and conservative local quota guards.
 - Keep provider configuration data-only; chess or AI domain logic belongs in native C++.
 - Free-tier safety is conservative: no paid tools, no automatic retry loops, and bounded request/output limits.
+- `coach_provider.json` quota fields (`rpmSoftLimit`, `rpmHardLimit`, `tpmSoftLimit`, `tpmHardLimit`, `rpdSoftLimit`, `rpdHardLimit`) reserve headroom below Google AI Studio limits; Automatic Coach yields at soft limits while manual/repair calls may use the hard-limit reserve.

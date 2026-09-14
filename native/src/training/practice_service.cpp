@@ -31,7 +31,9 @@ nlohmann::json progress_json(const std::string& key,
   return {{"exerciseId", key}, {"isMastered", record ? record->mastered : false},
           {"successStreak", record ? record->success_streak : 0},
           {"successCount", record ? record->success_count : 0},
-          {"attemptCount", record ? record->attempt_count : 0}};
+          {"attemptCount", record ? record->attempt_count : 0},
+          // Deepest an opening drill has ever run for this key; zero elsewhere.
+          {"bestDepth", record ? record->best_depth : 0}};
 }
 }  // namespace
 
@@ -98,14 +100,18 @@ std::string PracticeService::command(const std::string& request) {
   const auto json = nlohmann::json::parse(request);
   const auto op = json.at("op").get<std::string>();
   if (op == "catalog") return catalog().dump();
-  if (op == "nodes") {
-    auto nodes = content_.openings(json.value("parent", 0), json.value("query", std::string{}));
+  if (op == "nodes" || op == "families") {
+    auto nodes = op == "families"
+        ? content_.families()
+        : content_.openings(json.value("parent", 0), json.value("query", std::string{}));
     const auto stored = database_.training_progress();
     const auto index = index_progress(stored);
     for (auto& node : nodes) {
       const auto key = node.at("progressKey").get<std::string>();
       node["progress"] = progress_json(key, find_progress(index, key));
       node["masteryThreshold"] = TrainingService::mastery_threshold;
+      // What a full drill of this scenario is worth, for the depth meter.
+      node["targetDepth"] = kDrillDepth;
     }
     return nodes.dump();
   }
@@ -128,12 +134,38 @@ std::string PracticeService::command(const std::string& request) {
   throw std::invalid_argument("Unknown practice operation");
 }
 
-nlohmann::json PracticeService::snapshot(const Session& session) const {
-  return {{"session", session.id}, {"key", session.key}, {"kind", session.kind},
+nlohmann::json PracticeService::snapshot(const Session& session) {
+  nlohmann::json result = {{"session", session.id}, {"key", session.key}, {"kind", session.kind},
       {"status", session.status}, {"solverColor", session.solver},
       {"position", nlohmann::json::parse(position_view_json(session.fen))},
-      {"played", session.played}, {"maxMoves", session.budget},
+      {"played", session.played}, {"ply", session.ply}, {"maxMoves", session.budget},
       {"clean", session.clean}, {"evaluation", session.evaluation},
       {"progress", progress(session.key)}};
+
+  if (session.kind == "opening") {
+    // The drill's own state: how deep this run is, what the book just played,
+    // and — only once it has been missed — the move it wanted.
+    result["depth"] = session.played;
+    result["targetDepth"] = session.budget;
+    result["attempts"] = session.attempts;
+    result["bookExhausted"] = session.book_exhausted;
+    result["bookMoves"] = static_cast<int>(session.book.size());
+    result["openingMoves"] = session.opening_moves;
+    if (!session.opponent_uci.empty()) {
+      result["opponentMove"] = {{"uci", session.opponent_uci},
+          {"san", session.opponent_san}, {"side", session.opponent_side},
+          {"moveNumber", session.opponent_number},
+          {"alternatives", session.opponent_alternatives}};
+    }
+    if (!session.answer_uci.empty()) {
+      result["answer"] = {{"uci", session.answer_uci}, {"san", session.answer_san},
+          {"rank", session.answer_rank}};
+    }
+    if (!session.hint.empty()) {
+      result["hint"] = session.hint;
+      result["hintSan"] = session.hint_san;
+    }
+  }
+  return result;
 }
 }  // namespace kchess

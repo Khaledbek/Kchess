@@ -14,9 +14,17 @@ namespace {
 // -----------------------------------------------------------------------------
 
 constexpr int kMaxPracticalLossCp = 80;
+constexpr double kMaxPracticalExpectedScoreLoss = 0.08;
 
 double clamp01(double value) {
   return std::clamp(value, 0.0, 1.0);
+}
+
+std::optional<double> expected_score_loss_from_best(
+    const CandidateMove& best, const CandidateMove& candidate) {
+  if (best.move_uci == candidate.move_uci) return 0.0;
+  if (!best.expected_score || !candidate.expected_score) return std::nullopt;
+  return std::clamp(*best.expected_score - *candidate.expected_score, 0.0, 1.0);
 }
 
 std::optional<int> loss_from_best(const CandidateMove& best,
@@ -37,9 +45,13 @@ std::optional<int> loss_from_best(const CandidateMove& best,
 }
 
 bool objectively_eligible(const CandidateMove& candidate,
-                           const std::optional<int>& loss) {
+                           const std::optional<int>& loss_cp,
+                           const std::optional<double>& expected_score_loss) {
   if (candidate.rank == 1) return true;
-  return loss.has_value() && *loss <= kMaxPracticalLossCp;
+  if (expected_score_loss.has_value()) {
+    return *expected_score_loss <= kMaxPracticalExpectedScoreLoss;
+  }
+  return loss_cp.has_value() && *loss_cp <= kMaxPracticalLossCp;
 }
 
 // -----------------------------------------------------------------------------
@@ -74,10 +86,15 @@ std::optional<double> candidate_difficulty(
 }
 
 std::optional<double> candidate_risk(
-    const std::optional<int>& loss,
+    const std::optional<int>& loss_cp,
+    const std::optional<double>& expected_score_loss,
     const PracticalityAssessment& objective) {
-  const std::optional<double> quality_risk =
-      loss ? std::optional<double>(clamp01(*loss / 80.0)) : std::nullopt;
+  const std::optional<double> quality_risk = expected_score_loss
+      ? std::optional<double>(clamp01(
+            *expected_score_loss / kMaxPracticalExpectedScoreLoss))
+      : loss_cp
+          ? std::optional<double>(clamp01(*loss_cp / 80.0))
+          : std::nullopt;
   if (objective.risk && quality_risk) {
     return clamp01(0.75 * *objective.risk + 0.25 * *quality_risk);
   }
@@ -102,11 +119,15 @@ std::optional<double> fit_score(
     risk_fit = 1.0 - 0.35 * *candidate.risk;
   }
 
-  const double quality = candidate.evaluation_loss_cp
+  const double quality = candidate.expected_score_loss
                              ? 1.0 - 0.20 * clamp01(
-                                         *candidate.evaluation_loss_cp /
-                                         static_cast<double>(kMaxPracticalLossCp))
-                             : (candidate.engine_rank == 1 ? 1.0 : 0.0);
+                                         *candidate.expected_score_loss /
+                                         kMaxPracticalExpectedScoreLoss)
+                             : candidate.evaluation_loss_cp
+                                 ? 1.0 - 0.20 * clamp01(
+                                             *candidate.evaluation_loss_cp /
+                                             static_cast<double>(kMaxPracticalLossCp))
+                                 : (candidate.engine_rank == 1 ? 1.0 : 0.0);
   return clamp01(0.40 * skill_fit + 0.20 * clarity + 0.20 * forgiveness +
                  0.10 * risk_fit + 0.10 * quality);
 }
@@ -119,10 +140,12 @@ PracticalCandidateFit build_fit(const CandidateMove& candidate,
   result.move_uci = candidate.move_uci;
   result.engine_rank = candidate.rank;
   result.evaluation_loss_cp = loss_from_best(best, candidate);
-  result.objectively_eligible =
-      objectively_eligible(candidate, result.evaluation_loss_cp);
+  result.expected_score_loss = expected_score_loss_from_best(best, candidate);
+  result.objectively_eligible = objectively_eligible(
+      candidate, result.evaluation_loss_cp, result.expected_score_loss);
   result.difficulty = candidate_difficulty(candidate, objective);
-  result.risk = candidate_risk(result.evaluation_loss_cp, objective);
+  result.risk = candidate_risk(
+      result.evaluation_loss_cp, result.expected_score_loss, objective);
   if (result.objectively_eligible) {
     result.fit = fit_score(result, objective, player);
   }
@@ -196,22 +219,27 @@ EvidenceItem PlayerPracticalityEngine::evidence(
     if (candidate.evaluation_loss_cp) {
       item["evaluationLossCp"] = *candidate.evaluation_loss_cp;
     }
+    if (candidate.expected_score_loss) {
+      item["expectedScoreLoss"] = *candidate.expected_score_loss;
+    }
     if (candidate.difficulty) item["difficulty"] = *candidate.difficulty;
     if (candidate.risk) item["risk"] = *candidate.risk;
     if (candidate.fit) item["fit"] = *candidate.fit;
     candidates.push_back(std::move(item));
   }
 
-  nlohmann::json payload{{"version", 1},
+  nlohmann::json payload{{"version", 2},
                          {"playerAdjusted", true},
                          {"objectiveLossLimitCp", kMaxPracticalLossCp},
+                         {"objectiveExpectedScoreLossLimit",
+                          kMaxPracticalExpectedScoreLoss},
                          {"player", std::move(player)},
                          {"candidates", std::move(candidates)}};
   if (assessment.practical_choice_uci) {
     payload["practicalChoice"] = *assessment.practical_choice_uci;
   }
   return {
-      .id = "practicality.player.v1",
+      .id = "practicality.player.v2",
       .kind = EvidenceKind::practicality,
       .payload = payload.dump(),
       .confidence = assessment.confidence,

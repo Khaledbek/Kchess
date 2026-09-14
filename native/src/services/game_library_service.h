@@ -14,6 +14,7 @@ class GameLibraryService {
   GameLibraryService(Database& database, ProfileService& profile_service);
 
   std::string games_json() const;
+  std::string initial_games_json() const;
   std::string query_games_json(const std::string& query_json) const;
   std::string favorite_games_json() const;
   std::string game_json(const std::string& game_id) const;

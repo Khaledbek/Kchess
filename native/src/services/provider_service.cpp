@@ -8,9 +8,11 @@
 #include <chrono>
 #include <cctype>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -363,6 +365,14 @@ void ProviderService::sync_provider_resources(
     const int year,
     const int month,
     const std::shared_ptr<ProviderJob>& job) {
+  sync_provider_metadata(profile_id, provider, job);
+  sync_provider_month(profile_id, provider, year, month, job);
+}
+
+void ProviderService::sync_provider_metadata(
+    const std::string& profile_id,
+    GameProvider& provider,
+    const std::shared_ptr<ProviderJob>& job) {
   auto profile = database_.profile(profile_id);
   if (!profile.has_value() || !profile->provider_username.has_value()) {
     throw std::invalid_argument("online profile not found");
@@ -412,7 +422,35 @@ void ProviderService::sync_provider_resources(
   ensure_active();
   set_phase("months");
   const auto archive_cache = database_.provider_cache(profile_id, "archives");
-  if (!archive_cache || archive_cache->expires_at <= unix_time_seconds()) {
+  bool lichess_needs_joined_month = !archive_cache.has_value();
+  if (provider.type() == ProviderType::lichess && archive_cache.has_value()) {
+    try {
+      const auto cached = nlohmann::json::parse(archive_cache->payload_json);
+      lichess_needs_joined_month = !cached.is_array() || cached.empty();
+    } catch (...) {
+      lichess_needs_joined_month = true;
+    }
+  }
+  const bool archives_need_refresh = !archive_cache.has_value() ||
+      archive_cache->expires_at <= unix_time_seconds() ||
+      (provider.type() == ProviderType::lichess && lichess_needs_joined_month);
+  if (archives_need_refresh) {
+    // Lichess has no archives endpoint. On first background history discovery
+    // we need the account creation time to construct the complete month range.
+    // That timestamp is intentionally not persisted, so obtain it transiently
+    // if the normal profile-cache refresh above did not already provide it.
+    if (provider.type() == ProviderType::lichess && lichess_needs_joined_month &&
+        !transient_provider_joined.has_value()) {
+      auto remote_profile = provider.fetch_profile(
+          *profile->provider_username, {}, job->cancel);
+      if (remote_profile.value.has_value()) {
+        transient_provider_joined = remote_profile.value->joined;
+        profile = database_.update_provider_profile(
+            profile_id, *remote_profile.value, remote_profile.cache,
+            normalized_profile_json(*remote_profile.value));
+        cache_provider_avatar(profile_id, *remote_profile.value, job->cancel);
+      }
+    }
     auto archives = provider.fetch_available_months(
         *profile->provider_username,
         archive_cache ? archive_cache->validators : CacheValidators{}, job->cancel);
@@ -464,6 +502,27 @@ void ProviderService::sync_provider_resources(
           profile_id, "archives", months_json.dump(), archives.cache);
     }
   }
+}
+
+void ProviderService::sync_provider_month(
+    const std::string& profile_id,
+    GameProvider& provider,
+    const int year,
+    const int month,
+    const std::shared_ptr<ProviderJob>& job) {
+  const auto profile = database_.profile(profile_id);
+  if (!profile.has_value() || !profile->provider_username.has_value()) {
+    throw std::invalid_argument("online profile not found");
+  }
+  const auto ensure_active = [&] {
+    if (job->cancel->is_cancelled()) {
+      throw ProviderException(HttpError::cancelled, "provider request cancelled");
+    }
+  };
+  const auto set_phase = [&](const char* phase) {
+    std::lock_guard lock(job->state_mutex);
+    job->state = phase;
+  };
 
   ensure_active();
   set_phase("games");
@@ -487,6 +546,151 @@ void ProviderService::sync_provider_resources(
           profile_id, month_name, normalized, remote_games.cache);
     }
   }
+}
+
+bool ProviderService::backfill_player_profile_history_once(
+    const std::string& owner_profile_id) {
+  validate_token(owner_profile_id, "profile id");
+
+  auto profiles = database_.profiles();
+  std::sort(profiles.begin(), profiles.end(), [](const Profile& left, const Profile& right) {
+    if (left.created_at != right.created_at) return left.created_at < right.created_at;
+    return left.id < right.id;
+  });
+
+  for (const auto& profile : profiles) {
+    if (profile.type == ProfileType::local_pgn_fen || !profile.provider_username.has_value()) {
+      continue;
+    }
+    if (database_.player_profile_owner_id(profile.id) != owner_profile_id) continue;
+
+    const auto provider_type = static_cast<ProviderType>(profile.type);
+    if (provider_scheduler_.retry_after_seconds(provider_type) > 0) continue;
+
+    // Do not race an explicit provider job for the same account. The profile
+    // worker will try again later and the explicit sync remains authoritative.
+    {
+      std::lock_guard lock(provider_jobs_mutex_);
+      bool foreground_sync_active = false;
+      for (const auto& [id, active] : provider_jobs_) {
+        (void)id;
+        std::lock_guard state_lock(active->state_mutex);
+        if (!active->finished && active->profile_id == profile.id) {
+          foreground_sync_active = true;
+          break;
+        }
+      }
+      if (foreground_sync_active) continue;
+    }
+
+    auto job = std::make_shared<ProviderJob>();
+    job->id = "profile-history";
+    job->profile_id = profile.id;
+
+    try {
+      auto provider = provider_for(profile.type);
+      sync_provider_metadata(profile.id, *provider, job);
+
+      const auto archive_cache = database_.provider_cache(profile.id, "archives");
+      if (!archive_cache.has_value()) continue;
+
+      nlohmann::json months_json;
+      try {
+        months_json = nlohmann::json::parse(archive_cache->payload_json);
+      } catch (...) {
+        continue;
+      }
+      if (!months_json.is_array()) continue;
+
+      std::vector<std::string> available_months;
+      available_months.reserve(months_json.size());
+      for (const auto& value : months_json) {
+        if (!value.is_string()) continue;
+        const auto month = value.get<std::string>();
+        if (month.size() == 7 && month[4] == '-') available_months.push_back(month);
+      }
+      std::sort(available_months.begin(), available_months.end(), std::greater<>());
+      available_months.erase(
+          std::unique(available_months.begin(), available_months.end()),
+          available_months.end());
+
+      const auto cached = database_.cached_months(profile.id);
+      const std::set<std::string> cached_set(cached.begin(), cached.end());
+      for (const auto& label : available_months) {
+        if (cached_set.contains(label)) continue;
+        int year = 0;
+        int month = 0;
+        try {
+          year = std::stoi(label.substr(0, 4));
+          month = std::stoi(label.substr(5, 2));
+        } catch (...) {
+          continue;
+        }
+        sync_provider_month(profile.id, *provider, year, month, job);
+        database_.set_provider_sync_state(profile.id, provider_type, "idle", {}, 0);
+        return true;
+      }
+    } catch (const ProviderException& error) {
+      database_.set_provider_sync_state(
+          profile.id, provider_type, "error", error.what(),
+          provider_scheduler_.retry_after_seconds(provider_type));
+      continue;
+    } catch (const std::exception& error) {
+      database_.set_provider_sync_state(
+          profile.id, provider_type, "error", error.what(), 0);
+      continue;
+    }
+  }
+  return false;
+}
+
+PlayerProfileHistoryProgress ProviderService::player_profile_history_progress(
+    const std::string& owner_profile_id) const {
+  validate_token(owner_profile_id, "profile id");
+
+  PlayerProfileHistoryProgress progress;
+  const auto profiles = database_.profiles();
+  for (const auto& profile : profiles) {
+    if (profile.type == ProfileType::local_pgn_fen ||
+        !profile.provider_username.has_value()) {
+      continue;
+    }
+    if (database_.player_profile_owner_id(profile.id) != owner_profile_id) continue;
+
+    ++progress.account_count;
+    const auto archives = database_.provider_cache(profile.id, "archives");
+    if (!archives.has_value()) continue;
+
+    nlohmann::json months_json;
+    try {
+      months_json = nlohmann::json::parse(archives->payload_json);
+    } catch (...) {
+      continue;
+    }
+    if (!months_json.is_array()) continue;
+
+    ++progress.discovered_account_count;
+    std::set<std::string> available_months;
+    for (const auto& value : months_json) {
+      if (!value.is_string()) continue;
+      const auto month = value.get<std::string>();
+      if (month.size() == 7 && month[4] == '-') available_months.insert(month);
+    }
+
+    const auto cached = database_.cached_months(profile.id);
+    const std::set<std::string> cached_months(cached.begin(), cached.end());
+    progress.available_month_count += static_cast<int>(available_months.size());
+    for (const auto& month : available_months) {
+      if (cached_months.contains(month)) ++progress.synced_month_count;
+    }
+  }
+
+  progress.pending_month_count = std::max(
+      0, progress.available_month_count - progress.synced_month_count);
+  progress.complete =
+      progress.discovered_account_count == progress.account_count &&
+      progress.pending_month_count == 0;
+  return progress;
 }
 
 void ProviderService::run_provider_create(

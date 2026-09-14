@@ -13,6 +13,9 @@ class CoachOutputPanel extends StatefulWidget {
     required this.isLoading,
     this.errorMessage,
     this.onShowBoard,
+    this.onPlayMove,
+    this.onCopyConversation,
+    this.onDiagnostics,
     super.key,
   });
 
@@ -20,6 +23,9 @@ class CoachOutputPanel extends StatefulWidget {
   final bool isLoading;
   final String? errorMessage;
   final ValueChanged<CoachUiMessage>? onShowBoard;
+  final ValueChanged<CoachUiMessage>? onPlayMove;
+  final VoidCallback? onCopyConversation;
+  final VoidCallback? onDiagnostics;
 
   @override
   State<CoachOutputPanel> createState() => _CoachOutputPanelState();
@@ -72,9 +78,23 @@ class _CoachOutputPanelState extends State<CoachOutputPanel> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-          child: Text(
-            strings.coachTrainerOutput,
-            style: theme.textTheme.titleMedium,
+          child: Row(
+            children: [
+              Expanded(child: Text(
+                strings.coachTrainerOutput,
+                style: theme.textTheme.titleMedium,
+              )),
+              IconButton(
+                tooltip: strings.coachCopyConversation,
+                onPressed: widget.messages.isEmpty ? null : widget.onCopyConversation,
+                icon: const Icon(Icons.copy_all_outlined),
+              ),
+              IconButton(
+                tooltip: strings.coachDiagnostics,
+                onPressed: widget.onDiagnostics,
+                icon: const Icon(Icons.monitor_heart_outlined),
+              ),
+            ],
           ),
         ),
         const Divider(height: 1),
@@ -98,6 +118,10 @@ class _CoachOutputPanelState extends State<CoachOutputPanel> {
                             !widget.isLoading &&
                                 (message.positionFen?.isNotEmpty ?? false)
                             ? widget.onShowBoard
+                            : null,
+                        onPlayMove: message.boardMoves.isNotEmpty &&
+                                (message.positionFen?.isNotEmpty ?? false)
+                            ? widget.onPlayMove
                             : null,
                       );
                     }
@@ -206,10 +230,15 @@ class _CoachError extends StatelessWidget {
 }
 
 class _CoachMessageSection extends StatelessWidget {
-  const _CoachMessageSection({required this.message, this.onShowBoard});
+  const _CoachMessageSection({
+    required this.message,
+    this.onShowBoard,
+    this.onPlayMove,
+  });
 
   final CoachUiMessage message;
   final ValueChanged<CoachUiMessage>? onShowBoard;
+  final ValueChanged<CoachUiMessage>? onPlayMove;
 
   @override
   Widget build(BuildContext context) {
@@ -298,6 +327,14 @@ class _CoachMessageSection extends StatelessWidget {
                     : () => onShowBoard!(message),
                 icon: const Icon(Icons.center_focus_strong, size: 18),
                 label: Text(strings.coachShowOnBoard),
+              ),
+            if (message.boardMoves.isNotEmpty)
+              TextButton.icon(
+                onPressed: onPlayMove == null
+                    ? null
+                    : () => onPlayMove!(message),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: Text(strings.play),
               ),
           ],
         ),

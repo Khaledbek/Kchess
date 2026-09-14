@@ -24,6 +24,11 @@ struct CoachResponse {
   std::vector<std::string> evidence_references;
   std::vector<EvidenceItem> evidence;
   std::vector<std::string> validation_issues;
+  std::string provider_error_code;
+  // Stable machine-only fallback kind for a native-safe UI prompt when an LLM
+  // quiz/hint response cannot cross the validation boundary. Flutter maps this
+  // key to ARB text; C++ never owns the visible fallback wording.
+  std::string safe_fallback_kind;
   bool accepted{true};
   bool validation_passed{true};
   bool validation_repaired{false};

@@ -54,6 +54,7 @@ Widgets klein halten und neue Verantwortlichkeiten in eigene Dateien teilen, sta
 ## Integration
 
 `coach_session_screen.dart` ist die dünne Integrationsschicht: sie hält nur Chat-View-State, baut den Transport-Request und ruft `CoreGateway.coachAsk` auf. Analysis/FEN/PGN, Play, Training/Opening und Profile dürfen nur Kontext (FEN, IDs, Orientierung) übergeben; Routing, PGN-Anreicherung, Profil-Evidenz und Antwortvalidierung bleiben nativ.
+Provider-/Quota-Status bleibt nativ bestimmt. Flutter übersetzt `provider_rate_limited` und `provider_daily_limit` nur in ARB-Texte und berechnet weder RPM/TPM/RPD noch Retry-Zeiten selbst.
 
 ## Automatic Coach
 
@@ -84,3 +85,23 @@ Das Coach-Brett übernimmt die Analysis-Präsentation mit nativer Evalbar, Best-
 Der Hint arbeitet pro Stellung als unbegrenzter dreistufiger Zyklus: (1) die native Engine bestimmt bis zu zwei gleichwertige Kandidaten, Flutter markiert die Ausgangsfelder und ergänzt eine kurze lokalisierte Trainer-Nachricht, (2) Zielfelder/Pfeile werden sichtbar und mit einer zweiten Trainer-Nachricht kombiniert, (3) eine geerdete Coach-Erklärung darf angefragt werden. Danach springt nur der UI-Hint-Zustand zurück auf Schritt 1; die bereits berechneten Engine-Kandidaten werden für dieselbe unveränderte Stellung wiederverwendet. Ein Stellungswechsel verwirft den Hint-Cache. FEN/PGN liegen ausschließlich im Drei-Punkte-Menü der Eingabeleiste.
 
 Der Hauptnavigationseintrag des Coach läuft ohne KChess-Sidebar/Drawer; `onExit` führt zurück in die normale App-Navigation.
+
+## Update 136 - automatic move hand-off
+
+Flutter requests Automatic Coach only for a completed, natively resolved move/analysis context. Duplicate callbacks for the same board key must not invalidate a live request. A native `skipped` result is retryable when a later completed-analysis snapshot arrives; an accidental square tap never starts a move request or cancels the active answer. Scoring, trigger criticality, exercise difficulty and factual grounding remain native. No new fixed UI text is introduced outside ARB.
+
+Navigation and loaded-game position changes clear the ephemeral completed-move marker. Only `_playBoardMove` installs that marker after `resolveFreeBoardMove` returns a legal move. Automatic request payloads carry previous FEN and UCI as an event locator; native service rechecks them against its own move and FEN before any learner-attempt attribution. Replaying the same position after navigating away may issue a fresh request; duplicate callbacks while the same position remains visible may not.
+For a direct move in a persisted game, a pending quiz answer may reach native Automatic Coach before move classification is ready. Flutter may ask once with that completed-move locator; if a saved classification arrives during the in-flight request and native returns `skipped`, retry that same board once. Do not loop on quota/provider failures or reclassify the move in Dart.
+
+## Update 164 - personal training action
+
+Flutter exposes the localized "train from my games" action only when a player profile exists and sends the boolean `personalTraining` intent flag with quiz mode. It never selects a game, weakness or skill itself. When native returns a selected training FEN, Flutter switches the board to that returned FEN as transient free-board UI state; selection/scoring remain native.
+
+
+## Fix Update 168 - localized safe Coach fallbacks
+
+Flutter may map native `safeFallbackKind` values to fixed ARB strings when rejected provider output has been discarded. Flutter does not decide when fallback is allowed and must never derive a move, hint target or validation result itself. `quiz_question` keeps the returned native training FEN so own-game training can continue and be scored natively.
+
+## Update 173 - Trainer diagnostics and conversation copy
+
+The Coach output header exposes localized copy and diagnostics actions. Copy serializes only the currently visible UI conversation to the clipboard after the user clicks; it never uploads or persists it. Diagnostics display the native, read-only Coach performance snapshot through FFI with refresh/copy controls. All fixed visible labels belong in the three ARB sources.

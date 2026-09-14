@@ -50,14 +50,28 @@ set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
 # Shared C++20 runtime used by Dart through the stable C ABI.
-set(KCHESS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-add_subdirectory(
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../native"
-  "${CMAKE_CURRENT_BINARY_DIR}/kchess_native"
-)
+#
+# On Windows/MSVC x64 the native build lives under %LOCALAPPDATA% instead of
+# flutter_app/build, so Flutter clean keeps its normal behavior without
+# destroying unchanged C++ object files. The delegated child CMake tree remains
+# authoritative for source/header dependency tracking.
+set(KCHESS_USE_PERSISTENT_NATIVE_WINDOWS_CACHE OFF)
+if(WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(KCHESS_USE_PERSISTENT_NATIVE_WINDOWS_CACHE ON)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/../../native/cmake/kchess_windows_build_cache.cmake")
+else()
+  set(KCHESS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  add_subdirectory(
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../native"
+    "${CMAKE_CURRENT_BINARY_DIR}/kchess_native"
+  )
+endif()
 
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
+if(KCHESS_USE_PERSISTENT_NATIVE_WINDOWS_CACHE)
+  add_dependencies(${BINARY_NAME} kchess_native_windows_cache)
+endif()
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
@@ -80,8 +94,14 @@ set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
-install(TARGETS kchess_core RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
-  COMPONENT Runtime)
+if(KCHESS_USE_PERSISTENT_NATIVE_WINDOWS_CACHE)
+  install(FILES "${KCHESS_WINDOWS_CORE_DLL}"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+else()
+  install(TARGETS kchess_core RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+endif()
 install(FILES
   "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/stockfish/source/src/nn-c288c895ea92.nnue"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/stockfish/source/src/nn-37f18f62d772.nnue"

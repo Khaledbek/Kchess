@@ -10,8 +10,8 @@ const std::vector<ModelVersionInfo>& ModelVersionRegistry::all() {
   static const std::vector<ModelVersionInfo> versions = {
       {"PositionFeatures", "v1"},
       {"ConceptCatalog", "v1"},
-      {"Practicality", "v1"},
-      {"CoachPrompt", "v2"},
+      {"Practicality", "v2"},
+      {"CoachPrompt", "v5"},
       {"RouterModel", "v1"},
       {"ContextPlannerModel", "v1"},
       {"EmbeddingModel", "v1"},

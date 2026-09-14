@@ -26,6 +26,7 @@ struct PracticalCandidateFit {
   std::string move_uci;
   int engine_rank{0};
   std::optional<int> evaluation_loss_cp;
+  std::optional<double> expected_score_loss;
   bool objectively_eligible{false};
   std::optional<double> difficulty;
   std::optional<double> risk;

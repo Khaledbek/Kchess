@@ -185,22 +185,35 @@ double move_accuracy_weight(
 std::optional<double> game_accuracy(
     const std::vector<AccuracyMove>& moves, const AccuracyConfig& config) {
   if (!valid_config(config)) return std::nullopt;
+  std::vector<AccuracySample> samples;
+  samples.reserve(moves.size());
+  for (const auto& move : moves) {
+    if (move.theory) {
+      samples.push_back({.theory = true});
+      continue;
+    }
+    samples.push_back({.accuracy = move_accuracy(move, config),
+                       .weight = move_accuracy_weight(move, config)});
+  }
+  return aggregate_accuracy(samples);
+}
 
+std::optional<double> aggregate_accuracy(const std::vector<AccuracySample>& samples) {
   double weighted_accuracy_total = 0.0;
   double weighted_reciprocal_total = 0.0;
   double total_weight = 0.0;
   bool has_zero_accuracy = false;
   int theory = 0;
 
-  for (const auto& move : moves) {
-    if (move.theory) {
+  for (const auto& sample : samples) {
+    if (sample.theory) {
       ++theory;
       continue;
     }
 
-    const auto accuracy = move_accuracy(move, config);
+    const auto accuracy = sample.accuracy;
     if (!accuracy.has_value() || !std::isfinite(*accuracy)) continue;
-    const double weight = move_accuracy_weight(move, config);
+    const double weight = sample.weight;
     if (!std::isfinite(weight) || weight <= 0.0) continue;
 
     weighted_accuracy_total += weight * *accuracy;

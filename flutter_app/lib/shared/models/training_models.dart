@@ -9,6 +9,7 @@ class ExerciseProgress {
     required this.isMastered,
     required this.successStreak,
     required this.attemptCount,
+    this.bestDepth = 0,
   });
 
   factory ExerciseProgress.fromJson(Map<String, Object?> json) =>
@@ -16,11 +17,15 @@ class ExerciseProgress {
         isMastered: json['isMastered'] as bool? ?? false,
         successStreak: json['successStreak'] as int? ?? 0,
         attemptCount: json['attemptCount'] as int? ?? 0,
+        bestDepth: json['bestDepth'] as int? ?? 0,
       );
 
   final bool isMastered;
   final int successStreak;
   final int attemptCount;
+
+  /// Deepest an opening drill has run for this exercise; zero elsewhere.
+  final int bestDepth;
 }
 
 class TrainingExercise {

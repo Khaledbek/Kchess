@@ -157,6 +157,9 @@ class FakeCoreGateway implements CoreGateway {
   Future<AppProfile?> activeProfile() async => active;
 
   @override
+  Future<Map<String, Object?>?> playerProfile() async => null;
+
+  @override
   Future<AppProfile> createProfile({
     required ProfileType type,
     required String displayName,
@@ -271,6 +274,20 @@ class FakeCoreGateway implements CoreGateway {
       ),
     ],
   );
+
+  @override
+  Future<AccuracyStats> accuracyStats({String timeControl = 'all'}) async =>
+      const AccuracyStats();
+
+  @override
+  Future<void> startBackgroundAnalysis() async {}
+
+  @override
+  Future<BackgroundAnalysisStatus> backgroundAnalysisStatus() async =>
+      const BackgroundAnalysisStatus();
+
+  @override
+  Future<void> setBackgroundAnalysisEnabled(bool enabled) async {}
 
   @override
   Future<ProviderOverview> providerOverview(String profileId) async =>
@@ -436,6 +453,12 @@ class FakeCoreGateway implements CoreGateway {
       active == null ? const [] : List.unmodifiable(storedGames);
 
   @override
+  Future<GameMonthSnapshot> initialGames() async => GameMonthSnapshot(
+    month: active?.type == ProfileType.localPgnFen ? null : '2026-08',
+    games: active == null ? const [] : List.unmodifiable(storedGames),
+  );
+
+  @override
   Future<List<GameSummary>> queryGames(GameQuery query) async => games();
 
   @override
@@ -585,6 +608,10 @@ class FakeCoreGateway implements CoreGateway {
       };
 
   @override
+  Future<Map<String, Object?>> coachPerformanceDiagnostics() async =>
+      <String, Object?>{'schema': 'coach.performance.v1', 'recent': <Object?>[]};
+
+  @override
   Future<Map<String, Object?>> coachContext(Map<String, Object?> request) async =>
       <String, Object?>{
         'position': <String, Object?>{
@@ -597,6 +624,16 @@ class FakeCoreGateway implements CoreGateway {
       };
 
   @override
+  Future<Map<String, Object?>> knowledgeInspector(
+    Map<String, Object?> request,
+  ) async => <String, Object?>{
+    'schema': 'knowledge.inspector.v1',
+    'status': 'ok',
+    'matches': <Object?>[],
+    'recentQueryTraces': <Object?>[],
+  };
+
+  @override
   Future<Map<String, Object?>> coachAutomatic(
     Map<String, Object?> request,
   ) async => <String, Object?>{
@@ -604,6 +641,9 @@ class FakeCoreGateway implements CoreGateway {
     'triggered': false,
     'reasons': const <Object?>[],
   };
+
+  @override
+  Future<void> cancelCoachSessionJobs(String sessionId) async {}
 
   @override
   Future<TrainingOverview> trainingOverview() async => const TrainingOverview(

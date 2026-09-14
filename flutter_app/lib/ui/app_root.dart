@@ -11,6 +11,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../diagnostics/app_startup_diagnostics.dart';
 import '../ffi/core_gateway.dart';
 import '../localization/generated/app_localizations.dart';
 import '../shared/models/models.dart';
@@ -22,6 +23,7 @@ import '../features/analysis/presentation/analysis_screen.dart';
 import '../features/coach/models/coach_ui_models.dart';
 import '../features/coach/presentation/coach_session_screen.dart';
 import '../features/training/models/opening_training_request.dart';
+import '../features/training/presentation/opening/opening_weakness_tile.dart';
 import '../features/training/presentation/training_arena_screen.dart';
 import '../features/training/presentation/training_navigation.dart';
 
@@ -40,11 +42,11 @@ part '../features/profile/presentation/profile_screen.dart';
 part '../features/statistics/presentation/statistics_screen.dart';
 part '../features/statistics/presentation/stats_widgets.dart';
 part '../features/statistics/presentation/overview_section.dart';
-part '../features/statistics/presentation/form_section.dart';
 part '../features/statistics/presentation/rating_section.dart';
 part '../features/statistics/presentation/termination_section.dart';
 part '../features/statistics/presentation/phase_section.dart';
 part '../features/statistics/presentation/openings_section.dart';
+part '../features/statistics/presentation/accuracy_section.dart';
 part '../features/statistics/presentation/opening_games_sheet.dart';
 part '../features/statistics/presentation/player_comparison.dart';
 part '../features/settings/presentation/settings_screen.dart';

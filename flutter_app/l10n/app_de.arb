@@ -3,6 +3,8 @@
   "coachShowOnBoard": "Auf dem Brett zeigen",
   "coachCompareMoves": "Züge vergleichen",
   "coachChallenge": "Stell mir eine Aufgabe",
+  "coachPersonalTraining": "Aus meinen Partien trainieren",
+  "coachPersonalTrainingRequest": "Gib mir eine persönliche Trainingsstellung aus meinen eigenen analysierten Partien und erkannten Schwächen. Lass mich den besten Zug finden, bevor du ihn verrätst.",
   "coachCompareRequest": "Vergleiche die vorliegenden Engine-Kandidaten in dieser Schachstellung. Erkläre für jeden die Idee und die gegnerische Antwort nur anhand geprüfter Belege. Wenn nur ein Kandidat vorliegt, erkläre ihn und sage, dass ein zweiter bewerteter Kandidat fehlt.",
   "coachChallengeRequest": "Trainiere mit mir anhand einer gezielten Frage zu dieser Schachstellung. Lass mich die Idee auf dem Brett finden, bevor du den Zug verrätst. Warte auf meinen Versuch und gib mir dann hilfreiches Feedback.",
   "appTitle": "KChess",
@@ -212,6 +214,30 @@
   "statsPhaseEmpty": "Nicht genügend Daten zu Spielphasen.",
   "statsPhaseNoProfile": "Erstelle oder wähle ein Profil, um Statistiken zu sehen.",
   "statsPhaseError": "Spielphasen konnten nicht geladen werden.",
+  "statsAccuracyTitle": "Genauigkeit",
+  "statsAccuracyAverage": "Durchschnittliche Genauigkeit",
+  "statsAccuracyBlundersPerGame": "{value} grobe Fehler pro Partie",
+  "statsAccuracyEmpty": "Noch keine analysierten Partien. Deine Partien werden im Hintergrund analysiert, solange die App geöffnet ist.",
+  "statsAccuracyError": "Genauigkeit konnte nicht geladen werden.",
+  "statsAccuracyImproving": "Du verbesserst dich",
+  "statsAccuracySteady": "Gleichbleibend",
+  "statsAccuracyDeclining": "Rückläufig",
+  "statsAccuracyTrendInsufficient": "Noch nicht genug analysierte Partien",
+  "statsAccuracyTrendDetail": "Letzte {games} Partien: {recent} (davor: {previous})",
+  "statsAccuracyTrendBlunders": "Grobe Fehler pro Partie: {recent} (davor: {previous})",
+  "statsAccuracyTrendNeeded": "{count, plural, =1{Noch 1 analysierte Partie} other{Noch {count} analysierte Partien}}, um zu sehen, ob du dich verbesserst.",
+  "statsAccuracyErrorsPerGame": "{value} Fehler pro Partie",
+  "statsAccuracyGames": "{count, plural, =1{1 Partie} other{{count} Partien}}",
+  "statsAccuracyByColor": "Nach Farbe",
+  "statsAccuracyByTimeControl": "Nach Bedenkzeit",
+  "backgroundAnalysisProgress": "{analysed} von {total} profilrelevanten Partien aufbereitet",
+  "backgroundAnalysisRunning": "Analyse läuft im Hintergrund",
+  "backgroundAnalysisPaused": "Pausiert, während du analysierst oder spielst",
+  "backgroundAnalysisComplete": "Profilrelevante Partien aufbereitet",
+  "backgroundAnalysisDisabled": "Hintergrundanalyse ist aus (Einstellungen)",
+  "backgroundAnalysisUnavailable": "Engine nicht verfügbar, neuer Versuch gleich",
+  "backgroundAnalysisSetting": "Spielerprofil im Hintergrund vorbereiten",
+  "backgroundAnalysisSettingSubtitle": "Nutzt den gemeinsamen Analyse-Cache für ausgewählte Partien. Manuelle Analysen haben Vorrang.",
   "statsPhaseRetry": "Erneut versuchen",
   "statsPhaseClassifiedNote": "{classified} von {total} Partien",
   "statsTitle": "Statistiken",
@@ -372,6 +398,46 @@
   "trainingOpeningTreeZoomOut": "Verkleinern",
   "trainingOpeningTreeFit": "Baum einpassen",
   "trainingOpeningTreeHint": "Tippe auf eine Karte, um ihre Varianten aufzuklappen — oder trainiere die Linie direkt.",
+  "trainingOpeningIncorrectMove": "Falscher Zug",
+  "trainingOpeningTryAgain": "Versuch es erneut.",
+  "trainingOpeningPlayInstead": "Richtig war {move}",
+  "@trainingOpeningPlayInstead": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "trainingOpeningScenariosTitle": "Eröffnungs-Szenarien",
+  "trainingOpeningScenariosCaption": "Spiele den Buchzug gegen jede Antwort, die das Buch kennt.",
+  "trainingOpeningScenarioDepth": "Tiefe gemeistert: {done}/{total} Züge",
+  "trainingOpeningPlayAs": "Spielen als",
+  "trainingOpeningOpponentPlayed": "Der Gegner spielte {move}.",
+  "trainingOpeningScenarioReady": "Stellung nach {move}.",
+  "trainingOpeningFindBest": "Finde die beste Engine-Antwort.",
+  "trainingOpeningCurrentDepth": "Aktuelle Tiefe: Zug {done} / {total}",
+  "trainingOpeningCorrect": "{move} — das ist der Buchzug.",
+  "trainingOpeningAlternative": "{move} geht auch — Buchwahl Nr. {rank}.",
+  "trainingOpeningDepthReached": "Tiefe {depth} erreicht",
+  "trainingOpeningBookExhausted": "Hier endet das Buch — du hast alles beantwortet, was es kennt.",
+  "trainingOpeningNoBook": "Das Eröffnungsbuch kennt für diese Stellung keine Züge.",
+  "trainingOpeningDrillClean": "Ohne Fehler — dieser Durchgang zählt zur Meisterschaft.",
+  "trainingOpeningDrillWithErrors": "Mit Korrekturen beendet. Nur ein fehlerfreier Durchgang zählt zur Meisterschaft.",
+  "trainingOpeningDrillAgain": "Nochmal trainieren",
+  "trainingOpeningBookChoices": "{count, plural, =1{die einzige Buchantwort} other{eine von {count} Buchantworten}}",
+  "openingWeaknessTitle": "Eröffnungen mit Trainingsbedarf",
+  "openingWeaknessCaption": "Linien, die du immer wieder verlierst oder falsch spielst — die schlimmsten zuerst.",
+  "openingWeaknessLost": "{losses} von {games} Partien verloren",
+  "openingWeaknessErrors": "Eröffnungsfehler in {count} von {analysed} analysierten Partien",
+  "openingWeaknessRecurring": "Du hast hier {count}-mal {move} gespielt — die Engine bevorzugt {better}.",
+  "openingWeaknessRecurringFlagged": "Du hast hier {count}-mal {move} gespielt, und die Engine hat es jedes Mal markiert.",
+  "openingWeaknessAnalyseHint": "Analysiere deine Partien, um auch die Züge zu finden, die schiefgehen — nicht nur die Ergebnisse.",
+  "openingWeaknessShowAll": "Alle {count} zeigen",
+  "openingWeaknessShowFewer": "Weniger zeigen",
+  "openingWeaknessFamily": "Über die ganze Eröffnungsfamilie",
+  "trainingWeakSpotsTitle": "Deine Schwachstellen",
+  "trainingWeakSpotBadge": "Schwachstelle",
+  "trainingWeakSpotMetric": "Schwachstelle: {opening}",
   "playAgainstBot": "Gegen einen Bot spielen",
   "continueAgainstBot": "Gegen Bot weiterspielen",
   "botPlayerColor": "Deine Farbe",
@@ -502,6 +568,13 @@
   "coachBoardContext": "Brettkontext",
   "coachNoPosition": "Keine Stellung geladen",
   "coachTrainerOutput": "Trainer",
+  "coachCopyConversation": "Gespräch kopieren",
+  "coachConversationCopied": "Gespräch in die Zwischenablage kopiert.",
+  "coachConversationYou": "Du",
+  "coachDiagnostics": "Coach-Diagnose",
+  "coachDiagnosticsRefresh": "Aktualisieren",
+  "coachCopyDiagnostics": "Diagnose kopieren",
+  "coachDiagnosticsUnavailable": "Die Coach-Diagnose ist nicht verfügbar.",
   "coachWelcome": "Frage zur Stellung oder zu einem beliebigen Schachthema.",
   "coachThinking": "Der Trainer denkt nach …",
   "coachHint": "Hinweis",
@@ -513,6 +586,9 @@
   "coachUnavailable": "Das Sprachmodell des Trainers ist noch nicht verfügbar.",
   "coachOffTopic": "Der Trainer beantwortet ausschließlich Schachfragen.",
   "coachValidationFailed": "Die Trainerantwort konnte nicht sicher geprüft werden.",
+  "coachSafeQuizFallbackAnswer": "Die Trainingsstellung ist bereit.",
+  "coachSafeQuizFallbackQuestion": "Welchen Zug würdest du hier spielen?",
+  "coachSafeHintFallbackAnswer": "Prüfe zuerst Schachs, Schlagzüge und direkte Drohungen. Welche deiner Figuren kann sofort aktiver werden?",
   "coachHintRequest": "Gib mir einen Hinweis zu dieser Stellung.",
   "coachFen": "FEN",
   "coachPgn": "PGN",
@@ -526,5 +602,237 @@
   "coachPlayerBlack": "Schwarz",
   "coachHintPieceMessage": "Beginne mit der markierten Figur. Überlege zuerst, was sich verbessert, wenn diese Figur zieht.",
   "coachHintTargetMessage": "Schau jetzt auf das markierte Zielfeld und den Pfeil. Versuche die Idee zu finden, bevor du die Erklärung aufdeckst.",
-  "coachHintExplainRequest": "Erkläre, warum der native Engine-Hinweiszug in dieser Stellung stark ist. Konzentriere dich auf die Schachidee und den praktischen Plan, nicht auf Engine-Zahlen."
+  "coachHintExplainRequest": "Erkläre, warum der native Engine-Hinweiszug in dieser Stellung stark ist. Konzentriere dich auf die Schachidee und den praktischen Plan, nicht auf Engine-Zahlen.",
+  "profileDisabled": "Profil deaktiviert",
+  "profileSync": "Synchronisieren",
+  "playerProfileTitle": "Spielerprofil & AI Coach",
+  "playerProfileSubtitle": "KChess leitet aus vorhandenen Partien und Analysen wiederkehrende Muster und Coaching-Prioritäten ab.",
+  "playerProfileLoading": "Spielerprofil wird aufgebaut…",
+  "playerProfileUnavailable": "Das Spielerprofil ist vorübergehend nicht verfügbar.",
+  "playerProfileConfidence": "Profil-Konfidenz: {percent}%",
+  "@playerProfileConfidence": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileBackground": "Profilverarbeitung",
+  "playerProfileProgress": "{processed} von {total} Partien berücksichtigt",
+  "@playerProfileProgress": {
+    "placeholders": {
+      "processed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileIndexedProgress": "Bibliothek indexiert: {indexed} / {total} Partien",
+  "@playerProfileIndexedProgress": {
+    "placeholders": {
+      "indexed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileHistoryProgress": "Historie synchronisiert: {synced} / {available} Monate · Accounts erkannt: {discovered} / {accounts}",
+  "@playerProfileHistoryProgress": {
+    "placeholders": {
+      "synced": {
+        "type": "int"
+      },
+      "available": {
+        "type": "int"
+      },
+      "discovered": {
+        "type": "int"
+      },
+      "accounts": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileHistoryPending": "Noch ausstehende historische Monate: {count}",
+  "@playerProfileHistoryPending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfilePipelineFunnel": "9-Stufen-Funnel: {scanned} gescannt · {sampled} / {sampleBudget} historische Stichprobe · {interesting} interessant · {enginePromoted} zur Engine weitergegeben",
+  "@playerProfilePipelineFunnel": {
+    "placeholders": {
+      "scanned": {
+        "type": "int"
+      },
+      "sampled": {
+        "type": "int"
+      },
+      "sampleBudget": {
+        "type": "int"
+      },
+      "interesting": {
+        "type": "int"
+      },
+      "enginePromoted": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileRelevantProgress": "Relevante Partien verarbeitet: {resolved} / {relevant}",
+  "@playerProfileRelevantProgress": {
+    "placeholders": {
+      "resolved": {
+        "type": "int"
+      },
+      "relevant": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileQueueProgress": "Profil-Warteschlange: {queued} wartend · {enginePending} wartet auf gemeinsame Analyse",
+  "@playerProfileQueueProgress": {
+    "placeholders": {
+      "queued": {
+        "type": "int"
+      },
+      "enginePending": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileReusedAnalysis": "Vorhandene Vollanalysen wiederverwendet: {count}",
+  "@playerProfileReusedAnalysis": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileStatusEmpty": "Noch keine Partien verfügbar",
+  "playerProfileStatusSyncingHistory": "Ältere Partien werden im Hintergrund geladen",
+  "playerProfileStatusAnalyzing": "Relevante Evidenz wird analysiert",
+  "playerProfileStatusComplete": "Profil-Hintergrundarbeit ist aktuell",
+  "playerProfileStatusQueued": "Relevante Partien stehen noch in der Warteschlange",
+  "playerProfileMainGoal": "Hauptziel des Coachings",
+  "playerProfileSecondaryGoals": "Nebenziele",
+  "playerProfileStrengths": "Stabile Stärken",
+  "playerProfileWeaknesses": "Wiederkehrende Schwächen",
+  "playerProfileNoPatterns": "KChess benötigt mehr Evidenz, bevor stabile Muster benannt werden.",
+  "playerProfileTrainFromGames": "Mit meinen Partien trainieren",
+  "playerProfileTrainingPosition": "Trainingsstellung {number}",
+  "@playerProfileTrainingPosition": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "profilePatternBlunderControl": "Entscheidende Patzer vermeiden",
+  "profilePatternMissedOpportunities": "Verpasste Chancen erkennen",
+  "profilePatternCalculationConsistency": "Konstanz der Berechnung",
+  "profilePatternOpeningErrors": "Entscheidungsqualität in der Eröffnung",
+  "profilePatternEndgameErrors": "Entscheidungsqualität im Endspiel",
+  "profilePatternTimePressureErrors": "Entscheidungsprozess unter Zeitdruck",
+  "profilePatternMoveConsistency": "Konstante Zugqualität",
+  "profilePatternOpeningStability": "Stabiles Eröffnungsspiel",
+  "profilePatternEndgameStability": "Stabiles Endspiel",
+  "profileTrendImproving": "Verbessert sich",
+  "profileTrendStable": "Stabil",
+  "profileTrendWorsening": "Benötigt Aufmerksamkeit",
+  "playerProfileEstimatedStrength": "Geschätzte Spielstärke",
+  "playerProfileAverageAccuracy": "Gemessene Accuracy",
+  "playerProfileConfidenceShort": "Profil-Konfidenz",
+  "playerProfileCoverageShort": "Profil-Abdeckung",
+  "playerProfileAnalyzedEvidence": "Analysierte Partien",
+  "playerProfileStrengthEstimateConfidence": "Sicherheit der Spielstärke-Schätzung: {percent}%",
+  "@playerProfileStrengthEstimateConfidence": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveLibrary": "Bibliothek {scanned}/{total}",
+  "@playerProfileLiveLibrary": {
+    "placeholders": {
+      "scanned": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveSample": "Stichprobe {sampled}/{budget}",
+  "@playerProfileLiveSample": {
+    "placeholders": {
+      "sampled": {
+        "type": "int"
+      },
+      "budget": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveInteresting": "Interessant {count}",
+  "@playerProfileLiveInteresting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveEngine": "Engine {count}",
+  "@playerProfileLiveEngine": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveEvidence": "Evidenz {resolved}/{relevant}",
+  "@playerProfileLiveEvidence": {
+    "placeholders": {
+      "resolved": {
+        "type": "int"
+      },
+      "relevant": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveQueue": "Wartend {count}",
+  "@playerProfileLiveQueue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveDepth": "Tiefe {depth}/{target}",
+  "@playerProfileLiveDepth": {
+    "placeholders": {
+      "depth": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+  "playerProfileLiveCurrentGame": "Aktuelle Partie {percent}%",
+  "@playerProfileLiveCurrentGame": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  }
 }

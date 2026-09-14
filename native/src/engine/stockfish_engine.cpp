@@ -5,7 +5,6 @@
 #include <deque>
 #include <cmath>
 #include <filesystem>
-#include <map>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -175,6 +174,20 @@ std::optional<AnalysisResult> terminal_position_result(const std::string& fen) {
   return result;
 }
 
+int stockfish18_root_line_count(
+    const std::string& fen, const AnalysisRequest& request) {
+  if (!request.search_moves.empty()) {
+    return std::max(1, std::min(
+        request.multi_pv, static_cast<int>(request.search_moves.size())));
+  }
+  std::deque<Stockfish::StateInfo> states(1);
+  Stockfish::Position position;
+  position.set(fen, false, &states.back());
+  const int legal_moves = static_cast<int>(
+      Stockfish::MoveList<Stockfish::LEGAL>(position).size());
+  return std::max(1, std::min(request.multi_pv, legal_moves));
+}
+
 }  // namespace
 
 class StockfishEngine::Impl {
@@ -185,7 +198,8 @@ class StockfishEngine::Impl {
   std::atomic_bool cancelled{false};
   std::atomic_int current_depth{0};
   mutable std::mutex live_result_mutex;
-  std::map<int, EngineLine> live_lines;
+  std::vector<EngineLine> live_complete_lines;
+  int live_complete_depth{0};
   std::string live_best_move;
   bool ready{false};
   std::optional<int> configured_threads;
@@ -304,7 +318,8 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   }
   {
     std::lock_guard live_lock(impl_->live_result_mutex);
-    impl_->live_lines.clear();
+    impl_->live_complete_lines.clear();
+    impl_->live_complete_depth = 0;
     impl_->live_best_move.clear();
   }
 
@@ -356,6 +371,10 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   int stable_iterations = 0;
   std::vector<EngineLine> previous_stability_lines;
   bool converged_early = false;
+  const int expected_line_count = stockfish18_root_line_count(request.fen, request);
+  std::vector<EngineLine> pending_iteration;
+  pending_iteration.reserve(static_cast<std::size_t>(expected_line_count));
+  int pending_depth = 0;
   impl_->engine->set_on_update_no_moves([](const Stockfish::Engine::InfoShort&) {});
   impl_->engine->set_on_iter([](const Stockfish::Engine::InfoIter&) {});
   impl_->engine->set_on_update_full([&](const Stockfish::Engine::InfoFull& info) {
@@ -364,7 +383,7 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
     bool should_stop = false;
     {
       std::lock_guard result_lock(impl_->live_result_mutex);
-      auto& line = impl_->live_lines[static_cast<int>(info.multiPV)];
+      EngineLine line;
       line.rank = static_cast<int>(info.multiPV);
       line.depth = info.depth;
       line.nodes = static_cast<std::uint64_t>(info.nodes);
@@ -372,55 +391,72 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
       line.moves = split_moves(info.pv);
       apply_score(line, info.score);
 
-      // MultiPV callbacks arrive once per line. Evaluate convergence only when
-      // every requested line has reached this depth, then compare the two most
-      // important lines (best + runner-up). This keeps classification quality
-      // stable while allowing quiet positions to finish well before max depth.
-      const int depth = static_cast<int>(info.depth);
+      // SF18 can report another rank (or an aspiration retry) while older
+      // slots still contain scores from a different search iteration. Publish
+      // only one exact rank sequence with a shared depth and distinct moves.
+      if (line.rank == 1) {
+        pending_iteration.clear();
+        pending_depth = line.depth;
+      }
+      const bool valid_move = !line.best_move().empty()
+          && line.best_move() != "(none)" && line.best_move() != "0000";
+      const bool duplicate_move = std::any_of(
+          pending_iteration.begin(), pending_iteration.end(),
+          [&](const EngineLine& previous) {
+            return previous.best_move() == line.best_move();
+          });
+      if (!info.bound.empty() || !valid_move || duplicate_move
+          || line.depth <= 0 || line.depth != pending_depth
+          || line.rank != static_cast<int>(pending_iteration.size()) + 1
+          || line.rank > expected_line_count) {
+        pending_iteration.clear();
+        pending_depth = 0;
+        return;
+      }
+      pending_iteration.push_back(std::move(line));
+      if (static_cast<int>(pending_iteration.size()) != expected_line_count) return;
+
+      const int depth = pending_depth;
+      if (depth >= impl_->live_complete_depth) {
+        impl_->live_complete_lines = pending_iteration;
+        impl_->live_complete_depth = depth;
+      }
+      pending_iteration.clear();
+      pending_depth = 0;
+
+      // Evaluate convergence only from a complete published iteration.
       if (request.dynamic_early_stop
           && depth >= request.early_stop_min_depth
           && depth > last_stability_depth) {
-        std::vector<EngineLine> iteration;
-        iteration.reserve(static_cast<std::size_t>(request.multi_pv));
-        bool complete_iteration = true;
-        for (int rank = 1; rank <= request.multi_pv; ++rank) {
-          const auto found = impl_->live_lines.find(rank);
-          if (found == impl_->live_lines.end() || found->second.depth != depth) {
-            complete_iteration = false;
-            break;
-          }
-          iteration.push_back(found->second);
+        std::vector<EngineLine> iteration = impl_->live_complete_lines;
+        const bool ordinary_cp_iteration = std::all_of(
+            iteration.begin(), iteration.end(), [](const EngineLine& line) {
+              return line.evaluation_cp.has_value() && !line.mate_in.has_value();
+            });
+        const bool ordinary_cp_previous = std::all_of(
+            previous_stability_lines.begin(), previous_stability_lines.end(),
+            [](const EngineLine& line) {
+              return line.evaluation_cp.has_value() && !line.mate_in.has_value();
+            });
+        const bool eligible_for_early_stop =
+            !request.early_stop_require_cp_scores
+            || (ordinary_cp_iteration && ordinary_cp_previous);
+        if (eligible_for_early_stop
+            && stable_engine_lines(
+                iteration, previous_stability_lines,
+                request.early_stop_eval_tolerance_cp)) {
+          ++stable_iterations;
+        } else {
+          stable_iterations = 0;
         }
-        if (complete_iteration) {
-          const bool ordinary_cp_iteration = std::all_of(
-              iteration.begin(), iteration.end(), [](const EngineLine& line) {
-                return line.evaluation_cp.has_value() && !line.mate_in.has_value();
-              });
-          const bool ordinary_cp_previous = std::all_of(
-              previous_stability_lines.begin(), previous_stability_lines.end(),
-              [](const EngineLine& line) {
-                return line.evaluation_cp.has_value() && !line.mate_in.has_value();
-              });
-          const bool eligible_for_early_stop =
-              !request.early_stop_require_cp_scores
-              || (ordinary_cp_iteration && ordinary_cp_previous);
-          if (eligible_for_early_stop
-              && stable_engine_lines(
-                  iteration, previous_stability_lines,
-                  request.early_stop_eval_tolerance_cp)) {
-            ++stable_iterations;
-          } else {
-            stable_iterations = 0;
-          }
-          previous_stability_lines = std::move(iteration);
-          last_stability_depth = depth;
-          const bool decisive_gap = decisive_score_gap(
-              previous_stability_lines, request.early_stop_score_gap_cp);
-          if (stable_iterations >= request.early_stop_stable_iterations
-              || decisive_gap) {
-            converged_early = true;
-            should_stop = true;
-          }
+        previous_stability_lines = std::move(iteration);
+        last_stability_depth = depth;
+        const bool decisive_gap = decisive_score_gap(
+            previous_stability_lines, request.early_stop_score_gap_cp);
+        if (stable_iterations >= request.early_stop_stable_iterations
+            || decisive_gap) {
+          converged_early = true;
+          should_stop = true;
         }
       }
     }
@@ -479,17 +515,17 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
 AnalysisResult StockfishEngine::current_result() const {
   AnalysisResult result;
   std::lock_guard result_lock(impl_->live_result_mutex);
-  result.best_move = impl_->live_best_move;
-  for (const auto& [rank, line] : impl_->live_lines) {
-    (void)rank;
-    result.reached_depth = std::max(result.reached_depth, line.depth);
+  if (impl_->live_complete_lines.empty()) return result;
+  result.lines = impl_->live_complete_lines;
+  result.reached_depth = impl_->live_complete_depth;
+  // Preserve SF18's final bestmove callback for the existing difficulty
+  // audit; consumers of the recommendation use the coherent rank-1 PV.
+  result.best_move = !impl_->live_best_move.empty()
+      && impl_->live_best_move != "(none)" && impl_->live_best_move != "0000"
+      ? impl_->live_best_move
+      : result.lines.front().best_move();
+  for (const auto& line : result.lines) {
     result.nodes = std::max(result.nodes, line.nodes);
-    result.lines.push_back(line);
-  }
-  if ((result.best_move.empty() || result.best_move == "(none)"
-       || result.best_move == "0000")
-      && !result.lines.empty() && !result.lines.front().moves.empty()) {
-    result.best_move = result.lines.front().moves.front();
   }
   return result;
 }

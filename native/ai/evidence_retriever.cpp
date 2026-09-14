@@ -29,7 +29,7 @@ std::string_view stable_id(EvidenceKind kind) {
     case EvidenceKind::opening:
       return "opening.lookup.v1";
     case EvidenceKind::user_profile:
-      return "profile.snapshot.v1";
+      return "profile.context.v3";
     case EvidenceKind::engine:
       return "engine.analysis.v1";
     case EvidenceKind::conversation:
@@ -49,6 +49,22 @@ bool append_source(std::vector<EvidenceItem>& items,
   if (!item.has_value() || item->payload.empty()) return false;
   item->kind = kind;
   item->id = std::string(stable_id(kind));
+  item->confidence = std::clamp(item->confidence, 0.0, 1.0);
+  items.push_back(std::move(*item));
+  return true;
+}
+
+bool append_profile_source(std::vector<EvidenceItem>& items,
+                           const ProfileEvidenceSource& source,
+                           const CoachRequest& request,
+                           const QueryPlan& plan,
+                           const EmbeddingModel* embeddings) {
+  if (!source || !plan.needs_profile || plan.query_family == QueryFamily::general_chess ||
+      !requested(plan, EvidenceKind::user_profile)) return false;
+  auto item = source(request, plan, embeddings);
+  if (!item.has_value() || item->payload.empty()) return false;
+  item->kind = EvidenceKind::user_profile;
+  item->id = std::string(stable_id(EvidenceKind::user_profile));
   item->confidence = std::clamp(item->confidence, 0.0, 1.0);
   items.push_back(std::move(*item));
   return true;
@@ -98,6 +114,12 @@ bool append_candidates(RetrievedEvidence& result,
 EvidenceRetriever::EvidenceRetriever(EvidenceSources sources)
     : sources_(std::move(sources)) {}
 
+std::optional<EvidenceItem> EvidenceRetriever::completed_move_analysis(
+    const CoachRequest& request, const std::string& original_fen) const {
+  if (!sources_.completed_move_analysis) return std::nullopt;
+  return sources_.completed_move_analysis(request, original_fen);
+}
+
 RetrievedEvidence EvidenceRetriever::retrieve(
     const CoachRequest& request,
     const QueryPlan& plan,
@@ -121,20 +143,14 @@ RetrievedEvidence EvidenceRetriever::retrieve(
   append_conversation(result.items, plan, context);
   append_concepts(result.items, request, plan, embeddings);
 
-  if (requested(plan, EvidenceKind::position_features) &&
-      request.position_fen.has_value()) {
-    PositionFeatureExtractor extractor;
-    result.position_features = extractor.extract(*request.position_fen);
-    result.items.push_back(extractor.evidence(*result.position_features));
-  }
-
   append_source(result.items, sources_.theory, EvidenceKind::theory, request,
                 plan);
   append_source(result.items, sources_.opening, EvidenceKind::opening, request,
                 plan);
-  append_source(result.items, sources_.user_profile,
-                EvidenceKind::user_profile, request, plan);
-  if (requested(plan, EvidenceKind::user_profile) &&
+  append_profile_source(result.items, sources_.user_profile, request, plan,
+                        embeddings);
+  if (plan.needs_profile && plan.query_family != QueryFamily::general_chess &&
+      requested(plan, EvidenceKind::user_profile) &&
       sources_.practicality_player) {
     result.practicality_player = sources_.practicality_player(request, plan);
   }
