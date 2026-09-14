@@ -44,6 +44,8 @@ class _GeneralSettingsPage extends StatelessWidget {
                   onChanged: controller.setAutoSyncOnline,
                 ),
                 const Divider(height: 1),
+                _BackgroundAnalysisSwitch(gateway: controller.gateway),
+                const Divider(height: 1),
                 SwitchListTile(
                   secondary: const Icon(Icons.delete_outline),
                   title: Text(strings.confirmBeforeDelete),
@@ -70,3 +72,60 @@ class _GeneralSettingsPage extends StatelessWidget {
   }
 }
 
+/// On/off for background analysis, with how far it has come. The choice is
+/// saved natively, next to the queue it controls.
+class _BackgroundAnalysisSwitch extends StatefulWidget {
+  const _BackgroundAnalysisSwitch({required this.gateway});
+
+  final CoreGateway gateway;
+
+  @override
+  State<_BackgroundAnalysisSwitch> createState() => _BackgroundAnalysisSwitchState();
+}
+
+class _BackgroundAnalysisSwitchState extends State<_BackgroundAnalysisSwitch> {
+  BackgroundAnalysisStatus? _status;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final status = await widget.gateway.backgroundAnalysisStatus();
+      if (mounted) setState(() => _status = status);
+    } catch (_) {}
+  }
+
+  Future<void> _toggle(bool enabled) async {
+    setState(() => _saving = true);
+    try {
+      await widget.gateway.setBackgroundAnalysisEnabled(enabled);
+    } catch (_) {}
+    await _load();
+    if (mounted) setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final status = _status;
+    return SwitchListTile(
+      key: const Key('settings-background-analysis'),
+      secondary: const Icon(Icons.insights_outlined),
+      title: Text(strings.backgroundAnalysisSetting),
+      subtitle: Text(
+        status == null || status.totalGames == 0
+            ? strings.backgroundAnalysisSettingSubtitle
+            : '${strings.backgroundAnalysisSettingSubtitle}\n'
+                '${strings.backgroundAnalysisProgress(status.analysedGames, status.totalGames)}',
+      ),
+      isThreeLine: status != null && status.totalGames > 0,
+      value: status?.enabled ?? true,
+      onChanged: status == null || _saving ? null : _toggle,
+    );
+  }
+}

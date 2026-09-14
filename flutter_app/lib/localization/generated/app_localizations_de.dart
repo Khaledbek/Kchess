@@ -559,6 +559,110 @@ class AppLocalizationsDe extends AppLocalizations {
   String get statsPhaseError => 'Spielphasen konnten nicht geladen werden.';
 
   @override
+  String get statsAccuracyTitle => 'Genauigkeit';
+
+  @override
+  String get statsAccuracyAverage => 'Durchschnittliche Genauigkeit';
+
+  @override
+  String statsAccuracyBlundersPerGame(String value) {
+    return '$value grobe Fehler pro Partie';
+  }
+
+  @override
+  String get statsAccuracyEmpty =>
+      'Noch keine analysierten Partien. Deine Partien werden im Hintergrund analysiert, solange die App geöffnet ist.';
+
+  @override
+  String get statsAccuracyError => 'Genauigkeit konnte nicht geladen werden.';
+
+  @override
+  String get statsAccuracyImproving => 'Du verbesserst dich';
+
+  @override
+  String get statsAccuracySteady => 'Gleichbleibend';
+
+  @override
+  String get statsAccuracyDeclining => 'Rückläufig';
+
+  @override
+  String get statsAccuracyTrendInsufficient =>
+      'Noch nicht genug analysierte Partien';
+
+  @override
+  String statsAccuracyTrendDetail(int games, String recent, String previous) {
+    return 'Letzte $games Partien: $recent (davor: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendBlunders(String recent, String previous) {
+    return 'Grobe Fehler pro Partie: $recent (davor: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendNeeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Noch $count analysierte Partien',
+      one: 'Noch 1 analysierte Partie',
+    );
+    return '$_temp0, um zu sehen, ob du dich verbesserst.';
+  }
+
+  @override
+  String statsAccuracyErrorsPerGame(String value) {
+    return '$value Fehler pro Partie';
+  }
+
+  @override
+  String statsAccuracyGames(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Partien',
+      one: '1 Partie',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsAccuracyByColor => 'Nach Farbe';
+
+  @override
+  String get statsAccuracyByTimeControl => 'Nach Bedenkzeit';
+
+  @override
+  String backgroundAnalysisProgress(int analysed, int total) {
+    return '$analysed von $total Partien analysiert';
+  }
+
+  @override
+  String get backgroundAnalysisRunning => 'Analyse läuft im Hintergrund';
+
+  @override
+  String get backgroundAnalysisPaused =>
+      'Pausiert, während du analysierst oder spielst';
+
+  @override
+  String get backgroundAnalysisComplete => 'Alle Partien analysiert';
+
+  @override
+  String get backgroundAnalysisDisabled =>
+      'Hintergrundanalyse ist aus (Einstellungen)';
+
+  @override
+  String get backgroundAnalysisUnavailable =>
+      'Engine nicht verfügbar, neuer Versuch gleich';
+
+  @override
+  String get backgroundAnalysisSetting => 'Partien im Hintergrund analysieren';
+
+  @override
+  String get backgroundAnalysisSettingSubtitle =>
+      'Hält Genauigkeits- und Schwächenstatistiken aktuell, solange die App geöffnet ist. Pausiert, sobald du analysierst oder spielst.';
+
+  @override
   String get statsPhaseRetry => 'Erneut versuchen';
 
   @override

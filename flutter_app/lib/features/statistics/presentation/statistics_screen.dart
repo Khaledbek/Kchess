@@ -16,6 +16,7 @@ class StatisticsScreen extends StatefulWidget {
 class _StatisticsScreenState extends State<StatisticsScreen> {
   late Future<StatisticsOverview> _overview;
   late Future<OpeningsStats> _openings;
+  late Future<AccuracyStats> _accuracy;
   late Future<TerminationStats> _terminations;
   late Future<PhaseStats> _phases;
   late Future<StatisticsTimeline> _games;
@@ -57,6 +58,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _loadStats() {
     _overview = widget.controller.gateway.statisticsOverview();
     _loadOpenings();
+    _loadAccuracy();
     // Termination and phase data span the whole library (stored PGNs / move
     // counts), so they are not affected by the time-control filter.
     _terminations = widget.controller.gateway.terminationStats();
@@ -69,6 +71,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     _openings = widget.controller.gateway.openingsStats(
       timeControl: _timeControl,
     );
+  }
+
+  void _loadAccuracy() {
+    _accuracy = widget.controller.gateway.accuracyStats(timeControl: _timeControl);
+  }
+
+  /// Background analysis finished more games: accuracy and the weakness
+  /// warnings both read analysed games, so both refresh.
+  void _onMoreAnalysed() {
+    if (!mounted) return;
+    setState(() {
+      _loadAccuracy();
+      _loadOpenings();
+    });
   }
 
   // Load native recent-form and rating summaries for the selected filter.
@@ -119,6 +135,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       _timeControl = value;
       _loadGames();
       _loadOpenings();
+      _loadAccuracy();
     });
   }
 
@@ -187,6 +204,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       onRetry: _reloadAll,
     );
     final phase = _PhaseCard(future: _phases, onRetry: _reloadAll);
+    final accuracy = _AccuracyCard(
+      controller: widget.controller,
+      future: _accuracy,
+      timeControl: _timeControl,
+      onRetry: _reloadAll,
+      onMoreAnalysed: _onMoreAnalysed,
+    );
     // Where the recent-form strip used to be; it collapses to nothing, gap
     // included, when there is no warning.
     final weaknesses = _OpeningWeaknessCard(future: _openings);
@@ -218,6 +242,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       children: [
                         overview,
                         const SizedBox(height: 20),
+                        accuracy,
+                        const SizedBox(height: 20),
                         termination,
                       ],
                     ),
@@ -246,6 +272,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             overview,
+            const SizedBox(height: 20),
+            accuracy,
             const SizedBox(height: 20),
             termination,
             const SizedBox(height: 20),

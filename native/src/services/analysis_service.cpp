@@ -1236,6 +1236,12 @@ void AnalysisService::rebuild_classification(
         .expected_score_loss = assessment.loss,
         .recommended_move = recommended_move,
         .theory = theory,
+        .move_accuracy = assessment.accuracy.theory
+            ? std::nullopt
+            : move_accuracy(assessment.accuracy),
+        .accuracy_weight = assessment.accuracy.theory
+            ? 0.0
+            : move_accuracy_weight(assessment.accuracy),
     });
     {
       std::ostringstream log_message;
@@ -1926,6 +1932,80 @@ void AnalysisService::run_refinement_queue(
 
 std::string AnalysisService::start_analysis_json(const std::string& game_id) {
   validate_token(game_id, "game id");
+  note_foreground_activity();
+  return start_analysis(game_id, preanalysis_budget_settings(), false);
+}
+
+void AnalysisService::start_background_analysis(const std::string& game_id) {
+  validate_token(game_id, "game id");
+  // The pre-analysis budget, with the resources cut down to stay out of the
+  // user's way. Threads and hash do not change what a run means, so the saved
+  // result is still reused by a later foreground start.
+  auto settings = preanalysis_budget_settings();
+  settings.threads = 1;
+  settings.hash_mb = std::min(settings.hash_mb, 64);
+  start_analysis(game_id, settings, true);
+}
+
+bool AnalysisService::background_analysis_running() const {
+  std::lock_guard lock(jobs_mutex_);
+  if (background_game_id_.empty()) return false;
+  const auto found = jobs_.find(background_game_id_);
+  return found != jobs_.end() && !found->second->finished;
+}
+
+void AnalysisService::cancel_background_analysis() noexcept {
+  std::lock_guard lock(jobs_mutex_);
+  if (background_game_id_.empty()) return;
+  const auto found = jobs_.find(background_game_id_);
+  if (found != jobs_.end() && !found->second->finished) {
+    found->second->state = AnalysisJobState::cancelling;
+    found->second->cancel_requested = true;
+    found->second->engine->cancel();
+  }
+}
+
+bool AnalysisService::foreground_analysis_running() const {
+  {
+    std::lock_guard lock(jobs_mutex_);
+    for (const auto& [game_id, job] : jobs_) {
+      if (game_id != background_game_id_ && !job->finished) return true;
+    }
+  }
+  {
+    std::lock_guard lock(refinement_jobs_mutex_);
+    for (const auto& [game_id, job] : refinement_jobs_) {
+      (void)game_id;
+      if (!job->finished) return true;
+    }
+  }
+  std::lock_guard lock(variation_jobs_mutex_);
+  for (const auto& [job_id, job] : variation_jobs_) {
+    (void)job_id;
+    if (!job->finished) return true;
+  }
+  return false;
+}
+
+std::int64_t AnalysisService::last_foreground_activity() const noexcept {
+  return last_foreground_activity_.load();
+}
+
+void AnalysisService::note_foreground_activity() noexcept {
+  last_foreground_activity_ = unix_time_seconds();
+  cancel_background_analysis();
+}
+
+void AnalysisService::refresh_classification(const std::string& game_id) {
+  validate_token(game_id, "game id");
+  const auto settings = preanalysis_budget_settings();
+  const auto analysed = reusable_analysis(game_id, settings);
+  if (!analysed.has_value() || analysed->status != "complete") return;
+  rebuild_classification(game_id, analysed->config_hash, true);
+}
+
+std::string AnalysisService::start_analysis(
+    const std::string& game_id, const AppSettings& settings, const bool background) {
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
   std::vector<std::string> positions;
@@ -1945,9 +2025,9 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
 
   // A main-line analysis owns the Stockfish work slot. If a sideline engine
   // is still resident, release it before starting or resuming this worker.
-  stop_all_variation_jobs(true);
+  // Background work never takes it from the user.
+  if (!background) stop_all_variation_jobs(true);
 
-  const auto settings = preanalysis_budget_settings();
   const auto version_probe = create_stockfish_engine(settings.engine_id);
   const auto config_hash = analysis_config_hash(settings);
   if (auto reusable = reusable_analysis(game_id, settings);
@@ -2007,12 +2087,19 @@ std::string AnalysisService::start_analysis_json(const std::string& game_id) {
           });
       jobs_.emplace(game_id, std::move(job));
     }
+    if (background) {
+      background_game_id_ = game_id;
+    } else if (background_game_id_ == game_id) {
+      // The user took this game over; it is theirs now.
+      background_game_id_.clear();
+    }
   }
   return analysis_json(game_id, persisted);
 }
 
 std::string AnalysisService::analysis_status_json(const std::string& game_id) {
   validate_token(game_id, "game id");
+  last_foreground_activity_ = unix_time_seconds();
   std::optional<PersistedAnalysis> result;
   std::shared_ptr<AnalysisJob> live_job;
   {
@@ -2033,6 +2120,7 @@ std::string AnalysisService::analysis_status_json(const std::string& game_id) {
 
 std::string AnalysisService::move_analysis_status_json(const std::string& game_id, const int ply) {
   validate_token(game_id, "game id");
+  last_foreground_activity_ = unix_time_seconds();
   if (ply < 0) throw std::invalid_argument("ply must be non-negative");
 
   // Prefer a maximum-quality live refinement when that position already has
@@ -2138,6 +2226,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
 std::string AnalysisService::start_move_refinement_json(
     const std::string& game_id, const int ply) {
   validate_token(game_id, "game id");
+  note_foreground_activity();
   if (ply < 0) throw std::invalid_argument("ply must be non-negative");
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
@@ -2461,6 +2550,7 @@ std::string AnalysisService::start_variation_job_json(
     const std::string& fen,
     const std::string& uci,
     AppSettings settings) {
+  note_foreground_activity();
   reap_finished_variation_jobs();
   // Validate/apply the move before touching the current worker. An illegal
   // sideline attempt must not kill the analysis that is already visible.
@@ -2650,6 +2740,7 @@ std::string AnalysisService::start_variation_job_json(
 
 std::string AnalysisService::variation_analysis_status_json(const std::string& job_id) {
   validate_token(job_id, "variation job id");
+  last_foreground_activity_ = unix_time_seconds();
   std::shared_ptr<VariationJob> job;
   {
     std::lock_guard lock(variation_jobs_mutex_);

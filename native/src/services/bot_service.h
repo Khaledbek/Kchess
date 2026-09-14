@@ -50,8 +50,12 @@ class BotService {
   std::string start_move_json(const std::string& fen, int requested_elo);
   std::string move_status_json(const std::string& job_id) const;
   void cancel_move(const std::string& job_id);
+  // Unix seconds of the last bot move requested or polled: a game in progress.
+  std::int64_t last_activity() const noexcept { return last_activity_.load(); }
 
  private:
+  mutable std::atomic<std::int64_t> last_activity_{0};
+
   enum class JobState {
     queued,
     running,

@@ -556,6 +556,109 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statsPhaseError => 'تعذّر تحميل مراحل اللعب.';
 
   @override
+  String get statsAccuracyTitle => 'الدقة';
+
+  @override
+  String get statsAccuracyAverage => 'متوسط الدقة';
+
+  @override
+  String statsAccuracyBlundersPerGame(String value) {
+    return '$value أخطاء فادحة في المباراة';
+  }
+
+  @override
+  String get statsAccuracyEmpty =>
+      'لا توجد مباريات محللة بعد. تُحلل مبارياتك في الخلفية أثناء فتح التطبيق.';
+
+  @override
+  String get statsAccuracyError => 'تعذر تحميل الدقة.';
+
+  @override
+  String get statsAccuracyImproving => 'في تحسن';
+
+  @override
+  String get statsAccuracySteady => 'مستقر';
+
+  @override
+  String get statsAccuracyDeclining => 'في تراجع';
+
+  @override
+  String get statsAccuracyTrendInsufficient =>
+      'لا توجد مباريات محللة كافية بعد';
+
+  @override
+  String statsAccuracyTrendDetail(int games, String recent, String previous) {
+    return 'آخر $games مباريات: $recent (قبلها: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendBlunders(String recent, String previous) {
+    return 'الأخطاء الفادحة لكل مباراة: $recent (قبلها: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendNeeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مباريات محللة إضافية',
+      one: 'مباراة محللة واحدة إضافية',
+    );
+    return '$_temp0 لمعرفة ما إذا كنت تتحسن.';
+  }
+
+  @override
+  String statsAccuracyErrorsPerGame(String value) {
+    return '$value أخطاء في المباراة';
+  }
+
+  @override
+  String statsAccuracyGames(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مباريات',
+      one: 'مباراة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsAccuracyByColor => 'حسب اللون';
+
+  @override
+  String get statsAccuracyByTimeControl => 'حسب نظام الوقت';
+
+  @override
+  String backgroundAnalysisProgress(int analysed, int total) {
+    return 'تم تحليل $analysed من $total مباريات';
+  }
+
+  @override
+  String get backgroundAnalysisRunning => 'التحليل يعمل في الخلفية';
+
+  @override
+  String get backgroundAnalysisPaused => 'متوقف مؤقتًا أثناء التحليل أو اللعب';
+
+  @override
+  String get backgroundAnalysisComplete => 'تم تحليل كل المباريات';
+
+  @override
+  String get backgroundAnalysisDisabled =>
+      'التحليل في الخلفية متوقف (الإعدادات)';
+
+  @override
+  String get backgroundAnalysisUnavailable =>
+      'المحرك غير متاح، إعادة المحاولة قريبًا';
+
+  @override
+  String get backgroundAnalysisSetting => 'تحليل المباريات في الخلفية';
+
+  @override
+  String get backgroundAnalysisSettingSubtitle =>
+      'يحافظ على تحديث إحصاءات الدقة ونقاط الضعف أثناء فتح التطبيق. يتوقف عند التحليل أو اللعب.';
+
+  @override
   String get statsPhaseRetry => 'إعادة المحاولة';
 
   @override

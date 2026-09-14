@@ -558,6 +558,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsPhaseError => 'Could not load game phases.';
 
   @override
+  String get statsAccuracyTitle => 'Accuracy';
+
+  @override
+  String get statsAccuracyAverage => 'Average accuracy';
+
+  @override
+  String statsAccuracyBlundersPerGame(String value) {
+    return '$value blunders per game';
+  }
+
+  @override
+  String get statsAccuracyEmpty =>
+      'No analysed games yet. Your games are analysed in the background while the app is open.';
+
+  @override
+  String get statsAccuracyError => 'Could not load accuracy.';
+
+  @override
+  String get statsAccuracyImproving => 'Improving';
+
+  @override
+  String get statsAccuracySteady => 'Holding steady';
+
+  @override
+  String get statsAccuracyDeclining => 'Declining';
+
+  @override
+  String get statsAccuracyTrendInsufficient => 'Not enough analysed games yet';
+
+  @override
+  String statsAccuracyTrendDetail(int games, String recent, String previous) {
+    return 'Last $games games: $recent (before: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendBlunders(String recent, String previous) {
+    return 'Blunders per game: $recent (before: $previous)';
+  }
+
+  @override
+  String statsAccuracyTrendNeeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more analysed games',
+      one: '1 more analysed game',
+    );
+    return '$_temp0 to see whether you are improving.';
+  }
+
+  @override
+  String statsAccuracyErrorsPerGame(String value) {
+    return '$value mistakes per game';
+  }
+
+  @override
+  String statsAccuracyGames(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count games',
+      one: '1 game',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsAccuracyByColor => 'By colour';
+
+  @override
+  String get statsAccuracyByTimeControl => 'By time control';
+
+  @override
+  String backgroundAnalysisProgress(int analysed, int total) {
+    return 'Analysed $analysed of $total games';
+  }
+
+  @override
+  String get backgroundAnalysisRunning => 'Analysing in the background';
+
+  @override
+  String get backgroundAnalysisPaused => 'Paused while you analyse or play';
+
+  @override
+  String get backgroundAnalysisComplete => 'All games analysed';
+
+  @override
+  String get backgroundAnalysisDisabled =>
+      'Background analysis is off (Settings)';
+
+  @override
+  String get backgroundAnalysisUnavailable =>
+      'Engine unavailable, retrying shortly';
+
+  @override
+  String get backgroundAnalysisSetting => 'Analyse games in the background';
+
+  @override
+  String get backgroundAnalysisSettingSubtitle =>
+      'Keeps accuracy and weakness statistics up to date while the app is open. Pauses whenever you analyse or play.';
+
+  @override
   String get statsPhaseRetry => 'Retry';
 
   @override

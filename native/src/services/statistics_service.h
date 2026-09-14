@@ -30,6 +30,10 @@ class StatisticsService {
   // "blitz", "rapid", ...); "all" (the default) keeps every game, so the tab's
   // filter reaches the openings card instead of it silently staying all-time.
   std::string openings_json(const std::string& time_control = "all") const;
+  // Accuracy over the analysed games of the active profile: average, by colour,
+  // time control and game phase, the chart series, and whether the profile is
+  // improving. Only games with a finished engine analysis count.
+  std::string accuracy_json(const std::string& time_control = "all") const;
 
   // How the active profile's games ended (checkmate, resignation, timeout,
   // draw, other), aggregated from the stored PGN Termination tags.

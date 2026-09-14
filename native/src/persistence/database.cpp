@@ -887,6 +887,16 @@ ALTER TABLE training_progress ADD COLUMN best_depth INTEGER NOT NULL DEFAULT 0;
 PRAGMA user_version = 21;
 )sql";
 
+// Each classified move keeps its own accuracy and weight. Game accuracy is a
+// weighted blend of its moves, so storing the parts lets statistics compute the
+// same figure for a phase of the game. Older rows stay NULL until their game is
+// classified again.
+constexpr const char* kMigration22 = R"sql(
+ALTER TABLE move_analysis ADD COLUMN move_accuracy REAL;
+ALTER TABLE move_analysis ADD COLUMN accuracy_weight REAL;
+PRAGMA user_version = 22;
+)sql";
+
 }  // namespace
 
 Database::Database(std::filesystem::path data_directory)
@@ -941,6 +951,7 @@ void Database::open_and_migrate() {
     if (version < 19) execute(kMigration19);
     if (version < 20) execute(kMigration20);
     if (version < 21) execute(kMigration21);
+    if (version < 22) execute(kMigration22);
 
     // Older builds could leave several completed/cancelled analysis_runs for
     // the same game. At process startup there are no live workers, so collapse
@@ -2238,6 +2249,113 @@ std::vector<GameStatRow> Database::games_for_statistics(
   return result;
 }
 
+namespace {
+// Games analysis can score, and the latest finished classified run of a game.
+constexpr const char* kAnalysableGame =
+    "g.kind<>'fen' AND EXISTS(SELECT 1 FROM game_moves gm WHERE gm.game_id=g.id)";
+constexpr const char* kLatestClassifiedRun =
+    "(SELECT r.id FROM analysis_runs r WHERE r.game_id=g.id AND r.status='complete' "
+    "AND r.classifier_version>0 ORDER BY r.completed_at DESC LIMIT 1)";
+}  // namespace
+
+BackgroundAnalysisProgress Database::background_analysis_progress(
+    const std::string& profile_id) const {
+  const std::string sql = std::string("SELECT COUNT(*),COALESCE(SUM(")
+      + kLatestClassifiedRun + " IS NOT NULL),0) FROM games g WHERE g.profile_id=? AND "
+      + kAnalysableGame + ";";
+  auto statement = prepare(db_, sql.c_str());
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  BackgroundAnalysisProgress progress;
+  if (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    progress.total = sqlite3_column_int(statement.get(), 0);
+    progress.analysed = sqlite3_column_int(statement.get(), 1);
+  }
+  return progress;
+}
+
+std::vector<std::string> Database::games_awaiting_analysis(
+    const std::string& profile_id, const int limit) const {
+  const std::string sql = std::string("SELECT g.id FROM games g WHERE g.profile_id=? AND ")
+      + kAnalysableGame + " AND " + kLatestClassifiedRun + " IS NULL "
+      + "ORDER BY g.provider_ended_at DESC, g.created_at DESC LIMIT ?;";
+  auto statement = prepare(db_, sql.c_str());
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(statement.get(), 2, limit);
+  std::vector<std::string> ids;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    ids.push_back(text_column(statement.get(), 0));
+  }
+  return ids;
+}
+
+std::vector<std::string> Database::games_missing_move_accuracy(
+    const std::string& profile_id, const int limit) const {
+  const std::string sql = std::string("SELECT g.id FROM games g WHERE g.profile_id=? AND ")
+      + "EXISTS(SELECT 1 FROM move_analysis m WHERE m.analysis_run_id="
+      + kLatestClassifiedRun + " AND m.category<>'unknown' AND m.accuracy_weight IS NULL) "
+      + "ORDER BY g.provider_ended_at DESC, g.created_at DESC LIMIT ?;";
+  auto statement = prepare(db_, sql.c_str());
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(statement.get(), 2, limit);
+  std::vector<std::string> ids;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    ids.push_back(text_column(statement.get(), 0));
+  }
+  return ids;
+}
+
+std::vector<AccuracyGameRow> Database::accuracy_games_for_statistics(
+    const std::string& profile_id) const {
+  const std::string sql = std::string(
+      "SELECT g.id,g.provider_outcome,g.result,g.white_name,g.black_name,"
+      "g.time_control_type,"
+      "CASE WHEN g.provider_ended_at>0 THEN g.provider_ended_at ELSE g.created_at END,"
+      "r.white_local_accuracy,r.black_local_accuracy "
+      "FROM games g JOIN analysis_runs r ON r.id=") + kLatestClassifiedRun
+      + " WHERE g.profile_id=? "
+      + "ORDER BY CASE WHEN g.provider_ended_at>0 THEN g.provider_ended_at "
+      + "ELSE g.created_at END ASC, g.id ASC;";
+  auto statement = prepare(db_, sql.c_str());
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<AccuracyGameRow> rows;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    rows.push_back(AccuracyGameRow{
+        .game_id = text_column(statement.get(), 0),
+        .provider_outcome = text_column(statement.get(), 1),
+        .result = text_column(statement.get(), 2),
+        .white_name = text_column(statement.get(), 3),
+        .black_name = text_column(statement.get(), 4),
+        .time_control_type = text_column(statement.get(), 5),
+        .ended_at = sqlite3_column_int64(statement.get(), 6),
+        .white_accuracy = optional_double_column(statement.get(), 7),
+        .black_accuracy = optional_double_column(statement.get(), 8),
+    });
+  }
+  return rows;
+}
+
+std::vector<AccuracyMoveRow> Database::accuracy_moves_for_statistics(
+    const std::string& profile_id) const {
+  const std::string sql = std::string(
+      "SELECT g.id,m.ply,m.category,m.is_theory,m.move_accuracy,m.accuracy_weight "
+      "FROM games g JOIN move_analysis m ON m.analysis_run_id=") + kLatestClassifiedRun
+      + " WHERE g.profile_id=? AND m.category<>'unknown' ORDER BY g.id,m.ply;";
+  auto statement = prepare(db_, sql.c_str());
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<AccuracyMoveRow> rows;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    rows.push_back(AccuracyMoveRow{
+        .game_id = text_column(statement.get(), 0),
+        .ply = sqlite3_column_int(statement.get(), 1),
+        .category = text_column(statement.get(), 2),
+        .theory = sqlite3_column_int(statement.get(), 3) != 0,
+        .accuracy = optional_double_column(statement.get(), 4),
+        .weight = optional_double_column(statement.get(), 5),
+    });
+  }
+  return rows;
+}
+
 std::vector<GameMoveErrorRow> Database::move_errors_for_statistics(
     const std::string& profile_id, const int before_ply) const {
   // A game can hold several runs (other engine settings); only the latest
@@ -2936,7 +3054,8 @@ void Database::persist_classifications(
         "UPDATE move_analysis SET category=?,is_theory=?,classifier_version=?,"
         "expected_score_before=?,expected_score_best=?,expected_score_played=?,"
         "expected_score_loss=?,recommended_move=?,theory_games=?,theory_white_wins=?,"
-        "theory_draws=?,theory_black_wins=? WHERE analysis_run_id=? AND ply=?;");
+        "theory_draws=?,theory_black_wins=?,move_accuracy=?,accuracy_weight=? "
+        "WHERE analysis_run_id=? AND ply=?;");
     for (const auto& record : records) {
       sqlite3_reset(update.get());
       sqlite3_clear_bindings(update.get());
@@ -2959,8 +3078,12 @@ void Database::persist_classifications(
       } else {
         for (int index = 9; index <= 12; ++index) sqlite3_bind_null(update.get(), index);
       }
-      sqlite3_bind_text(update.get(), 13, run_id.c_str(), -1, SQLITE_TRANSIENT);
-      sqlite3_bind_int(update.get(), 14, record.ply);
+      bind_optional_double(update.get(), 13, record.move_accuracy);
+      // Always written, zero for theory or an unscorable move: a NULL weight
+      // then means only "classified before per-move accuracy existed".
+      sqlite3_bind_double(update.get(), 14, record.accuracy_weight);
+      sqlite3_bind_text(update.get(), 15, run_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_int(update.get(), 16, record.ply);
       check(sqlite3_step(update.get()), db_, "persist move classification");
       const int index = count_index(record.classification);
       if (index >= 0) ++counts[static_cast<std::size_t>(index)];

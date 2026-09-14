@@ -51,6 +51,10 @@ struct MoveClassificationRecord {
   std::optional<double> expected_score_loss;
   std::string recommended_move;
   TheoryMoveInfo theory;
+  // The move's accuracy and its weight in the game figure, so statistics can
+  // aggregate any subset of moves (e.g. one phase) with the game formula.
+  std::optional<double> move_accuracy;
+  double accuracy_weight{0.0};
 };
 
 struct GameRecord {
@@ -113,6 +117,35 @@ struct GameMoveErrorRow {
   std::string san;
   std::string fen_before;
   std::string recommended_move;   // engine's move in notation; may be empty
+};
+
+// How far the background analysis has come for one profile.
+struct BackgroundAnalysisProgress {
+  int total{0};     // games with moves that analysis can score
+  int analysed{0};  // of those, games with a finished, classified run
+};
+
+// One analysed game for the accuracy statistics, from its latest classified run.
+struct AccuracyGameRow {
+  std::string game_id;
+  std::string provider_outcome;
+  std::string result;
+  std::string white_name;
+  std::string black_name;
+  std::string time_control_type;
+  std::int64_t ended_at{0};  // provider end time, else import time (unix s)
+  std::optional<double> white_accuracy;
+  std::optional<double> black_accuracy;
+};
+
+// One classified move of an analysed game, with its stored accuracy parts.
+struct AccuracyMoveRow {
+  std::string game_id;
+  int ply{0};  // 0-based, 0 is White's first move
+  std::string category;
+  bool theory{false};
+  std::optional<double> accuracy;
+  std::optional<double> weight;  // null for rows classified before migration 22
 };
 
 // Minimal per-game fields for the game-phase ("phase of death") breakdown:
@@ -272,6 +305,8 @@ class Database {
   void set_engine_settings(int depth, int multi_pv, int time_limit_seconds);
   void set_engine_resources(int threads, int hash_mb);
   void set_setting(const std::string& key, const std::string& value);
+  // A raw app setting for services that own their key (e.g. background analysis).
+  std::optional<std::string> app_setting(const std::string& key) const { return setting(key); }
 
   std::string import_pgn(const std::string& profile_id, const ParsedGame& game);
   std::string import_fen(
@@ -310,6 +345,22 @@ class Database {
   // sides' moves are returned; the caller knows which side is the profile's.
   std::vector<GameMoveErrorRow> move_errors_for_statistics(
       const std::string& profile_id, int before_ply) const;
+
+  // Background analysis: progress, the next games to analyse (newest first),
+  // and analysed games whose moves predate stored per-move accuracy.
+  BackgroundAnalysisProgress background_analysis_progress(
+      const std::string& profile_id) const;
+  std::vector<std::string> games_awaiting_analysis(
+      const std::string& profile_id, int limit) const;
+  std::vector<std::string> games_missing_move_accuracy(
+      const std::string& profile_id, int limit) const;
+
+  // Accuracy statistics: analysed games oldest first, and their classified
+  // moves, both from each game's latest classified run.
+  std::vector<AccuracyGameRow> accuracy_games_for_statistics(
+      const std::string& profile_id) const;
+  std::vector<AccuracyMoveRow> accuracy_moves_for_statistics(
+      const std::string& profile_id) const;
 
   // Outcome + final ply per game, for the game-phase breakdown.
   std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;

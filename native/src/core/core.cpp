@@ -45,7 +45,8 @@ Core::Core(std::filesystem::path data_directory)
       bot_service_(database_),
       statistics_service_(database_),
       training_service_(database_),
-      practice_service_(database_, training_service_, bot_service_) {
+      practice_service_(database_, training_service_, bot_service_),
+      background_analysis_(database_, analysis_service_, bot_service_) {
   diagnostics::configure_logging(data_directory_);
   diagnostics::info("core", "Core created");
 }
@@ -310,6 +311,22 @@ std::string Core::provider_overview_json(const std::string& profile_id) {
 
 std::string Core::statistics_overview_json() {
   return statistics_service_.overview_json();
+}
+
+std::string Core::statistics_accuracy_json(const std::string& time_control) {
+  return statistics_service_.accuracy_json(time_control);
+}
+
+void Core::start_background_analysis() {
+  background_analysis_.start();
+}
+
+std::string Core::background_analysis_status_json() {
+  return background_analysis_.status_json();
+}
+
+void Core::set_background_analysis_enabled(const bool enabled) {
+  background_analysis_.set_enabled(enabled);
 }
 
 std::string Core::statistics_openings_json(const std::string& time_control) {

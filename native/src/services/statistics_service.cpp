@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "services/accuracy_statistics.h"
 #include "services/opening_weakness.h"
 #include "services/statistics_domain.h"
 #include "services/termination.h"
@@ -350,6 +351,136 @@ std::string StatisticsService::openings_json(
       {"weaknesses", weaknesses},
       {"analysedOpeningGames", analysed_opening_games},
       {"defaultColor", default_color},
+  };
+  return root.dump();
+}
+
+std::string StatisticsService::accuracy_json(const std::string& time_control) const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) {
+    return nlohmann::json{{"hasProfile", false}, {"analysedGames", 0}}.dump();
+  }
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
+  const bool filtered = time_control != "all" && !time_control.empty();
+
+  const auto move_rows = database_.accuracy_moves_for_statistics(profile->id);
+  std::map<std::string, std::vector<const AccuracyMoveRow*>> moves_by_game;
+  for (const auto& row : move_rows) moves_by_game[row.game_id].push_back(&row);
+
+  std::vector<AnalysedGame> games;
+  for (const auto& row : database_.accuracy_games_for_statistics(profile->id)) {
+    if (filtered && row.time_control_type != time_control) continue;
+    const auto color = game_color(username, row.white_name, row.black_name);
+    if (color != "white" && color != "black") continue;
+    const auto accuracy = color == "white" ? row.white_accuracy : row.black_accuracy;
+    if (!accuracy.has_value()) continue;
+
+    AnalysedGame game{.ended_at = row.ended_at,
+                      .color = color,
+                      .time_control = row.time_control_type,
+                      .accuracy = *accuracy};
+    const int own_parity = color == "white" ? 0 : 1;
+    if (const auto found = moves_by_game.find(row.game_id); found != moves_by_game.end()) {
+      for (const auto* move : found->second) {
+        if (move->ply % 2 != own_parity) continue;
+        const auto phase = static_cast<std::size_t>(phase_of_ply(move->ply));
+        const bool error = move->category == "mistake" || move->category == "blunder";
+        if (move->category == "blunder") game.blunders += 1;
+        if (move->category == "mistake") game.mistakes += 1;
+        if (error) game.phase_errors[phase] += 1;
+        // A NULL weight is a move classified before per-move accuracy was
+        // stored; background analysis fills it in. Until then the game has no
+        // phase breakdown rather than a partial one.
+        if (!move->weight.has_value()) continue;
+        game.phase_samples[phase].push_back(
+            {.theory = move->theory, .accuracy = move->accuracy, .weight = *move->weight});
+      }
+    }
+    games.push_back(std::move(game));
+  }
+
+  const auto average = [](const std::vector<const AnalysedGame*>& subset) {
+    if (subset.empty()) return nlohmann::json(nullptr);
+    double total = 0.0;
+    for (const auto* game : subset) total += game->accuracy;
+    return nlohmann::json(total / static_cast<double>(subset.size()));
+  };
+  const auto group = [&](const std::vector<const AnalysedGame*>& subset) {
+    return nlohmann::json{{"games", static_cast<int>(subset.size())},
+                          {"accuracy", average(subset)}};
+  };
+
+  std::vector<const AnalysedGame*> all, white, black;
+  std::map<std::string, std::vector<const AnalysedGame*>> by_control;
+  int blunders = 0;
+  for (const auto& game : games) {
+    all.push_back(&game);
+    (game.color == "white" ? white : black).push_back(&game);
+    by_control[game.time_control].push_back(&game);
+    blunders += game.blunders;
+  }
+
+  nlohmann::json controls = nlohmann::json::array();
+  for (const auto& [control, subset] : by_control) {
+    auto node = group(subset);
+    node["timeControl"] = control;
+    controls.push_back(std::move(node));
+  }
+  std::stable_sort(controls.begin(), controls.end(), [](const auto& a, const auto& b) {
+    return a.at("games").template get<int>() > b.at("games").template get<int>();
+  });
+
+  nlohmann::json phases = nlohmann::json::array();
+  const auto per_phase = phase_accuracy(games);
+  for (std::size_t index = 0; index < per_phase.size(); ++index) {
+    const auto& phase = per_phase[index];
+    phases.push_back({{"phase", phase_name(static_cast<GamePhase>(index))},
+                      {"games", phase.games},
+                      {"accuracy", phase.accuracy.has_value()
+                                       ? nlohmann::json(*phase.accuracy)
+                                       : nlohmann::json(nullptr)},
+                      {"errorsPerGame", phase.errors_per_game}});
+  }
+
+  // The chart: every analysed game with a rolling average, capped to the
+  // latest stretch so a large library stays a readable line.
+  constexpr std::size_t kTimelinePoints = 150;
+  constexpr int kRollingWindow = 10;
+  const auto rolling = rolling_accuracy(games, kRollingWindow);
+  nlohmann::json timeline = nlohmann::json::array();
+  const std::size_t first =
+      games.size() > kTimelinePoints ? games.size() - kTimelinePoints : 0;
+  for (std::size_t index = first; index < games.size(); ++index) {
+    timeline.push_back({{"endedAt", games[index].ended_at},
+                        {"accuracy", games[index].accuracy},
+                        {"average", rolling[index]}});
+  }
+
+  const auto trend = accuracy_trend(games);
+  const auto optional_number = [](const std::optional<double>& value) {
+    return value.has_value() ? nlohmann::json(*value) : nlohmann::json(nullptr);
+  };
+
+  nlohmann::json root{
+      {"hasProfile", true},
+      {"analysedGames", static_cast<int>(games.size())},
+      {"averageAccuracy", average(all)},
+      {"blundersPerGame", games.empty()
+                              ? nlohmann::json(nullptr)
+                              : nlohmann::json(static_cast<double>(blunders) / games.size())},
+      {"byColor", {{"white", group(white)}, {"black", group(black)}}},
+      {"byTimeControl", controls},
+      {"byPhase", phases},
+      {"timeline", timeline},
+      {"trend",
+       {{"verdict", trend.verdict},
+        {"window", trend.window},
+        {"gamesNeeded", trend.games_needed},
+        {"recentAccuracy", optional_number(trend.recent_accuracy)},
+        {"previousAccuracy", optional_number(trend.previous_accuracy)},
+        {"recentBlunders", optional_number(trend.recent_blunders)},
+        {"previousBlunders", optional_number(trend.previous_blunders)}}},
   };
   return root.dump();
 }

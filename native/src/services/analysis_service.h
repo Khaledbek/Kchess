@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -49,6 +50,26 @@ class AnalysisService {
       int hash_mb);
   std::string variation_analysis_status_json(const std::string& job_id);
   void cancel_variation_analysis(const std::string& job_id);
+
+  // --- Background analysis ---------------------------------------------------
+  // Starts or resumes the low-priority analysis of one game on a single engine
+  // thread, with the same pre-analysis depth the analysis screen uses, so its
+  // result is reused as is when the user opens the game. Only one background
+  // game runs at a time; starting another replaces it.
+  void start_background_analysis(const std::string& game_id);
+  // True while the background game is still being analysed.
+  bool background_analysis_running() const;
+  // Stops the background game. Every finished position stays saved, so the
+  // next start resumes where it stopped.
+  void cancel_background_analysis() noexcept;
+  // True while the user's own work is using the engine: a game analysis,
+  // a maximum-depth refinement or a sideline.
+  bool foreground_analysis_running() const;
+  // Unix seconds of the user's last analysis request or status poll.
+  std::int64_t last_foreground_activity() const noexcept;
+  // Re-derives classifications and per-move accuracy of an analysed game from
+  // its stored engine results. No engine search is involved.
+  void refresh_classification(const std::string& game_id);
 
  private:
   enum class AnalysisJobState {
@@ -125,6 +146,12 @@ class AnalysisService {
       const std::string& config_hash,
       bool force = false,
       int through_ply = -1);
+  // The user touched analysis: remember when, and give the engine back by
+  // stopping the background game.
+  void note_foreground_activity() noexcept;
+  std::string start_analysis(
+      const std::string& game_id, const AppSettings& settings, bool background);
+
   void run_analysis(
       const std::string& game_id,
       const std::string& config_hash,
@@ -153,6 +180,10 @@ class AnalysisService {
 
   mutable std::mutex jobs_mutex_;
   std::unordered_map<std::string, std::shared_ptr<AnalysisJob>> jobs_;
+
+  // Game currently analysed in the background; its job lives in jobs_.
+  std::string background_game_id_;
+  std::atomic<std::int64_t> last_foreground_activity_{0};
 
   mutable std::mutex refinement_jobs_mutex_;
   std::unordered_map<std::string, std::shared_ptr<AnalysisJob>> refinement_jobs_;

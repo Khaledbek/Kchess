@@ -120,6 +120,12 @@ class _Gateway implements CoreGateway {
   @override
   Future<StatisticsTimeline> statisticsTimeline(GameQuery query) =>
       Future.error('not scripted');
+  @override
+  Future<AccuracyStats> accuracyStats({String timeControl = 'all'}) =>
+      Future.error('not scripted');
+  @override
+  Future<BackgroundAnalysisStatus> backgroundAnalysisStatus() =>
+      Future.error('not scripted');
 
   @override
   Future<Object?> practiceCommand(Map<String, Object?> request) async {

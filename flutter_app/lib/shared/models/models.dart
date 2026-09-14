@@ -321,6 +321,179 @@ class OpeningsStats {
   bool get isEmpty => gamesWithOpening == 0;
 }
 
+/// Accuracy over the profile's analysed games, as native aggregated it.
+class AccuracyStats {
+  const AccuracyStats({
+    this.hasProfile = false,
+    this.analysedGames = 0,
+    this.averageAccuracy,
+    this.blundersPerGame,
+    this.white = const AccuracyGroup(),
+    this.black = const AccuracyGroup(),
+    this.byTimeControl = const [],
+    this.byPhase = const [],
+    this.timeline = const [],
+    this.trend = const AccuracyTrend(),
+  });
+
+  factory AccuracyStats.fromJson(Map<String, Object?> json) {
+    final colors = json['byColor'] as Map<String, Object?>? ?? const {};
+    return AccuracyStats(
+      hasProfile: json['hasProfile'] as bool? ?? false,
+      analysedGames: json['analysedGames'] as int? ?? 0,
+      averageAccuracy: (json['averageAccuracy'] as num?)?.toDouble(),
+      blundersPerGame: (json['blundersPerGame'] as num?)?.toDouble(),
+      white: AccuracyGroup.fromJson(colors['white'] as Map<String, Object?>? ?? const {}),
+      black: AccuracyGroup.fromJson(colors['black'] as Map<String, Object?>? ?? const {}),
+      byTimeControl: (json['byTimeControl'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(AccuracyGroup.fromJson)
+          .toList(growable: false),
+      byPhase: (json['byPhase'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(PhaseAccuracy.fromJson)
+          .toList(growable: false),
+      timeline: (json['timeline'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(AccuracyPoint.fromJson)
+          .toList(growable: false),
+      trend: AccuracyTrend.fromJson(json['trend'] as Map<String, Object?>? ?? const {}),
+    );
+  }
+
+  final bool hasProfile;
+  final int analysedGames;
+  final double? averageAccuracy;
+  final double? blundersPerGame;
+  final AccuracyGroup white;
+  final AccuracyGroup black;
+  final List<AccuracyGroup> byTimeControl;
+
+  /// Opening, middlegame and endgame, in that order.
+  final List<PhaseAccuracy> byPhase;
+
+  /// Analysed games oldest first, with a rolling average for the chart line.
+  final List<AccuracyPoint> timeline;
+  final AccuracyTrend trend;
+}
+
+class AccuracyGroup {
+  const AccuracyGroup({this.games = 0, this.accuracy, this.timeControl = ''});
+
+  factory AccuracyGroup.fromJson(Map<String, Object?> json) => AccuracyGroup(
+    games: json['games'] as int? ?? 0,
+    accuracy: (json['accuracy'] as num?)?.toDouble(),
+    timeControl: json['timeControl'] as String? ?? '',
+  );
+
+  final int games;
+  final double? accuracy;
+
+  /// Set only for the per-time-control groups.
+  final String timeControl;
+}
+
+class PhaseAccuracy {
+  const PhaseAccuracy({
+    required this.phase,
+    this.games = 0,
+    this.accuracy,
+    this.errorsPerGame = 0,
+  });
+
+  factory PhaseAccuracy.fromJson(Map<String, Object?> json) => PhaseAccuracy(
+    phase: json['phase'] as String? ?? 'opening',
+    games: json['games'] as int? ?? 0,
+    accuracy: (json['accuracy'] as num?)?.toDouble(),
+    errorsPerGame: (json['errorsPerGame'] as num?)?.toDouble() ?? 0,
+  );
+
+  /// `opening` | `middlegame` | `endgame`.
+  final String phase;
+  final int games;
+  final double? accuracy;
+
+  /// Mistakes plus blunders in this phase, per game that reached it.
+  final double errorsPerGame;
+}
+
+class AccuracyPoint {
+  const AccuracyPoint({required this.endedAt, required this.accuracy, required this.average});
+
+  factory AccuracyPoint.fromJson(Map<String, Object?> json) => AccuracyPoint(
+    endedAt: json['endedAt'] as int? ?? 0,
+    accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0,
+    average: (json['average'] as num?)?.toDouble() ?? 0,
+  );
+
+  /// Unix seconds.
+  final int endedAt;
+  final double accuracy;
+  final double average;
+}
+
+/// Whether the latest analysed games are better than the ones before them.
+class AccuracyTrend {
+  const AccuracyTrend({
+    this.verdict = 'insufficient',
+    this.window = 0,
+    this.gamesNeeded = 0,
+    this.recentAccuracy,
+    this.previousAccuracy,
+    this.recentBlunders,
+    this.previousBlunders,
+  });
+
+  factory AccuracyTrend.fromJson(Map<String, Object?> json) => AccuracyTrend(
+    verdict: json['verdict'] as String? ?? 'insufficient',
+    window: json['window'] as int? ?? 0,
+    gamesNeeded: json['gamesNeeded'] as int? ?? 0,
+    recentAccuracy: (json['recentAccuracy'] as num?)?.toDouble(),
+    previousAccuracy: (json['previousAccuracy'] as num?)?.toDouble(),
+    recentBlunders: (json['recentBlunders'] as num?)?.toDouble(),
+    previousBlunders: (json['previousBlunders'] as num?)?.toDouble(),
+  );
+
+  /// `improving` | `steady` | `declining` | `insufficient`.
+  final String verdict;
+
+  /// Games in each compared stretch.
+  final int window;
+
+  /// More analysed games needed before a verdict.
+  final int gamesNeeded;
+  final double? recentAccuracy;
+  final double? previousAccuracy;
+  final double? recentBlunders;
+  final double? previousBlunders;
+}
+
+/// Where background analysis of the profile's games stands.
+class BackgroundAnalysisStatus {
+  const BackgroundAnalysisStatus({
+    this.enabled = true,
+    this.state = 'waiting',
+    this.analysedGames = 0,
+    this.totalGames = 0,
+  });
+
+  factory BackgroundAnalysisStatus.fromJson(Map<String, Object?> json) =>
+      BackgroundAnalysisStatus(
+        enabled: json['enabled'] as bool? ?? true,
+        state: json['state'] as String? ?? 'waiting',
+        analysedGames: json['analysedGames'] as int? ?? 0,
+        totalGames: json['totalGames'] as int? ?? 0,
+      );
+
+  final bool enabled;
+
+  /// `running` | `paused` | `waiting` | `complete` | `disabled` |
+  /// `unavailable` | `noProfile`.
+  final String state;
+  final int analysedGames;
+  final int totalGames;
+}
+
 /// An opening line that needs training, with the evidence native found.
 class OpeningWeakness {
   const OpeningWeakness({

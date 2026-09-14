@@ -1156,6 +1156,150 @@ abstract class AppLocalizations {
   /// **'Could not load game phases.'**
   String get statsPhaseError;
 
+  /// No description provided for @statsAccuracyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accuracy'**
+  String get statsAccuracyTitle;
+
+  /// No description provided for @statsAccuracyAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average accuracy'**
+  String get statsAccuracyAverage;
+
+  /// No description provided for @statsAccuracyBlundersPerGame.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} blunders per game'**
+  String statsAccuracyBlundersPerGame(String value);
+
+  /// No description provided for @statsAccuracyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No analysed games yet. Your games are analysed in the background while the app is open.'**
+  String get statsAccuracyEmpty;
+
+  /// No description provided for @statsAccuracyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load accuracy.'**
+  String get statsAccuracyError;
+
+  /// No description provided for @statsAccuracyImproving.
+  ///
+  /// In en, this message translates to:
+  /// **'Improving'**
+  String get statsAccuracyImproving;
+
+  /// No description provided for @statsAccuracySteady.
+  ///
+  /// In en, this message translates to:
+  /// **'Holding steady'**
+  String get statsAccuracySteady;
+
+  /// No description provided for @statsAccuracyDeclining.
+  ///
+  /// In en, this message translates to:
+  /// **'Declining'**
+  String get statsAccuracyDeclining;
+
+  /// No description provided for @statsAccuracyTrendInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough analysed games yet'**
+  String get statsAccuracyTrendInsufficient;
+
+  /// No description provided for @statsAccuracyTrendDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Last {games} games: {recent} (before: {previous})'**
+  String statsAccuracyTrendDetail(int games, String recent, String previous);
+
+  /// No description provided for @statsAccuracyTrendBlunders.
+  ///
+  /// In en, this message translates to:
+  /// **'Blunders per game: {recent} (before: {previous})'**
+  String statsAccuracyTrendBlunders(String recent, String previous);
+
+  /// No description provided for @statsAccuracyTrendNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more analysed game} other{{count} more analysed games}} to see whether you are improving.'**
+  String statsAccuracyTrendNeeded(int count);
+
+  /// No description provided for @statsAccuracyErrorsPerGame.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} mistakes per game'**
+  String statsAccuracyErrorsPerGame(String value);
+
+  /// No description provided for @statsAccuracyGames.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 game} other{{count} games}}'**
+  String statsAccuracyGames(int count);
+
+  /// No description provided for @statsAccuracyByColor.
+  ///
+  /// In en, this message translates to:
+  /// **'By colour'**
+  String get statsAccuracyByColor;
+
+  /// No description provided for @statsAccuracyByTimeControl.
+  ///
+  /// In en, this message translates to:
+  /// **'By time control'**
+  String get statsAccuracyByTimeControl;
+
+  /// No description provided for @backgroundAnalysisProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysed {analysed} of {total} games'**
+  String backgroundAnalysisProgress(int analysed, int total);
+
+  /// No description provided for @backgroundAnalysisRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysing in the background'**
+  String get backgroundAnalysisRunning;
+
+  /// No description provided for @backgroundAnalysisPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused while you analyse or play'**
+  String get backgroundAnalysisPaused;
+
+  /// No description provided for @backgroundAnalysisComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'All games analysed'**
+  String get backgroundAnalysisComplete;
+
+  /// No description provided for @backgroundAnalysisDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Background analysis is off (Settings)'**
+  String get backgroundAnalysisDisabled;
+
+  /// No description provided for @backgroundAnalysisUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine unavailable, retrying shortly'**
+  String get backgroundAnalysisUnavailable;
+
+  /// No description provided for @backgroundAnalysisSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse games in the background'**
+  String get backgroundAnalysisSetting;
+
+  /// No description provided for @backgroundAnalysisSettingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps accuracy and weakness statistics up to date while the app is open. Pauses whenever you analyse or play.'**
+  String get backgroundAnalysisSettingSubtitle;
+
   /// No description provided for @statsPhaseRetry.
   ///
   /// In en, this message translates to:

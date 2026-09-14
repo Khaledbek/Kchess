@@ -48,11 +48,20 @@ class AppController extends ChangeNotifier {
       phase = AppPhase.error;
     }
     notifyListeners();
+    if (phase == AppPhase.ready) unawaited(_startBackgroundAnalysis());
     if (phase == AppPhase.ready &&
         settings.autoSyncOnline &&
         activeProfile?.type != ProfileType.localPgnFen) {
       unawaited(syncProvider());
     }
+  }
+
+  /// Lets native analyse the profile's games while the app is open; its saved
+  /// on/off setting decides whether it does. Statistics work without it.
+  Future<void> _startBackgroundAnalysis() async {
+    try {
+      await gateway.startBackgroundAnalysis();
+    } catch (_) {}
   }
 
   Future<void> createProfile(ProfileType type, String input) async {

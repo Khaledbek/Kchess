@@ -177,6 +177,8 @@ add_library(kchess_core SHARED
   src/services/statistics_service.cpp
   src/services/statistics_details.cpp
   src/services/opening_weakness.cpp
+  src/services/accuracy_statistics.cpp
+  src/services/background_analysis.cpp
   src/training/training_catalog.cpp
   src/training/training_service.cpp
   src/training/practice_catalog.cpp
@@ -442,6 +444,27 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
   )
   add_test(NAME kchess_opening_weakness_tests COMMAND kchess_opening_weakness_tests)
+
+  add_executable(kchess_accuracy_statistics_tests
+    tests/accuracy_statistics_tests.cpp
+    src/services/accuracy_statistics.cpp
+    src/analysis/accuracy.cpp
+  )
+  target_compile_features(kchess_accuracy_statistics_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_accuracy_statistics_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_accuracy_statistics_tests COMMAND kchess_accuracy_statistics_tests)
+
+  # Analyses a real game with Stockfish in the background through the C ABI.
+  add_executable(kchess_background_analysis_tests tests/background_analysis_tests.cpp)
+  target_compile_features(kchess_background_analysis_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_background_analysis_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
+  )
+  target_link_libraries(kchess_background_analysis_tests PRIVATE kchess_core)
+  add_test(NAME kchess_background_analysis_tests COMMAND kchess_background_analysis_tests)
 
   add_executable(kchess_bot_move_selector_tests
     tests/bot_move_selector_tests.cpp

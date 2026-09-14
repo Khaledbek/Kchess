@@ -207,6 +207,91 @@
   "statsPhaseEmpty": "Not enough data on game phases.",
   "statsPhaseNoProfile": "Create or select a profile to see statistics.",
   "statsPhaseError": "Could not load game phases.",
+  "statsAccuracyTitle": "Accuracy",
+  "statsAccuracyAverage": "Average accuracy",
+  "statsAccuracyBlundersPerGame": "{value} blunders per game",
+  "@statsAccuracyBlundersPerGame": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "statsAccuracyEmpty": "No analysed games yet. Your games are analysed in the background while the app is open.",
+  "statsAccuracyError": "Could not load accuracy.",
+  "statsAccuracyImproving": "Improving",
+  "statsAccuracySteady": "Holding steady",
+  "statsAccuracyDeclining": "Declining",
+  "statsAccuracyTrendInsufficient": "Not enough analysed games yet",
+  "statsAccuracyTrendDetail": "Last {games} games: {recent} (before: {previous})",
+  "@statsAccuracyTrendDetail": {
+    "placeholders": {
+      "games": {
+        "type": "int"
+      },
+      "recent": {
+        "type": "String"
+      },
+      "previous": {
+        "type": "String"
+      }
+    }
+  },
+  "statsAccuracyTrendBlunders": "Blunders per game: {recent} (before: {previous})",
+  "@statsAccuracyTrendBlunders": {
+    "placeholders": {
+      "recent": {
+        "type": "String"
+      },
+      "previous": {
+        "type": "String"
+      }
+    }
+  },
+  "statsAccuracyTrendNeeded": "{count, plural, =1{1 more analysed game} other{{count} more analysed games}} to see whether you are improving.",
+  "@statsAccuracyTrendNeeded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statsAccuracyErrorsPerGame": "{value} mistakes per game",
+  "@statsAccuracyErrorsPerGame": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "statsAccuracyGames": "{count, plural, =1{1 game} other{{count} games}}",
+  "@statsAccuracyGames": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statsAccuracyByColor": "By colour",
+  "statsAccuracyByTimeControl": "By time control",
+  "backgroundAnalysisProgress": "Analysed {analysed} of {total} games",
+  "@backgroundAnalysisProgress": {
+    "placeholders": {
+      "analysed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "backgroundAnalysisRunning": "Analysing in the background",
+  "backgroundAnalysisPaused": "Paused while you analyse or play",
+  "backgroundAnalysisComplete": "All games analysed",
+  "backgroundAnalysisDisabled": "Background analysis is off (Settings)",
+  "backgroundAnalysisUnavailable": "Engine unavailable, retrying shortly",
+  "backgroundAnalysisSetting": "Analyse games in the background",
+  "backgroundAnalysisSettingSubtitle": "Keeps accuracy and weakness statistics up to date while the app is open. Pauses whenever you analyse or play.",
   "statsPhaseRetry": "Retry",
   "statsPhaseClassifiedNote": "{classified} of {total} games",
   "@statsPhaseClassifiedNote": {

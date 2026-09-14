@@ -13,6 +13,7 @@
 #include "core/models.h"
 #include "persistence/database.h"
 #include "services/analysis_service.h"
+#include "services/background_analysis.h"
 #include "services/bot_service.h"
 #include "services/game_library_service.h"
 #include "services/profile_service.h"
@@ -100,6 +101,10 @@ class Core {
 
   std::string statistics_overview_json();
   std::string statistics_openings_json(const std::string& time_control = "all");
+  std::string statistics_accuracy_json(const std::string& time_control = "all");
+  void start_background_analysis();
+  std::string background_analysis_status_json();
+  void set_background_analysis_enabled(bool enabled);
   std::string statistics_terminations_json();
   std::string statistics_phases_json();
   std::string statistics_timeline_json(const std::string& query_json);
@@ -180,6 +185,9 @@ class Core {
   StatisticsService statistics_service_;
   TrainingService training_service_;
   PracticeService practice_service_;
+  // Declared last so it is destroyed first: it stops its worker, and the
+  // game it analyses, before the services it drives go away.
+  BackgroundAnalysis background_analysis_;
   bool initialized_{false};
   int32_t last_status_{0};
   std::string last_error_;

@@ -157,6 +157,17 @@ KCHESS_API char* kc_statistics_openings_filtered_json(
     kc_core_handle handle,
     const char* time_control_utf8);
 KCHESS_API char* kc_statistics_terminations_json(kc_core_handle handle);
+// Accuracy over analysed games; time_control is "all" or one bucket.
+KCHESS_API char* kc_statistics_accuracy_json(
+    kc_core_handle handle,
+    const char* time_control_utf8);
+// Background analysis of the active profile's games. Start once after
+// initialisation; the saved on/off setting decides whether it works.
+KCHESS_API kc_status kc_start_background_analysis(kc_core_handle handle);
+KCHESS_API char* kc_background_analysis_status_json(kc_core_handle handle);
+KCHESS_API kc_status kc_set_background_analysis_enabled(
+    kc_core_handle handle,
+    int32_t enabled);
 KCHESS_API char* kc_statistics_phases_json(kc_core_handle handle);
 // Returns owned UTF-8 JSON; release with kc_string_free, as for other JSON calls.
 KCHESS_API char* kc_statistics_timeline_json(kc_core_handle handle, const char* query_utf8);

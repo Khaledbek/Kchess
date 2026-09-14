@@ -812,6 +812,34 @@ char* kc_statistics_openings_filtered_json(
   });
 }
 
+char* kc_statistics_accuracy_json(
+    const kc_core_handle handle, const char* time_control_utf8) {
+  if (time_control_utf8 == nullptr || time_control_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Time-control filter is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->statistics_accuracy_json(time_control_utf8);
+  });
+}
+
+kc_status kc_start_background_analysis(const kc_core_handle handle) {
+  return status_call(
+      core_from(handle), [=] { core_from(handle)->start_background_analysis(); });
+}
+
+char* kc_background_analysis_status_json(const kc_core_handle handle) {
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->background_analysis_status_json();
+  });
+}
+
+kc_status kc_set_background_analysis_enabled(
+    const kc_core_handle handle, const int32_t enabled) {
+  return status_call(core_from(handle), [=] {
+    core_from(handle)->set_background_analysis_enabled(enabled != 0);
+  });
+}
+
 char* kc_training_overview_json(const kc_core_handle handle) {
   return string_call(core_from(handle), [=] {
     return core_from(handle)->training_overview_json();

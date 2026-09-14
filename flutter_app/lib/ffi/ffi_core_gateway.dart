@@ -296,6 +296,22 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_terminations_json',
         );
+    _statisticsAccuracy = _library
+        .lookupFunction<_StringArgNative, _StringArgDart>(
+          'kc_statistics_accuracy_json',
+        );
+    _startBackgroundAnalysis = _library
+        .lookupFunction<_StatusNoArgsNative, _StatusNoArgsDart>(
+          'kc_start_background_analysis',
+        );
+    _backgroundAnalysisStatus = _library
+        .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
+          'kc_background_analysis_status_json',
+        );
+    _setBackgroundAnalysisEnabled = _library
+        .lookupFunction<_StatusIntNative, _StatusIntDart>(
+          'kc_set_background_analysis_enabled',
+        );
     _statisticsPhases = _library
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_statistics_phases_json',
@@ -624,6 +640,10 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringNoArgsDart _statisticsOpenings;
   late final _StringArgDart _statisticsOpeningsFiltered;
   late final _StringNoArgsDart _statisticsTerminations;
+  late final _StringArgDart _statisticsAccuracy;
+  late final _StatusNoArgsDart _startBackgroundAnalysis;
+  late final _StringNoArgsDart _backgroundAnalysisStatus;
+  late final _StatusIntDart _setBackgroundAnalysisEnabled;
   late final _StringNoArgsDart _statisticsPhases;
   late final _StringArgDart _statisticsTimeline;
   late final _StatusStringIntDart _setGameFavorite;
@@ -867,6 +887,29 @@ class FfiCoreGateway implements CoreGateway {
       return OpeningsStats.fromJson(json);
     });
   }
+
+  @override
+  Future<AccuracyStats> accuracyStats({String timeControl = 'all'}) =>
+      _withNativeString(
+        timeControl.isEmpty ? 'all' : timeControl,
+        (value) => AccuracyStats.fromJson(
+          _readJson(_statisticsAccuracy(_handle, value))! as Map<String, Object?>,
+        ),
+      );
+
+  @override
+  Future<void> startBackgroundAnalysis() async =>
+      _checkStatus(_startBackgroundAnalysis(_handle));
+
+  @override
+  Future<BackgroundAnalysisStatus> backgroundAnalysisStatus() async =>
+      BackgroundAnalysisStatus.fromJson(
+        _readJson(_backgroundAnalysisStatus(_handle))! as Map<String, Object?>,
+      );
+
+  @override
+  Future<void> setBackgroundAnalysisEnabled(bool enabled) async =>
+      _checkStatus(_setBackgroundAnalysisEnabled(_handle, enabled ? 1 : 0));
 
   @override
   Future<TerminationStats> terminationStats() async =>

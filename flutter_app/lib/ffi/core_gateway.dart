@@ -27,6 +27,15 @@ abstract interface class CoreGateway {
   Future<ScoutReport> scoutReport(String username);
   Future<StatisticsOverview> statisticsOverview();
   Future<OpeningsStats> openingsStats({String timeControl = 'all'});
+
+  /// Accuracy over the profile's analysed games, including whether it improves.
+  Future<AccuracyStats> accuracyStats({String timeControl = 'all'});
+
+  /// Background analysis of the profile's games: start it once per launch, read
+  /// its progress, and switch it on or off (the choice is saved natively).
+  Future<void> startBackgroundAnalysis();
+  Future<BackgroundAnalysisStatus> backgroundAnalysisStatus();
+  Future<void> setBackgroundAnalysisEnabled(bool enabled);
   Future<TerminationStats> terminationStats();
   Future<PhaseStats> phaseStats();
   Future<StatisticsTimeline> statisticsTimeline(GameQuery query);
