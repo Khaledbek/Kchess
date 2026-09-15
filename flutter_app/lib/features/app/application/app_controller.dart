@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../diagnostics/app_startup_diagnostics.dart';
 import '../../../ffi/core_gateway.dart';
 import '../../../shared/models/models.dart';
 
@@ -22,40 +23,74 @@ class AppController extends ChangeNotifier {
   bool providerSyncing = false;
   String? providerNotice;
   String? selectedMonth;
-  Object? error;
   int _providerSyncGeneration = 0;
 
   Future<void> initialize() async {
+    final startup = AppStartupDiagnostics.instance;
+    final captureStartup = startup.beginControllerInitialization();
+    final initializationStopwatch = Stopwatch()..start();
+
+    Future<T> timed<T>(String name, Future<T> Function() action) async {
+      final stopwatch = Stopwatch()..start();
+      try {
+        return await action();
+      } finally {
+        if (captureStartup) {
+          startup.recordControllerDuration(name, stopwatch.elapsedMilliseconds);
+        }
+      }
+    }
+
     phase = AppPhase.loading;
-    error = null;
     notifyListeners();
+    var succeeded = false;
     try {
-      await gateway.initialize();
-      profiles = await gateway.profiles();
-      activeProfile = await gateway.activeProfile();
-      await _ensureActiveProfile();
-      settings = await gateway.settings();
-      games = await gateway.games();
-      favoriteGames = await gateway.favoriteGames();
-      favoriteCollections = await gateway.favoriteCollections();
+      await timed('gatewayInitializeMs', gateway.initialize);
+      profiles = await timed('profilesMs', gateway.profiles);
+      activeProfile = await timed('activeProfileMs', gateway.activeProfile);
+      await timed('ensureActiveProfileMs', _ensureActiveProfile);
+      settings = await timed('settingsMs', gateway.settings);
+      await timed('gamesMs', _loadInitialGameWindow);
+      favoriteGames = await timed('favoriteGamesMs', gateway.favoriteGames);
+      favoriteCollections = await timed(
+        'favoriteCollectionsMs',
+        gateway.favoriteCollections,
+      );
       if (activeProfile!.type != ProfileType.localPgnFen) {
-        providerOverview = await gateway.providerOverview(activeProfile!.id);
-        selectedMonth = _currentMonth();
+        providerOverview = await timed(
+          'providerOverviewMs',
+          () => gateway.providerOverview(activeProfile!.id),
+        );
       } else {
         providerOverview = null;
-        selectedMonth = null;
       }
       phase = AppPhase.ready;
-    } catch (caught) {
-      error = caught;
+      succeeded = true;
+    } catch (_) {
       phase = AppPhase.error;
+    } finally {
+      if (captureStartup) {
+        startup.completeControllerInitialization(
+          totalMs: initializationStopwatch.elapsedMilliseconds,
+          succeeded: succeeded,
+        );
+      }
     }
     notifyListeners();
+    if (phase == AppPhase.ready) unawaited(_startBackgroundAnalysis());
     if (phase == AppPhase.ready &&
         settings.autoSyncOnline &&
         activeProfile?.type != ProfileType.localPgnFen) {
       unawaited(syncProvider());
     }
+  }
+
+  /// Lets native analyse the profile's games while the app is open; its saved
+  /// on/off setting decides whether it does. Statistics work without it.
+  Future<void> _startBackgroundAnalysis() async {
+    try {
+      await gateway.startBackgroundAnalysis();
+    } catch (_) {}
   }
 
   Future<void> createProfile(ProfileType type, String input) async {
@@ -71,15 +106,13 @@ class AppController extends ChangeNotifier {
     profiles = await gateway.profiles();
     activeProfile = profile;
     settings = await gateway.settings();
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     if (type != ProfileType.localPgnFen) {
       providerOverview = await gateway.providerOverview(profile.id);
-      selectedMonth = _currentMonth();
     } else {
       providerOverview = null;
-      selectedMonth = null;
     }
     phase = AppPhase.ready;
     notifyListeners();
@@ -91,16 +124,14 @@ class AppController extends ChangeNotifier {
     await gateway.setActiveProfile(profile.id);
     activeProfile = profile;
     settings = await gateway.settings();
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     providerNotice = null;
     if (profile.type != ProfileType.localPgnFen) {
       providerOverview = await gateway.providerOverview(profile.id);
-      selectedMonth = _currentMonth();
     } else {
       providerOverview = null;
-      selectedMonth = null;
     }
     notifyListeners();
     if (settings.autoSyncOnline && profile.type != ProfileType.localPgnFen) {
@@ -119,12 +150,11 @@ class AppController extends ChangeNotifier {
     selectedMonth = null;
     await _ensureActiveProfile();
     settings = await gateway.settings();
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     if (activeProfile!.type != ProfileType.localPgnFen) {
       providerOverview = await gateway.providerOverview(activeProfile!.id);
-      selectedMonth = _currentMonth();
     }
     phase = AppPhase.ready;
     notifyListeners();
@@ -150,12 +180,11 @@ class AppController extends ChangeNotifier {
     selectedMonth = null;
     await _ensureActiveProfile();
     settings = await gateway.settings();
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     if (activeProfile!.type != ProfileType.localPgnFen) {
       providerOverview = await gateway.providerOverview(activeProfile!.id);
-      selectedMonth = _currentMonth();
     }
     phase = AppPhase.ready;
     notifyListeners();
@@ -195,7 +224,11 @@ class AppController extends ChangeNotifier {
       providerOverview = synced;
       activeProfile = providerOverview!.profile;
       profiles = await gateway.profiles();
-      games = await gateway.games();
+      if (month == null) {
+        await _loadInitialGameWindow();
+      } else {
+        await _reloadVisibleGames();
+      }
       favoriteGames = await gateway.favoriteGames();
     } catch (caught) {
       if (generation != _providerSyncGeneration ||
@@ -203,7 +236,7 @@ class AppController extends ChangeNotifier {
         return;
       }
       providerNotice = caught.toString();
-      games = await gateway.games();
+      await _reloadVisibleGames();
       favoriteGames = await gateway.favoriteGames();
     } finally {
       if (generation == _providerSyncGeneration) {
@@ -215,7 +248,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> toggleFavorite(GameSummary game) async {
     await gateway.setGameFavorite(game.id, !game.favorite);
-    games = await gateway.games();
+    await _reloadVisibleGames();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -242,7 +275,7 @@ class AppController extends ChangeNotifier {
     await gateway.deleteFavoriteCollection(collection.id);
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
-    games = await gateway.games();
+    await _reloadVisibleGames();
     notifyListeners();
   }
 
@@ -251,7 +284,7 @@ class AppController extends ChangeNotifier {
     FavoriteCollection? collection,
   ) async {
     await gateway.setGameFavoriteCollection(game.id, collection?.id);
-    games = await gateway.games();
+    await _reloadVisibleGames();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -261,7 +294,7 @@ class AppController extends ChangeNotifier {
     // Downloads are no longer a separate state. Saving an online game makes it
     // a global favorite and places it in the top-level Downloads collection.
     await gateway.setGameDownloaded(game.id, true);
-    games = await gateway.games();
+    await _reloadVisibleGames();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -269,7 +302,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> deleteLocalGame(GameSummary game) async {
     await gateway.deleteLocalGame(game.id);
-    games = await gateway.games();
+    await _reloadVisibleGames();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -279,11 +312,50 @@ class AppController extends ChangeNotifier {
     final profile = activeProfile;
     if (profile == null || profile.type == ProfileType.localPgnFen) return;
     await gateway.clearCachedMonth(profile.id, month);
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     providerOverview = await gateway.providerOverview(profile.id);
     notifyListeners();
+  }
+
+  Future<void> _loadInitialGameWindow() async {
+    final profile = activeProfile;
+    if (profile == null) {
+      games = const [];
+      selectedMonth = null;
+      return;
+    }
+    final snapshot = await gateway.initialGames();
+    games = snapshot.games;
+    if (profile.type == ProfileType.localPgnFen) {
+      selectedMonth = null;
+    } else {
+      final month = snapshot.month;
+      if (month == null) {
+        throw const CoreGatewayException(
+          'Native initial game window did not provide a month',
+        );
+      }
+      selectedMonth = month;
+    }
+  }
+
+  Future<void> _reloadVisibleGames() async {
+    final profile = activeProfile;
+    if (profile == null) {
+      games = const [];
+      selectedMonth = null;
+      return;
+    }
+    final month = selectedMonth;
+    if (profile.type != ProfileType.localPgnFen && month != null) {
+      games = await gateway.queryGames(
+        GameQuery(month: month, applyMonth: true),
+      );
+      return;
+    }
+    games = await gateway.games();
   }
 
   Future<void> _ensureActiveProfile() async {
@@ -304,18 +376,13 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  String _currentMonth() {
-    final now = DateTime.now();
-    return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}';
-  }
-
   Future<GameSummary> importPgn(String pgn) async {
     final game = await gateway.importPgn(pgn);
     // PGN/FEN imports always belong to the local library. The native layer may
     // create that profile on demand while preserving the currently active one.
     profiles = await gateway.profiles();
     activeProfile = await gateway.activeProfile();
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -332,7 +399,7 @@ class AppController extends ChangeNotifier {
     final game = await gateway.importFen(fen: fen, name: name);
     profiles = await gateway.profiles();
     activeProfile = await gateway.activeProfile();
-    games = await gateway.games();
+    await _loadInitialGameWindow();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -343,7 +410,7 @@ class AppController extends ChangeNotifier {
     // Analysis is persisted asynchronously in native storage. Refresh summaries
     // after the analysis workflow closes so local imports immediately show their
     // analyzed state/accuracy without a profile switch or app restart.
-    games = await gateway.games();
+    await _reloadVisibleGames();
     favoriteGames = await gateway.favoriteGames();
     favoriteCollections = await gateway.favoriteCollections();
     notifyListeners();
@@ -521,6 +588,12 @@ class AppController extends ChangeNotifier {
   Future<void> setLocale(String locale) async {
     await gateway.setLocale(locale);
     settings = settings.copyWith(locale: locale);
+    notifyListeners();
+  }
+
+  Future<void> setEngineId(String engineId) async {
+    await gateway.setEngineId(engineId);
+    settings = await gateway.settings();
     notifyListeners();
   }
 

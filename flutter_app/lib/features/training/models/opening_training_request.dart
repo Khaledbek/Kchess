@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Opening training navigation DTO
+// -----------------------------------------------------------------------------
+
 /// A line the user picked in the statistics tab and wants to train.
 ///
 /// Carried from the statistics deep link into the opening lab, so the trainer

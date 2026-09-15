@@ -8,6 +8,13 @@ label each stored game with an ECO code and an opening name (for example
 `D06 Queen's Gambit Declined: Marshall Defense`). Python is not shipped in the
 app.
 
+## Rolle im aktuellen KChess-Aufbau
+
+Dieses Tool ist reine Development-/Datenbuilder-Logik. Das erzeugte `KCO1` wird
+vom nativen C++-Core gelesen und zusätzlich dient derselbe dokumentierte
+`chess-openings`-Snapshot als Quelle des eingebetteten Opening-Trainingskatalogs.
+Python wird nicht mit der App ausgeliefert.
+
 This is separate from `tools/opening_book`, which builds the statistical
 move-popularity book (`KCB`). The two share only the Stockfish position key, and
 this builder imports that exact key function from `../opening_book/build_book.py`

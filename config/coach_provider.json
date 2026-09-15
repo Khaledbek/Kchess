@@ -1,0 +1,15 @@
+{
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "freeTierOnly": true,
+  "rpmSoftLimit": 10,
+  "rpmHardLimit": 14,
+  "tpmSoftLimit": 200000,
+  "tpmHardLimit": 240000,
+  "rpdSoftLimit": 450,
+  "rpdHardLimit": 495,
+  "backoffBaseSeconds": 2,
+  "backoffMaxSeconds": 60,
+  "maxOutputTokens": 700,
+  "timeoutMs": 45000
+}

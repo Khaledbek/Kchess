@@ -36,6 +36,8 @@ class CancelToken {
 
 struct HttpRequest {
   std::string url;
+  std::string method{"GET"};
+  std::string body;
   std::map<std::string, std::string> headers;
   int timeout_ms{15'000};
   int max_redirects{5};

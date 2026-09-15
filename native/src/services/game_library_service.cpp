@@ -16,7 +16,6 @@
 #include "chess/pgn.h"
 #include "chess/move.h"
 #include "chess/position_view.h"
-#include "services/termination.h"
 
 namespace kchess {
 namespace {
@@ -104,6 +103,20 @@ bool valid_month(const std::string& month) {
   return month_number >= 1 && month_number <= 12;
 }
 
+std::string current_utc_month() {
+  const std::time_t now = std::time(nullptr);
+  std::tm utc{};
+#if defined(_WIN32)
+  gmtime_s(&utc, &now);
+#else
+  gmtime_r(&now, &utc);
+#endif
+  std::ostringstream value;
+  value << std::setfill('0') << std::setw(4) << utc.tm_year + 1900
+        << '-' << std::setw(2) << utc.tm_mon + 1;
+  return value.str();
+}
+
 }  // namespace
 
 GameLibraryService::GameLibraryService(Database& database, ProfileService& profile_service)
@@ -170,8 +183,7 @@ std::string GameLibraryService::game_record_json(
   append_optional_string(json, game.favorite_collection_id);
   json << ",\"downloaded\":" << (game.downloaded ? "true" : "false")
        << ",\"analyzed\":" << (game.analyzed ? "true" : "false")
-       << ",\"termination\":\"" << termination_bucket(game.pgn, game.result)
-       << "\",\"isFixture\":false";
+       << ",\"isFixture\":false";
   if (include_moves) {
     nlohmann::json outcome = nullptr;
     if (!game.moves.empty()) {
@@ -190,6 +202,7 @@ std::string GameLibraryService::game_record_json(
             || game.result == "1/2-1/2" || game.result == "½-½")) {
       outcome = {{"result", game.result}, {"checkmate", false}};
     }
+    const auto move_clocks = extract_mainline_clock_millis(game.pgn, game.moves.size());
     json << ",\"startingPosition\":" << position_view_json(game.starting_fen)
          << ",\"outcome\":" << outcome.dump()
          << ",\"pgn\":\"" << escape_json(game.pgn) << "\",\"moves\":[";
@@ -203,7 +216,13 @@ std::string GameLibraryService::game_record_json(
            << "\",\"uci\":\"" << escape_json(move.uci)
            << "\",\"fenBefore\":\"" << escape_json(move.fen_before)
            << "\",\"fenAfter\":\"" << escape_json(move.fen_after)
-           << "\",\"positionBefore\":" << position_view_json(move.fen_before)
+           << "\",\"clockMillis\":";
+      if (index < move_clocks.size() && move_clocks[index].has_value()) {
+        json << *move_clocks[index];
+      } else {
+        json << "null";
+      }
+      json << ",\"positionBefore\":" << position_view_json(move.fen_before)
            << ",\"positionAfter\":" << position_view_json(move.fen_after) << "}";
     }
     json << ']';
@@ -223,6 +242,34 @@ std::string GameLibraryService::games_json() const {
     json << game_record_json(games[index], false);
   }
   json << ']';
+  return json.str();
+}
+
+std::string GameLibraryService::initial_games_json() const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) return R"({"month":null,"games":[]})";
+
+  std::optional<std::string> month;
+  std::vector<GameRecord> games;
+  if (profile->type == ProfileType::local_pgn_fen) {
+    games = database_.games(profile->id);
+  } else {
+    const auto current_month = current_utc_month();
+    month = database_.latest_game_month_at_or_before(profile->id, current_month)
+                .value_or(current_month);
+    games = database_.games_for_month(profile->id, *month);
+  }
+
+  std::ostringstream json;
+  json << "{\"month\":";
+  if (month.has_value()) json << '"' << escape_json(*month) << '"';
+  else json << "null";
+  json << ",\"games\":[";
+  for (std::size_t index = 0; index < games.size(); ++index) {
+    if (index != 0) json << ',';
+    json << game_record_json(games[index], false);
+  }
+  json << "]}";
   return json.str();
 }
 
@@ -267,7 +314,12 @@ std::string GameLibraryService::query_games_json(const std::string& query_text) 
 
   const auto identity = lowercase(
       profile->provider_username.value_or(profile->display_name));
-  auto games = database_.games(profile->id);
+  if (apply_month && !month.empty() && !valid_month(month)) {
+    throw std::invalid_argument("Month must use YYYY-MM");
+  }
+  auto games = apply_month && !month.empty()
+      ? database_.games_for_month(profile->id, month)
+      : database_.games(profile->id);
   games.erase(std::remove_if(games.begin(), games.end(), [&](const GameRecord& game) {
     if (favorite_only && !game.favorite) return true;
     if (!search.empty() && lowercase(game.white_name).find(search) == std::string::npos
@@ -281,19 +333,6 @@ std::string GameLibraryService::query_games_json(const std::string& query_text) 
     }
     if (require_analyzed && !game.analyzed) return true;
     if (require_not_analyzed && game.analyzed) return true;
-    if (apply_month && !month.empty() && game.ended_at > 0) {
-      const std::time_t timestamp = static_cast<std::time_t>(game.ended_at);
-      std::tm utc{};
-#if defined(_WIN32)
-      gmtime_s(&utc, &timestamp);
-#else
-      gmtime_r(&timestamp, &utc);
-#endif
-      std::ostringstream value;
-      value << std::setfill('0') << std::setw(4) << utc.tm_year + 1900
-            << '-' << std::setw(2) << utc.tm_mon + 1;
-      if (value.str() != month) return true;
-    }
     return false;
   }), games.end());
 
@@ -329,8 +368,8 @@ std::string GameLibraryService::resolve_board_move_json(
     const std::string& target,
     const int first_candidate_ply) const {
   validate_token(game_id, "game id");
-  if (source.size() != 2 || target.size() != 2) {
-    throw std::invalid_argument("Board squares must use algebraic coordinates");
+  if (source.size() != 2 || (target.size() != 2 && target.size() != 3)) {
+    throw std::invalid_argument("Board move must use source, target and optional promotion suffix");
   }
   const auto game = database_.game(game_id);
   if (!game.has_value()) throw std::runtime_error("Game not found");
@@ -355,6 +394,35 @@ std::string GameLibraryService::resolve_board_move_json(
           ? nlohmann::json(*main_line_ply) : nlohmann::json(nullptr)},
   };
   return json.dump();
+}
+
+std::string GameLibraryService::resolve_free_board_move_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) const {
+  if (source.size() != 2 || (target.size() != 2 && target.size() != 3)) {
+    throw std::invalid_argument("Board move must use source, target and optional promotion suffix");
+  }
+  const auto applied = apply_legal_uci_move(fen, source + target);
+  const auto outcome = position_outcome(applied.fen_after);
+  nlohmann::json json{
+      {"uci", applied.uci},
+      {"san", applied.san},
+      {"fenAfter", applied.fen_after},
+      {"positionAfter", nlohmann::json::parse(position_view_json(applied.fen_after))},
+      {"mainLinePly", nullptr},
+      {"terminal", outcome.terminal},
+      {"checkmate", outcome.checkmate},
+      {"result", outcome.result},
+  };
+  return json.dump();
+}
+
+std::string GameLibraryService::board_promotion_options_json(
+    const std::string& fen,
+    const std::string& source,
+    const std::string& target) const {
+  return nlohmann::json(legal_promotion_choices(fen, source, target)).dump();
 }
 
 std::string GameLibraryService::import_pgn_json(const std::string& pgn) {

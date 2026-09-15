@@ -115,8 +115,9 @@ class AndroidHttpClient final : public HttpClient {
     jclass url_class = env->FindClass("java/net/URL");
     jclass connection_class = env->FindClass("javax/net/ssl/HttpsURLConnection");
     jclass input_class = env->FindClass("java/io/InputStream");
+    jclass output_class = env->FindClass("java/io/OutputStream");
     if (env->ExceptionCheck() || url_class == nullptr || connection_class == nullptr
-        || input_class == nullptr) {
+        || input_class == nullptr || output_class == nullptr) {
       return java_failure(env, "loading Android HTTPS classes");
     }
     const jmethodID url_constructor = env->GetMethodID(
@@ -135,6 +136,10 @@ class AndroidHttpClient final : public HttpClient {
         connection_class, "setReadTimeout", "(I)V");
     const jmethodID set_method = env->GetMethodID(
         connection_class, "setRequestMethod", "(Ljava/lang/String;)V");
+    const jmethodID set_do_output = env->GetMethodID(
+        connection_class, "setDoOutput", "(Z)V");
+    const jmethodID output_stream = env->GetMethodID(
+        connection_class, "getOutputStream", "()Ljava/io/OutputStream;");
     const jmethodID set_property = env->GetMethodID(
         connection_class, "setRequestProperty", "(Ljava/lang/String;Ljava/lang/String;)V");
     const jmethodID connect = env->GetMethodID(connection_class, "connect", "()V");
@@ -149,6 +154,8 @@ class AndroidHttpClient final : public HttpClient {
     const jmethodID disconnect = env->GetMethodID(connection_class, "disconnect", "()V");
     const jmethodID read = env->GetMethodID(input_class, "read", "([B)I");
     const jmethodID close = env->GetMethodID(input_class, "close", "()V");
+    const jmethodID output_write = env->GetMethodID(output_class, "write", "([B)V");
+    const jmethodID output_close = env->GetMethodID(output_class, "close", "()V");
     if (env->ExceptionCheck()) return java_failure(env, "resolving Android HTTPS methods");
 
     jstring initial_text = env->NewStringUTF(request.url.c_str());
@@ -173,8 +180,10 @@ class AndroidHttpClient final : public HttpClient {
       env->CallVoidMethod(connection, set_follow_redirects, JNI_FALSE);
       env->CallVoidMethod(connection, set_connect_timeout, request.timeout_ms);
       env->CallVoidMethod(connection, set_read_timeout, request.timeout_ms);
-      jstring method = env->NewStringUTF("GET");
+      const auto request_method = request.method.empty() ? std::string{"GET"} : request.method;
+      jstring method = env->NewStringUTF(request_method.c_str());
       env->CallVoidMethod(connection, set_method, method);
+      if (!request.body.empty()) env->CallVoidMethod(connection, set_do_output, JNI_TRUE);
       for (const auto& [name, value] : request.headers) {
         jstring key = env->NewStringUTF(name.c_str());
         jstring content = env->NewStringUTF(value.c_str());
@@ -183,7 +192,21 @@ class AndroidHttpClient final : public HttpClient {
         env->DeleteLocalRef(content);
       }
       if (env->ExceptionCheck()) return java_failure(env, "configuring HTTPS request");
-      env->CallVoidMethod(connection, connect);
+      if (!request.body.empty()) {
+        jobject output = env->CallObjectMethod(connection, output_stream);
+        if (env->ExceptionCheck() || output == nullptr) {
+          return java_failure(env, "opening HTTPS request stream");
+        }
+        jbyteArray payload = env->NewByteArray(static_cast<jsize>(request.body.size()));
+        env->SetByteArrayRegion(
+            payload, 0, static_cast<jsize>(request.body.size()),
+            reinterpret_cast<const jbyte*>(request.body.data()));
+        env->CallVoidMethod(output, output_write, payload);
+        env->CallVoidMethod(output, output_close);
+        if (env->ExceptionCheck()) return java_failure(env, "writing HTTPS request");
+      } else {
+        env->CallVoidMethod(connection, connect);
+      }
       const jint status = env->CallIntMethod(connection, response_code);
       if (env->ExceptionCheck()) return java_failure(env, "receiving HTTPS response");
 

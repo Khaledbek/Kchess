@@ -230,8 +230,8 @@ class _TimeControlBadge extends StatelessWidget {
       };
 }
 
-/// One player row: a hollow (white) or solid (black) piece marker, the name,
-/// and an optional rating pill.
+/// One player row: a large real pawn asset marks the current player's side,
+/// followed by the name and an optional rating pill.
 class _PlayerLine extends StatelessWidget {
   const _PlayerLine({
     required this.name,
@@ -254,20 +254,26 @@ class _PlayerLine extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 20,
+          width: 38,
+          height: 38,
           child: isCurrentPlayer
-              ? Text(
-                  isWhitePiece ? '♙' : '♟',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    height: 1,
-                    color: scheme.onSurface,
+              ? Semantics(
+                  label: isWhitePiece
+                      ? AppLocalizations.of(context).whitePlayer
+                      : AppLocalizations.of(context).blackPlayer,
+                  image: true,
+                  child: SvgPicture.asset(
+                    isWhitePiece
+                        ? 'assets/analysis_img/piece_white_pawn.svg'
+                        : 'assets/analysis_img/piece_black_pawn.svg',
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.contain,
                   ),
                 )
               : null,
         ),
-        const SizedBox(width: 7),
+        const SizedBox(width: 9),
         Flexible(
           child: Text(
             name,
@@ -334,49 +340,3 @@ class _ProfileTag extends StatelessWidget {
     );
   }
 }
-
-/// Proportional win / draw / loss ribbon for a performance card.
-class _WinLossBar extends StatelessWidget {
-  const _WinLossBar({
-    required this.wins,
-    required this.draws,
-    required this.losses,
-  });
-
-  final int wins;
-  final int draws;
-  final int losses;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final segments = <Widget>[
-      if (wins > 0)
-        Expanded(
-          flex: wins,
-          child: const ColoredBox(color: AppTheme.success),
-        ),
-      if (draws > 0)
-        Expanded(
-          flex: draws,
-          child: ColoredBox(color: scheme.onSurfaceVariant),
-        ),
-      if (losses > 0)
-        Expanded(
-          flex: losses,
-          child: ColoredBox(color: scheme.error),
-        ),
-    ];
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        height: 8,
-        child: segments.isEmpty
-            ? ColoredBox(color: scheme.surfaceContainerHighest)
-            : Row(children: segments),
-      ),
-    );
-  }
-}
-
-/// A titled group of settings rendered as a bordered card.

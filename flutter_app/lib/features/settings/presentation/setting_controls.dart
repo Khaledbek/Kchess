@@ -1,9 +1,12 @@
 part of '../../../ui/app_root.dart';
 
+// -----------------------------------------------------------------------------
+// Section: Analysis depth controls
+// -----------------------------------------------------------------------------
+
 class _DepthRangeSettingTile extends StatelessWidget {
   const _DepthRangeSettingTile({
     required this.title,
-    required this.description,
     required this.minimumDepth,
     required this.maximumDepth,
     required this.onMinimumChanged,
@@ -12,7 +15,6 @@ class _DepthRangeSettingTile extends StatelessWidget {
   });
 
   final String title;
-  final String description;
   final int minimumDepth;
   final int maximumDepth;
   final Future<void> Function(int value) onMinimumChanged;
@@ -31,13 +33,6 @@ class _DepthRangeSettingTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
               ],
             ),
           ),
@@ -193,6 +188,10 @@ class _CompactIntegerControlState extends State<_CompactIntegerControl> {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Section: Integer engine setting controls
+// -----------------------------------------------------------------------------
+
 class _IntegerSettingTile extends StatefulWidget {
   const _IntegerSettingTile({
     required this.icon,
@@ -201,24 +200,18 @@ class _IntegerSettingTile extends StatefulWidget {
     required this.minimum,
     required this.maximum,
     required this.onChanged,
-    this.description,
-    this.valueLabel,
     this.valueLabelBuilder,
     this.allowedValues,
-    this.editable = false,
     super.key,
   });
 
   final IconData icon;
   final String title;
-  final String? description;
   final int value;
   final int minimum;
   final int maximum;
-  final String? valueLabel;
   final String Function(int value)? valueLabelBuilder;
   final List<int>? allowedValues;
-  final bool editable;
   final Future<void> Function(int value) onChanged;
 
   @override
@@ -310,17 +303,11 @@ class _IntegerSettingTileState extends State<_IntegerSettingTile> {
     final previous = _previousValue;
     final next = _nextValue;
     final range = '${widget.minimum}–${widget.maximum}';
-    final label =
-        widget.valueLabelBuilder?.call(_value) ??
-        widget.valueLabel ??
-        '$_value';
+    final label = widget.valueLabelBuilder?.call(_value) ?? '$_value';
     return ListTile(
       leading: Icon(widget.icon),
       title: Text(widget.title),
-      subtitle: widget.description == null
-          ? Text(range)
-          : Text('${widget.description}\n$range'),
-      isThreeLine: widget.description != null,
+      subtitle: Text(range),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -330,31 +317,11 @@ class _IntegerSettingTileState extends State<_IntegerSettingTile> {
           ),
           SizedBox(
             width: 72,
-            child: widget.editable
-                ? TextFormField(
-                    key: ValueKey('integer-${widget.key}-$_value'),
-                    initialValue: '$_value',
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(isDense: true),
-                    onFieldSubmitted: (text) {
-                      final parsed = int.tryParse(text);
-                      if (parsed != null) {
-                        final bounded = parsed < widget.minimum
-                            ? widget.minimum
-                            : (parsed > widget.maximum
-                                  ? widget.maximum
-                                  : parsed);
-                        _changeValue(bounded);
-                      }
-                    },
-                  )
-                : Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.ltr,
-                  ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.ltr,
+            ),
           ),
           IconButton(
             onPressed: next == null ? null : () => _changeValue(next),

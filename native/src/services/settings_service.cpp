@@ -33,6 +33,10 @@ std::string SettingsService::settings_json() const {
       {"threads", settings.threads},
       {"maxThreads", maximum_engine_threads()},
       {"hashMb", settings.hash_mb},
+      {"sidelineDepth", settings.sideline_depth},
+      {"sidelineMultiPv", settings.sideline_multi_pv},
+      {"sidelineThreads", std::min(settings.sideline_threads, maximum_engine_threads())},
+      {"sidelineHashMb", settings.sideline_hash_mb},
       {"showBoardArrows", settings.show_board_arrows},
       {"showBestMoveArrow", settings.show_board_arrows},
       {"showThreatArrow", settings.show_threat_arrow},
@@ -52,6 +56,7 @@ std::string SettingsService::settings_json() const {
       {"diagnosticLogging", settings.diagnostic_logging},
       {"themeMode", settings.theme_mode},
       {"locale", settings.locale},
+      {"engineId", settings.engine_id},
   }.dump();
 }
 
@@ -91,6 +96,27 @@ void SettingsService::set_engine_resources(const int threads, const int hash_mb)
   database_.set_engine_resources(threads, hash_mb);
 }
 
+void SettingsService::set_sideline_engine_settings(
+    const int depth, const int multi_pv, const int threads, const int hash_mb) {
+  if (!valid_integer_setting(kDepthSetting, depth)) {
+    throw std::invalid_argument("sideline depth must be between 1 and 64");
+  }
+  if (!valid_integer_setting(kMultiPvSetting, multi_pv)) {
+    throw std::invalid_argument("sideline number of lines must be between 1 and 8");
+  }
+  if (!valid_integer_setting(kThreadsSetting, threads)
+      || threads > maximum_engine_threads()) {
+    throw std::invalid_argument("sideline threads exceed the safe device limit");
+  }
+  if (!valid_integer_setting(kHashMbSetting, hash_mb)) {
+    throw std::invalid_argument("sideline hash must be between 16 and 2048 MB");
+  }
+  database_.set_setting("sidelineDepth", std::to_string(depth));
+  database_.set_setting("sidelineMultiPv", std::to_string(multi_pv));
+  database_.set_setting("sidelineThreads", std::to_string(threads));
+  database_.set_setting("sidelineHashMb", std::to_string(hash_mb));
+}
+
 void SettingsService::set_show_board_arrows(const bool enabled) {
   // Legacy export kept for ABI compatibility.  The current UI calls this
   // setting "Best move arrow".
@@ -126,6 +152,13 @@ void SettingsService::set_locale(const std::string& locale) {
     throw std::invalid_argument("invalid locale");
   }
   database_.set_setting("locale", locale);
+}
+
+void SettingsService::set_engine_id(const std::string& engine_id) {
+  if (engine_id != "stockfish18" && engine_id != "stockfish19") {
+    throw std::invalid_argument("invalid engine id");
+  }
+  database_.set_setting("engineId", engine_id);
 }
 
 }  // namespace kchess

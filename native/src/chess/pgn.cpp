@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <deque>
 #include <optional>
 #include <regex>
@@ -111,6 +112,61 @@ std::optional<std::string> strip_move_number(std::string token) {
     return std::nullopt;
   }
   return token;
+}
+
+
+std::optional<std::int64_t> clock_millis_from_comment(const std::string& comment) {
+  static const std::regex clock_pattern(
+      R"pgn(\[%clk\s+([0-9]+(?::[0-9]{1,2}){1,2}(?:\.[0-9]+)?)\])pgn",
+      std::regex::icase);
+  std::smatch match;
+  if (!std::regex_search(comment, match, clock_pattern)) return std::nullopt;
+
+  std::vector<std::string> fields;
+  std::stringstream stream(match[1].str());
+  std::string field;
+  while (std::getline(stream, field, ':')) fields.push_back(field);
+  if (fields.size() != 2 && fields.size() != 3) return std::nullopt;
+
+  try {
+    double seconds = 0.0;
+    if (fields.size() == 3) {
+      const auto hours = std::stoll(fields[0]);
+      const auto minutes = std::stoll(fields[1]);
+      const auto secs = std::stod(fields[2]);
+      if (hours < 0 || minutes < 0 || minutes >= 60 || secs < 0.0 || secs >= 60.0) {
+        return std::nullopt;
+      }
+      seconds = static_cast<double>(hours * 3600 + minutes * 60) + secs;
+    } else {
+      const auto minutes = std::stoll(fields[0]);
+      const auto secs = std::stod(fields[1]);
+      if (minutes < 0 || secs < 0.0 || secs >= 60.0) return std::nullopt;
+      seconds = static_cast<double>(minutes * 60) + secs;
+    }
+    return static_cast<std::int64_t>(std::llround(seconds * 1000.0));
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+std::string pgn_movetext_only(const std::string& pgn) {
+  std::istringstream lines(pgn);
+  std::string line;
+  std::string movetext;
+  const std::regex tag_pattern(
+      R"pgn(^\s*\[([A-Za-z0-9_]+)\s+"((?:\\.|[^"])*)"\]\s*$)pgn");
+  bool movetext_started = false;
+  while (std::getline(lines, line)) {
+    std::smatch match;
+    if (!movetext_started && std::regex_match(line, match, tag_pattern)) {
+      continue;
+    }
+    if (!trim(line).empty()) movetext_started = true;
+    movetext += line;
+    movetext.push_back('\n');
+  }
+  return movetext;
 }
 
 Stockfish::PieceType san_piece_type(const char value) {
@@ -235,6 +291,93 @@ Stockfish::Move resolve_san(const Stockfish::Position& position, std::string san
 }
 
 }  // namespace
+
+
+std::vector<std::optional<std::int64_t>> extract_mainline_clock_millis(
+    const std::string& pgn, const std::size_t ply_count) noexcept {
+  std::vector<std::optional<std::int64_t>> clocks(ply_count);
+  if (pgn.empty() || ply_count == 0) return clocks;
+
+  try {
+    const std::string movetext = pgn_movetext_only(pgn);
+    std::string token;
+    std::size_t current_ply = 0;
+    int variation_depth = 0;
+
+    auto flush_token = [&] {
+      if (token.empty()) return;
+      std::string value = std::move(token);
+      token.clear();
+      if (variation_depth != 0 || current_ply >= ply_count) return;
+      if (value == "1-0" || value == "0-1" || value == "1/2-1/2" || value == "*") {
+        return;
+      }
+      if (!value.empty() && value.front() == '$') return;
+      auto san = strip_move_number(std::move(value));
+      if (!san.has_value()) return;
+      const auto inline_nag = san->find('$');
+      if (inline_nag != std::string::npos) san->erase(inline_nag);
+      if (san->empty() || *san == "1-0" || *san == "0-1" || *san == "1/2-1/2"
+          || *san == "*") {
+        return;
+      }
+      ++current_ply;
+    };
+
+    for (std::size_t index = 0; index < movetext.size();) {
+      const char character = movetext[index];
+      if (std::isspace(static_cast<unsigned char>(character))) {
+        flush_token();
+        ++index;
+        continue;
+      }
+      if (character == '{') {
+        flush_token();
+        const auto end = movetext.find('}', index + 1);
+        if (end == std::string::npos) break;
+        if (variation_depth == 0 && current_ply > 0 && current_ply <= ply_count) {
+          const auto clock = clock_millis_from_comment(
+              movetext.substr(index + 1, end - index - 1));
+          if (clock.has_value()) clocks[current_ply - 1] = clock;
+        }
+        index = end + 1;
+        continue;
+      }
+      if (character == ';') {
+        flush_token();
+        const auto end = movetext.find_first_of("\r\n", index + 1);
+        const auto length = end == std::string::npos ? movetext.size() - index - 1
+                                                     : end - index - 1;
+        if (variation_depth == 0 && current_ply > 0 && current_ply <= ply_count) {
+          const auto clock = clock_millis_from_comment(
+              movetext.substr(index + 1, length));
+          if (clock.has_value()) clocks[current_ply - 1] = clock;
+        }
+        index = end == std::string::npos ? movetext.size() : end;
+        continue;
+      }
+      if (character == '(') {
+        flush_token();
+        ++variation_depth;
+        ++index;
+        continue;
+      }
+      if (character == ')') {
+        flush_token();
+        if (variation_depth > 0) --variation_depth;
+        ++index;
+        continue;
+      }
+      token.push_back(character);
+      ++index;
+    }
+    flush_token();
+  } catch (...) {
+    // Clock annotations are optional metadata and must never make a valid PGN
+    // unusable for the library or analysis UI.
+  }
+  return clocks;
+}
 
 PgnParseResult parse_pgn(const std::string& pgn) noexcept {
   try {

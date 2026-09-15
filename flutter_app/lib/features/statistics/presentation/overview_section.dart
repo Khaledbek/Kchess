@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: overview section presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 class _OverviewCard extends StatelessWidget {
@@ -191,7 +195,7 @@ class _OverviewContent extends StatelessWidget {
             const SizedBox(height: 10),
             for (final control in overview.byTimeControl)
               _TallyRow(
-                label: _timeControlLabel(control.type),
+                label: _timeControlLabel(context, control.type),
                 tally: control.tally,
               ),
           ],
@@ -284,15 +288,18 @@ TextStyle? _overviewSectionLabel(ThemeData theme) =>
       color: theme.colorScheme.onSurfaceVariant,
     );
 
-String _timeControlLabel(String type) => switch (type) {
-  'bullet' => 'Bullet',
-  'blitz' => 'Blitz',
-  'rapid' => 'Rapid',
-  'classical' => 'Classical',
-  'daily' => 'Daily',
-  'correspondence' => 'Correspondence',
-  _ => 'Other',
-};
+String _timeControlLabel(BuildContext context, String type) {
+  final strings = AppLocalizations.of(context);
+  return switch (type) {
+    'bullet' => strings.ratingBullet,
+    'blitz' => strings.ratingBlitz,
+    'rapid' => strings.ratingRapid,
+    'classical' => strings.ratingClassical,
+    'daily' => strings.ratingDaily,
+    'correspondence' => strings.statsTimeControlCorrespondence,
+    _ => strings.statsTimeControlOther,
+  };
+}
 
 class _OverviewText {
   const _OverviewText({

@@ -17,10 +17,12 @@ class SettingsService {
   void set_engine_settings(int depth, int multi_pv, int time_limit_seconds);
   void set_analysis_depth_range(int minimum_depth, int maximum_depth);
   void set_engine_resources(int threads, int hash_mb);
+  void set_sideline_engine_settings(int depth, int multi_pv, int threads, int hash_mb);
   void set_show_board_arrows(bool enabled);
   void set_boolean_setting(const std::string& key, bool enabled);
   void set_theme_mode(const std::string& mode);
   void set_locale(const std::string& locale);
+  void set_engine_id(const std::string& engine_id);
 
  private:
   Database& database_;

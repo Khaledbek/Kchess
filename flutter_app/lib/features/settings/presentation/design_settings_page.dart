@@ -49,7 +49,6 @@ class _DesignSettingsPage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.grid_on_outlined),
                   title: Text(strings.showBoardCoordinates),
-                  subtitle: Text(strings.showBoardCoordinatesHelp),
                   value: controller.settings.showBoardCoordinates,
                   onChanged: controller.setShowBoardCoordinates,
                 ),
@@ -57,7 +56,6 @@ class _DesignSettingsPage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.compare_arrows),
                   title: Text(strings.highlightLastMove),
-                  subtitle: Text(strings.highlightLastMoveHelp),
                   value: controller.settings.highlightLastMove,
                   onChanged: controller.setHighlightLastMove,
                 ),
@@ -65,7 +63,6 @@ class _DesignSettingsPage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.touch_app),
                   title: Text(strings.highlightSelectedSquare),
-                  subtitle: Text(strings.highlightSelectedSquareHelp),
                   value: controller.settings.highlightSelectedSquare,
                   onChanged: controller.setHighlightSelectedSquare,
                 ),
