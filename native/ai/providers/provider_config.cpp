@@ -176,6 +176,39 @@ std::optional<std::string> read_text(const fs::path& path) {
                      std::istreambuf_iterator<char>());
 }
 
+// Empty when secrets/<id>_api_key.txt is missing or still holds the setup
+// placeholder.
+std::string read_api_key(const fs::path& root, const std::string& id) {
+  const auto text = read_text(root / "secrets" / (id + "_api_key.txt"));
+  auto key = text ? trimmed(*text) : std::string{};
+  if (key.starts_with("PASTE_YOUR_")) key.clear();
+  return key;
+}
+
+// "provider": "auto" selects the first id in "autoOrder" that has a key file.
+// Gemini leads the default order so its free tier wins while its key exists.
+constexpr std::string_view kDefaultAutoOrder[] = {"gemini", "deepseek", "claude",
+                                                  "openai"};
+
+std::optional<std::string> first_provider_with_key(const json& document,
+                                                   const fs::path& root) {
+  std::vector<std::string> order;
+  if (document.contains("autoOrder") && document["autoOrder"].is_array()) {
+    for (const auto& item : document["autoOrder"]) {
+      if (item.is_string()) order.push_back(item.get<std::string>());
+    }
+  } else {
+    for (const auto id : kDefaultAutoOrder) order.emplace_back(id);
+  }
+  for (const auto& id : order) {
+    if (id != "auto" && valid_provider_id(id) &&
+        !read_api_key(root, id).empty()) {
+      return id;
+    }
+  }
+  return std::nullopt;
+}
+
 UsageState read_usage(const fs::path& path) {
   UsageState state;
   const auto text = read_text(path);
@@ -350,6 +383,11 @@ std::optional<ProviderConfig> load_coach_provider_config(std::string* error_code
   try {
     const auto document = json::parse(*config_text);
     config.id = document.value("provider", std::string{});
+    if (config.id == "auto") {
+      auto selected = first_provider_with_key(document, root);
+      if (!selected) return fail("coach_provider_api_key_missing");
+      config.id = std::move(*selected);
+    }
     if (!valid_provider_id(config.id)) return fail("coach_provider_invalid");
 
     // Current format: one settings object per provider under "providers".
@@ -422,12 +460,8 @@ std::optional<ProviderConfig> load_coach_provider_config(std::string* error_code
     return fail("coach_provider_config_invalid");
   }
 
-  const auto key_text =
-      read_text(root / "secrets" / (config.id + "_api_key.txt"));
-  config.api_key = key_text ? trimmed(*key_text) : std::string{};
-  if (config.api_key.empty() || config.api_key.starts_with("PASTE_YOUR_")) {
-    return fail(config.id + "_api_key_missing");
-  }
+  config.api_key = read_api_key(root, config.id);
+  if (config.api_key.empty()) return fail(config.id + "_api_key_missing");
   if (const auto* known = find_preset(config.id);
       known && !known->free_tier_model.empty() &&
       (!config.free_tier_only || config.model != known->free_tier_model)) {

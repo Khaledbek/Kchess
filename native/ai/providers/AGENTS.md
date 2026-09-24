@@ -11,6 +11,7 @@
 - `RemoteProvider` adapts an external transport callback. Do not hard-code API keys or secrets here.
 - `coach_provider.*` builds the one remote provider selected in `config/coach_provider.json`. `provider_config.*` loads its settings, reads the key from the ignored `secrets/<provider>_api_key.txt` and owns the local quota guard in `secrets/<provider>_usage.json`.
 - `provider_prompt.*` is the single provider-neutral Coach instruction/input text and `provider_transport.*` the single quota-guarded HTTPS path. Wire adapters (`gemini_provider.cpp`, `claude_provider.cpp`, `openai_compatible_provider.cpp`, declared in `provider_adapters.h`) only serialize that prompt and parse the vendor reply.
+- `"provider": "auto"` is resolved only in `provider_config.cpp`: the first id in `"autoOrder"` with a real key file wins. There is no runtime fallback to another provider after a failed call.
 - Built-in provider ids are `gemini`, `claude`, `deepseek` and `openai`. Another vendor needs a config block with an explicit `api` (`openai_chat_completions` or `anthropic_messages`), https `endpoint` and `model`; do not add vendor branches outside the adapters.
 - Adapters report unparseable/truncated output as `<provider>_response_invalid` so the orchestrator's safe fallback stays provider-neutral.
 - The Coach language model is remote inference only. Do not add or select a local GGUF fallback for the Coach.

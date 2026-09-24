@@ -1,5 +1,6 @@
 {
-  "provider": "gemini",
+  "provider": "auto",
+  "autoOrder": ["gemini", "deepseek", "claude", "openai"],
   "providers": {
     "gemini": {
       "model": "gemini-3.5-flash-lite",
