@@ -9,7 +9,7 @@
 - Keep the coach chess-only; `OFF_TOPIC` is rejected by native routing/policy.
 - Prefer deterministic KChess facts, cache, theory/opening data and Stockfish before asking an LLM.
 - Provider code must remain replaceable; do not couple contracts to one model/vendor.
-- Optional small-model assets belong under `third_party/model/`, never inside Flutter; the Coach LLM itself uses Gemini.
+- Optional small-model assets belong under `third_party/model/`, never inside Flutter; the Coach LLM itself is the remote provider selected in `config/coach_provider.json`.
 - Python is development/training tooling only and must not become an app runtime dependency.
 - Keep request/response DTOs transport-oriented. Do not hide engine calls or domain decisions inside DTOs.
 
@@ -157,7 +157,7 @@ Keep files focused and small. Split components by responsibility as the coach gr
 - `providers/llm_provider.*` is the single provider-neutral language-model contract used by the orchestrator.
 - Provider adapters must contain transport/inference plumbing only; chess reasoning, evidence selection and validation remain in their dedicated native layers.
 - The orchestrator receives a replaceable provider instance and must not contain vendor/model branches. OFF_TOPIC requests never reach the provider.
-- The Coach LLM is remote Gemini. `third_party/model/` is reserved only for optional small router/embedding/tokenizer assets, not a local Coach GGUF.
+- The Coach LLM is the selected remote provider (Gemini by default; see `providers/AGENTS.md`). `third_party/model/` is reserved only for optional small router/embedding/tokenizer assets, not a local Coach GGUF.
 - Provider errors/unavailability must not fabricate a natural-language answer. Structured response/error propagation is extended by Update 38.
 
 ## Structured coach response

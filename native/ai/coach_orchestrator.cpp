@@ -192,7 +192,7 @@ ProviderStageResult provider_content(
   ++output.provider_calls;
   if (!result.ok()) {
     output.provider_error_code = result.error_code;
-    if (result.error_code == "gemini_response_invalid") {
+    if (result.output_invalid()) {
       output.safe_fallback_kind =
           safe_fallback_kind(request, provider_request.evidence);
       if (!output.safe_fallback_kind.empty()) output.validation_passed = true;

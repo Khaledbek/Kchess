@@ -1,15 +1,61 @@
 {
   "provider": "gemini",
-  "model": "gemini-3.5-flash-lite",
-  "freeTierOnly": true,
-  "rpmSoftLimit": 10,
-  "rpmHardLimit": 14,
-  "tpmSoftLimit": 200000,
-  "tpmHardLimit": 240000,
-  "rpdSoftLimit": 450,
-  "rpdHardLimit": 495,
-  "backoffBaseSeconds": 2,
-  "backoffMaxSeconds": 60,
-  "maxOutputTokens": 700,
-  "timeoutMs": 45000
+  "providers": {
+    "gemini": {
+      "model": "gemini-3.5-flash-lite",
+      "freeTierOnly": true,
+      "rpmSoftLimit": 10,
+      "rpmHardLimit": 14,
+      "tpmSoftLimit": 200000,
+      "tpmHardLimit": 240000,
+      "rpdSoftLimit": 450,
+      "rpdHardLimit": 495,
+      "backoffBaseSeconds": 2,
+      "backoffMaxSeconds": 60,
+      "maxOutputTokens": 700,
+      "timeoutMs": 45000
+    },
+    "deepseek": {
+      "model": "deepseek-chat",
+      "rpmSoftLimit": 10,
+      "rpmHardLimit": 14,
+      "tpmSoftLimit": 200000,
+      "tpmHardLimit": 240000,
+      "rpdSoftLimit": 450,
+      "rpdHardLimit": 495,
+      "backoffBaseSeconds": 2,
+      "backoffMaxSeconds": 60,
+      "maxOutputTokens": 1500,
+      "timeoutMs": 60000
+    },
+    "claude": {
+      "model": "claude-opus-5",
+      "effort": "low",
+      "refusalFallback": true,
+      "rpmSoftLimit": 10,
+      "rpmHardLimit": 14,
+      "tpmSoftLimit": 200000,
+      "tpmHardLimit": 240000,
+      "rpdSoftLimit": 450,
+      "rpdHardLimit": 495,
+      "backoffBaseSeconds": 2,
+      "backoffMaxSeconds": 60,
+      "maxOutputTokens": 4096,
+      "timeoutMs": 90000
+    },
+    "openai": {
+      "model": "gpt-5-mini",
+      "effort": "low",
+      "rpmSoftLimit": 10,
+      "rpmHardLimit": 14,
+      "tpmSoftLimit": 200000,
+      "tpmHardLimit": 240000,
+      "rpdSoftLimit": 450,
+      "rpdHardLimit": 495,
+      "backoffBaseSeconds": 2,
+      "backoffMaxSeconds": 60,
+      "maxOutputTokens": 4096,
+      "timeoutMs": 90000
+    }
+  }
 }

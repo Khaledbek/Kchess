@@ -94,9 +94,9 @@ temp/
 *.pfx
 
 
-# Local AI provider secrets / usage state
-/secrets/gemini_api_key.txt
-/secrets/gemini_usage.json
+# Local AI provider secrets / usage state (secrets/<provider>_api_key.txt)
+/secrets/*_api_key.txt
+/secrets/*_usage.json
 
 # Archives / update packages
 *.zip

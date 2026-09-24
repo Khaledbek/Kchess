@@ -9,8 +9,11 @@
 - `LLMProvider` is the single provider contract used by the coach orchestrator.
 - Keep chess facts, routing, evidence selection, practicality and validation outside providers.
 - `RemoteProvider` adapts an external transport callback. Do not hard-code API keys or secrets here.
-- `gemini_provider.*` is the vendor-specific Gemini transport adapter; it reads the key through `gemini_config.*` from the ignored `secrets/` file and uses the shared native HTTPS client.
-- The Coach language-model provider is Gemini remote inference. Do not add or select a local GGUF fallback for the Coach.
+- `coach_provider.*` builds the one remote provider selected in `config/coach_provider.json`. `provider_config.*` loads its settings, reads the key from the ignored `secrets/<provider>_api_key.txt` and owns the local quota guard in `secrets/<provider>_usage.json`.
+- `provider_prompt.*` is the single provider-neutral Coach instruction/input text and `provider_transport.*` the single quota-guarded HTTPS path. Wire adapters (`gemini_provider.cpp`, `claude_provider.cpp`, `openai_compatible_provider.cpp`, declared in `provider_adapters.h`) only serialize that prompt and parse the vendor reply.
+- Built-in provider ids are `gemini`, `claude`, `deepseek` and `openai`. Another vendor needs a config block with an explicit `api` (`openai_chat_completions` or `anthropic_messages`), https `endpoint` and `model`; do not add vendor branches outside the adapters.
+- Adapters report unparseable/truncated output as `<provider>_response_invalid` so the orchestrator's safe fallback stays provider-neutral.
+- The Coach language model is remote inference only. Do not add or select a local GGUF fallback for the Coach.
 - Provider requests consume already bounded `CoachContext` plus structured evidence. Providers must not silently expand the PGN/context budget.
 - Provider failures return structured status/error codes; do not fabricate a coach answer on failure.
 - Structured provider output remains provider-neutral; native validation owns factual acceptance and repair policy.
@@ -27,7 +30,7 @@ Keep vendor/model-specific adapters in separate files and keep the common interf
 
 ## Validation repair
 
-- `gemini_response_json.h` serializes/parses typed claims, recommendations and the optional trainer question; never reduce Gemini output back to answer-only text.
+- `coach_response_json.h` serializes/parses typed claims, recommendations and the optional trainer question for every provider; never reduce provider output back to answer-only text. Claude receives the same schema with closed objects; JSON-mode providers receive it in the instruction.
 - The trainer question is conversation content, not factual authority. Prompt instructions require its factual premises to be included in checked claims too.
 
 - `LLMProviderRequest::repair_candidate` and `validation_feedback` are provider-neutral repair inputs. An adapter may serialize them however its runtime requires.

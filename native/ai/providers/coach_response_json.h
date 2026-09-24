@@ -7,7 +7,7 @@
 #include <nlohmann/json.hpp>
 #include "../dto/structured_coach_response.h"
 
-namespace kchess::ai::gemini_json {
+namespace kchess::ai::coach_response_json {
 using json = nlohmann::json;
 
 // Section: Provider wire contract (native validation remains authoritative)
@@ -88,7 +88,8 @@ inline json schema() {
 }
 
 inline StructuredCoachContent parse(json value) {
-  for (const auto* field : {"evidence_ids", "claims", "recommendations"})
+  for (const auto* field : {"follow_up_segments", "evidence_ids", "claims",
+                            "recommendations"})
     if (!value.contains(field)) value[field] = json::array();
   StructuredCoachContent result;
   result.answer_segments = parse_segments(value.at("answer_segments"));
@@ -163,4 +164,4 @@ inline json serialize(const StructuredCoachContent& content) {
   }
   return result;
 }
-}  // namespace kchess::ai::gemini_json
+}  // namespace kchess::ai::coach_response_json

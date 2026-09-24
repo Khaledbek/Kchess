@@ -12,7 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "ai/automatic/automatic_coach_trigger.h"
-#include "ai/providers/gemini_provider.h"
+#include "ai/providers/coach_provider.h"
 #include "ai/teaching/personal_training_selector.h"
 #include "ai/teaching/spaced_repetition_scheduler.h"
 #include "chess/pgn.h"
@@ -531,7 +531,7 @@ CoachService::CoachService(Database& database, AnalysisService& analysis_service
       hint_cache_(std::make_shared<CoachHintCache>()),
       small_models_(ai::load_optional_small_model_suite(std::move(small_model_root))),
       orchestrator_(make_sources(database, analysis_service, knowledge_runtime, hint_cache_),
-                    ai::make_gemini_provider(), small_models_.suite,
+                    ai::make_coach_provider(), small_models_.suite,
                     [&database](const ai::CoachLearningAttempt& attempt) {
                       if (!attempt.profile_id || attempt.skill_id.empty()) return;
                       const auto owner =

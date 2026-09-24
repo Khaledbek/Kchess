@@ -101,19 +101,19 @@ Ausnahme nur, wenn die Aufgabe genau diesen Bereich betrifft.
 
 Bevor Code geändert wird: Aufrufer suchen, Verantwortung bestimmen, kleinste sichere Änderung wählen. Bei Cleanup nur nachweislich tote/redundante Pfade entfernen. Keine Parallelimplementierung erstellen, wenn eine bestehende Schnittstelle erweitert werden kann.
 
-## Gemini API
+## Coach LLM API
 
-Der Coach verwendet standardmäßig den nativen Gemini-Remote-Provider. API-Schlüssel liegen ausschließlich in `secrets/gemini_api_key.txt`, niemals in Dart/C++-Quelltext. `config/coach_provider.json` enthält nur nicht-geheime Provider-/Quota-Konfiguration. Lokale GGUF-Dateien dürfen vorhanden bleiben, werden aber vom Standard-Coach-Pfad nicht verwendet.
+Der Coach verwendet den in `config/coach_provider.json` gewählten nativen Remote-Provider (Standard: Gemini). API-Schlüssel liegen ausschließlich in `secrets/<provider>_api_key.txt` (z. B. `gemini_api_key.txt`, `deepseek_api_key.txt`, `claude_api_key.txt`), niemals in Dart/C++-Quelltext. `config/coach_provider.json` enthält nur nicht-geheime Provider-/Quota-Konfiguration. Lokale GGUF-Dateien dürfen vorhanden bleiben, werden aber vom Standard-Coach-Pfad nicht verwendet.
 Die Free-Tier-Steuerung verwendet getrennte RPM/TPM/RPD-Soft-/Hard-Limits. Automatic Coach gibt bei Soft-Limits Kapazität für manuelle Fragen/Follow-ups und den einmaligen Repair-Pass frei; RPD folgt dem Pacific-Reset von Google AI Studio. HTTP 429 startet nur einen persistenten Backoff und keine Retry-Schleife.
 
 ## AI Chess Coach UI-Ziel
 
 Die Coach-UI liegt unter `flutter_app/lib/features/coach/` und übernimmt die visuelle Sprache des Analysis-Screens: Board links; rechts oben Coach-Ausgabe; rechts unten die Eingabeleiste mit Hint/Depth sowie FEN/PGN-Kontextwahl. Flutter bleibt dabei reine UI, sichtbare feste Texte bleiben ARB-basiert. Die native Anbindung erfolgt über kontrollierte Callbacks/FFI und darf keine Coach-Domainlogik nach Dart verlagern.
 
-## Gemini-only Coach provider
+## Remote-only Coach provider
 
-- The main Coach LLM uses Gemini API only. Do not restore the old local GGUF/llama.cpp Coach fallback.
-- The Gemini key stays only in `secrets/gemini_api_key.txt`, which is git-ignored.
+- The main Coach LLM is one remote provider selected in `config/coach_provider.json` (see Update 176). Do not restore the old local GGUF/llama.cpp Coach fallback.
+- Each provider key stays only in `secrets/<provider>_api_key.txt`; `/secrets/*_api_key.txt` is git-ignored.
 
 
 ## Update 85 - single authoritative analysis cache
@@ -591,3 +591,10 @@ Der allgemeine lokale Knowledge Graph ist über `native/src/knowledge/KnowledgeR
 - Gemini liefert `coach_response.v4` mit geordneten Antwort-/Rückfragesegmenten. Der sichtbare Text wird nativ daraus zusammengesetzt. Jedes faktische Segment verweist auf genau einen typisierten Claim mit identischem `answer_quote`; die Validierung nutzt nur provider-sichtbare Evidenz. Das ist eine strukturelle Grenze und ersetzt keine menschliche semantische Prüfung.
 - `move.contrast.v1` enthält objektive Klassifikation/Score nur aus einer bereits gespeicherten, vollständigen Analyse, wenn Partie, Halbzug, UCI, Ausgangs- und Ziel-FEN übereinstimmen. Ohne diesen Cache bleibt der Vergleich statisch. Keine zweite Engine-Suche und kein zweiter Analysespeicher.
 - Echte Coach-Dialoge und menschliche Korrekturen bleiben private lokale Evaluationsdaten. `tools/ai/evaluation/` fasst menschliche Urteile zusammen und trennt Spieler-/Partiegruppen in Entwicklung/Held-out. Es trainiert kein Modell und liefert keine App-Runtime-Wahrheit.
+
+## Update 176 - selectable Coach LLM provider
+
+- `config/coach_provider.json` selects one remote Coach provider via `"provider"` and keeps one non-secret settings block per provider under `"providers"`. The legacy flat file (settings at the top level) is still read.
+- The provider id names every local secret file: `secrets/<provider>_api_key.txt` for the key and `secrets/<provider>_usage.json` for the local quota state. Built-in ids are `gemini`, `claude`, `deepseek` and `openai`; another OpenAI-compatible or Anthropic-compatible vendor may be added with an explicit `api`, https `endpoint` and `model`.
+- `native/ai/providers/` keeps one shared prompt, one quota-guarded transport and one wire adapter per format (Gemini Interactions, Anthropic Messages, OpenAI chat completions). Native routing, evidence, validation, the single repair pass and the response cache are unchanged and provider-neutral; the provider id is part of the exact response-cache key.
+- Earlier sections that say "Gemini" for the Coach language layer now mean the selected provider. Gemini keeps its free-tier model guard; the other providers use the same RPM/TPM/RPD soft/hard guards as local spend budgets. Flutter is unchanged.

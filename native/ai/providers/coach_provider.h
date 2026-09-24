@@ -7,9 +7,11 @@
 namespace kchess::ai {
 
 // -----------------------------------------------------------------------------
-// Section: Gemini provider factory
+// Section: Coach provider factory
 // -----------------------------------------------------------------------------
 
-[[nodiscard]] std::shared_ptr<const LLMProvider> make_gemini_provider();
+// Builds the remote provider selected in config/coach_provider.json. A missing
+// config or secrets/<provider>_api_key.txt yields an unavailable provider.
+[[nodiscard]] std::shared_ptr<const LLMProvider> make_coach_provider();
 
 }  // namespace kchess::ai

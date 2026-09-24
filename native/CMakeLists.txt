@@ -201,9 +201,14 @@ add_library(kchess_core SHARED
   ai/models/small_models.cpp
   ai/optimization/provider_input_optimizer.cpp
   ai/optimization/validated_response_cache.cpp
-  ai/providers/gemini_config.cpp
+  ai/providers/claude_provider.cpp
+  ai/providers/coach_provider.cpp
   ai/providers/gemini_provider.cpp
   ai/providers/llm_provider.cpp
+  ai/providers/openai_compatible_provider.cpp
+  ai/providers/provider_config.cpp
+  ai/providers/provider_prompt.cpp
+  ai/providers/provider_transport.cpp
   ai/providers/remote_provider.cpp
   ai/query_classifier.cpp
   ai/query_planner.cpp

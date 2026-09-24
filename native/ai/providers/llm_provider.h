@@ -68,6 +68,12 @@ struct LLMProviderResult {
   [[nodiscard]] bool ok() const {
     return status == LLMProviderStatus::ok && !content.empty();
   }
+
+  // Adapters report unparseable or truncated structured output as
+  // "<provider>_response_invalid".
+  [[nodiscard]] bool output_invalid() const {
+    return error_code.ends_with("_response_invalid");
+  }
 };
 
 // -----------------------------------------------------------------------------
