@@ -328,6 +328,7 @@ class AccuracyStats {
     this.byPhase = const [],
     this.timeline = const [],
     this.trend = const AccuracyTrend(),
+    this.timePressure = const TimePressureStats(),
   });
 
   factory AccuracyStats.fromJson(Map<String, Object?> json) {
@@ -352,6 +353,9 @@ class AccuracyStats {
           .map(AccuracyPoint.fromJson)
           .toList(growable: false),
       trend: AccuracyTrend.fromJson(json['trend'] as Map<String, Object?>? ?? const {}),
+      timePressure: TimePressureStats.fromJson(
+        json['timePressure'] as Map<String, Object?>? ?? const {},
+      ),
     );
   }
 
@@ -369,6 +373,79 @@ class AccuracyStats {
   /// Analysed games oldest first, with a rolling average for the chart line.
   final List<AccuracyPoint> timeline;
   final AccuracyTrend trend;
+
+  /// How the profile plays as its clock runs down.
+  final TimePressureStats timePressure;
+}
+
+/// Accuracy and errors by how much of the clock was left, from the clock
+/// comments in the analysed games' PGNs.
+class TimePressureStats {
+  const TimePressureStats({
+    this.games = 0,
+    this.moves = 0,
+    this.blunders = 0,
+    this.buckets = const [],
+    this.blunderShareInTimeTrouble,
+    this.gamesInTimeTrouble,
+  });
+
+  factory TimePressureStats.fromJson(Map<String, Object?> json) => TimePressureStats(
+    games: json['games'] as int? ?? 0,
+    moves: json['moves'] as int? ?? 0,
+    blunders: json['blunders'] as int? ?? 0,
+    buckets: (json['buckets'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(ClockBucketAccuracy.fromJson)
+        .toList(growable: false),
+    blunderShareInTimeTrouble:
+        (json['blunderShareInTimeTrouble'] as num?)?.toDouble(),
+    gamesInTimeTrouble: (json['gamesInTimeTrouble'] as num?)?.toDouble(),
+  );
+
+  /// Analysed games that carried clock times.
+  final int games;
+  final int moves;
+  final int blunders;
+
+  /// Comfortable, fair, low and critical, in that order.
+  final List<ClockBucketAccuracy> buckets;
+
+  /// Share of all blunders played with under a tenth of the clock left.
+  final double? blunderShareInTimeTrouble;
+
+  /// Share of games that reached that last tenth at all.
+  final double? gamesInTimeTrouble;
+
+  bool get hasClocks => moves > 0;
+}
+
+class ClockBucketAccuracy {
+  const ClockBucketAccuracy({
+    required this.bucket,
+    this.moves = 0,
+    this.blunders = 0,
+    this.errors = 0,
+    this.errorsPerHundredMoves = 0,
+    this.accuracy,
+  });
+
+  factory ClockBucketAccuracy.fromJson(Map<String, Object?> json) => ClockBucketAccuracy(
+    bucket: json['bucket'] as String? ?? 'comfortable',
+    moves: json['moves'] as int? ?? 0,
+    blunders: json['blunders'] as int? ?? 0,
+    errors: json['errors'] as int? ?? 0,
+    errorsPerHundredMoves: (json['errorsPerHundredMoves'] as num?)?.toDouble() ?? 0,
+    accuracy: (json['accuracy'] as num?)?.toDouble(),
+  );
+
+  /// `comfortable` | `fair` | `low` | `critical`.
+  final String bucket;
+  final int moves;
+  final int blunders;
+  final int errors;
+  final double errorsPerHundredMoves;
+  final double? accuracy;
 }
 
 class AccuracyGroup {

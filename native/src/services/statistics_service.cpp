@@ -14,8 +14,10 @@
 #include <string_view>
 #include <vector>
 
+#include "chess/pgn.h"
 #include "services/accuracy_statistics.h"
 #include "services/opening_weakness.h"
+#include "services/time_pressure.h"
 #include "services/statistics_domain.h"
 #include "services/termination.h"
 
@@ -52,6 +54,7 @@ nlohmann::json weakness_json(const OpeningWeakness& weakness) {
   node["openingBlunders"] = weakness.blunders;
   node["poorResults"] = weakness.poor_results;
   node["frequentErrors"] = weakness.frequent_errors;
+  node["lossRateLowerBound"] = weakness.loss_rate_lower_bound;
   node["severity"] = weakness.severity;
   if (weakness.recurring) {
     const auto& mistake = *weakness.recurring;
@@ -606,6 +609,28 @@ std::string StatisticsService::accuracy_json(const std::string& time_control) co
   std::map<std::string, std::vector<const AccuracyMoveRow*>> moves_by_game;
   for (const auto& row : move_rows) moves_by_game[row.game_id].push_back(&row);
 
+  // Clock times live in the stored PGN of each analysed game. A game without a
+  // usable TimeControl tag or without clock comments simply stays out of the
+  // clock statistics rather than being counted against an unknown budget.
+  struct GameClocks {
+    std::vector<std::optional<std::int64_t>> per_ply;
+    std::int64_t base_ms{0};
+  };
+  std::map<std::string, GameClocks> clocks_by_game;
+  for (const auto& row : database_.accuracy_game_clocks_for_statistics(profile->id)) {
+    const auto budget = parse_time_control(row.time_control);
+    if (!budget.base_ms.has_value() || row.ply_count <= 0) continue;
+    auto clocks = extract_mainline_clock_millis(
+        row.pgn, static_cast<std::size_t>(row.ply_count));
+    const bool any_clock = std::any_of(clocks.begin(), clocks.end(),
+        [](const std::optional<std::int64_t>& clock) { return clock.has_value(); });
+    if (!any_clock) continue;
+    clocks_by_game.emplace(row.game_id, GameClocks{std::move(clocks), *budget.base_ms});
+  }
+  std::vector<TimedMove> timed_moves;
+  int clock_games = 0;
+  int time_trouble_games = 0;
+
   std::vector<AnalysedGame> games;
   for (const auto& row : database_.accuracy_games_for_statistics(profile->id)) {
     if (filtered && row.time_control_type != time_control) continue;
@@ -619,21 +644,49 @@ std::string StatisticsService::accuracy_json(const std::string& time_control) co
                       .time_control = row.time_control_type,
                       .accuracy = *accuracy};
     const int own_parity = color == "white" ? 0 : 1;
+    const auto clocks = clocks_by_game.find(row.game_id);
+    const GameClocks* game_clocks =
+        clocks == clocks_by_game.end() ? nullptr : &clocks->second;
+    bool counted_clock_game = false;
+    bool in_time_trouble = false;
     if (const auto found = moves_by_game.find(row.game_id); found != moves_by_game.end()) {
       for (const auto* move : found->second) {
         if (move->ply % 2 != own_parity) continue;
         const auto phase = static_cast<std::size_t>(phase_of_ply(move->ply));
-        const bool error = move->category == "mistake" || move->category == "blunder";
-        if (move->category == "blunder") game.blunders += 1;
-        if (move->category == "mistake") game.mistakes += 1;
-        if (error) game.phase_errors[phase] += 1;
+        const bool blunder = move->category == "blunder";
+        const bool mistake = move->category == "mistake";
+        if (blunder) game.blunders += 1;
+        if (mistake) game.mistakes += 1;
+        if (blunder || mistake) game.phase_errors[phase] += 1;
         // A NULL weight is a move classified before per-move accuracy was
-        // stored; background analysis fills it in. Until then the game has no
-        // phase breakdown rather than a partial one.
+        // stored; the profile worker fills it in. Until then the move still
+        // counts as played, but carries no accuracy of its own.
+        const AccuracySample sample = move->weight.has_value()
+            ? AccuracySample{.theory = move->theory,
+                             .accuracy = move->accuracy,
+                             .weight = *move->weight}
+            : AccuracySample{};
+
+        if (game_clocks != nullptr &&
+            static_cast<std::size_t>(move->ply) < game_clocks->per_ply.size()) {
+          if (const auto& remaining = game_clocks->per_ply[move->ply]) {
+            const auto bucket = clock_bucket(*remaining, game_clocks->base_ms);
+            timed_moves.push_back({.bucket = bucket,
+                                   .blunder = blunder,
+                                   .mistake = mistake,
+                                   .sample = sample});
+            counted_clock_game = true;
+            if (bucket == ClockBucket::critical) in_time_trouble = true;
+          }
+        }
+
         if (!move->weight.has_value()) continue;
-        game.phase_samples[phase].push_back(
-            {.theory = move->theory, .accuracy = move->accuracy, .weight = *move->weight});
+        game.phase_samples[phase].push_back(sample);
       }
+    }
+    if (counted_clock_game) {
+      clock_games += 1;
+      if (in_time_trouble) time_trouble_games += 1;
     }
     games.push_back(std::move(game));
   }
@@ -695,6 +748,21 @@ std::string StatisticsService::accuracy_json(const std::string& time_control) co
                         {"average", rolling[index]}});
   }
 
+  // How the profile plays as its clock runs down.
+  const auto pressure = time_pressure(timed_moves, clock_games, time_trouble_games);
+  nlohmann::json clock_buckets = nlohmann::json::array();
+  for (std::size_t index = 0; index < kClockBucketCount; ++index) {
+    const auto& bucket = pressure.buckets[index];
+    clock_buckets.push_back(
+        {{"bucket", clock_bucket_name(static_cast<ClockBucket>(index))},
+         {"moves", bucket.moves},
+         {"blunders", bucket.blunders},
+         {"errors", bucket.errors},
+         {"errorsPerHundredMoves", bucket.errors_per_hundred},
+         {"accuracy", bucket.accuracy.has_value() ? nlohmann::json(*bucket.accuracy)
+                                                  : nlohmann::json(nullptr)}});
+  }
+
   const auto trend = accuracy_trend(games);
   const auto optional_number = [](const std::optional<double>& value) {
     return value.has_value() ? nlohmann::json(*value) : nlohmann::json(nullptr);
@@ -711,6 +779,19 @@ std::string StatisticsService::accuracy_json(const std::string& time_control) co
       {"byTimeControl", controls},
       {"byPhase", phases},
       {"timeline", timeline},
+      {"timePressure",
+       {{"games", pressure.games},
+        {"moves", pressure.moves},
+        {"blunders", pressure.blunders},
+        {"buckets", clock_buckets},
+        {"blunderShareInTimeTrouble",
+         pressure.blunder_share_in_time_trouble.has_value()
+             ? nlohmann::json(*pressure.blunder_share_in_time_trouble)
+             : nlohmann::json(nullptr)},
+        {"gamesInTimeTrouble",
+         pressure.games_in_time_trouble.has_value()
+             ? nlohmann::json(*pressure.games_in_time_trouble)
+             : nlohmann::json(nullptr)}}},
       {"trend",
        {{"verdict", trend.verdict},
         {"window", trend.window},
@@ -718,7 +799,9 @@ std::string StatisticsService::accuracy_json(const std::string& time_control) co
         {"recentAccuracy", optional_number(trend.recent_accuracy)},
         {"previousAccuracy", optional_number(trend.previous_accuracy)},
         {"recentBlunders", optional_number(trend.recent_blunders)},
-        {"previousBlunders", optional_number(trend.previous_blunders)}}},
+        {"previousBlunders", optional_number(trend.previous_blunders)},
+        {"delta", trend.delta},
+        {"noiseMargin", trend.noise_margin}}},
   };
   return root.dump();
 }

@@ -57,6 +57,22 @@ void test_small_or_winning_samples_are_not_weaknesses() {
   std::vector<OpeningGameEvidence> few(3, game(kFriedLiver, "black", "loss"));
   expect(find_opening_weaknesses(few, 6).empty(), "Three games are too few to judge");
 
+  // Three losses out of four is 75% on paper, but the confidence bound says a
+  // line that close to even could just as well have been bad luck.
+  std::vector<OpeningGameEvidence> unlucky(3, game(kFriedLiver, "black", "loss"));
+  unlucky.push_back(game(kFriedLiver, "black", "win"));
+  expect(find_opening_weaknesses(unlucky, 6).empty(),
+      "Three losses out of four are not yet confidently a weakness");
+
+  // The same 75% over twice as many games is.
+  std::vector<OpeningGameEvidence> repeated(6, game(kFriedLiver, "black", "loss"));
+  for (int i = 0; i < 2; ++i) repeated.push_back(game(kFriedLiver, "black", "win"));
+  const auto confident = find_opening_weaknesses(repeated, 6);
+  expect(confident.size() == 1 && confident[0].poor_results,
+      "Six losses out of eight clear the confidence bound");
+  expect(confident[0].loss_rate_lower_bound > 0.5,
+      "The reported bound is what cleared it");
+
   // A winning line with the odd opening slip is fine.
   std::vector<OpeningGameEvidence> winning;
   for (int i = 0; i < 6; ++i) {

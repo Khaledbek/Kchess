@@ -101,6 +101,30 @@ void test_phase_accuracy() {
       "Endgame figures come from the one game that reached it");
 }
 
+// A change has to be bigger than the scatter of the games it is measured over.
+void test_trend_ignores_noise() {
+  // Steady play: every game within a point of the mean, so a four-point jump
+  // is a real change.
+  std::vector<AnalysedGame> steady_player;
+  for (int i = 0; i < 10; ++i) steady_player.push_back(game(70 + (i % 2)));
+  for (int i = 0; i < 10; ++i) steady_player.push_back(game(74 + (i % 2)));
+  const auto steady_verdict = accuracy_trend(steady_player);
+  expect(steady_verdict.verdict == "improving",
+      "A four-point gain by a consistent player is improvement");
+  expect(near(steady_verdict.noise_margin, kTrendThreshold),
+      "Consistent games only have to clear the practical threshold");
+
+  // The same four points from a player whose games swing between 50 and 90 is
+  // indistinguishable from their usual scatter.
+  std::vector<AnalysedGame> erratic;
+  for (int i = 0; i < 10; ++i) erratic.push_back(game(i % 2 == 0 ? 50.0 : 90.0));
+  for (int i = 0; i < 10; ++i) erratic.push_back(game(i % 2 == 0 ? 54.0 : 94.0));
+  const auto erratic_verdict = accuracy_trend(erratic);
+  expect(near(erratic_verdict.delta, 4.0), "Both stretches differ by four points");
+  expect(erratic_verdict.noise_margin > 4.0 && erratic_verdict.verdict == "steady",
+      "Wild swings need a bigger change before it counts");
+}
+
 void test_trend() {
   std::vector<AnalysedGame> few(9, game(70));
   const auto insufficient = accuracy_trend(few);
@@ -153,6 +177,7 @@ int main() {
     test_aggregate_is_the_game_formula();
     test_phase_accuracy();
     test_trend();
+    test_trend_ignores_noise();
     test_rolling_accuracy();
   } catch (const std::exception& error) {
     std::cerr << "accuracy statistics tests failed: " << error.what() << std::endl;

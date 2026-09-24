@@ -278,6 +278,7 @@ add_library(kchess_core SHARED
   src/services/statistics_details.cpp
   src/services/opening_weakness.cpp
   src/services/accuracy_statistics.cpp
+  src/services/time_pressure.cpp
   src/training/training_catalog.cpp
   src/training/training_service.cpp
   src/training/practice_catalog.cpp
@@ -560,6 +561,17 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
   add_test(NAME kchess_accuracy_statistics_tests COMMAND kchess_accuracy_statistics_tests)
+
+  add_executable(kchess_time_pressure_tests
+    tests/time_pressure_tests.cpp
+    src/services/time_pressure.cpp
+    src/analysis/accuracy.cpp
+  )
+  target_compile_features(kchess_time_pressure_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_time_pressure_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  add_test(NAME kchess_time_pressure_tests COMMAND kchess_time_pressure_tests)
 
   add_executable(kchess_bot_move_selector_tests
     tests/bot_move_selector_tests.cpp

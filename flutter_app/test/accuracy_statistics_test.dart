@@ -35,6 +35,23 @@ Map<String, Object?> _accuracyJson({int games = 40, String verdict = 'improving'
         for (var i = 0; i < games; i++)
           {'endedAt': 1788000000 + i * 86400, 'accuracy': 65.0 + (i % 7) * 2, 'average': 70.0 + i * 0.15},
       ],
+      'timePressure': <String, Object?>{
+        'games': 30,
+        'moves': 900,
+        'blunders': 20,
+        'blunderShareInTimeTrouble': 0.65,
+        'gamesInTimeTrouble': 0.4,
+        'buckets': <Object?>[
+          {'bucket': 'comfortable', 'moves': 600, 'blunders': 4, 'errors': 30,
+           'errorsPerHundredMoves': 5.0, 'accuracy': 80.0},
+          {'bucket': 'fair', 'moves': 200, 'blunders': 3, 'errors': 20,
+           'errorsPerHundredMoves': 10.0, 'accuracy': 72.0},
+          {'bucket': 'low', 'moves': 60, 'blunders': 0, 'errors': 9,
+           'errorsPerHundredMoves': 15.0, 'accuracy': 66.0},
+          {'bucket': 'critical', 'moves': 40, 'blunders': 13, 'errors': 16,
+           'errorsPerHundredMoves': 40.0, 'accuracy': 48.0},
+        ],
+      },
       'trend': verdict == 'insufficient'
           ? {'verdict': 'insufficient', 'window': 0, 'gamesNeeded': 8}
           : {
@@ -165,6 +182,48 @@ void main() {
     expect(find.descendant(of: card, matching: find.text('Endgame')), findsOneWidget);
     expect(find.descendant(of: card, matching: find.text('Rapid')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the clock breakdown shows where the blunders happen', (tester) async {
+    final gateway = _Gateway(
+      accuracy: _accuracyJson(),
+      status: const BackgroundAnalysisStatus(state: 'running', analysedGames: 40, totalGames: 120),
+    );
+    await _pumpStatistics(tester, gateway);
+
+    final clock = find.byKey(const Key('stats-accuracy-clock'));
+    expect(clock, findsOneWidget);
+    expect(find.text('By time left on the clock'), findsOneWidget);
+    expect(
+      find.text('65% of your blunders come with under a tenth of the clock left.'),
+      findsOneWidget,
+    );
+
+    // Every bucket that was played shows its accuracy and its error rate.
+    final critical = find.byKey(const ValueKey('stats-accuracy-clock-critical'));
+    expect(find.descendant(of: critical, matching: find.text('Under a tenth')), findsOneWidget);
+    expect(find.descendant(of: critical, matching: find.text('48%')), findsOneWidget);
+    expect(
+      find.descendant(of: critical, matching: find.text('40.0 mistakes per 100 moves')),
+      findsOneWidget,
+    );
+    final bars = tester.widgetList(find.descendant(of: clock, matching: find.byType(LayoutBuilder)));
+    expect(bars, hasLength(4));
+  });
+
+  testWidgets('one bad evening does not become a clock claim', (tester) async {
+    final json = _accuracyJson();
+    (json['timePressure']! as Map<String, Object?>)
+      ..['blunders'] = 3
+      ..['blunderShareInTimeTrouble'] = 1.0;
+    final gateway = _Gateway(
+      accuracy: json,
+      status: const BackgroundAnalysisStatus(state: 'running', analysedGames: 4, totalGames: 120),
+    );
+    await _pumpStatistics(tester, gateway);
+
+    expect(find.byKey(const Key('stats-accuracy-clock')), findsOneWidget);
+    expect(find.byKey(const Key('stats-accuracy-clock-share')), findsNothing);
   });
 
   testWidgets('too few analysed games say how many more are needed', (tester) async {

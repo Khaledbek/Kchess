@@ -46,13 +46,19 @@ std::array<PhaseAccuracy, 3> phase_accuracy(const std::vector<AnalysedGame>& gam
 // Is the profile getting better? The latest games against the ones before.
 //
 // With n analysed games (at least kTrendMinimumGames) the most recent w games,
-// w = min(20, n / 2), are compared with the w before them. Accuracy up by at
-// least kTrendThreshold points is "improving", down by as much "declining",
-// anything in between "steady". Fewer games give "insufficient" and say how
-// many more are needed.
+// w = min(20, n / 2), are compared with the w before them.
+//
+// The change has to clear two bars before it is called improvement or decline:
+// kTrendThreshold points, so a change too small to matter is not announced, and
+// the noise of the games themselves, measured as the standard error of the two
+// means. A player whose accuracy swings wildly therefore needs a larger change
+// than a steady one before the verdict moves. Fewer games give "insufficient"
+// and say how many more are needed.
 constexpr int kTrendMinimumGames = 10;
 constexpr int kTrendMaxWindow = 20;
 constexpr double kTrendThreshold = 2.0;
+// One-sided 90% normal quantile, as in wilson_lower_bound.
+constexpr double kTrendConfidenceZ = 1.2816;
 
 struct AccuracyTrend {
   std::string verdict;  // improving | steady | declining | insufficient
@@ -62,6 +68,9 @@ struct AccuracyTrend {
   std::optional<double> previous_accuracy;
   std::optional<double> recent_blunders;    // per game
   std::optional<double> previous_blunders;  // per game
+  // Accuracy change and the bar it had to clear to count as a real change.
+  double delta{0.0};
+  double noise_margin{0.0};
 };
 AccuracyTrend accuracy_trend(const std::vector<AnalysedGame>& chronological);
 

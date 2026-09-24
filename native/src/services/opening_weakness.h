@@ -69,6 +69,8 @@ struct OpeningWeakness {
   int blunders{0};
   bool poor_results{false};
   bool frequent_errors{false};
+  // How high the loss rate confidently is, given how few games there are.
+  double loss_rate_lower_bound{0.0};
   std::optional<RecurringOpeningMistake> recurring;
   double severity{0.0};
 };
@@ -76,7 +78,9 @@ struct OpeningWeakness {
 // Openings the profile keeps losing or keeps misplaying, worst first.
 //
 // A line is weak when any of these holds:
-//  - poor results: at least 4 decided games, 3 losses, and 60% of them lost;
+//  - poor results: at least 4 decided games, 3 losses, and a loss rate whose
+//    confidence bound still sits above an even score, so one unlucky evening
+//    (three losses out of four) is not reported as a weakness;
 //  - a recurring mistake: the same flagged move in the same position twice;
 //  - frequent errors: opening errors in two thirds of at least 3 analysed
 //    games, while losing at least half.

@@ -3018,6 +3018,27 @@ std::vector<AccuracyGameRow> Database::accuracy_games_for_statistics(
   return rows;
 }
 
+std::vector<GameClockRow> Database::accuracy_game_clocks_for_statistics(
+    const std::string& profile_id) const {
+  const std::string sql = std::string(
+      "SELECT g.id,g.pgn,COALESCE(g.time_control,''),"
+      "(SELECT COUNT(*) FROM game_moves gm WHERE gm.game_id=g.id) "
+      "FROM games g WHERE g.profile_id=? AND ") + kLatestClassifiedRun
+      + " IS NOT NULL;";
+  auto statement = prepare(db_, sql.c_str());
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<GameClockRow> rows;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    rows.push_back(GameClockRow{
+        .game_id = text_column(statement.get(), 0),
+        .pgn = text_column(statement.get(), 1),
+        .time_control = text_column(statement.get(), 2),
+        .ply_count = sqlite3_column_int(statement.get(), 3),
+    });
+  }
+  return rows;
+}
+
 std::vector<AccuracyMoveRow> Database::accuracy_moves_for_statistics(
     const std::string& profile_id) const {
   const std::string sql = std::string(

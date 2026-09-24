@@ -14,7 +14,10 @@ namespace {
 
 constexpr int kPoorResultsMinimumDecided = 4;
 constexpr int kPoorResultsMinimumLosses = 3;
-constexpr double kPoorResultsLossRate = 0.6;
+// Losing is only a weakness when the line is confidently worse than an even
+// score; matchmaking keeps opponents near the player's own level, so 50% is
+// the honest baseline.
+constexpr double kPoorResultsBaseline = 0.5;
 constexpr int kFrequentErrorsMinimumAnalysed = 3;
 constexpr double kFrequentErrorsRate = 2.0 / 3.0;
 constexpr double kFrequentErrorsLossRate = 0.5;
@@ -89,16 +92,18 @@ std::optional<OpeningWeakness> judge(const Group& group) {
     }
   }
 
+  const double loss_rate_bound = wilson_lower_bound(tally.losses, decided);
   const bool poor_results = decided >= kPoorResultsMinimumDecided &&
-      tally.losses >= kPoorResultsMinimumLosses && loss_rate >= kPoorResultsLossRate;
+      tally.losses >= kPoorResultsMinimumLosses &&
+      loss_rate_bound > kPoorResultsBaseline;
   const bool frequent_errors = group.analysed >= kFrequentErrorsMinimumAnalysed &&
       error_rate >= kFrequentErrorsRate && loss_rate >= kFrequentErrorsLossRate;
   if (!poor_results && !frequent_errors && !recurring) return std::nullopt;
 
-  // Evidence is shrunk towards zero for small samples, so a line lost four
+  // The confidence bound already grows with the evidence, so a line lost four
   // times out of four does not outrank one lost fifteen times out of twenty.
   double severity =
-      std::max(0.0, loss_rate - 0.5) * 2.0 * decided / (decided + 4.0) +
+      std::max(0.0, loss_rate_bound - kPoorResultsBaseline) * 2.0 +
       error_rate * group.analysed / (group.analysed + 3.0);
   if (recurring) severity += 0.15 + 0.05 * std::min(recurring->count - 2, 3);
 
@@ -115,6 +120,7 @@ std::optional<OpeningWeakness> judge(const Group& group) {
   weakness.blunders = group.blunders;
   weakness.poor_results = poor_results;
   weakness.frequent_errors = frequent_errors;
+  weakness.loss_rate_lower_bound = loss_rate_bound;
   weakness.recurring = recurring;
   weakness.severity = severity;
   return weakness;

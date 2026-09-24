@@ -128,6 +128,15 @@ struct AccuracyGameRow {
   std::optional<double> black_accuracy;
 };
 
+// The clock source of one analysed game: the stored PGN carries the per-move
+// `[%clk ...]` comments, the TimeControl tag says what they started from.
+struct GameClockRow {
+  std::string game_id;
+  std::string pgn;
+  std::string time_control;  // PGN tag, e.g. "180+2"
+  int ply_count{0};
+};
+
 struct AccuracyMoveRow {
   std::string game_id;
   int ply{0};
@@ -519,6 +528,12 @@ class Database {
   std::vector<AccuracyGameRow> accuracy_games_for_statistics(
       const std::string& profile_id) const;
   std::vector<AccuracyMoveRow> accuracy_moves_for_statistics(
+      const std::string& profile_id) const;
+
+  // PGN and time control of the analysed games, for reading their clocks. Only
+  // games with a classified run are returned, so clock statistics stay on the
+  // same set of games as the rest of the accuracy read model.
+  std::vector<GameClockRow> accuracy_game_clocks_for_statistics(
       const std::string& profile_id) const;
   // Existing complete shared analyses needing classification or whose old
   // move rows lack phase-accuracy weights. No engine work is implied.

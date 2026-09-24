@@ -637,6 +637,31 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get statsClockTitle => 'حسب الوقت المتبقي';
+
+  @override
+  String get statsClockComfortable => 'أكثر من النصف متبقٍ';
+
+  @override
+  String get statsClockFair => 'من النصف إلى الربع';
+
+  @override
+  String get statsClockLow => 'من الربع إلى العُشر';
+
+  @override
+  String get statsClockCritical => 'أقل من العُشر';
+
+  @override
+  String statsClockBlunderShare(String share) {
+    return '$share من أخطائك الفادحة تحدث مع أقل من عُشر الوقت المتبقي.';
+  }
+
+  @override
+  String statsClockErrorRate(String value) {
+    return '$value أخطاء لكل 100 نقلة';
+  }
+
+  @override
   String statsAccuracyGames(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

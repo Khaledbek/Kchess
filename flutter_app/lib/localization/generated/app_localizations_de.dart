@@ -640,6 +640,31 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get statsClockTitle => 'Nach verbleibender Bedenkzeit';
+
+  @override
+  String get statsClockComfortable => 'Mehr als die Hälfte übrig';
+
+  @override
+  String get statsClockFair => 'Hälfte bis Viertel';
+
+  @override
+  String get statsClockLow => 'Viertel bis Zehntel';
+
+  @override
+  String get statsClockCritical => 'Unter einem Zehntel';
+
+  @override
+  String statsClockBlunderShare(String share) {
+    return '$share deiner groben Fehler passieren mit weniger als einem Zehntel der Bedenkzeit.';
+  }
+
+  @override
+  String statsClockErrorRate(String value) {
+    return '$value Fehler pro 100 Züge';
+  }
+
+  @override
   String statsAccuracyGames(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

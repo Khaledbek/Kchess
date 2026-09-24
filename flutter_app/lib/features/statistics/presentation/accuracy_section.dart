@@ -288,6 +288,10 @@ class _AccuracyContent extends StatelessWidget {
               accuracy: phase.accuracy,
               detail: strings.statsAccuracyErrorsPerGame(phase.errorsPerGame.toStringAsFixed(1)),
             ),
+        if (stats.timePressure.hasClocks) ...[
+          const SizedBox(height: 10),
+          _ClockPressureSection(pressure: stats.timePressure),
+        ],
         const SizedBox(height: 10),
         _AccuracySubheading(label: strings.statsAccuracyByColor),
         for (final (label, group) in [
@@ -492,6 +496,59 @@ class _AccuracyChart extends StatelessWidget {
           '${_formatPointDate(points.first.endedAt)}  —  ${_formatPointDate(points.last.endedAt)}',
           style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
         ),
+      ],
+    );
+  }
+}
+
+/// Accuracy and errors by how much clock was left, plus the one line that
+/// makes it actionable: how much of the damage happens in time trouble.
+class _ClockPressureSection extends StatelessWidget {
+  const _ClockPressureSection({required this.pressure});
+
+  /// Below this many blunders the share is one or two games talking.
+  static const _minimumBlundersForShare = 5;
+
+  final TimePressureStats pressure;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final share = pressure.blunderShareInTimeTrouble;
+    final labels = <String, String>{
+      'comfortable': strings.statsClockComfortable,
+      'fair': strings.statsClockFair,
+      'low': strings.statsClockLow,
+      'critical': strings.statsClockCritical,
+    };
+    return Column(
+      key: const Key('stats-accuracy-clock'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _AccuracySubheading(label: strings.statsClockTitle),
+        if (share != null && pressure.blunders >= _minimumBlundersForShare)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              strings.statsClockBlunderShare('${(share * 100).round()}%'),
+              key: const Key('stats-accuracy-clock-share'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        for (final bucket in pressure.buckets)
+          if (bucket.moves > 0)
+            _AccuracyBar(
+              key: ValueKey('stats-accuracy-clock-${bucket.bucket}'),
+              label: labels[bucket.bucket] ?? bucket.bucket,
+              accuracy: bucket.accuracy,
+              detail: strings.statsClockErrorRate(
+                bucket.errorsPerHundredMoves.toStringAsFixed(1),
+              ),
+            ),
       ],
     );
   }

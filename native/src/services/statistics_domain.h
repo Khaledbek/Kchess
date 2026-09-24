@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <nlohmann/json.hpp>
 #include <string>
 
@@ -51,6 +53,30 @@ inline nlohmann::json tally_json(const Tally& tally) {
     node["scorePercent"] = nullptr;
   }
   return node;
+}
+
+// Lower end of the Wilson score interval for a share, e.g. "of the decided
+// games in this line, how large can the loss rate confidently be said to be".
+//
+// A raw share of a handful of games is mostly noise: three losses out of four
+// looks like 75% but is one unlucky evening. The Wilson bound answers the
+// question the statistics actually want - "is this share really above the
+// baseline?" - and it tightens on its own as more games arrive, so no separate
+// minimum-sample rule has to guess for it.
+//
+// `z` is the standard-normal quantile; 1.2816 is a one-sided 90% bound, which
+// is deliberately softer than the textbook 1.96 because a training hint is not
+// a scientific claim and must still appear after a handful of games.
+inline double wilson_lower_bound(const int successes, const int trials,
+                                 const double z = 1.2816) {
+  if (trials <= 0 || successes < 0) return 0.0;
+  const double n = trials;
+  const double share = static_cast<double>(successes) / n;
+  const double z_squared = z * z;
+  const double centre = (share + z_squared / (2.0 * n)) / (1.0 + z_squared / n);
+  const double spread = (z / (1.0 + z_squared / n)) *
+      std::sqrt(share * (1.0 - share) / n + z_squared / (4.0 * n * n));
+  return std::clamp(centre - spread, 0.0, 1.0);
 }
 
 // Case-insensitive equality; provider game player names and the stored profile

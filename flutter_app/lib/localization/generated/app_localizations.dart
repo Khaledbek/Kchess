@@ -1276,6 +1276,48 @@ abstract class AppLocalizations {
   /// **'{value} mistakes per game'**
   String statsAccuracyErrorsPerGame(String value);
 
+  /// No description provided for @statsClockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'By time left on the clock'**
+  String get statsClockTitle;
+
+  /// No description provided for @statsClockComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Over half left'**
+  String get statsClockComfortable;
+
+  /// No description provided for @statsClockFair.
+  ///
+  /// In en, this message translates to:
+  /// **'Half to a quarter'**
+  String get statsClockFair;
+
+  /// No description provided for @statsClockLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Quarter to a tenth'**
+  String get statsClockLow;
+
+  /// No description provided for @statsClockCritical.
+  ///
+  /// In en, this message translates to:
+  /// **'Under a tenth'**
+  String get statsClockCritical;
+
+  /// No description provided for @statsClockBlunderShare.
+  ///
+  /// In en, this message translates to:
+  /// **'{share} of your blunders come with under a tenth of the clock left.'**
+  String statsClockBlunderShare(String share);
+
+  /// No description provided for @statsClockErrorRate.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} mistakes per 100 moves'**
+  String statsClockErrorRate(String value);
+
   /// No description provided for @statsAccuracyGames.
   ///
   /// In en, this message translates to:

@@ -5,6 +5,7 @@
 #include "services/accuracy_statistics.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace kchess::statistics {
 
@@ -80,10 +81,30 @@ AccuracyTrend accuracy_trend(const std::vector<AnalysedGame>& chronological) {
   trend.previous_accuracy = mean(count - 2 * window, count - window, false);
   trend.recent_blunders = mean(count - window, count, true);
   trend.previous_blunders = mean(count - 2 * window, count - window, true);
-  const double delta = *trend.recent_accuracy - *trend.previous_accuracy;
-  trend.verdict = delta >= kTrendThreshold
+  // How much the games in each stretch scatter: two runs of 70% each say more
+  // than one run of 50-90% and another of 60-80%.
+  const auto variance = [&](int from, int to, double mean_accuracy) {
+    if (to - from < 2) return 0.0;
+    double total = 0.0;
+    for (int index = from; index < to; ++index) {
+      const double difference =
+          chronological[static_cast<std::size_t>(index)].accuracy - mean_accuracy;
+      total += difference * difference;
+    }
+    return total / (to - from - 1);
+  };
+  const double recent_variance =
+      variance(count - window, count, *trend.recent_accuracy);
+  const double previous_variance =
+      variance(count - 2 * window, count - window, *trend.previous_accuracy);
+  const double standard_error =
+      std::sqrt(recent_variance / window + previous_variance / window);
+
+  trend.delta = *trend.recent_accuracy - *trend.previous_accuracy;
+  trend.noise_margin = std::max(kTrendThreshold, kTrendConfidenceZ * standard_error);
+  trend.verdict = trend.delta >= trend.noise_margin
       ? "improving"
-      : delta <= -kTrendThreshold ? "declining" : "steady";
+      : trend.delta <= -trend.noise_margin ? "declining" : "steady";
   return trend;
 }
 

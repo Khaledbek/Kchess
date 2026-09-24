@@ -271,6 +271,27 @@
       }
     }
   },
+  "statsClockTitle": "By time left on the clock",
+  "statsClockComfortable": "Over half left",
+  "statsClockFair": "Half to a quarter",
+  "statsClockLow": "Quarter to a tenth",
+  "statsClockCritical": "Under a tenth",
+  "statsClockBlunderShare": "{share} of your blunders come with under a tenth of the clock left.",
+  "@statsClockBlunderShare": {
+    "placeholders": {
+      "share": {
+        "type": "String"
+      }
+    }
+  },
+  "statsClockErrorRate": "{value} mistakes per 100 moves",
+  "@statsClockErrorRate": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "statsAccuracyGames": "{count, plural, =1{1 game} other{{count} games}}",
   "@statsAccuracyGames": {
     "placeholders": {
