@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: phase section presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 /// "Nach Spielphase": where the profile's games end (opening / middlegame /
@@ -37,13 +41,6 @@ class _PhaseCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              labels.subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
             ),
             const SizedBox(height: 14),
             FutureBuilder<PhaseStats>(
@@ -104,14 +101,18 @@ class _PhaseContent extends StatelessWidget {
     final tallies = {
       for (final phase in _order) phase: byPhase[phase] ?? const StatTally(),
     };
-    final total = _order.fold<int>(0, (sum, p) => sum + tallies[p]!.games);
+    final total = stats.classified;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Macro distribution strip: how the games split across phases.
         if (total > 0) ...[
-          _PhaseDistributionStrip(tallies: tallies, total: total, labels: labels),
+          _PhaseDistributionStrip(
+            tallies: tallies,
+            total: total,
+            labels: labels,
+          ),
           const SizedBox(height: 8),
           _distributionCaption(context, tallies, total),
           const SizedBox(height: 16),
@@ -127,13 +128,7 @@ class _PhaseContent extends StatelessWidget {
         ],
         const SizedBox(height: 14),
         // Key for the win/draw/loss segments inside each phase bar.
-        _WdlLegend(
-          tally: StatTally(
-            wins: _order.fold(0, (s, p) => s + tallies[p]!.wins),
-            draws: _order.fold(0, (s, p) => s + tallies[p]!.draws),
-            losses: _order.fold(0, (s, p) => s + tallies[p]!.losses),
-          ),
-        ),
+        _WdlLegend(tally: stats.overall),
         if (stats.classified < stats.totalGames) ...[
           const SizedBox(height: 10),
           Text(
@@ -216,8 +211,7 @@ class _PhaseDistributionStrip extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final available =
-            constraints.maxWidth - _gap * (phases.length - 1);
+        final available = constraints.maxWidth - _gap * (phases.length - 1);
         final children = <Widget>[];
         for (final phase in phases) {
           if (children.isNotEmpty) children.add(const SizedBox(width: _gap));
@@ -235,8 +229,7 @@ class _PhaseDistributionStrip extends StatelessWidget {
             Expanded(
               flex: games,
               child: Tooltip(
-                message:
-                    '${labels.shortPhase(phase)} · $games ($percent)',
+                message: '${labels.shortPhase(phase)} · $games ($percent)',
                 child: Container(
                   color: _phaseColor(phase),
                   alignment: Alignment.center,
@@ -290,7 +283,7 @@ class _PhaseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final winRate = tally.games > 0 ? tally.wins / tally.games : null;
+    final winRate = tally.winShare;
     final sharePct = total == 0 ? 0 : (tally.games / total * 100).round();
 
     return Column(
@@ -389,7 +382,10 @@ class _PhaseOutcomeBar extends StatelessWidget {
       flex: weight,
       child: message == null
           ? ColoredBox(color: color)
-          : Tooltip(message: message, child: ColoredBox(color: color)),
+          : Tooltip(
+              message: message,
+              child: ColoredBox(color: color),
+            ),
     );
 
     return ClipRRect(
@@ -415,7 +411,10 @@ class _PhaseOutcomeBar extends StatelessWidget {
                       ),
                     ),
                   if (rest > 0)
-                    Expanded(flex: rest, child: ColoredBox(color: trackColor)),
+                    Expanded(
+                      flex: rest,
+                      child: ColoredBox(color: trackColor),
+                    ),
                 ],
               ),
       ),
@@ -446,7 +445,6 @@ Color _phaseColor(String phase) => switch (phase) {
 class _PhaseText {
   const _PhaseText({
     required this.title,
-    required this.subtitle,
     required this.opening,
     required this.middlegame,
     required this.endgame,
@@ -463,7 +461,6 @@ class _PhaseText {
   });
 
   final String title;
-  final String subtitle;
   final String opening;
   final String middlegame;
   final String endgame;
@@ -499,7 +496,6 @@ _PhaseText _phaseText(BuildContext context) {
   final strings = AppLocalizations.of(context);
   return _PhaseText(
     title: strings.statsPhaseTitle,
-    subtitle: strings.statsPhaseSubtitle,
     opening: strings.statsPhaseOpening,
     middlegame: strings.statsPhaseMiddlegame,
     endgame: strings.statsPhaseEndgame,

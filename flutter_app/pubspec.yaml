@@ -7,6 +7,7 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  path: ^1.8.3
   ffi: ^2.1.4
   file_picker: ^12.0.0
   fl_chart: ^1.0.0
@@ -17,7 +18,6 @@ dependencies:
   flutter_svg: ^2.3.0
   intl: ^0.20.2
   path_provider: ^2.1.5
-  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
@@ -30,7 +30,6 @@ flutter:
   assets:
     - assets/
     - assets/analysis_img/
-    - assets/icons/
     - ../img/
     - assets/opening_book.kcb
     - assets/opening_names.kco

@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: openings section presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 class _OpeningsCard extends StatelessWidget {
@@ -71,6 +75,124 @@ class _OpeningsCard extends StatelessWidget {
   }
 }
 
+/// Openings the profile keeps losing or keeps misplaying, one dense row each
+/// and one tap from its drill. Takes no room at all when native found nothing
+/// to warn about, or while the numbers are loading.
+class _OpeningWeaknessCard extends StatefulWidget {
+  const _OpeningWeaknessCard({required this.future});
+
+  final Future<OpeningsStats> future;
+
+  @override
+  State<_OpeningWeaknessCard> createState() => _OpeningWeaknessCardState();
+}
+
+class _OpeningWeaknessCardState extends State<_OpeningWeaknessCard> {
+  static const _collapsedRows = 3;
+
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<OpeningsStats>(
+    future: widget.future,
+    builder: (context, snapshot) {
+      final stats = snapshot.data;
+      if (stats == null || stats.weaknesses.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      final strings = AppLocalizations.of(context);
+      final theme = Theme.of(context);
+      final canTrain = TrainingNavigator.maybeOf(context) != null;
+      final weaknesses = stats.weaknesses;
+      final visible = _expanded
+          ? weaknesses
+          : weaknesses.take(_collapsedRows).toList(growable: false);
+      return Card(
+        key: const Key('stats-opening-weaknesses'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.healing_rounded,
+                    size: 20,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Tooltip(
+                      message: strings.openingWeaknessCaption,
+                      child: Text(
+                        strings.openingWeaknessTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Move-level warnings need analysed games; say so quietly.
+                  if (stats.analysedOpeningGames == 0)
+                    Tooltip(
+                      message: strings.openingWeaknessAnalyseHint,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              for (final (index, weakness) in visible.indexed) ...[
+                if (index > 0) const Divider(height: 1),
+                OpeningWeaknessRow(
+                  weakness: weakness,
+                  colorLabel: weakness.color == 'white'
+                      ? strings.statsOpeningsWhite
+                      : strings.statsOpeningsBlack,
+                  trainLabel: strings.statsTrainOpening,
+                  onTrain: canTrain
+                      ? () => _trainOpening(
+                          context,
+                          OpeningTrainingRequest(
+                            openingName: weakness.name,
+                            eco: weakness.eco,
+                            color: weakness.color,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
+              if (weaknesses.length > _collapsedRows)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    key: const Key('stats-opening-weaknesses-more'),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    child: Text(
+                      _expanded
+                          ? strings.openingWeaknessShowFewer
+                          : strings.openingWeaknessShowAll(weaknesses.length),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 enum _OpeningSort { mostPlayed, bestWinRate }
 
 class _OpeningsContent extends StatefulWidget {
@@ -91,9 +213,6 @@ class _OpeningsContent extends StatefulWidget {
 }
 
 class _OpeningsContentState extends State<_OpeningsContent> {
-  /// Best-win-rate ranking ignores tiny samples so one lucky game can't top the
-  /// list.
-  static const _minGamesForWinRate = 3;
   static const _maxRows = 12;
 
   late String _color;
@@ -124,33 +243,16 @@ class _OpeningsContentState extends State<_OpeningsContent> {
     _color = _defaultColor();
   }
 
-  String _defaultColor() {
-    int total(String color) =>
-        _familiesFor(color).fold(0, (sum, f) => sum + f.tally.games);
-    final colors = _availableColors;
-    if (colors.isEmpty) return 'white';
-    colors.sort((a, b) => total(b).compareTo(total(a)));
-    return colors.first;
-  }
+  String _defaultColor() => widget.stats.defaultColor;
 
   List<OpeningFamily> _rows() {
-    final families = List<OpeningFamily>.from(_familiesFor(_color));
-    if (_sort == _OpeningSort.bestWinRate) {
-      final ranked = families
-          .where(
-            (f) =>
-                f.tally.games >= _minGamesForWinRate && f.tally.winRate != null,
-          )
-          .toList();
-      ranked.sort((a, b) {
-        final rate = b.tally.winRate!.compareTo(a.tally.winRate!);
-        if (rate != 0) return rate;
-        return b.tally.games.compareTo(a.tally.games);
-      });
-      return ranked.take(_maxRows).toList(growable: false);
-    }
-    families.sort((a, b) => b.tally.games.compareTo(a.tally.games));
-    return families.take(_maxRows).toList(growable: false);
+    final families = _sort == _OpeningSort.bestWinRate
+        ? widget.stats.bestWinRateFamilies
+        : widget.stats.families;
+    return families
+        .where((family) => family.color == _color)
+        .take(_maxRows)
+        .toList(growable: false);
   }
 
   String _colorLabel(String color) => switch (color) {
@@ -506,7 +608,10 @@ class _OpeningVariationRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            SizedBox(width: 96, child: _WinLossDrawBar(tally: tally, height: 6)),
+            SizedBox(
+              width: 96,
+              child: _WinLossDrawBar(tally: tally, height: 6),
+            ),
             const SizedBox(width: 10),
             SizedBox(
               width: 42,

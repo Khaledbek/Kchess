@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,5 +41,11 @@ struct PgnParseResult {
 };
 
 PgnParseResult parse_pgn(const std::string& pgn) noexcept;
+
+// Extracts per-mainline-move remaining clock values from PGN comments such as
+// {[%clk 0:01:23.4]}. Values are milliseconds and align with ParsedMove ply
+// indices. Missing clock comments stay std::nullopt. Variations are ignored.
+std::vector<std::optional<std::int64_t>> extract_mainline_clock_millis(
+    const std::string& pgn, std::size_t ply_count) noexcept;
 
 }  // namespace kchess

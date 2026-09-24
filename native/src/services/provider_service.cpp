@@ -1,12 +1,18 @@
+// -----------------------------------------------------------------------------
+// Section: Provider jobs and public archive statistics
+// -----------------------------------------------------------------------------
+
 #include "services/provider_service.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cctype>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -18,6 +24,8 @@
 #include "providers/provider_common.h"
 #include "providers/provider_models.h"
 #include "services/termination.h"
+#include "services/statistics_service.h"
+#include "services/statistics_domain.h"
 
 namespace kchess {
 namespace {
@@ -141,42 +149,11 @@ nlohmann::json scout_profile_object(const ProviderProfile& profile) {
   return result;
 }
 
-std::string scout_profile_json(const ProviderProfile& profile) {
-  return scout_profile_object(profile).dump();
-}
-
-// Lightweight win/draw/loss tally for the in-memory scouting aggregation. Kept
-// local to this module (the statistics service keeps its own equivalent).
-struct ScoutTally {
-  int games{0};
-  int wins{0};
-  int draws{0};
-  int losses{0};
-  void add(const std::string& outcome) {
-    games += 1;
-    if (outcome == "win") wins += 1;
-    else if (outcome == "loss") losses += 1;
-    else if (outcome == "draw") draws += 1;
-  }
-};
+// Scouting and local statistics share the same native tally rules.
+using ScoutTally = statistics::Tally;
 
 nlohmann::json scout_tally_json(const ScoutTally& tally) {
-  const int decided = tally.wins + tally.draws + tally.losses;
-  nlohmann::json node{
-      {"games", tally.games},
-      {"wins", tally.wins},
-      {"draws", tally.draws},
-      {"losses", tally.losses},
-      {"undecided", tally.games - decided},
-  };
-  if (decided > 0) {
-    node["winRate"] = static_cast<double>(tally.wins) / decided;
-    node["scorePercent"] = (static_cast<double>(tally.wins) + 0.5 * tally.draws) / decided;
-  } else {
-    node["winRate"] = nullptr;
-    node["scorePercent"] = nullptr;
-  }
-  return node;
+  return statistics::tally_json(tally);
 }
 
 // Value of a PGN tag with its original casing preserved (unlike the lowercasing
@@ -388,6 +365,14 @@ void ProviderService::sync_provider_resources(
     const int year,
     const int month,
     const std::shared_ptr<ProviderJob>& job) {
+  sync_provider_metadata(profile_id, provider, job);
+  sync_provider_month(profile_id, provider, year, month, job);
+}
+
+void ProviderService::sync_provider_metadata(
+    const std::string& profile_id,
+    GameProvider& provider,
+    const std::shared_ptr<ProviderJob>& job) {
   auto profile = database_.profile(profile_id);
   if (!profile.has_value() || !profile->provider_username.has_value()) {
     throw std::invalid_argument("online profile not found");
@@ -437,7 +422,35 @@ void ProviderService::sync_provider_resources(
   ensure_active();
   set_phase("months");
   const auto archive_cache = database_.provider_cache(profile_id, "archives");
-  if (!archive_cache || archive_cache->expires_at <= unix_time_seconds()) {
+  bool lichess_needs_joined_month = !archive_cache.has_value();
+  if (provider.type() == ProviderType::lichess && archive_cache.has_value()) {
+    try {
+      const auto cached = nlohmann::json::parse(archive_cache->payload_json);
+      lichess_needs_joined_month = !cached.is_array() || cached.empty();
+    } catch (...) {
+      lichess_needs_joined_month = true;
+    }
+  }
+  const bool archives_need_refresh = !archive_cache.has_value() ||
+      archive_cache->expires_at <= unix_time_seconds() ||
+      (provider.type() == ProviderType::lichess && lichess_needs_joined_month);
+  if (archives_need_refresh) {
+    // Lichess has no archives endpoint. On first background history discovery
+    // we need the account creation time to construct the complete month range.
+    // That timestamp is intentionally not persisted, so obtain it transiently
+    // if the normal profile-cache refresh above did not already provide it.
+    if (provider.type() == ProviderType::lichess && lichess_needs_joined_month &&
+        !transient_provider_joined.has_value()) {
+      auto remote_profile = provider.fetch_profile(
+          *profile->provider_username, {}, job->cancel);
+      if (remote_profile.value.has_value()) {
+        transient_provider_joined = remote_profile.value->joined;
+        profile = database_.update_provider_profile(
+            profile_id, *remote_profile.value, remote_profile.cache,
+            normalized_profile_json(*remote_profile.value));
+        cache_provider_avatar(profile_id, *remote_profile.value, job->cancel);
+      }
+    }
     auto archives = provider.fetch_available_months(
         *profile->provider_username,
         archive_cache ? archive_cache->validators : CacheValidators{}, job->cancel);
@@ -489,6 +502,27 @@ void ProviderService::sync_provider_resources(
           profile_id, "archives", months_json.dump(), archives.cache);
     }
   }
+}
+
+void ProviderService::sync_provider_month(
+    const std::string& profile_id,
+    GameProvider& provider,
+    const int year,
+    const int month,
+    const std::shared_ptr<ProviderJob>& job) {
+  const auto profile = database_.profile(profile_id);
+  if (!profile.has_value() || !profile->provider_username.has_value()) {
+    throw std::invalid_argument("online profile not found");
+  }
+  const auto ensure_active = [&] {
+    if (job->cancel->is_cancelled()) {
+      throw ProviderException(HttpError::cancelled, "provider request cancelled");
+    }
+  };
+  const auto set_phase = [&](const char* phase) {
+    std::lock_guard lock(job->state_mutex);
+    job->state = phase;
+  };
 
   ensure_active();
   set_phase("games");
@@ -512,6 +546,151 @@ void ProviderService::sync_provider_resources(
           profile_id, month_name, normalized, remote_games.cache);
     }
   }
+}
+
+bool ProviderService::backfill_player_profile_history_once(
+    const std::string& owner_profile_id) {
+  validate_token(owner_profile_id, "profile id");
+
+  auto profiles = database_.profiles();
+  std::sort(profiles.begin(), profiles.end(), [](const Profile& left, const Profile& right) {
+    if (left.created_at != right.created_at) return left.created_at < right.created_at;
+    return left.id < right.id;
+  });
+
+  for (const auto& profile : profiles) {
+    if (profile.type == ProfileType::local_pgn_fen || !profile.provider_username.has_value()) {
+      continue;
+    }
+    if (database_.player_profile_owner_id(profile.id) != owner_profile_id) continue;
+
+    const auto provider_type = static_cast<ProviderType>(profile.type);
+    if (provider_scheduler_.retry_after_seconds(provider_type) > 0) continue;
+
+    // Do not race an explicit provider job for the same account. The profile
+    // worker will try again later and the explicit sync remains authoritative.
+    {
+      std::lock_guard lock(provider_jobs_mutex_);
+      bool foreground_sync_active = false;
+      for (const auto& [id, active] : provider_jobs_) {
+        (void)id;
+        std::lock_guard state_lock(active->state_mutex);
+        if (!active->finished && active->profile_id == profile.id) {
+          foreground_sync_active = true;
+          break;
+        }
+      }
+      if (foreground_sync_active) continue;
+    }
+
+    auto job = std::make_shared<ProviderJob>();
+    job->id = "profile-history";
+    job->profile_id = profile.id;
+
+    try {
+      auto provider = provider_for(profile.type);
+      sync_provider_metadata(profile.id, *provider, job);
+
+      const auto archive_cache = database_.provider_cache(profile.id, "archives");
+      if (!archive_cache.has_value()) continue;
+
+      nlohmann::json months_json;
+      try {
+        months_json = nlohmann::json::parse(archive_cache->payload_json);
+      } catch (...) {
+        continue;
+      }
+      if (!months_json.is_array()) continue;
+
+      std::vector<std::string> available_months;
+      available_months.reserve(months_json.size());
+      for (const auto& value : months_json) {
+        if (!value.is_string()) continue;
+        const auto month = value.get<std::string>();
+        if (month.size() == 7 && month[4] == '-') available_months.push_back(month);
+      }
+      std::sort(available_months.begin(), available_months.end(), std::greater<>());
+      available_months.erase(
+          std::unique(available_months.begin(), available_months.end()),
+          available_months.end());
+
+      const auto cached = database_.cached_months(profile.id);
+      const std::set<std::string> cached_set(cached.begin(), cached.end());
+      for (const auto& label : available_months) {
+        if (cached_set.contains(label)) continue;
+        int year = 0;
+        int month = 0;
+        try {
+          year = std::stoi(label.substr(0, 4));
+          month = std::stoi(label.substr(5, 2));
+        } catch (...) {
+          continue;
+        }
+        sync_provider_month(profile.id, *provider, year, month, job);
+        database_.set_provider_sync_state(profile.id, provider_type, "idle", {}, 0);
+        return true;
+      }
+    } catch (const ProviderException& error) {
+      database_.set_provider_sync_state(
+          profile.id, provider_type, "error", error.what(),
+          provider_scheduler_.retry_after_seconds(provider_type));
+      continue;
+    } catch (const std::exception& error) {
+      database_.set_provider_sync_state(
+          profile.id, provider_type, "error", error.what(), 0);
+      continue;
+    }
+  }
+  return false;
+}
+
+PlayerProfileHistoryProgress ProviderService::player_profile_history_progress(
+    const std::string& owner_profile_id) const {
+  validate_token(owner_profile_id, "profile id");
+
+  PlayerProfileHistoryProgress progress;
+  const auto profiles = database_.profiles();
+  for (const auto& profile : profiles) {
+    if (profile.type == ProfileType::local_pgn_fen ||
+        !profile.provider_username.has_value()) {
+      continue;
+    }
+    if (database_.player_profile_owner_id(profile.id) != owner_profile_id) continue;
+
+    ++progress.account_count;
+    const auto archives = database_.provider_cache(profile.id, "archives");
+    if (!archives.has_value()) continue;
+
+    nlohmann::json months_json;
+    try {
+      months_json = nlohmann::json::parse(archives->payload_json);
+    } catch (...) {
+      continue;
+    }
+    if (!months_json.is_array()) continue;
+
+    ++progress.discovered_account_count;
+    std::set<std::string> available_months;
+    for (const auto& value : months_json) {
+      if (!value.is_string()) continue;
+      const auto month = value.get<std::string>();
+      if (month.size() == 7 && month[4] == '-') available_months.insert(month);
+    }
+
+    const auto cached = database_.cached_months(profile.id);
+    const std::set<std::string> cached_months(cached.begin(), cached.end());
+    progress.available_month_count += static_cast<int>(available_months.size());
+    for (const auto& month : available_months) {
+      if (cached_months.contains(month)) ++progress.synced_month_count;
+    }
+  }
+
+  progress.pending_month_count = std::max(
+      0, progress.available_month_count - progress.synced_month_count);
+  progress.complete =
+      progress.discovered_account_count == progress.account_count &&
+      progress.pending_month_count == 0;
+  return progress;
 }
 
 void ProviderService::run_provider_create(
@@ -570,7 +749,7 @@ void ProviderService::run_scout(
       stats_json = normalized_stats_json(*stats.value);
     }
     std::ostringstream json;
-    json << "{\"profile\":" << scout_profile_json(*remote_profile.value)
+    json << "{\"profile\":" << scout_profile_object(*remote_profile.value).dump()
          << ",\"stats\":" << stats_json << ",\"availableMonths\":[]"
          << ",\"offlineReady\":false,\"retryAfterSeconds\":0}";
     finish_provider_job(job, "complete", json.str());
@@ -661,11 +840,11 @@ void ProviderService::run_scout_report(
         std::string color = "unknown";
         if (lowercase(game.white_username) == requested) color = "white";
         else if (lowercase(game.black_username) == requested) color = "black";
-        overall.add(outcome);
-        if (color == "white") white.add(outcome);
-        else if (color == "black") black.add(outcome);
-        by_time_control[time_control_name(game.time_control_type)].add(outcome);
-        terminations[termination_bucket(game.pgn, game.result)].add(outcome);
+        statistics::add_outcome(overall, outcome);
+        if (color == "white") statistics::add_outcome(white, outcome);
+        else if (color == "black") statistics::add_outcome(black, outcome);
+        statistics::add_outcome(by_time_control[time_control_name(game.time_control_type)], outcome);
+        statistics::add_outcome(terminations[termination_bucket(game.pgn, game.result)], outcome);
         const std::string eco = pgn_tag_raw(game.pgn, "ECO");
         const std::string name = scout_opening_name(game.pgn);
         if (!eco.empty() || !name.empty()) {
@@ -675,7 +854,7 @@ void ProviderService::run_scout_report(
             entry.name = name;
             entry.color = color;
           }
-          entry.tally.add(outcome);
+          statistics::add_outcome(entry.tally, outcome);
         }
         games_analyzed += 1;
         if (games_analyzed >= kMaxGames) break;
@@ -726,7 +905,8 @@ void ProviderService::run_scout_report(
         {"terminations", term_list},
         {"openings", opening_list},
     };
-    finish_provider_job(job, "complete", report.dump());
+    finish_provider_job(job, "complete",
+        StatisticsService(database_).comparison_json(report.dump()));
   } catch (const ProviderException& error) {
     finish_provider_job(job, "error", {}, http_error_name(error.kind()), error.what());
   } catch (const std::exception& error) {

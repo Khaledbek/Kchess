@@ -166,15 +166,6 @@ std::string ProfileService::active_profile_json() const {
   return profile.has_value() ? profile_json(*profile) : "null";
 }
 
-Profile ProfileService::require_local_profile() const {
-  const auto profile = database_.active_profile();
-  if (!profile.has_value()) throw std::runtime_error("No active profile");
-  if (profile->type != ProfileType::local_pgn_fen) {
-    throw std::invalid_argument("PGN/FEN import requires a local profile");
-  }
-  return *profile;
-}
-
 Profile ProfileService::ensure_local_profile() {
   const auto active = database_.active_profile();
   if (active.has_value() && active->type == ProfileType::local_pgn_fen) {
@@ -192,12 +183,6 @@ Profile ProfileService::ensure_local_profile() {
       ProfileType::local_pgn_fen, "Kchess", std::nullopt, "profile_unknown.png");
   if (active.has_value()) database_.set_active_profile(active->id);
   return created;
-}
-
-Profile ProfileService::require_active_profile() const {
-  const auto profile = database_.active_profile();
-  if (!profile.has_value()) throw std::runtime_error("No active profile");
-  return *profile;
 }
 
 void ProfileService::delete_profile_storage(const Profile& profile) {

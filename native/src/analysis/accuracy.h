@@ -83,4 +83,16 @@ std::optional<double> game_accuracy(
     const std::vector<AccuracyMove>& moves,
     const AccuracyConfig& config = {});
 
+// One move's contribution to an accuracy figure, as stored after analysis.
+struct AccuracySample {
+  bool theory{false};
+  std::optional<double> accuracy;  // 0..100; null when it could not be scored
+  double weight{0.0};              // move_accuracy_weight
+};
+
+// The game-accuracy formula over already-scored moves. game_accuracy() is this
+// over every move of one side; statistics use it over any subset (a phase, a
+// month) so a phase figure means exactly what a game figure means.
+std::optional<double> aggregate_accuracy(const std::vector<AccuracySample>& samples);
+
 }  // namespace kchess

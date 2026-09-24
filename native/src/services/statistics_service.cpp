@@ -1,116 +1,319 @@
-#include "services/statistics_service.h"
+// -----------------------------------------------------------------------------
+// Section: Profile statistics aggregation
+// -----------------------------------------------------------------------------
 
-#include "services/termination.h"
+#include "services/statistics_service.h"
 
 #include <algorithm>
 #include <array>
-#include <cctype>
+#include <chrono>
+#include <cmath>
 #include <map>
-#include <optional>
+#include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "chess/pgn.h"
+#include "services/accuracy_statistics.h"
+#include "services/opening_weakness.h"
+#include "services/time_pressure.h"
+#include "services/statistics_domain.h"
+#include "services/termination.h"
 
 namespace kchess {
 namespace {
 
-struct Tally {
-  int games{0};
-  int wins{0};
-  int draws{0};
-  int losses{0};
-  int decided() const { return wins + draws + losses; }
-};
+using namespace statistics;
 
-void add_outcome(Tally& tally, const std::string& outcome) {
-  tally.games += 1;
-  if (outcome == "win") {
-    tally.wins += 1;
-  } else if (outcome == "loss") {
-    tally.losses += 1;
-  } else if (outcome == "draw") {
-    tally.draws += 1;
+constexpr int kNemesisMinimumGames = 5;
+constexpr double kNemesisMaximumWinRate = 0.45;
+constexpr std::size_t kMaxWeaknesses = 6;
+constexpr std::size_t kPlayerKnowledgeCacheMaximumEntries = 64;
+
+std::string position_key(const std::string& fen) {
+  std::string key;
+  int fields = 0;
+  for (const char character : fen) {
+    if (character == ' ' && ++fields == 4) break;
+    key += character;
   }
+  return key;
 }
 
-nlohmann::json tally_json(const Tally& tally) {
-  nlohmann::json node{
-      {"games", tally.games},
-      {"wins", tally.wins},
-      {"draws", tally.draws},
-      {"losses", tally.losses},
-      {"undecided", tally.games - tally.decided()},
-  };
-  const int decided = tally.decided();
-  if (decided > 0) {
-    node["winRate"] = static_cast<double>(tally.wins) / decided;
-    node["scorePercent"] = (static_cast<double>(tally.wins) + 0.5 * tally.draws) / decided;
+nlohmann::json weakness_json(const OpeningWeakness& weakness) {
+  nlohmann::json node = tally_json(weakness.tally);
+  node["level"] = weakness.level;
+  node["name"] = weakness.name;
+  node["family"] = weakness.family;
+  node["eco"] = weakness.eco;
+  node["color"] = weakness.color;
+  node["analysedGames"] = weakness.analysed_games;
+  node["gamesWithOpeningErrors"] = weakness.games_with_errors;
+  node["openingErrors"] = weakness.errors;
+  node["openingBlunders"] = weakness.blunders;
+  node["poorResults"] = weakness.poor_results;
+  node["frequentErrors"] = weakness.frequent_errors;
+  node["lossRateLowerBound"] = weakness.loss_rate_lower_bound;
+  node["severity"] = weakness.severity;
+  if (weakness.recurring) {
+    const auto& mistake = *weakness.recurring;
+    node["recurringMistake"] = {
+        {"fen", mistake.position}, {"san", mistake.san},
+        {"recommended", mistake.recommended.empty()
+            ? nlohmann::json(nullptr) : nlohmann::json(mistake.recommended)},
+        {"category", mistake.category}, {"moveNumber", mistake.move_number},
+        {"side", mistake.side}, {"count", mistake.count}};
   } else {
-    node["winRate"] = nullptr;
-    node["scorePercent"] = nullptr;
+    node["recurringMistake"] = nullptr;
   }
   return node;
 }
 
-// Case-insensitive equality; provider game player names and the stored profile
-// handle can differ only in case.
-bool names_equal(const std::string& a, const std::string& b) {
-  if (a.empty() || a.size() != b.size()) return false;
-  for (std::size_t index = 0; index < a.size(); ++index) {
-    if (std::tolower(static_cast<unsigned char>(a[index]))
-        != std::tolower(static_cast<unsigned char>(b[index]))) {
-      return false;
-    }
-  }
-  return true;
+void append_cache_key_field(std::string& key, const std::string_view value) {
+  key.append(std::to_string(value.size()));
+  key.push_back(':');
+  key.append(value);
+  key.push_back('|');
 }
 
-// Which side the profile played: "white", "black", or "unknown".
-std::string game_color(
-    const std::string& username,
-    const std::string& white_name,
-    const std::string& black_name) {
-  if (username.empty()) return "unknown";
-  if (names_equal(white_name, username)) return "white";
-  if (names_equal(black_name, username)) return "black";
-  return "unknown";
-}
-
-// Prefer the authoritative provider outcome; otherwise derive it from the game
-// result and the profile's color (covers local imports where the profile's
-// username matches a player). Returns "unknown" when it cannot be determined.
-std::string effective_outcome(
-    const std::string& provider_outcome,
-    const std::string& color,
-    const std::string& result) {
-  if (provider_outcome == "win" || provider_outcome == "loss"
-      || provider_outcome == "draw") {
-    return provider_outcome;
-  }
-  if (color != "white" && color != "black") return "unknown";
-  // Providers write either spelling; missing the second one silently
-  // dropped draws into "unknown" for every tally on the tab.
-  if (result == "1/2-1/2" || result == "\xc2\xbd-\xc2\xbd") return "draw";
-  if (result == "1-0") return color == "white" ? "win" : "loss";
-  if (result == "0-1") return color == "white" ? "loss" : "win";
-  return "unknown";
-}
-
-// Base opening family: everything before the first ':' or ',' (trimmed).
-// "Scandinavian Defense: Mieses-Kotroc Variation" -> "Scandinavian Defense".
-std::string opening_family(const std::string& name) {
-  const auto pos = name.find_first_of(":,");
-  std::string base = pos == std::string::npos ? name : name.substr(0, pos);
-  const auto last = base.find_last_not_of(" \t");
-  if (last == std::string::npos) return {};
-  base.erase(last + 1);
-  return base.substr(base.find_first_not_of(" \t"));
+std::string player_knowledge_cache_key(
+    const std::string& owner, const std::vector<std::string>& time_controls,
+    const std::vector<std::string>& player_colors, const std::int64_t since) {
+  std::string key;
+  key.reserve(owner.size() + 64 + (time_controls.size() + player_colors.size()) * 12);
+  append_cache_key_field(key, owner);
+  append_cache_key_field(key, std::to_string(since));
+  append_cache_key_field(key, std::to_string(time_controls.size()));
+  for (const auto& value : time_controls) append_cache_key_field(key, value);
+  append_cache_key_field(key, std::to_string(player_colors.size()));
+  for (const auto& value : player_colors) append_cache_key_field(key, value);
+  return key;
 }
 
 }  // namespace
 
-StatisticsService::StatisticsService(Database& database) : database_(database) {}
+StatisticsService::StatisticsService(Database& database)
+    : database_(database) {}
+
+// -----------------------------------------------------------------------------
+// Section: Shared-player knowledge read model
+// -----------------------------------------------------------------------------
+
+std::string StatisticsService::player_knowledge_json(
+    const std::string& profile_id, const std::vector<std::string>& time_controls,
+    const std::vector<std::string>& player_colors, const std::int64_t since) const {
+  using Json = nlohmann::json;
+  const auto started = std::chrono::steady_clock::now();
+  player_knowledge_requests_.fetch_add(1, std::memory_order_relaxed);
+  const auto finish_metrics = [&](const std::size_t rows_scanned) {
+    const auto elapsed = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started)
+            .count());
+    player_knowledge_rows_scanned_.fetch_add(rows_scanned, std::memory_order_relaxed);
+    player_knowledge_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
+    player_knowledge_last_ms_.store(elapsed, std::memory_order_relaxed);
+  };
+  const auto owner = database_.player_profile_owner_id(profile_id);
+  if (owner.empty() || !database_.profile(owner)) {
+    finish_metrics(0);
+    return Json::array().dump();
+  }
+
+  const auto source_revision = database_.statistics_source_revision();
+  const auto cache_key =
+      player_knowledge_cache_key(owner, time_controls, player_colors, since);
+  {
+    std::lock_guard lock(player_knowledge_cache_mutex_);
+    if (player_knowledge_cache_revision_ != source_revision) {
+      player_knowledge_cache_.clear();
+      player_knowledge_cache_revision_ = source_revision;
+    }
+    if (const auto cached = player_knowledge_cache_.find(cache_key);
+        cached != player_knowledge_cache_.end()) {
+      player_knowledge_cache_hits_.fetch_add(1, std::memory_order_relaxed);
+      finish_metrics(0);
+      return cached->second;
+    }
+  }
+  player_knowledge_cache_misses_.fetch_add(1, std::memory_order_relaxed);
+  const auto rows = database_.player_profile_game_sources(owner);
+  struct Aggregate {
+    Tally results;
+    int analyzed_games{0}, moves{0}, errors{0}, accuracy_games{0};
+    double accuracy_sum{0.0};
+    std::int64_t first{0}, last{0};
+    void add(const PlayerProfileGameSourceRow& row, int analyzed, int major_errors) {
+      add_outcome(results, effective_outcome(row.provider_outcome, row.player_color, row.result));
+      if (analyzed > 0) ++analyzed_games;
+      moves += analyzed;
+      errors += major_errors;
+      if (row.played_at > 0) {
+        first = first == 0 ? row.played_at : std::min(first, row.played_at);
+        last = std::max(last, row.played_at);
+      }
+    }
+    Json data() const {
+      auto out = tally_json(results);
+      out["analyzedGames"] = analyzed_games;
+      out["analyzedMoves"] = moves;
+      // A zero error count without analyzed moves is not an ability measure.
+      if (moves > 0) {
+        out["majorErrors"] = errors;
+        out["majorErrorRate"] = static_cast<double>(errors) / moves;
+      }
+      if (accuracy_games > 0) {
+        out["averageAccuracy"] = accuracy_sum / accuracy_games;
+        out["accuracyGames"] = accuracy_games;
+      }
+      out["firstPlayedAt"] = first;
+      out["lastPlayedAt"] = last;
+      return out;
+    }
+  };
+  Json facts = Json::array();
+  const auto controls = time_controls.empty() ? std::vector<std::string>{"all"} : time_controls;
+  const auto colors = player_colors.empty() ? std::vector<std::string>{"all"} : player_colors;
+  for (const auto& tc : controls) for (const auto& color : colors) {
+    Aggregate total;
+    std::map<std::pair<std::string, std::string>, Aggregate> openings;
+    std::map<std::string, Aggregate> phases;
+    std::map<std::string, Aggregate> terminations;
+    std::map<std::pair<std::string, std::string>, Aggregate> splits;
+    std::map<std::pair<std::string, std::string>, const PlayerProfileGameSourceRow*> ratings;
+    int named_games = 0;
+    for (const auto& row : rows) {
+      if ((tc != "all" && row.time_control_type != tc) ||
+          (color != "all" && row.player_color != color) || row.played_at < since) continue;
+      total.add(row, row.analyzed_moves, row.miss + row.mistake + row.blunder);
+      const auto errors = row.miss + row.mistake + row.blunder;
+      if (tc == "all" && color == "all") {
+        splits[{row.time_control_type, "all"}].add(row, row.analyzed_moves, errors);
+        if (row.player_color == "white" || row.player_color == "black") {
+          splits[{"all", row.player_color}].add(row, row.analyzed_moves, errors);
+          splits[{row.time_control_type, row.player_color}].add(row, row.analyzed_moves, errors);
+        }
+      }
+      terminations[row.termination_type].add(row, row.analyzed_moves, errors);
+      if (row.accuracy) { total.accuracy_sum += *row.accuracy; ++total.accuracy_games; }
+      if (!row.opening_name.empty() || !row.opening_eco.empty()) {
+        ++named_games;
+        openings[{row.opening_eco, row.opening_name}].add(row,
+            row.opening_analyzed_moves, row.opening_miss + row.opening_mistake + row.opening_blunder);
+      }
+      const auto phase = [&](const char* name, int moves, int errors) {
+        if (moves > 0) phases[name].add(row, moves, errors);
+      };
+      phase("opening", row.opening_analyzed_moves,
+            row.opening_miss + row.opening_mistake + row.opening_blunder);
+      phase("middlegame", row.middlegame_analyzed_moves,
+            row.middlegame_miss + row.middlegame_mistake + row.middlegame_blunder);
+      phase("endgame", row.endgame_analyzed_moves,
+            row.endgame_miss + row.endgame_mistake + row.endgame_blunder);
+      if (row.player_rating && *row.player_rating > 0) {
+        auto& latest = ratings[{row.time_control_type, row.source_profile_id}];
+        if (!latest || row.played_at > latest->played_at ||
+            (row.played_at == latest->played_at && row.game_id > latest->game_id)) latest = &row;
+      }
+    }
+    if (total.results.games == 0) continue;
+    const std::string base = "library:" + tc + ":" + color + ":" + std::to_string(since) + ":";
+    const auto append = [&](const std::string& key, const std::string& topic, Json data) {
+      data["topic"] = topic;
+      data["profile_id"] = owner;
+      if (tc != "all") data["time_control"] = tc;
+      if (color != "all") data["player_color"] = color;
+      data["temporal_scope"] = since > 0 ? "recent" : "lifetime";
+      if (since > 0) data["periodStart"] = since;
+      data["statistic_key"] = base + key;
+      facts.push_back(std::move(data));
+    };
+    auto overview = total.data();
+    overview["namedOpeningGames"] = named_games;
+    overview["unknownOpeningGames"] = total.results.games - named_games;
+    append("overview", "statistics", std::move(overview));
+    for (const auto& [axes, tally] : splits) {
+      auto data = tally.data();
+      if (axes.first != "all") data["time_control"] = axes.first;
+      if (axes.second != "all") data["player_color"] = axes.second;
+      append("split:" + axes.first + ":" + axes.second, "statistics", std::move(data));
+    }
+    for (const auto& [type, tally] : terminations) {
+      auto data = tally.data();
+      data["termination_type"] = type;
+      append("termination:" + type, "termination", std::move(data));
+    }
+    for (const auto& [key, tally] : openings) {
+      auto data = tally.data();
+      data["opening_eco"] = key.first;
+      data["opening_name"] = key.second;
+      data["opening_family"] = opening_family(key.second);
+      data["phase"] = "opening";
+      data["libraryGames"] = total.results.games;
+      data["namedOpeningGames"] = named_games;
+      data["resultMeaning"] = "association_not_opening_causation";
+      append("opening:" + key.first + ":" + key.second, "opening", std::move(data));
+    }
+    for (const auto& [name, tally] : phases) {
+      auto data = tally.data();
+      data["phase"] = name;
+      data["phaseDefinition"] = name == "opening" ? "moves_1_to_12" :
+          name == "middlegame" ? "moves_13_to_30" : "moves_31_onward";
+      data["endgameMaterialTypeClassified"] = false;
+      data["resultMeaning"] = "association_not_phase_causation";
+      append("phase:" + name, name, std::move(data));
+    }
+    for (const auto& [rating_scope, latest] : ratings) {
+      const auto& [control, account_id] = rating_scope;
+      Json data{{"time_control", control}, {"latestRecordedGameRating", *latest->player_rating},
+                {"playedAt", latest->played_at}, {"gameId", latest->game_id},
+                {"ratingMeaning", "recorded_game_not_live_or_fide"}};
+      if (const auto account = database_.profile(account_id)) {
+        data["sourceAccount"] = account->provider_username.value_or(account->display_name);
+        data["sourceAccountId"] = account->id;
+        data["sourceProvider"] = account->type == ProfileType::chess_com ? "chess.com" :
+            account->type == ProfileType::lichess ? "lichess" : "local";
+      }
+      append("rating:" + control + ":" + account_id, "rating", std::move(data));
+    }
+  }
+  auto payload = facts.dump();
+  // Cache only a stable read. If games or completed/classified analysis changed
+  // while this aggregation was running, the result remains valid for this
+  // caller but is deliberately not reused by a later Coach question.
+  if (database_.statistics_source_revision() == source_revision) {
+    std::lock_guard lock(player_knowledge_cache_mutex_);
+    if (player_knowledge_cache_revision_ == source_revision) {
+      if (player_knowledge_cache_.size() >= kPlayerKnowledgeCacheMaximumEntries) {
+        player_knowledge_cache_.clear();
+      }
+      player_knowledge_cache_[cache_key] = payload;
+    }
+  }
+  finish_metrics(rows.size());
+  return payload;
+}
+
+std::string StatisticsService::performance_diagnostics_json() const {
+  const auto requests = player_knowledge_requests_.load(std::memory_order_relaxed);
+  const auto total_ms = player_knowledge_total_ms_.load(std::memory_order_relaxed);
+  return nlohmann::json({
+      {"schema", "statistics.performance.v1"},
+      {"playerKnowledge", {
+          {"requests", requests},
+          {"rowsScanned", player_knowledge_rows_scanned_.load(std::memory_order_relaxed)},
+          {"lastDurationMs", player_knowledge_last_ms_.load(std::memory_order_relaxed)},
+          {"totalDurationMs", total_ms},
+          {"averageDurationMs",
+           requests > 0 ? static_cast<double>(total_ms) / requests : 0.0},
+          {"cacheEnabled", true},
+          {"cacheHits", player_knowledge_cache_hits_.load(std::memory_order_relaxed)},
+          {"cacheMisses", player_knowledge_cache_misses_.load(std::memory_order_relaxed)},
+          {"sourceRevision", database_.statistics_source_revision()},
+      }},
+  }).dump();
+}
 
 std::string StatisticsService::overview_json() const {
   const auto profile = database_.active_profile();
@@ -126,11 +329,14 @@ std::string StatisticsService::overview_json() const {
   Tally white;
   Tally black;
   std::map<std::string, Tally> by_time_control;
-  std::vector<std::string> recent_form;  // Most recent first, decided games only.
+  std::vector<std::string>
+      recent_form;  // Most recent first, decided games only.
 
   for (const auto& row : rows) {
-    const std::string color = game_color(username, row.white_name, row.black_name);
-    const std::string outcome = effective_outcome(row.provider_outcome, color, row.result);
+    const std::string color =
+        game_color(username, row.white_name, row.black_name);
+    const std::string outcome =
+        effective_outcome(row.provider_outcome, color, row.result);
 
     add_outcome(overall, outcome);
     if (color == "white") {
@@ -140,8 +346,8 @@ std::string StatisticsService::overview_json() const {
     }
     add_outcome(by_time_control[row.time_control_type], outcome);
 
-    if (recent_form.size() < 10
-        && (outcome == "win" || outcome == "loss" || outcome == "draw")) {
+    if (recent_form.size() < 10 &&
+        (outcome == "win" || outcome == "loss" || outcome == "draw")) {
       recent_form.push_back(outcome);
     }
   }
@@ -149,7 +355,8 @@ std::string StatisticsService::overview_json() const {
   // Emit time controls fastest-to-slowest so the UI reads naturally; only
   // buckets with games appear, and any unexpected type is appended.
   static constexpr std::array<const char*, 7> kOrder{
-      "bullet", "blitz", "rapid", "classical", "daily", "correspondence", "unknown"};
+      "bullet", "blitz",          "rapid",  "classical",
+      "daily",  "correspondence", "unknown"};
   nlohmann::json time_controls = nlohmann::json::array();
   std::map<std::string, bool> emitted;
   auto emit = [&](const std::string& type) {
@@ -185,7 +392,8 @@ std::string StatisticsService::openings_json(
     const std::string& time_control) const {
   const auto profile = database_.active_profile();
   if (!profile.has_value()) {
-    return nlohmann::json{{"hasProfile", false}, {"gamesWithOpening", 0}}.dump();
+    return nlohmann::json{{"hasProfile", false}, {"gamesWithOpening", 0}}
+        .dump();
   }
 
   const std::string username =
@@ -194,7 +402,8 @@ std::string StatisticsService::openings_json(
 
   struct Variation {
     std::string eco;
-    std::string name;  // full opening name, e.g. "Scandinavian Defense: Main Line"
+    std::string
+        name;  // full opening name, e.g. "Scandinavian Defense: Main Line"
     Tally tally;
   };
   struct Family {
@@ -203,7 +412,8 @@ std::string StatisticsService::openings_json(
     Tally tally;
     std::map<std::string, Variation> variations;  // key: full opening name
   };
-  std::map<std::string, Family> families;  // key: family + unit separator + color
+  std::map<std::string, Family>
+      families;  // key: family + unit separator + color
   int games_with_opening = 0;
   int games_without_opening = 0;
 
@@ -212,6 +422,17 @@ std::string StatisticsService::openings_json(
   // the card's own totals describe the filtered set rather than the library.
   const bool filtered = time_control != "all" && !time_control.empty();
 
+  // The profile's own flagged opening moves, grouped by game. The query is
+  // bounded by the widest opening phase; each game is cut to its own below.
+  const auto move_errors = database_.move_errors_for_statistics(
+      profile->id, kOpeningPhaseMaxPly);
+  std::map<std::string, std::vector<const GameMoveErrorRow*>> errors_by_game;
+  for (const auto& error : move_errors) {
+    errors_by_game[error.game_id].push_back(&error);
+  }
+  std::vector<OpeningGameEvidence> evidence;
+  int analysed_opening_games = 0;
+
   for (const auto& row : rows) {
     if (filtered && row.time_control_type != time_control) continue;
     if (row.opening_name.empty()) {
@@ -219,8 +440,31 @@ std::string StatisticsService::openings_json(
       continue;
     }
     games_with_opening += 1;
-    const std::string color = game_color(username, row.white_name, row.black_name);
-    const std::string outcome = effective_outcome(row.provider_outcome, color, row.result);
+    const std::string color =
+        game_color(username, row.white_name, row.black_name);
+    const std::string outcome =
+        effective_outcome(row.provider_outcome, color, row.result);
+
+    if (row.analysed) analysed_opening_games += 1;
+    OpeningGameEvidence game{.eco = row.opening_eco,
+                             .name = row.opening_name,
+                             .color = color,
+                             .outcome = outcome,
+                             .analysed = row.analysed};
+    const auto found = errors_by_game.find(row.game_id);
+    if (found != errors_by_game.end() && (color == "white" || color == "black")) {
+      const int end_ply = opening_phase_end_ply(row.opening_ply);
+      const int own_parity = color == "white" ? 0 : 1;
+      for (const auto* error : found->second) {
+        if (error->ply >= end_ply || error->ply % 2 != own_parity) continue;
+        game.errors.push_back({.ply = error->ply,
+                               .category = error->category,
+                               .san = error->san,
+                               .position = position_key(error->fen_before),
+                               .recommended = error->recommended_move});
+      }
+    }
+    evidence.push_back(std::move(game));
     const std::string family_name = opening_family(row.opening_name);
 
     auto& family = families[family_name + '\x1f' + color];
@@ -241,26 +485,44 @@ std::string StatisticsService::openings_json(
   std::vector<const Family*> ordered;
   ordered.reserve(families.size());
   for (const auto& item : families) ordered.push_back(&item.second);
-  std::sort(ordered.begin(), ordered.end(), [](const Family* a, const Family* b) {
-    if (a->tally.games != b->tally.games) return a->tally.games > b->tally.games;
-    if (a->family != b->family) return a->family < b->family;
-    return a->color < b->color;
-  });
+  std::sort(ordered.begin(), ordered.end(),
+            [](const Family* a, const Family* b) {
+              if (a->tally.games != b->tally.games)
+                return a->tally.games > b->tally.games;
+              if (a->family != b->family) return a->family < b->family;
+              return a->color < b->color;
+            });
 
-  constexpr std::size_t kMaxFamilies = 60;
-  nlohmann::json list = nlohmann::json::array();
-  for (std::size_t index = 0; index < ordered.size() && index < kMaxFamilies; ++index) {
-    const Family& family = *ordered[index];
-    // Variations, most played first; the family's base ECO follows the dominant
-    // line so the collapsed header shows a representative code.
+  const Family* nemesis = nullptr;
+  double nemesis_win_rate = 1.0;
+  for (const Family* family : ordered) {
+    if (family->tally.games < kNemesisMinimumGames ||
+        family->tally.decided() == 0) {
+      continue;
+    }
+    const double win_rate = static_cast<double>(family->tally.wins) /
+                            family->tally.decided();
+    if (win_rate >= kNemesisMaximumWinRate || win_rate >= nemesis_win_rate) {
+      continue;
+    }
+    nemesis = family;
+    nemesis_win_rate = win_rate;
+  }
+
+  const auto family_json = [](const Family& family) {
     std::vector<const Variation*> variations;
     variations.reserve(family.variations.size());
-    for (const auto& item : family.variations) variations.push_back(&item.second);
+    for (const auto& item : family.variations) {
+      variations.push_back(&item.second);
+    }
     std::sort(variations.begin(), variations.end(),
               [](const Variation* a, const Variation* b) {
-                if (a->tally.games != b->tally.games) return a->tally.games > b->tally.games;
+                if (a->tally.games != b->tally.games) {
+                  return a->tally.games > b->tally.games;
+                }
                 return a->name < b->name;
               });
+
     nlohmann::json variation_list = nlohmann::json::array();
     for (const Variation* variation : variations) {
       nlohmann::json node = tally_json(variation->tally);
@@ -268,12 +530,54 @@ std::string StatisticsService::openings_json(
       node["name"] = variation->name;
       variation_list.push_back(std::move(node));
     }
+
     nlohmann::json node = tally_json(family.tally);
     node["family"] = family.family;
     node["color"] = family.color;
     node["eco"] = variations.empty() ? std::string{} : variations.front()->eco;
+    node["hasDistinctVariations"] =
+        variations.size() > 1 ||
+        (variations.size() == 1 && variations.front()->name != family.family);
     node["variations"] = std::move(variation_list);
-    list.push_back(std::move(node));
+    return node;
+  };
+
+  constexpr std::size_t kMaxFamilies = 60;
+  nlohmann::json list = nlohmann::json::array();
+  for (std::size_t index = 0; index < ordered.size() && index < kMaxFamilies;
+       ++index) {
+    list.push_back(family_json(*ordered[index]));
+  }
+
+  nlohmann::json ranked = nlohmann::json::array();
+  std::map<std::string, int> color_counts;
+  for (auto& family : list) {
+    color_counts[family.at("color").get<std::string>()] +=
+        family.at("games").get<int>();
+    if (family.at("games").get<int>() >= 3 && !family.at("winRate").is_null()) {
+      ranked.push_back(family);
+    }
+  }
+  std::stable_sort(ranked.begin(), ranked.end(),
+                   [](const auto& a, const auto& b) {
+                     if (a.at("winRate") != b.at("winRate"))
+                       return a.at("winRate") > b.at("winRate");
+                     return a.at("games") > b.at("games");
+                   });
+  std::string default_color = "white";
+  int most_games = -1;
+  for (const char* color : {"white", "black", "unknown"}) {
+    if (color_counts[color] > most_games) {
+      most_games = color_counts[color];
+      default_color = color;
+    }
+  }
+
+  // Lines the profile keeps losing or keeps misplaying, for the statistics
+  // warning and the training tab's weak spots.
+  nlohmann::json weaknesses = nlohmann::json::array();
+  for (const auto& weakness : find_opening_weaknesses(evidence, kMaxWeaknesses)) {
+    weaknesses.push_back(weakness_json(weakness));
   }
 
   nlohmann::json root{
@@ -282,6 +586,222 @@ std::string StatisticsService::openings_json(
       {"gamesWithoutOpening", games_without_opening},
       {"distinctFamilies", static_cast<int>(families.size())},
       {"families", list},
+      {"bestWinRateFamilies", ranked},
+      {"nemesis", nemesis == nullptr ? nlohmann::json(nullptr)
+                                      : family_json(*nemesis)},
+      {"weaknesses", weaknesses},
+      {"analysedOpeningGames", analysed_opening_games},
+      {"defaultColor", default_color},
+  };
+  return root.dump();
+}
+
+std::string StatisticsService::accuracy_json(const std::string& time_control) const {
+  const auto profile = database_.active_profile();
+  if (!profile.has_value()) {
+    return nlohmann::json{{"hasProfile", false}, {"analysedGames", 0}}.dump();
+  }
+  const std::string username =
+      profile->provider_username.value_or(profile->display_name);
+  const bool filtered = time_control != "all" && !time_control.empty();
+
+  const auto move_rows = database_.accuracy_moves_for_statistics(profile->id);
+  std::map<std::string, std::vector<const AccuracyMoveRow*>> moves_by_game;
+  for (const auto& row : move_rows) moves_by_game[row.game_id].push_back(&row);
+
+  // Clock times live in the stored PGN of each analysed game. A game without a
+  // usable TimeControl tag or without clock comments simply stays out of the
+  // clock statistics rather than being counted against an unknown budget.
+  struct GameClocks {
+    std::vector<std::optional<std::int64_t>> per_ply;
+    std::int64_t base_ms{0};
+  };
+  std::map<std::string, GameClocks> clocks_by_game;
+  for (const auto& row : database_.accuracy_game_clocks_for_statistics(profile->id)) {
+    const auto budget = parse_time_control(row.time_control);
+    if (!budget.base_ms.has_value() || row.ply_count <= 0) continue;
+    auto clocks = extract_mainline_clock_millis(
+        row.pgn, static_cast<std::size_t>(row.ply_count));
+    const bool any_clock = std::any_of(clocks.begin(), clocks.end(),
+        [](const std::optional<std::int64_t>& clock) { return clock.has_value(); });
+    if (!any_clock) continue;
+    clocks_by_game.emplace(row.game_id, GameClocks{std::move(clocks), *budget.base_ms});
+  }
+  std::vector<TimedMove> timed_moves;
+  int clock_games = 0;
+  int time_trouble_games = 0;
+
+  std::vector<AnalysedGame> games;
+  for (const auto& row : database_.accuracy_games_for_statistics(profile->id)) {
+    if (filtered && row.time_control_type != time_control) continue;
+    const auto color = game_color(username, row.white_name, row.black_name);
+    if (color != "white" && color != "black") continue;
+    const auto accuracy = color == "white" ? row.white_accuracy : row.black_accuracy;
+    if (!accuracy.has_value()) continue;
+
+    AnalysedGame game{.ended_at = row.ended_at,
+                      .color = color,
+                      .time_control = row.time_control_type,
+                      .accuracy = *accuracy};
+    const int own_parity = color == "white" ? 0 : 1;
+    const auto clocks = clocks_by_game.find(row.game_id);
+    const GameClocks* game_clocks =
+        clocks == clocks_by_game.end() ? nullptr : &clocks->second;
+    bool counted_clock_game = false;
+    bool in_time_trouble = false;
+    if (const auto found = moves_by_game.find(row.game_id); found != moves_by_game.end()) {
+      for (const auto* move : found->second) {
+        if (move->ply % 2 != own_parity) continue;
+        const auto phase = static_cast<std::size_t>(phase_of_ply(move->ply));
+        const bool blunder = move->category == "blunder";
+        const bool mistake = move->category == "mistake";
+        if (blunder) game.blunders += 1;
+        if (mistake) game.mistakes += 1;
+        if (blunder || mistake) game.phase_errors[phase] += 1;
+        // A NULL weight is a move classified before per-move accuracy was
+        // stored; the profile worker fills it in. Until then the move still
+        // counts as played, but carries no accuracy of its own.
+        const AccuracySample sample = move->weight.has_value()
+            ? AccuracySample{.theory = move->theory,
+                             .accuracy = move->accuracy,
+                             .weight = *move->weight}
+            : AccuracySample{};
+
+        if (game_clocks != nullptr &&
+            static_cast<std::size_t>(move->ply) < game_clocks->per_ply.size()) {
+          if (const auto& remaining = game_clocks->per_ply[move->ply]) {
+            const auto bucket = clock_bucket(*remaining, game_clocks->base_ms);
+            timed_moves.push_back({.bucket = bucket,
+                                   .blunder = blunder,
+                                   .mistake = mistake,
+                                   .sample = sample});
+            counted_clock_game = true;
+            if (bucket == ClockBucket::critical) in_time_trouble = true;
+          }
+        }
+
+        if (!move->weight.has_value()) continue;
+        game.phase_samples[phase].push_back(sample);
+      }
+    }
+    if (counted_clock_game) {
+      clock_games += 1;
+      if (in_time_trouble) time_trouble_games += 1;
+    }
+    games.push_back(std::move(game));
+  }
+
+  const auto average = [](const std::vector<const AnalysedGame*>& subset) {
+    if (subset.empty()) return nlohmann::json(nullptr);
+    double total = 0.0;
+    for (const auto* game : subset) total += game->accuracy;
+    return nlohmann::json(total / static_cast<double>(subset.size()));
+  };
+  const auto group = [&](const std::vector<const AnalysedGame*>& subset) {
+    return nlohmann::json{{"games", static_cast<int>(subset.size())},
+                          {"accuracy", average(subset)}};
+  };
+
+  std::vector<const AnalysedGame*> all, white, black;
+  std::map<std::string, std::vector<const AnalysedGame*>> by_control;
+  int blunders = 0;
+  for (const auto& game : games) {
+    all.push_back(&game);
+    (game.color == "white" ? white : black).push_back(&game);
+    by_control[game.time_control].push_back(&game);
+    blunders += game.blunders;
+  }
+
+  nlohmann::json controls = nlohmann::json::array();
+  for (const auto& [control, subset] : by_control) {
+    auto node = group(subset);
+    node["timeControl"] = control;
+    controls.push_back(std::move(node));
+  }
+  std::stable_sort(controls.begin(), controls.end(), [](const auto& a, const auto& b) {
+    return a.at("games").template get<int>() > b.at("games").template get<int>();
+  });
+
+  nlohmann::json phases = nlohmann::json::array();
+  const auto per_phase = phase_accuracy(games);
+  for (std::size_t index = 0; index < per_phase.size(); ++index) {
+    const auto& phase = per_phase[index];
+    phases.push_back({{"phase", phase_name(static_cast<GamePhase>(index))},
+                      {"games", phase.games},
+                      {"accuracy", phase.accuracy.has_value()
+                                       ? nlohmann::json(*phase.accuracy)
+                                       : nlohmann::json(nullptr)},
+                      {"errorsPerGame", phase.errors_per_game}});
+  }
+
+  // The chart: every analysed game with a rolling average, capped to the
+  // latest stretch so a large library stays a readable line.
+  constexpr std::size_t kTimelinePoints = 150;
+  constexpr int kRollingWindow = 10;
+  const auto rolling = rolling_accuracy(games, kRollingWindow);
+  nlohmann::json timeline = nlohmann::json::array();
+  const std::size_t first =
+      games.size() > kTimelinePoints ? games.size() - kTimelinePoints : 0;
+  for (std::size_t index = first; index < games.size(); ++index) {
+    timeline.push_back({{"endedAt", games[index].ended_at},
+                        {"accuracy", games[index].accuracy},
+                        {"average", rolling[index]}});
+  }
+
+  // How the profile plays as its clock runs down.
+  const auto pressure = time_pressure(timed_moves, clock_games, time_trouble_games);
+  nlohmann::json clock_buckets = nlohmann::json::array();
+  for (std::size_t index = 0; index < kClockBucketCount; ++index) {
+    const auto& bucket = pressure.buckets[index];
+    clock_buckets.push_back(
+        {{"bucket", clock_bucket_name(static_cast<ClockBucket>(index))},
+         {"moves", bucket.moves},
+         {"blunders", bucket.blunders},
+         {"errors", bucket.errors},
+         {"errorsPerHundredMoves", bucket.errors_per_hundred},
+         {"accuracy", bucket.accuracy.has_value() ? nlohmann::json(*bucket.accuracy)
+                                                  : nlohmann::json(nullptr)}});
+  }
+
+  const auto trend = accuracy_trend(games);
+  const auto optional_number = [](const std::optional<double>& value) {
+    return value.has_value() ? nlohmann::json(*value) : nlohmann::json(nullptr);
+  };
+
+  nlohmann::json root{
+      {"hasProfile", true},
+      {"analysedGames", static_cast<int>(games.size())},
+      {"averageAccuracy", average(all)},
+      {"blundersPerGame", games.empty()
+                              ? nlohmann::json(nullptr)
+                              : nlohmann::json(static_cast<double>(blunders) / games.size())},
+      {"byColor", {{"white", group(white)}, {"black", group(black)}}},
+      {"byTimeControl", controls},
+      {"byPhase", phases},
+      {"timeline", timeline},
+      {"timePressure",
+       {{"games", pressure.games},
+        {"moves", pressure.moves},
+        {"blunders", pressure.blunders},
+        {"buckets", clock_buckets},
+        {"blunderShareInTimeTrouble",
+         pressure.blunder_share_in_time_trouble.has_value()
+             ? nlohmann::json(*pressure.blunder_share_in_time_trouble)
+             : nlohmann::json(nullptr)},
+        {"gamesInTimeTrouble",
+         pressure.games_in_time_trouble.has_value()
+             ? nlohmann::json(*pressure.games_in_time_trouble)
+             : nlohmann::json(nullptr)}}},
+      {"trend",
+       {{"verdict", trend.verdict},
+        {"window", trend.window},
+        {"gamesNeeded", trend.games_needed},
+        {"recentAccuracy", optional_number(trend.recent_accuracy)},
+        {"previousAccuracy", optional_number(trend.previous_accuracy)},
+        {"recentBlunders", optional_number(trend.recent_blunders)},
+        {"previousBlunders", optional_number(trend.previous_blunders)},
+        {"delta", trend.delta},
+        {"noiseMargin", trend.noise_margin}}},
   };
   return root.dump();
 }
@@ -300,8 +820,10 @@ std::string StatisticsService::terminations_json() const {
   std::map<std::string, Tally> tallies;
   for (const auto& game : games) {
     const std::string bucket = termination_bucket(game.pgn, game.result);
-    const std::string color = game_color(username, game.white_name, game.black_name);
-    const std::string outcome = effective_outcome(game.provider_outcome, color, game.result);
+    const std::string color =
+        game_color(username, game.white_name, game.black_name);
+    const std::string outcome =
+        effective_outcome(game.provider_outcome, color, game.result);
     add_outcome(tallies[bucket], outcome);
   }
 
@@ -316,10 +838,26 @@ std::string StatisticsService::terminations_json() const {
     list.push_back(std::move(node));
   }
 
+  nlohmann::json spotlight = nullptr;
+  for (const auto& entry : list) {
+    if (spotlight.is_null() || entry.at("games") > spotlight.at("games"))
+      spotlight = entry;
+  }
+  if (!spotlight.is_null() && !games.empty()) {
+    const int count = spotlight.at("games").get<int>();
+    const int loss_percent = static_cast<int>(
+        std::round(100.0 * spotlight.at("losses").get<int>() / count));
+    spotlight["sharePercent"] =
+        static_cast<int>(std::round(100.0 * count / games.size()));
+    spotlight["lossPercent"] = loss_percent;
+    spotlight["costly"] = loss_percent >= 50;
+  }
+
   nlohmann::json root{
       {"hasProfile", true},
       {"totalGames", static_cast<int>(games.size())},
       {"terminations", list},
+      {"spotlight", spotlight},
   };
   return root.dump();
 }
@@ -338,6 +876,7 @@ std::string StatisticsService::phases_json() const {
   constexpr int kOpeningMax = 12;     // moves 1-12
   constexpr int kMiddlegameMax = 30;  // moves 13-30; 31+ is endgame
 
+  Tally overall;
   Tally opening;
   Tally middlegame;
   Tally endgame;
@@ -345,12 +884,16 @@ std::string StatisticsService::phases_json() const {
   for (const auto& row : rows) {
     if (row.max_ply < 0) continue;  // no stored moves (e.g. FEN import)
     const int move_number = (row.max_ply / 2) + 1;
-    const std::string color = game_color(username, row.white_name, row.black_name);
-    const std::string outcome = effective_outcome(row.provider_outcome, color, row.result);
-    Tally& bucket = move_number <= kOpeningMax
-        ? opening
-        : (move_number <= kMiddlegameMax ? middlegame : endgame);
+    const std::string color =
+        game_color(username, row.white_name, row.black_name);
+    const std::string outcome =
+        effective_outcome(row.provider_outcome, color, row.result);
+    Tally& bucket =
+        move_number <= kOpeningMax
+            ? opening
+            : (move_number <= kMiddlegameMax ? middlegame : endgame);
     add_outcome(bucket, outcome);
+    add_outcome(overall, outcome);
     classified += 1;
   }
 
@@ -369,6 +912,7 @@ std::string StatisticsService::phases_json() const {
       {"totalGames", static_cast<int>(rows.size())},
       {"classified", classified},
       {"phases", phases},
+      {"overall", tally_json(overall)},
   };
   return root.dump();
 }

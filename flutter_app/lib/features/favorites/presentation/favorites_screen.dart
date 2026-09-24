@@ -46,13 +46,6 @@ class FavoritesScreen extends StatelessWidget {
                       strings.favoriteCollectionsTitle,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      strings.favoriteCollectionRule,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   ],
                 ),
               ),

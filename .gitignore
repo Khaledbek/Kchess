@@ -1,4 +1,4 @@
-﻿# =========================================================
+# =========================================================
 # Kchess
 # Keep source code and required runtime assets.
 # Ignore generated builds, caches, local data and secrets.
@@ -49,6 +49,8 @@ flutter_app/android/captures/
 native/build/
 native/out/
 native/.cache/
+# Stable local Stockfish libraries survive `flutter clean`; large build caches live in %LOCALAPPDATA%.
+native/prebuilt/windows/
 
 **/CMakeFiles/
 **/CMakeCache.txt
@@ -91,6 +93,11 @@ temp/
 *.p12
 *.pfx
 
+
+# Local AI provider secrets / usage state (secrets/<provider>_api_key.txt)
+/secrets/*_api_key.txt
+/secrets/*_usage.json
+
 # Archives / update packages
 *.zip
 *.7z
@@ -110,3 +117,11 @@ Kchess_Update_*/
 # Python build-tool caches (tools/opening_book, tools/opening_names)
 __pycache__/
 *.pyc
+# Prevent accidental nested project copies
+/Kchess/
+/flutter_app/flutter_app/
+
+
+# Local coding-agent scratch artifacts
+/codex_changes.patch
+/codex_status.txt

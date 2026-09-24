@@ -1,0 +1,9 @@
+{
+  "schema": "kchess.ai.model_manifest.v1",
+  "models": [
+    {"role": "coach", "version": "v1", "path": "coach/"},
+    {"role": "router", "version": "v1", "path": "router/"},
+    {"role": "context_planner", "version": "v1", "path": "router/"},
+    {"role": "embeddings", "version": "v1", "path": "embeddings/"}
+  ]
+}

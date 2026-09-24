@@ -169,9 +169,14 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow,
+        fillColor: isDark
+            ? scheme.surfaceContainerHigh
+            : scheme.surfaceContainerLow,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: inputBorder(Colors.transparent),
         enabledBorder: inputBorder(Colors.transparent),
         focusedBorder: inputBorder(scheme.primary, 1.6),
@@ -240,9 +245,7 @@ class AppTheme {
         labelStyle: text.labelLarge?.copyWith(color: scheme.onSurface),
         secondaryLabelStyle: text.labelLarge,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
 
       navigationRailTheme: NavigationRailThemeData(
@@ -276,9 +279,7 @@ class AppTheme {
         iconColor: scheme.onSurfaceVariant,
         selectedColor: scheme.onPrimaryContainer,
         selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.55),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
 
@@ -286,9 +287,7 @@ class AppTheme {
         backgroundColor: scheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
         elevation: 6,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         titleTextStyle: text.titleLarge,
       ),
 
@@ -303,10 +302,10 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.inverseSurface,
-        contentTextStyle: text.bodyMedium?.copyWith(color: scheme.onInverseSurface),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+        contentTextStyle: text.bodyMedium?.copyWith(
+          color: scheme.onInverseSurface,
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -314,9 +313,7 @@ class AppTheme {
         highlightElevation: 4,
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
 
       menuTheme: MenuThemeData(

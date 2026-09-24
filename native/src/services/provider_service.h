@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: Provider job interface
+// -----------------------------------------------------------------------------
+
 #pragma once
 
 #include <atomic>
@@ -16,6 +20,15 @@
 #include "services/profile_service.h"
 
 namespace kchess {
+
+struct PlayerProfileHistoryProgress {
+  int account_count{0};
+  int discovered_account_count{0};
+  int available_month_count{0};
+  int synced_month_count{0};
+  int pending_month_count{0};
+  bool complete{true};
+};
 
 // Owns online-provider transports, synchronization jobs and provider cache
 // orchestration. Core only coordinates lifecycle between profiles/analysis.
@@ -43,6 +56,14 @@ class ProviderService {
   std::string provider_job_status_json(const std::string& job_id);
   void cancel_provider_job(const std::string& job_id);
   std::string provider_overview_json(const std::string& profile_id);
+
+  // Background player-profile maintenance calls this directly from its native
+  // worker. It discovers persisted online accounts in the shared player scope
+  // and imports at most one still-missing provider month per invocation. No UI
+  // navigation/job polling is required for historical games to arrive.
+  bool backfill_player_profile_history_once(const std::string& owner_profile_id);
+  [[nodiscard]] PlayerProfileHistoryProgress player_profile_history_progress(
+      const std::string& owner_profile_id) const;
 
   void cancel_jobs_for_other_profiles(const std::string& profile_id);
   void cancel_jobs_for_profile(const std::string& profile_id);
@@ -75,6 +96,12 @@ class ProviderService {
       std::string profile_id, int year, int month,
       const std::shared_ptr<ProviderJob>& job) noexcept;
   void sync_provider_resources(
+      const std::string& profile_id, GameProvider& provider, int year, int month,
+      const std::shared_ptr<ProviderJob>& job);
+  void sync_provider_metadata(
+      const std::string& profile_id, GameProvider& provider,
+      const std::shared_ptr<ProviderJob>& job);
+  void sync_provider_month(
       const std::string& profile_id, GameProvider& provider, int year, int month,
       const std::shared_ptr<ProviderJob>& job);
   void finish_provider_job(

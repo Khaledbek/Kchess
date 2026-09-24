@@ -12,15 +12,6 @@ Future<void> _showFavoriteCollectionPicker(
     builder: (dialogContext) => SimpleDialog(
       title: Text(strings.favoriteMoveToCollection),
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-          child: Text(
-            strings.favoriteMoveHelp,
-            style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-              color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
         SimpleDialogOption(
           key: const Key('favorite-collection-loose'),
           onPressed: () => Navigator.pop(dialogContext, ''),

@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------------
+// Section: statistics screen presentation
+// -----------------------------------------------------------------------------
+
 part of '../../../ui/app_root.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -12,9 +16,10 @@ class StatisticsScreen extends StatefulWidget {
 class _StatisticsScreenState extends State<StatisticsScreen> {
   late Future<StatisticsOverview> _overview;
   late Future<OpeningsStats> _openings;
+  late Future<AccuracyStats> _accuracy;
   late Future<TerminationStats> _terminations;
   late Future<PhaseStats> _phases;
-  late Future<List<GameSummary>> _games;
+  late Future<StatisticsTimeline> _games;
   late bool _providerSyncing;
   String? _profileId;
   String _timeControl = 'all';
@@ -53,26 +58,38 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void _loadStats() {
     _overview = widget.controller.gateway.statisticsOverview();
     _loadOpenings();
+    _loadAccuracy();
     // Termination and phase data span the whole library (stored PGNs / move
     // counts), so they are not affected by the time-control filter.
     _terminations = widget.controller.gateway.terminationStats();
     _phases = widget.controller.gateway.phaseStats();
   }
 
-  /// Openings are filtered natively rather than in Dart: the aggregation owns
-  /// the family/variation grouping, so re-running it for one time-control
-  /// bucket keeps a single source of truth for those counts.
+  /// Opening aggregation and filtering remain native; Flutter only selects the
+  /// requested time-control bucket and displays the returned DTO.
   void _loadOpenings() {
     _openings = widget.controller.gateway.openingsStats(
       timeControl: _timeControl,
     );
   }
 
-  /// The form strip and rating trend derive from per-game rows; a filtered
-  /// [queryGames] keeps the actual W/L/D→display selection and rating series in
-  /// the C++ query, not in Dart aggregation.
+  void _loadAccuracy() {
+    _accuracy = widget.controller.gateway.accuracyStats(timeControl: _timeControl);
+  }
+
+  /// Background analysis finished more games: accuracy and the weakness
+  /// warnings both read analysed games, so both refresh.
+  void _onMoreAnalysed() {
+    if (!mounted) return;
+    setState(() {
+      _loadAccuracy();
+      _loadOpenings();
+    });
+  }
+
+  // Load native recent-form and rating summaries for the selected filter.
   void _loadGames() {
-    _games = widget.controller.queryGames(
+    _games = widget.controller.gateway.statisticsTimeline(
       GameQuery(
         timeControls: _timeControl == 'all'
             ? const <String>[]
@@ -118,6 +135,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       _timeControl = value;
       _loadGames();
       _loadOpenings();
+      _loadAccuracy();
     });
   }
 
@@ -143,13 +161,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     text.introTitle,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    text.introBody,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -183,12 +194,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       timeControl: _timeControl,
       onRetry: _reloadAll,
     );
-    final form = _RecentFormCard(
-      controller: widget.controller,
-      future: _games,
-      timeControl: _timeControl,
-      onRetry: _reloadGames,
-    );
     final rating = _RatingTrendCard(
       future: _games,
       timeControl: _timeControl,
@@ -199,6 +204,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       onRetry: _reloadAll,
     );
     final phase = _PhaseCard(future: _phases, onRetry: _reloadAll);
+    final accuracy = _AccuracyCard(
+      controller: widget.controller,
+      future: _accuracy,
+      timeControl: _timeControl,
+      onRetry: _reloadAll,
+      onMoreAnalysed: _onMoreAnalysed,
+    );
+    // Where the recent-form strip used to be; it collapses to nothing, gap
+    // included, when there is no warning.
+    final weaknesses = _OpeningWeaknessCard(future: _openings);
+    final weaknessesGap = FutureBuilder<OpeningsStats>(
+      future: _openings,
+      builder: (context, snapshot) => SizedBox(
+        height: (snapshot.data?.weaknesses.isNotEmpty ?? false) ? 20 : 0,
+      ),
+    );
     final openings = _OpeningsCard(
       future: _openings,
       onRetry: _reloadAll,
@@ -221,6 +242,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       children: [
                         overview,
                         const SizedBox(height: 20),
+                        accuracy,
+                        const SizedBox(height: 20),
                         termination,
                       ],
                     ),
@@ -230,8 +253,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        form,
-                        const SizedBox(height: 20),
+                        weaknesses,
+                        weaknessesGap,
                         rating,
                         const SizedBox(height: 20),
                         phase,
@@ -250,12 +273,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           children: [
             overview,
             const SizedBox(height: 20),
+            accuracy,
+            const SizedBox(height: 20),
             termination,
             const SizedBox(height: 20),
             phase,
             const SizedBox(height: 20),
-            form,
-            const SizedBox(height: 20),
+            weaknesses,
+            weaknessesGap,
             rating,
             const SizedBox(height: 20),
             openings,
@@ -266,13 +291,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 }
 
-({String title, String introTitle, String introBody}) _statisticsText(
+({String title, String introTitle}) _statisticsText(
   BuildContext context,
 ) {
   final strings = AppLocalizations.of(context);
   return (
     title: strings.statsTitle,
     introTitle: strings.statsIntroTitle,
-    introBody: strings.statsIntroBody,
   );
 }

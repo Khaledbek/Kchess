@@ -65,6 +65,10 @@ struct AppSettings {
   int time_limit_seconds{default_time_limit_seconds};
   int threads{kThreadsSetting.default_int};
   int hash_mb{kHashMbSetting.default_int};
+  int sideline_depth{kDepthSetting.default_int};
+  int sideline_multi_pv{kMultiPvSetting.default_int};
+  int sideline_threads{kThreadsSetting.default_int};
+  int sideline_hash_mb{kHashMbSetting.default_int};
   bool show_board_arrows{kShowBoardArrowsSetting.default_bool};
   bool show_threat_arrow{kShowThreatArrowSetting.default_bool};
   bool show_evaluation_bar{kShowEvaluationBarSetting.default_bool};
@@ -83,14 +87,17 @@ struct AppSettings {
   bool diagnostic_logging{kDiagnosticLoggingSetting.default_bool};
   std::string theme_mode{std::string(kThemeModeSetting.default_string)};
   std::string locale{std::string(kLocaleSetting.default_string)};
+  std::string engine_id{std::string(kEngineIdSetting.default_string)};
 };
 
 enum class MoveCategory {
   theory,
+  forced,
   brilliant,
   critical,
   best,
   excellent,
+  good,
   okay,
   miss,
   mistake,
@@ -100,10 +107,12 @@ enum class MoveCategory {
 
 struct PlayerAnalysisSummary {
   int theory{0};
+  int forced{0};
   int brilliant{0};
   int critical{0};
   int best{0};
   int excellent{0};
+  int good{0};
   int okay{0};
   int miss{0};
   int mistake{0};

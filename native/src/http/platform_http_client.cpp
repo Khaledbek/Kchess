@@ -132,8 +132,9 @@ class WinHttpClient final : public HttpClient {
         session.get(), host.c_str(), components.nPort, 0));
     if (!connection) return winhttp_failure(GetLastError(), "WinHttpConnect");
     const wchar_t* accepted[] = {L"application/json", L"application/x-ndjson", L"*/*", nullptr};
+    const auto method = widen(request.method.empty() ? "GET" : request.method);
     WinHttpHandle handle(WinHttpOpenRequest(
-        connection.get(), L"GET", path.c_str(), nullptr, WINHTTP_NO_REFERER,
+        connection.get(), method.c_str(), path.c_str(), nullptr, WINHTTP_NO_REFERER,
         accepted, WINHTTP_FLAG_SECURE));
     if (!handle) return winhttp_failure(GetLastError(), "WinHttpOpenRequest");
     DWORD redirect_policy = WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP;
@@ -148,9 +149,12 @@ class WinHttpClient final : public HttpClient {
         return winhttp_failure(GetLastError(), "WinHttpAddRequestHeaders");
       }
     }
+    const auto body_size = static_cast<DWORD>(request.body.size());
+    void* body = request.body.empty() ? WINHTTP_NO_REQUEST_DATA
+                                      : const_cast<char*>(request.body.data());
     if (!WinHttpSendRequest(
             handle.get(), WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-            WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
+            body, body_size, body_size, 0)) {
       return winhttp_failure(GetLastError(), "WinHttpSendRequest");
     }
     if (!WinHttpReceiveResponse(handle.get(), nullptr)) {

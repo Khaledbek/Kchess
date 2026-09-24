@@ -72,7 +72,7 @@ aggregation database nor builder dependencies.
 
 ## Packaged artifact sizes
 
-| Artifact | Before Phase 3.1 | After Phase 3.1 | Difference |
+| Artifact | Previous shipped artifact | Current shipped artifact | Difference |
 |---|---:|---:|---:|
 | `opening_book.kcb` | 26,004 bytes | 756,776 bytes | +730,772 bytes |
 | Android ARM64 debug APK | 320,124,586 bytes | 320,124,586 bytes | 0 bytes |

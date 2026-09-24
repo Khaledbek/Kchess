@@ -240,7 +240,15 @@ inline constexpr SettingDescriptor kLocaleSetting{
     .default_string = "de",
 };
 
-inline constexpr std::array<SettingDescriptor, 24> kSettingsRegistry{
+inline constexpr SettingDescriptor kEngineIdSetting{
+    .key = "engineId",
+    .type = SettingValueType::string_enum,
+    .scope = SettingScope::app,
+    .cache_relevant = false,
+    .default_string = "stockfish18",
+};
+
+inline constexpr std::array<SettingDescriptor, 25> kSettingsRegistry{
     kDepthSetting,
     kMultiPvSetting,
     kTimeLimitSetting,
@@ -265,6 +273,7 @@ inline constexpr std::array<SettingDescriptor, 24> kSettingsRegistry{
     kUseGlobalAnalysisCacheSetting,
     kDiagnosticLoggingSetting,
     kLocaleSetting,
+    kEngineIdSetting,
 };
 
 constexpr bool valid_integer_setting(const SettingDescriptor& descriptor, const int value) {
