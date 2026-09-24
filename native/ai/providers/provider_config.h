@@ -37,6 +37,9 @@ struct ProviderConfig {
   std::string effort;
   // openai_chat_completions only: name of the output-token limit field.
   std::string max_tokens_field{"max_tokens"};
+  // openai_chat_completions only: "enabled"/"disabled" sent as
+  // {"thinking": {"type": ...}}; empty leaves the vendor default.
+  std::string thinking;
   // anthropic_messages only: let the API retry a refusal on its default model.
   bool refusal_fallback{false};
   int timeout_ms{45'000};

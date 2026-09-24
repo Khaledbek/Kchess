@@ -29,6 +29,8 @@ struct ProviderPreset {
   std::string_view endpoint;
   std::string_view model;
   std::string_view max_tokens_field;
+  // openai_chat_completions only: default "thinking" type; empty = not sent.
+  std::string_view thinking;
   // Non-empty only for Gemini: the single model the free-tier guard accepts.
   std::string_view free_tier_model;
   int max_output_tokens;
@@ -47,6 +49,7 @@ constexpr ProviderPreset kProviderPresets[] = {
      .endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions",
      .model = "gemini-3.5-flash-lite",
      .max_tokens_field = "",
+     .thinking = "",
      .free_tier_model = "gemini-3.5-flash-lite",
      .max_output_tokens = 700,
      .max_output_tokens_ceiling = 700,
@@ -59,6 +62,7 @@ constexpr ProviderPreset kProviderPresets[] = {
      .endpoint = "https://api.anthropic.com/v1/messages",
      .model = "claude-opus-5",
      .max_tokens_field = "",
+     .thinking = "",
      .free_tier_model = "",
      .max_output_tokens = 4'096,
      .max_output_tokens_ceiling = 16'000,
@@ -69,8 +73,9 @@ constexpr ProviderPreset kProviderPresets[] = {
     {.id = "deepseek",
      .api = ProviderApi::openai_chat_completions,
      .endpoint = "https://api.deepseek.com/chat/completions",
-     .model = "deepseek-chat",
+     .model = "deepseek-flash",
      .max_tokens_field = "max_tokens",
+     .thinking = "disabled",
      .free_tier_model = "",
      .max_output_tokens = 1'500,
      .max_output_tokens_ceiling = 8'000,
@@ -83,6 +88,7 @@ constexpr ProviderPreset kProviderPresets[] = {
      .endpoint = "https://api.openai.com/v1/chat/completions",
      .model = "gpt-5-mini",
      .max_tokens_field = "max_completion_tokens",
+     .thinking = "",
      .free_tier_model = "",
      .max_output_tokens = 4'096,
      .max_output_tokens_ceiling = 16'000,
@@ -100,6 +106,7 @@ constexpr ProviderPreset kCustomProviderLimits{
     .endpoint = "",
     .model = "",
     .max_tokens_field = "max_tokens",
+    .thinking = "",
     .free_tier_model = "",
     .max_output_tokens = 1'500,
     .max_output_tokens_ceiling = 16'000,
@@ -417,6 +424,8 @@ std::optional<ProviderConfig> load_coach_provider_config(std::string* error_code
     config.effort = settings.value("effort", std::string{});
     config.max_tokens_field = settings.value(
         "maxTokensField", std::string(preset.max_tokens_field));
+    config.thinking =
+        settings.value("thinking", std::string(preset.thinking));
     config.refusal_fallback = settings.value("refusalFallback", false);
     config.free_tier_only =
         settings.value("freeTierOnly", !preset.free_tier_model.empty());
@@ -456,7 +465,9 @@ std::optional<ProviderConfig> load_coach_provider_config(std::string* error_code
   if (!config.endpoint.starts_with("https://") || config.model.empty() ||
       (config.api == ProviderApi::openai_chat_completions &&
        config.max_tokens_field != "max_tokens" &&
-       config.max_tokens_field != "max_completion_tokens")) {
+       config.max_tokens_field != "max_completion_tokens") ||
+      (!config.thinking.empty() && config.thinking != "enabled" &&
+       config.thinking != "disabled")) {
     return fail("coach_provider_config_invalid");
   }
 

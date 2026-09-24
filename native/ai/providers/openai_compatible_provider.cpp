@@ -44,6 +44,9 @@ json request_body(const LLMProviderRequest& request, const ProviderConfig& confi
   };
   body[config.max_tokens_field] = config.max_output_tokens;
   if (!config.effort.empty()) body["reasoning_effort"] = config.effort;
+  if (!config.thinking.empty()) {
+    body["thinking"] = {{"type", config.thinking}};
+  }
   return body;
 }
 

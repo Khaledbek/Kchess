@@ -13,6 +13,7 @@
 - `provider_prompt.*` is the single provider-neutral Coach instruction/input text and `provider_transport.*` the single quota-guarded HTTPS path. Wire adapters (`gemini_provider.cpp`, `claude_provider.cpp`, `openai_compatible_provider.cpp`, declared in `provider_adapters.h`) only serialize that prompt and parse the vendor reply.
 - `"provider": "auto"` is resolved only in `provider_config.cpp`: the first id in `"autoOrder"` with a real key file wins. There is no runtime fallback to another provider after a failed call.
 - Built-in provider ids are `gemini`, `claude`, `deepseek` and `openai`. Another vendor needs a config block with an explicit `api` (`openai_chat_completions` or `anthropic_messages`), https `endpoint` and `model`; do not add vendor branches outside the adapters.
+- DeepSeek defaults to `deepseek-flash` with `"thinking": "disabled"`: Coach answers are formatting/explanation work over native evidence, and hidden reasoning would add latency and consume the bounded output budget. The `thinking` setting is sent only when configured, so vendors that reject it never receive it.
 - Adapters report unparseable/truncated output as `<provider>_response_invalid` so the orchestrator's safe fallback stays provider-neutral.
 - The Coach language model is remote inference only. Do not add or select a local GGUF fallback for the Coach.
 - Provider requests consume already bounded `CoachContext` plus structured evidence. Providers must not silently expand the PGN/context budget.
