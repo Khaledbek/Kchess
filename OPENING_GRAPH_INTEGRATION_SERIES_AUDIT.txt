@@ -1,0 +1,35 @@
+KChess Opening Graph Integration Series — Final Audit (7/7)
+Date: 2026-09-19
+
+Scope completed
+1. Native build contract repaired after unified move-classification migration:
+   PlayerLearningStats includes good/okay/inaccuracy and stale classification_rank1_conflict local removed.
+2. opening_lines.kcl bundled/installed and parsed by strict native KCL1 reader.
+3. KCL/KCO use one Stockfish position-key universe and KCL shares the stable 16-bit KCB move codec.
+4. Native OpeningLineGraph provides keyed navigation and transposition convergence.
+5. KCL topology is combined with unchanged KCB1 statistics/weight and KCO ECO/name lookup.
+6. Training Arena continuation play is graph-based; openings_*.inc remains catalogue/setup-only and old PolyGlot continuation fallback is removed.
+7. Final audit removed the remaining legacy top-3 acceptance gate: every KCL edge is a valid user continuation. KCB only orders hints and weights opponent sampling.
+
+Static regression coverage
+- KCL magic/layout/node/edge contract and bundled asset presence.
+- KCL/KCO node-count and ordered position-key fingerprint compatibility.
+- Shared move-code roundtrip including promotions.
+- Known opening node lookup and legal continuation resolution.
+- Transposed move orders converge to one KCL node.
+- Opening drill ABI fixture now installs KCL/KCO/KCB before native initialization, matching production asset installation.
+- User moves outside KCL are rejected without moving the board; graph-valid user moves are not restricted by a legacy rank cap.
+
+Opening book rebuild compatibility
+- opening_book.kcb format/schema was not changed.
+- Runtime contains no 3-month/14-month assumption.
+- A broader 14-month KCB rebuild can replace the bundled KCB1 file without changing KCL, KCO, ABI, or Training-Arena code.
+- The final update ZIP intentionally does NOT contain opening_book.kcb, so it will not overwrite the user's newly rebuilt book.
+
+Retained legacy data by design
+- native/src/training/data/openings_a.inc ... openings_e.inc remain because KCL1 does not encode complete named setup SAN/FEN paths. They are no longer an answer/continuation book.
+- PolyGlot support may remain elsewhere in KChess for unrelated functionality/tests, but it is not a productive Training-Arena continuation path.
+
+Verification policy
+- Static audit only.
+- No build, CTest, Flutter test, flutter analyze, flutter run, or application execution was performed by the assistant.

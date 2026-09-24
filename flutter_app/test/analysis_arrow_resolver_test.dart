@@ -6,113 +6,130 @@ import 'package:kchess/shared/models/models.dart';
 // Section: Engine-coherent best-move arrow regression coverage
 // -----------------------------------------------------------------------------
 
-const _rank1 = EngineLine(
-  rank: 1,
-  depth: 20,
-  nodes: 1000,
-  moves: ['e2e4', 'e7e5'],
-);
-
-const _rank2 = EngineLine(
-  rank: 2,
-  depth: 20,
-  nodes: 900,
-  moves: ['d2d4', 'd7d5'],
-);
-
 const _fen = '8/8/8/8/8/8/8/8 w - - 0 1';
 const _otherFen = '8/8/8/8/8/8/8/8 b - - 0 1';
 
+AnalysisArrowContract _contract({
+  String schema = 'analysis.arrow.v1',
+  String snapshotId = 'snapshot-1',
+  String fen = _fen,
+  String move = 'e2e4',
+  bool renderable = true,
+  String reason = 'coherent',
+}) => AnalysisArrowContract(
+  schema: schema,
+  snapshotId: snapshotId,
+  fen: fen,
+  move: move,
+  renderable: renderable,
+  reason: reason,
+);
+
 void main() {
-  test('Stockfish 18 best-move arrow ignores selected rank 2 PV', () {
+  test('native rank-1 arrow contract renders its exact move', () {
     expect(
       resolveAnalysisArrowMove(
-        engineVersion: 'Stockfish 18',
-        engineId: 'stockfish18',
-        selectedLine: _rank2,
-        lines: const [_rank1, _rank2],
-        resultBestMove: 'g1f3',
+        contract: _contract(move: 'e2e4'),
         boardFen: _fen,
-        analysisFen: _fen,
       ),
       'e2e4',
     );
   });
 
-  test('Stockfish 19 best-move arrow ignores selected rank 2 PV', () {
+  test('non-renderable native arrow contract is hidden', () {
     expect(
       resolveAnalysisArrowMove(
-        engineVersion: 'Stockfish 19 (sf_19-edb0d9d; live-exact-v1)',
-        engineId: 'stockfish19',
-        selectedLine: _rank2,
-        lines: const [_rank1, _rank2],
-        resultBestMove: 'e2e4',
-        boardFen: _fen,
-        analysisFen: _fen,
-      ),
-      'e2e4',
-    );
-  });
-
-  test('Stockfish 18 hides a position-mismatched arrow snapshot', () {
-    expect(
-      resolveAnalysisArrowMove(
-        engineVersion: 'Stockfish 18',
-        engineId: 'stockfish18',
-        selectedLine: _rank1,
-        lines: const [_rank1, _rank2],
-        resultBestMove: 'e2e4',
-        boardFen: _fen,
-        analysisFen: _otherFen,
-      ),
-      isEmpty,
-    );
-  });
-
-  test('Stockfish 19 hides a position-mismatched arrow snapshot', () {
-    expect(
-      resolveAnalysisArrowMove(
-        engineVersion: 'Stockfish 19 (sf_19-edb0d9d; live-exact-v1)',
-        engineId: 'stockfish19',
-        selectedLine: _rank1,
-        lines: const [_rank1, _rank2],
-        resultBestMove: 'e2e4',
-        boardFen: _fen,
-        analysisFen: _otherFen,
-      ),
-      isEmpty,
-    );
-  });
-
-  test('rank 1 wins over a stale result-level bestmove for both engines', () {
-    for (final engine in const ['stockfish18', 'stockfish19']) {
-      expect(
-        resolveAnalysisArrowMove(
-          engineVersion: engine == 'stockfish19' ? 'Stockfish 19' : 'Stockfish 18',
-          engineId: engine,
-          selectedLine: _rank2,
-          lines: const [_rank1, _rank2],
-          resultBestMove: 'g1f3',
-          boardFen: _fen,
-          analysisFen: _fen,
+        contract: _contract(
+          move: 'e2e4',
+          renderable: false,
+          reason: 'classification_snapshot_mismatch',
         ),
-        'e2e4',
-      );
-    }
+        boardFen: _fen,
+      ),
+      isEmpty,
+    );
   });
 
-  test('result-level bestmove is fallback only when rank 1 is unavailable', () {
+  test('unknown arrow contract schema is hidden', () {
     expect(
       resolveAnalysisArrowMove(
-        engineVersion: 'Stockfish 18',
-        engineId: 'stockfish18',
-        selectedLine: _rank2,
-        lines: const [_rank2],
-        resultBestMove: 'g1f3',
+        contract: _contract(schema: 'analysis.arrow.v0'),
         boardFen: _fen,
-        analysisFen: _fen,
       ),
-      'g1f3',
+      isEmpty,
+    );
+  });
+
+  test('arrow contract without snapshot provenance is hidden', () {
+    expect(
+      resolveAnalysisArrowMove(
+        contract: _contract(snapshotId: ''),
+        boardFen: _fen,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('position-mismatched native arrow contract is hidden', () {
+    expect(
+      resolveAnalysisArrowMove(
+        contract: _contract(fen: _otherFen),
+        boardFen: _fen,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('invalid native bestmove marker is hidden', () {
+    expect(
+      resolveAnalysisArrowMove(
+        contract: _contract(move: '0000'),
+        boardFen: _fen,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('classification presentation contract fails closed on schema or provenance', () {
+    const valid = AnalysisClassificationContract(
+      schema: 'analysis.classification.v1',
+      snapshotId: 'classification-1',
+      fen: _fen,
+      playedMove: 'e2e4',
+      rank1Move: 'e2e4',
+      playedMoveMatchesRank1: true,
+      renderable: true,
+      reason: 'coherent',
+    );
+    const wrongSchema = AnalysisClassificationContract(
+      schema: 'analysis.classification.v0',
+      snapshotId: 'classification-1',
+      fen: _fen,
+      playedMove: 'e2e4',
+      rank1Move: 'e2e4',
+      playedMoveMatchesRank1: true,
+      renderable: true,
+      reason: 'coherent',
+    );
+    const missingSnapshot = AnalysisClassificationContract(
+      schema: 'analysis.classification.v1',
+      snapshotId: '',
+      fen: _fen,
+      playedMove: 'e2e4',
+      rank1Move: 'e2e4',
+      playedMoveMatchesRank1: true,
+      renderable: true,
+      reason: 'coherent',
+    );
+    expect(valid.presentationRenderable, isTrue);
+    expect(wrongSchema.presentationRenderable, isFalse);
+    expect(missingSnapshot.presentationRenderable, isFalse);
+  });
+
+  test('missing native provenance never falls back to visible PV lines', () {
+    expect(
+      resolveAnalysisArrowMove(contract: null, boardFen: _fen),
+      isEmpty,
     );
   });
 }

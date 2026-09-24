@@ -1561,6 +1561,7 @@ enum MoveClassification {
   excellent,
   good,
   okay,
+  inaccuracy,
   miss,
   mistake,
   blunder,
@@ -1575,6 +1576,7 @@ enum MoveClassification {
     'excellent' => excellent,
     'good' => good,
     'okay' => okay,
+    'inaccuracy' => inaccuracy,
     'miss' => miss,
     'mistake' => mistake,
     'blunder' => blunder,
@@ -1583,17 +1585,18 @@ enum MoveClassification {
   };
 
   String? get assetPath => switch (this) {
-    theory => '../img/move_book.png',
-    forced => '../img/move_force.png',
-    brilliant => '../img/move_brilliant.png',
+    theory => 'assets/analysis_img/move_book.png',
+    forced => 'assets/analysis_img/move_force.png',
+    brilliant => 'assets/analysis_img/move_brilliant.png',
     critical => null,
-    best => '../img/move_best.png',
-    excellent => '../img/move_excellent.png',
-    good => '../img/move_okay.png',
-    okay => '../img/move_okay.png',
-    miss => '../img/move_miss.png',
-    mistake => '../img/move_mistake.png',
-    blunder => '../img/move_blunder.png',
+    best => 'assets/analysis_img/move_best.png',
+    excellent => 'assets/analysis_img/move_excellent.png',
+    good => 'assets/analysis_img/move_okay.png',
+    okay => 'assets/analysis_img/move_okay.png',
+    inaccuracy => 'assets/analysis_img/move_inaccuracy.png',
+    miss => 'assets/analysis_img/move_miss.png',
+    mistake => 'assets/analysis_img/move_mistake.png',
+    blunder => 'assets/analysis_img/move_blunder.png',
     unknown => null,
   };
 }
@@ -1608,6 +1611,7 @@ class PlayerAnalysisSummary {
     required this.excellent,
     this.good = 0,
     required this.okay,
+    this.inaccuracy = 0,
     required this.miss,
     required this.mistake,
     required this.blunder,
@@ -1625,6 +1629,7 @@ class PlayerAnalysisSummary {
         excellent: json['excellent']! as int,
         good: json['good'] as int? ?? 0,
         okay: json['okay']! as int,
+        inaccuracy: json['inaccuracy'] as int? ?? 0,
         miss: json['miss']! as int,
         mistake: json['mistake']! as int,
         blunder: json['blunder']! as int,
@@ -1640,6 +1645,7 @@ class PlayerAnalysisSummary {
   final int excellent;
   final int good;
   final int okay;
+  final int inaccuracy;
   final int miss;
   final int mistake;
   final int blunder;
@@ -1755,6 +1761,154 @@ class EngineLine {
   String get bestMove => moves.isEmpty ? '' : moves.first;
 }
 
+class AnalysisArrowContract {
+  const AnalysisArrowContract({
+    required this.schema,
+    required this.snapshotId,
+    required this.fen,
+    required this.move,
+    required this.renderable,
+    required this.reason,
+  });
+
+  factory AnalysisArrowContract.fromJson(Map<String, Object?> json) =>
+      AnalysisArrowContract(
+        schema: json['schema'] as String? ?? '',
+        snapshotId: json['snapshotId'] as String? ?? '',
+        fen: json['fen'] as String? ?? '',
+        move: json['move'] as String? ?? '',
+        renderable: json['renderable'] as bool? ?? false,
+        reason: json['reason'] as String? ?? '',
+      );
+
+  final String schema;
+  final String snapshotId;
+  final String fen;
+  final String move;
+  final bool renderable;
+  final String reason;
+}
+
+class AnalysisClassificationContract {
+  const AnalysisClassificationContract({
+    required this.schema,
+    required this.snapshotId,
+    required this.fen,
+    required this.playedMove,
+    required this.rank1Move,
+    required this.playedMoveMatchesRank1,
+    required this.renderable,
+    required this.reason,
+  });
+
+  factory AnalysisClassificationContract.fromJson(Map<String, Object?> json) =>
+      AnalysisClassificationContract(
+        schema: json['schema'] as String? ?? '',
+        snapshotId: json['snapshotId'] as String? ?? '',
+        fen: json['fen'] as String? ?? '',
+        playedMove: json['playedMove'] as String? ?? '',
+        rank1Move: json['rank1Move'] as String? ?? '',
+        playedMoveMatchesRank1:
+            json['playedMoveMatchesRank1'] as bool? ?? false,
+        renderable: json['renderable'] as bool? ?? false,
+        reason: json['reason'] as String? ?? '',
+      );
+
+  final String schema;
+  final String snapshotId;
+  final String fen;
+  final String playedMove;
+  final String rank1Move;
+  final bool playedMoveMatchesRank1;
+  final bool renderable;
+  final String reason;
+
+  bool get presentationRenderable =>
+      renderable &&
+      schema == 'analysis.classification.v1' &&
+      snapshotId.isNotEmpty;
+}
+
+class AnalysisSnapshotContract {
+  const AnalysisSnapshotContract({
+    required this.schema,
+    required this.engineSnapshotId,
+    required this.classificationSnapshotId,
+    required this.coherent,
+    required this.engineGeneration,
+    required this.classificationGeneration,
+    required this.engineConfigHash,
+    required this.classificationConfigHash,
+    required this.engineVersion,
+    required this.classificationEngineVersion,
+    required this.engineSearchMode,
+    required this.classificationSearchMode,
+    required this.engineRequestedDepth,
+    required this.classificationRequestedDepth,
+    required this.engineRequestedMultiPv,
+    required this.classificationRequestedMultiPv,
+    required this.engineReachedDepth,
+    required this.classificationReachedDepth,
+    required this.engineRank1Move,
+    required this.classificationRank1Move,
+  });
+
+  factory AnalysisSnapshotContract.fromJson(Map<String, Object?> json) =>
+      AnalysisSnapshotContract(
+        schema: json['schema'] as String? ?? '',
+        engineSnapshotId: json['engineSnapshotId'] as String? ?? '',
+        classificationSnapshotId:
+            json['classificationSnapshotId'] as String? ?? '',
+        coherent: json['coherent'] as bool? ?? false,
+        engineGeneration: json['engineGeneration'] as int? ?? 0,
+        classificationGeneration:
+            json['classificationGeneration'] as int? ?? 0,
+        engineConfigHash: json['engineConfigHash'] as String? ?? '',
+        classificationConfigHash:
+            json['classificationConfigHash'] as String? ?? '',
+        engineVersion: json['engineVersion'] as String? ?? '',
+        classificationEngineVersion:
+            json['classificationEngineVersion'] as String? ?? '',
+        engineSearchMode: json['engineSearchMode'] as String? ?? '',
+        classificationSearchMode:
+            json['classificationSearchMode'] as String? ?? '',
+        engineRequestedDepth: json['engineRequestedDepth'] as int? ?? 0,
+        classificationRequestedDepth:
+            json['classificationRequestedDepth'] as int? ?? 0,
+        engineRequestedMultiPv:
+            json['engineRequestedMultiPv'] as int? ?? 0,
+        classificationRequestedMultiPv:
+            json['classificationRequestedMultiPv'] as int? ?? 0,
+        engineReachedDepth: json['engineReachedDepth'] as int? ?? 0,
+        classificationReachedDepth:
+            json['classificationReachedDepth'] as int? ?? 0,
+        engineRank1Move: json['engineRank1Move'] as String? ?? '',
+        classificationRank1Move:
+            json['classificationRank1Move'] as String? ?? '',
+      );
+
+  final String schema;
+  final String engineSnapshotId;
+  final String classificationSnapshotId;
+  final bool coherent;
+  final int engineGeneration;
+  final int classificationGeneration;
+  final String engineConfigHash;
+  final String classificationConfigHash;
+  final String engineVersion;
+  final String classificationEngineVersion;
+  final String engineSearchMode;
+  final String classificationSearchMode;
+  final int engineRequestedDepth;
+  final int classificationRequestedDepth;
+  final int engineRequestedMultiPv;
+  final int classificationRequestedMultiPv;
+  final int engineReachedDepth;
+  final int classificationReachedDepth;
+  final String engineRank1Move;
+  final String classificationRank1Move;
+}
+
 enum AnalysisJobState {
   queued,
   running,
@@ -1812,6 +1966,9 @@ class AnalysisSnapshot {
     this.classification,
     this.theory,
     this.classifierVersion = 0,
+    this.arrowContract,
+    this.classificationContract,
+    this.snapshotContract,
   });
 
   factory AnalysisSnapshot.fromJson(Map<String, Object?> json) =>
@@ -1837,6 +1994,21 @@ class AnalysisSnapshot {
           json['classification'] as String?,
         ),
         classifierVersion: json['classifierVersion'] as int? ?? 0,
+        arrowContract: json['arrowContract'] == null
+            ? null
+            : AnalysisArrowContract.fromJson(
+                json['arrowContract']! as Map<String, Object?>,
+              ),
+        classificationContract: json['classificationContract'] == null
+            ? null
+            : AnalysisClassificationContract.fromJson(
+                json['classificationContract']! as Map<String, Object?>,
+              ),
+        snapshotContract: json['snapshotContract'] == null
+            ? null
+            : AnalysisSnapshotContract.fromJson(
+                json['snapshotContract']! as Map<String, Object?>,
+              ),
         theory: json['theory'] == null
             ? null
             : TheoryMoveInfo.fromJson(json['theory']! as Map<String, Object?>),
@@ -1870,6 +2042,9 @@ class AnalysisSnapshot {
   final MoveClassification? classification;
   final int classifierVersion;
   final TheoryMoveInfo? theory;
+  final AnalysisArrowContract? arrowContract;
+  final AnalysisClassificationContract? classificationContract;
+  final AnalysisSnapshotContract? snapshotContract;
 
   bool get isComplete => jobState == AnalysisJobState.completed;
   bool get isRunning => jobState == AnalysisJobState.running;
@@ -1894,6 +2069,8 @@ class VariationAnalysisSnapshot {
     this.moverEvaluationCp,
     this.moverMateIn,
     this.classification,
+    this.arrowContract,
+    this.classificationContract,
     this.error,
   });
 
@@ -1915,6 +2092,16 @@ class VariationAnalysisSnapshot {
         classification: MoveClassification.fromJson(
           json['classification'] as String?,
         ),
+        arrowContract: json['arrowContract'] == null
+            ? null
+            : AnalysisArrowContract.fromJson(
+                json['arrowContract']! as Map<String, Object?>,
+              ),
+        classificationContract: json['classificationContract'] == null
+            ? null
+            : AnalysisClassificationContract.fromJson(
+                json['classificationContract']! as Map<String, Object?>,
+              ),
         error: json['error'] as String?,
         lines: (json['lines'] as List<Object?>? ?? const [])
             .cast<Map<String, Object?>>()
@@ -1934,6 +2121,8 @@ class VariationAnalysisSnapshot {
   final int? moverEvaluationCp;
   final int? moverMateIn;
   final MoveClassification? classification;
+  final AnalysisArrowContract? arrowContract;
+  final AnalysisClassificationContract? classificationContract;
   final String? error;
   final List<EngineLine> lines;
 
@@ -1949,6 +2138,8 @@ class VariationAnalysisSnapshot {
     int? moverEvaluationCp,
     int? moverMateIn,
     MoveClassification? classification,
+    AnalysisArrowContract? arrowContract,
+    AnalysisClassificationContract? classificationContract,
     String? error,
     List<EngineLine>? lines,
   }) => VariationAnalysisSnapshot(
@@ -1964,6 +2155,9 @@ class VariationAnalysisSnapshot {
     moverEvaluationCp: moverEvaluationCp ?? this.moverEvaluationCp,
     moverMateIn: moverMateIn ?? this.moverMateIn,
     classification: classification ?? this.classification,
+    arrowContract: arrowContract ?? this.arrowContract,
+    classificationContract:
+        classificationContract ?? this.classificationContract,
     error: error ?? this.error,
     lines: lines ?? this.lines,
   );

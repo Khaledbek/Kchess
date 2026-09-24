@@ -38,3 +38,16 @@ Für eine Lastdiagnose den Inspector einmal öffnen, einige Sekunden warten und 
 - `sqliteWritePriority`: aktive/wartende SQLite-Schreiber und Wartezeiten.
 
 Ein fertiges Profil kann unabhängig davon Hintergrundarbeit ausführen. Deshalb immer `profileBackground.status`, `workerActivity`, `runtimeActivity` und `processRuntime` getrennt betrachten.
+
+## Cleanup-Serie 1 - produktive Diagnosepfade
+
+Diagnosen müssen ausschließlich den tatsächlich produktiven Laufzeitpfad abbilden.
+Für Scouting ist das die Scout-Report-Pipeline; der entfernte leichte Scout-Endpunkt
+als produktive Basis, solange kein ausdrücklich akzeptierter und integrierter Nachfolger
+aktiviert wurde. Verworfene v2-Artefakte oder reine Entwicklungszweige dürfen in der
+Runtime-Diagnose nicht als Fallback oder aktive Pipeline erscheinen.
+
+Repository-Hygiene-, Trainings- und Exportartefakte sind Entwicklerzustand und dürfen
+keine Runtime-Entscheidungen beeinflussen. Flutter-Startup-Telemetrie bleibt read-only;
+Scheduling, Analysepriorität und Ressourcenentscheidungen verbleiben in der nativen
+Produktlogik.

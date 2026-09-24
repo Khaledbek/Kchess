@@ -30,6 +30,7 @@ struct CandidateMoveSnapshot {
 // -----------------------------------------------------------------------------
 
 struct CandidateMove {
+  std::string candidate_id;
   int rank{0};
   std::string move_uci;
   std::vector<std::string> pv_uci;
@@ -41,6 +42,11 @@ struct CandidateMove {
 
 struct CandidateMoveSet {
   std::optional<CandidateMove> best;
+  // For explicitly inverted root analyses (worst move / fastest loss), the
+  // selected move is not a recommendation and must not be mislabeled as the
+  // engine's "best" candidate. focus_kind is stable provider/debug metadata.
+  std::optional<CandidateMove> focus;
+  std::string focus_kind;
   std::vector<CandidateMove> alternatives;
   std::optional<CandidateMove> user_move;
   std::optional<std::string> critical_reply_uci;

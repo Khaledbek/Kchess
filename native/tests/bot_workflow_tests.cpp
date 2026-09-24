@@ -71,7 +71,7 @@ int main() {
 
     constexpr auto start_fen =
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    const auto game = take_json(kc_create_bot_game_json(core, 1500), core);
+    const auto game = take_json(kc_create_bot_game_json(core, 1500, "white"), core);
     const auto game_id = game.at("gameId").get<std::string>();
     expect(game.at("playerColor") == "white" && game.at("botColor") == "black",
            "persisted bot game starts with the player as White");
@@ -97,7 +97,7 @@ int main() {
     expect(active.at("gameId") == game_id,
            "active bot game can be queried for resume");
 
-    char* duplicate = kc_create_bot_game_json(core, 1600);
+    char* duplicate = kc_create_bot_game_json(core, 1600, "white");
     expect(duplicate == nullptr,
            "a second unfinished bot game cannot hide the resumable game");
 
@@ -202,7 +202,7 @@ int main() {
     const auto no_active = take_json(kc_active_bot_game_json(core), core);
     expect(no_active.is_null(), "resigned game is no longer resumable");
 
-    const auto disposable = take_json(kc_create_bot_game_json(core, 100), core);
+    const auto disposable = take_json(kc_create_bot_game_json(core, 100, "white"), core);
     const auto disposable_id = disposable.at("gameId").get<std::string>();
     expect(disposable.at("botElo") == 100,
            "new game can be created after the previous game is finished");
@@ -276,7 +276,7 @@ int main() {
                && terminal_job.at("move").get<std::string>().empty(),
            "Stockfish 18 bot job reports an already terminal temporary FEN");
 
-    const auto mate_game = take_json(kc_create_bot_game_json(core, 1200), core);
+    const auto mate_game = take_json(kc_create_bot_game_json(core, 1200, "white"), core);
     const auto mate_id = mate_game.at("gameId").get<std::string>();
     auto mate_fen = std::string(start_fen);
     for (const auto* move : {"f2f3", "e7e5", "g2g4", "d8h4"}) {
@@ -303,7 +303,7 @@ int main() {
                && beginner.at("targetRank").get<int>() >= 1,
            "low-Elo probability-first bot selection remains operational");
 
-    char* invalid = kc_create_bot_game_json(core, 1550);
+    char* invalid = kc_create_bot_game_json(core, 1550, "white");
     expect(invalid == nullptr, "invalid non-100 Elo remains rejected by native policy");
 
     kc_core_destroy(core);

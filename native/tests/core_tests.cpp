@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -16,6 +17,7 @@
 #include "engine/chess_engine.h"
 #include "kchess/core_api.h"
 #include "persistence/database.h"
+#include "theory/opening_line_graph.h"
 #include "theory/opening_name_index.h"
 #include "theory/opening_theory_provider.h"
 #include "theory/position_key.h"
@@ -51,6 +53,11 @@ std::filesystem::path bundled_book_path() {
 std::filesystem::path bundled_names_path() {
   return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
       / "flutter_app" / "assets" / "opening_names.kco";
+}
+
+std::filesystem::path bundled_lines_path() {
+  return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
+      / "flutter_app" / "assets" / "opening_lines.kcl";
 }
 
 void test_smoke() {
@@ -184,10 +191,102 @@ void test_opening_names() {
          "1.d4 d5 2.c4 Nf6 must classify as D06 QGD Marshall Defense");
 }
 
+void test_opening_line_contract() {
+  const auto lines_path = bundled_lines_path();
+  const auto names_path = bundled_names_path();
+  expect(std::filesystem::exists(lines_path), "Bundled KCL line graph must exist");
+  expect(std::filesystem::exists(names_path), "Bundled KCO name index must exist");
+
+  const kchess::KclOpeningLineGraph lines(lines_path);
+  const kchess::KcoOpeningNameIndex names(names_path);
+  expect(lines.metadata().format_version == 1 && lines.metadata().node_count > 3000,
+         "Bundled KCL1 must expose the full opening-line position set");
+  expect(lines.metadata().edge_count > lines.metadata().node_count,
+         "Bundled KCL1 must contain root-to-opening move sequences");
+  expect(lines.metadata().node_count == names.metadata().entry_count,
+         "KCL and KCO must describe the same canonical opening-position universe");
+  expect(lines.position_key_fingerprint() == names.position_key_fingerprint(),
+         "KCL and KCO must use identical Stockfish position keys in identical order");
+
+  expect(kchess::encode_book_move("e2e4") == 0x070cU,
+         "Shared KCB/KCL move codec must keep the stable e2e4 representation");
+  expect(kchess::decode_book_move(0x070cU) == "e2e4",
+         "Shared KCB/KCL move codec must decode the stable e2e4 representation");
+  expect(kchess::decode_book_move(kchess::encode_book_move("a7a8q")) == "a7a8q",
+         "Shared KCB/KCL move codec must preserve promotion moves");
+
+  // Runtime graph queries are position-based, not path-based. A known named
+  // opening node must expose legal continuations from the concrete FEN.
+  const auto ruy = kchess::parse_pgn(
+      "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 *");
+  expect(ruy.valid && !ruy.game.moves.empty(), "KCL runtime fixture must parse");
+  const auto ruy_fen = ruy.game.moves.back().fen_after;
+  const auto ruy_node = lines.node_index(kchess::stockfish_position_key(ruy_fen));
+  expect(ruy_node.has_value(), "Known named opening position must resolve to a KCL node");
+  const auto replies = lines.continuations(ruy_fen);
+  expect(!replies.empty(), "Known KCL node must expose graph continuations");
+  for (const auto& reply : replies) {
+    expect(!reply.uci.empty() && !reply.san.empty() && !reply.fen_after.empty(),
+           "Every KCL runtime edge must resolve to a legal concrete move");
+    expect(reply.destination_key == kchess::stockfish_position_key(reply.fen_after),
+           "KCL runtime edge must expose the canonical destination key");
+  }
+
+  // KCL1 stores complete root-to-node lines. The runtime must reconstruct
+  // outgoing adjacency from shared prefixes instead of treating a node's move
+  // range as replies from its terminal position. Center Game is the regression
+  // that exposed this: after 3.Qxd4 the stored longer C21/C22 lines continue
+  // with ...Nc6; replaying the record as outgoing edges would instead try e2e4.
+  const auto center = kchess::parse_pgn("1. e4 e5 2. d4 exd4 3. Qxd4 *");
+  expect(center.valid && !center.game.moves.empty(), "Center Game KCL fixture must parse");
+  const auto center_fen = center.game.moves.back().fen_after;
+  const auto center_replies = lines.continuations(center_fen);
+  expect(std::any_of(center_replies.begin(), center_replies.end(), [](const auto& reply) {
+           return reply.uci == "b8c6";
+         }),
+         "Center Game after 3.Qxd4 must continue with the derived ...Nc6 graph edge");
+  expect(std::none_of(center_replies.begin(), center_replies.end(), [](const auto& reply) {
+           return reply.uci == "e2e4" || reply.uci == "e7e5";
+         }),
+         "A persisted root-line prefix must never leak out as terminal-position replies");
+
+  // Bishop's Opening has several independent source lines sharing the same
+  // three-ply prefix. They must merge into one runtime node with all legal
+  // continuations, not overwrite or duplicate each other.
+  const auto bishop = kchess::parse_pgn("1. e4 e5 2. Bc4 *");
+  expect(bishop.valid && !bishop.game.moves.empty(), "Bishop's Opening KCL fixture must parse");
+  const auto bishop_replies = lines.continuations(bishop.game.moves.back().fen_after);
+  expect(bishop_replies.size() >= 3,
+         "Bishop's Opening prefix must merge several KCL source lines");
+  expect(std::any_of(bishop_replies.begin(), bishop_replies.end(), [](const auto& reply) {
+           return reply.uci == "g8f6";
+         }),
+         "Bishop's Opening graph must include ...Nf6");
+  expect(std::any_of(bishop_replies.begin(), bishop_replies.end(), [](const auto& reply) {
+           return reply.uci == "f8c5";
+         }),
+         "Bishop's Opening graph must include ...Bc5");
+
+  // Two legal move orders reaching the same position must resolve to exactly
+  // one graph node. This is the transposition contract that distinguishes KCL
+  // from the legacy line/tree representation.
+  const auto transposition_a = kchess::parse_pgn("1. Nf3 d5 2. d4 Nf6 *");
+  const auto transposition_b = kchess::parse_pgn("1. d4 Nf6 2. Nf3 d5 *");
+  expect(transposition_a.valid && transposition_b.valid,
+         "KCL transposition fixtures must parse");
+  const auto key_a = kchess::stockfish_position_key(transposition_a.game.moves.back().fen_after);
+  const auto key_b = kchess::stockfish_position_key(transposition_b.game.moves.back().fen_after);
+  expect(key_a == key_b, "Equivalent move orders must share a canonical position key");
+  const auto node_a = lines.node_index(key_a);
+  const auto node_b = lines.node_index(key_b);
+  expect(node_a.has_value() && node_b.has_value() && node_a == node_b,
+         "KCL transpositions must converge on the same graph node");
+}
+
 void test_classifier_and_accuracy() {
   using kchess::MoveCategory;
-  using kchess::MoveClassifierInput;
-  auto classified = [](MoveClassifierInput input) { return kchess::classify_move(input); };
+  using kchess::MoveAnalysisFacts;
+  auto classified = [](MoveAnalysisFacts input) { return kchess::classify_move(input); };
   expect(classified({.theory = true, .played_is_best = true}) == MoveCategory::theory,
          "Theory must override Best");
   expect(classified({.played_is_best = true, .best_expected_score = .8,
@@ -404,6 +503,23 @@ void test_database_cache(const kchess::AnalysisResult& engine_result) {
                && complete->classification == kchess::MoveCategory::theory
                && complete->theory->games == 100,
            "Completed engine cache and rebuilt classification must survive restart");
+
+    // Engine selection is a persistence namespace, not a destructive migration.
+    // Finishing/reusing SF18 may prune superseded SF18 settings, but must leave
+    // an SF19 run for the same game intact so switching engines cannot silently
+    // replace one engine's truth with the other's data.
+    (void)database.prepare_analysis(
+        game_id, "test-config-old-sf18", "Stockfish 18 test", 2, 3, 3);
+    database.set_analysis_status(game_id, "test-config-old-sf18", "complete");
+    (void)database.prepare_analysis(
+        game_id, "test-config-sf19", "Stockfish 19 test", 2, 4, 3);
+    database.set_analysis_status(game_id, "test-config-sf19", "complete");
+    database.prune_game_analyses_except(
+        game_id, "Stockfish 18 test", "test-config");
+    expect(!database.analysis(game_id, "test-config-old-sf18").has_value(),
+           "same-engine superseded analysis is pruned");
+    expect(database.analysis(game_id, "test-config-sf19").has_value(),
+           "other Stockfish engine analysis survives same-game pruning");
   }
   std::filesystem::remove_all(directory);
 }
@@ -494,6 +610,7 @@ int main() {
     test_smoke();
     test_opening_book();
     test_opening_names();
+    test_opening_line_contract();
     test_classifier_and_accuracy();
     test_fen_validation();
     test_pgn_parser();

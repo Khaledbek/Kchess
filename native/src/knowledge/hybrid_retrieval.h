@@ -9,7 +9,6 @@
 #include "graph_store.h"
 #include "position_similarity.h"
 #include "query_router.h"
-#include "text_semantic_retrieval.h"
 
 namespace kchess::knowledge {
 
@@ -84,7 +83,6 @@ struct HybridRetrievalResult {
 class HybridRetrievalEngine {
  public:
   HybridRetrievalEngine(GraphStore& graph, ChunkRegistry& chunks,
-                        const SemanticChunkSearch* semantic_search = nullptr,
                         const PositionSimilarityIndex* position_similarity = nullptr);
 
   [[nodiscard]] HybridRetrievalResult retrieve(
@@ -93,7 +91,6 @@ class HybridRetrievalEngine {
  private:
   GraphStore& graph_;
   ChunkRegistry& chunks_;
-  const SemanticChunkSearch* semantic_search_{nullptr};
   const PositionSimilarityIndex* position_similarity_{nullptr};
 };
 

@@ -33,6 +33,33 @@ extension CoachSurfaceWire on CoachSurface {
 
 enum CoachMessageRole { user, coach }
 
+
+class CoachClientAction {
+  const CoachClientAction({required this.id, this.elo, this.color});
+
+  final String id;
+  final int? elo;
+  final String? color;
+
+  factory CoachClientAction.fromJson(Map<String, Object?> json) =>
+      CoachClientAction(
+        id: (json['id'] as String? ?? '').trim(),
+        elo: json['elo'] as int?,
+        color: (json['color'] as String?)?.trim(),
+      );
+
+  static List<CoachClientAction> fromReply(Map<String, Object?> reply) =>
+      (reply['clientActions'] as List<Object?>? ?? const <Object?>[])
+          .whereType<Map>()
+          .map(
+            (value) => CoachClientAction.fromJson(
+              value.map((key, value) => MapEntry(key.toString(), value)),
+            ),
+          )
+          .where((action) => action.id.isNotEmpty)
+          .toList(growable: false);
+}
+
 class CoachUiMessage {
   const CoachUiMessage({
     required this.role,
@@ -66,4 +93,70 @@ class CoachUiMessage {
             .whereType<String>()
             .toList(growable: false),
       );
+}
+
+class CoachSessionSummary {
+  const CoachSessionSummary({
+    required this.id,
+    required this.sessionNumber,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.lastOpenedAt,
+  });
+
+  final String id;
+  final int sessionNumber;
+  final String name;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime lastOpenedAt;
+
+  factory CoachSessionSummary.fromJson(Map<String, Object?> json) =>
+      CoachSessionSummary(
+        id: (json['id'] as String? ?? '').trim(),
+        sessionNumber: (json['sessionNumber'] as num? ?? 0).toInt(),
+        name: (json['name'] as String? ?? '').trim(),
+        createdAt: _dateFromUnix(json['createdAt']),
+        updatedAt: _dateFromUnix(json['updatedAt']),
+        lastOpenedAt: _dateFromUnix(json['lastOpenedAt']),
+      );
+}
+
+class CoachSessionTranscriptMessage {
+  const CoachSessionTranscriptMessage({
+    required this.sequence,
+    required this.role,
+    required this.content,
+    required this.payload,
+    required this.automaticTurn,
+    required this.createdAt,
+  });
+
+  final int sequence;
+  final String role;
+  final String content;
+  final Map<String, Object?> payload;
+  final bool automaticTurn;
+  final DateTime createdAt;
+
+  factory CoachSessionTranscriptMessage.fromJson(Map<String, Object?> json) {
+    final rawPayload = json['payload'];
+    return CoachSessionTranscriptMessage(
+      sequence: (json['sequence'] as num? ?? 0).toInt(),
+      role: (json['role'] as String? ?? '').trim(),
+      content: json['content'] as String? ?? '',
+      payload: rawPayload is Map
+          ? rawPayload.map((key, value) => MapEntry(key.toString(), value))
+          : const <String, Object?>{},
+      automaticTurn: json['automaticTurn'] as bool? ?? false,
+      createdAt: _dateFromUnix(json['createdAt']),
+    );
+  }
+}
+
+DateTime _dateFromUnix(Object? value) {
+  final seconds = (value as num? ?? 0).toInt();
+  return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true)
+      .toLocal();
 }

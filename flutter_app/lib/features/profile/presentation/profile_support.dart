@@ -424,7 +424,7 @@ String _profileTypeLabel(AppLocalizations strings, ProfileType type) =>
 
 Widget _profileAvatar(AppProfile profile, {double iconSize = 24}) {
   Widget fallback() => Image.asset(
-    '../img/${profile.avatarAsset}',
+    'assets/analysis_img/${profile.avatarAsset}',
     errorBuilder: (_, _, _) => Icon(Icons.person, size: iconSize),
   );
   final file = profile.avatarFile;

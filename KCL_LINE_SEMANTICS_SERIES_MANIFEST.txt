@@ -1,0 +1,16 @@
+KChess Opening Line Semantics Correction Series 3/3 — cumulative changed files
+
+AGENTS.md
+BUILD.md
+KChess_Update_Cleanup.ps1
+KCL_LINE_SEMANTICS_SERIES_AUDIT.txt
+KCL_LINE_SEMANTICS_SERIES_MANIFEST.txt
+native/src/theory/opening_line_graph.cpp
+native/src/theory/opening_line_graph.h
+native/src/theory/AGENTS.md
+native/src/training/AGENTS.md
+native/src/training/data/README.md
+native/tests/core_tests.cpp
+
+No opening_lines.kcl payload is replaced by this series; the user's existing validated KCL1 asset remains authoritative.
+No opening_book.kcb or opening_names.kco payload is replaced.

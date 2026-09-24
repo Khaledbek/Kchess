@@ -14,19 +14,20 @@ namespace kchess {
 // -----------------------------------------------------------------------------
 
 struct MoveClassifierConfig {
-  // V12 keeps the V11 severity model but binds Best/alternative comparisons to
-  // the same published rank-1 engine snapshot used by the board arrow. No
-  // severe label is produced from a single evaluation-bar threshold alone.
-  static constexpr int version = 12;
+  // V13 binds Best/alternative comparisons to the published rank-1 snapshot
+  // and moves negative severity to the shared outcome-first contract below.
+  // No severe label is produced from transient material or CP noise alone.
+  static constexpr int version = 18;
 
-  // Engine-equivalent moves. Stockfish's final bestmove is always rank 1, but
-  // an alternative with effectively the same score is also treated as Best.
-  double equivalent_loss{0.006};
-  int equivalent_cp_loss{12};
+  // Engine-equivalent moves. A completed Stockfish final bestmove is the
+  // recommendation authority even when the last captured MultiPV ordering is
+  // different; score-equivalent alternatives may also classify as Best.
+  double equivalent_loss{0.012};
+  int equivalent_cp_loss{20};
 
-  // Positive-quality bands used when rank information is unavailable. When
-  // ranks 2/3/4 are known, they map to Excellent/Good/Okay if the score remains
-  // inside the light-deviation envelope.
+  // Positive-quality cluster bands. Rank is supporting evidence only: any known
+  // top-five alternative inside a band receives that band, while score-equivalent
+  // alternatives are promoted to Best regardless of exact rank.
   double excellent_loss{0.035};
   int excellent_cp_loss{70};
   double good_loss{0.065};
@@ -34,13 +35,15 @@ struct MoveClassifierConfig {
   double okay_loss{0.10};
   int okay_cp_loss{180};
 
-  // Critical/Great means the engine-best move is genuinely narrow: the second
-  // choice must fall clearly behind in expected result, centipawns, or mate.
-  double critical_gap{0.10};
-  int critical_cp_gap{120};
-  // Brilliant requires a verified non-pawn piece sacrifice against best
-  // defence plus a sound resulting advantage. A pawn sacrifice alone can still
-  // be Best/Critical, but never Brilliant.
+  // Critical/Great means rank 1 is genuinely isolated from the next cluster.
+  // When both WDL/expected value and CP are available, both must confirm the
+  // separation; a raw score gap in an already saturated position is not enough.
+  double critical_gap{0.04};
+  int critical_cp_gap{50};
+  // Brilliant requires a real non-pawn material concession plus a sound
+  // Best/Near-Best result. The concession may be the moved piece itself or a
+  // different own piece that the move consciously leaves profitably capturable.
+  // A pawn-only concession can still be Best/Critical, but never Brilliant.
   int brilliant_piece_min_cp{300};
   int brilliant_net_sacrifice_min_cp{201};
   double brilliant_min_best_score{0.60};
@@ -54,23 +57,42 @@ struct MoveClassifierConfig {
   int miss_min_best_cp{50};
   int miss_material_opportunity_cp{100};
 
-  // Mistake requires a meaningful evaluation deterioration plus independent
-  // board/rank evidence (usually material loss or dropping outside top choices).
+  // Material evidence is semantic only (Miss vs self-inflicted damage).
+  // Severity itself is decided by the shared WDL/expected-score loss contract
+  // below, with CP used only when normalized outcome data is unavailable.
   int mistake_material_loss_cp{100};
-  double mistake_loss{0.05};
-  int mistake_cp_loss{90};
-
-  // Blunder is reserved for newly hanging mate, losing more than ~2 pawns of
-  // material with a real evaluation drop, or a catastrophic result-band flip.
-  int blunder_material_loss_cp{201};
-  double blunder_loss{0.10};
-  int blunder_cp_loss{180};
-  double blunder_outcome_loss{0.20};
-  double blunder_severe_loss{0.30};
 
   // Compatibility aliases used by the adaptive pre-analysis uncertainty test.
   double brilliant_gap{0.10};
-  double miss_unique_gap{0.10};
+};
+
+
+// Shared negative-severity contract for SF18 and SF19. Stockfish does not
+// produce Mistake/Blunder labels; KChess derives them from decision quality.
+// WDL/expected score is authoritative whenever available. Centipawns are a
+// compatibility fallback for old cache rows or incomplete engine samples only.
+enum class MoveSeverity {
+  none,
+  inaccuracy,
+  mistake,
+  blunder,
+};
+
+struct MoveSeverityConfig {
+  // Moderate objective deterioration is an Inaccuracy. Mistake and Blunder
+  // are intentionally farther apart so Okay/Inaccuracy/Mistake are not
+  // collapsed into one threshold.
+  double inaccuracy_expected_loss{0.08};
+  double mistake_expected_loss{0.15};
+  double blunder_expected_loss{0.25};
+  double result_band_blunder_loss{0.18};
+  double result_band_best_floor{0.60};
+  double result_band_played_ceiling{0.45};
+  double collapse_best_floor{0.45};
+  double collapse_played_ceiling{0.15};
+  int fallback_inaccuracy_cp_loss{180};
+  int fallback_mistake_cp_loss{260};
+  int fallback_blunder_cp_loss{400};
 };
 
 struct PositionEvaluation {
@@ -86,24 +108,56 @@ struct VerifiedSacrifice {
 };
 
 struct PvMaterialEvidence {
+  // Largest temporary material swing in either direction, measured from the
+  // root mover's material balance before the PV starts.
   int maximum_gain_cp{0};
   int maximum_loss_cp{0};
   int final_delta_cp{0};
+
+  // Recovery after the deepest material concession in the inspected PV.  A
+  // queen sacrifice that reaches -900 and later returns to 0 records 900cp of
+  // recovered material.  If the continuation finishes at +300 it records
+  // 1200cp, because the mover both recovered the concession and emerged ahead.
+  int recovered_from_maximum_loss_cp{0};
+  int final_net_loss_cp{0};
+  int final_net_gain_cp{0};
+  int maximum_loss_ply{0};
+  bool fully_recovered{false};
 };
 
-struct MoveClassifierInput {
+// Immediate material exposure created or consciously left available by the
+// root move.  This is deliberately broader than VerifiedSacrifice: the
+// opponent may profitably capture a different piece than the one that moved.
+// Update 3 may later combine this with deeper PV recovery/compensation.
+struct MaterialExposureEvidence {
+  bool present{false};
+  bool immediately_unprotected{false};
+  bool other_piece_than_mover{false};
+  bool piece_was_already_on_square{false};
+  int exposed_piece_value_cp{0};
+  int estimated_net_loss_cp{0};
+  std::string opponent_capture_uci;
+};
+
+// Shared, engine-neutral facts for one completed move decision.  SF18 and SF19
+// consume the same record; classifier-specific policy belongs in the classifier
+// config, not in a second facts model.  Later tactical/material passes extend
+// this structure instead of adding parallel ad-hoc inputs.
+struct MoveAnalysisFacts {
+  std::string played_move_uci;
+  std::string best_move_uci;
+
   bool theory{false};
   // Authoritative final Stockfish bestmove for this root.
   bool played_is_best{false};
   bool sacrifice_against_best_defense{false};
-  bool only_move_tactical{false};
   bool missed_forced_mate{false};
   bool allowed_forced_mate{false};
   bool was_in_check_before_move{false};
   int legal_move_count{0};
 
-  // 1..4 when the move is present in the classification MultiPV search. 5 means
-  // "outside the top four". 0 means that no reliable rank was available.
+  // 1..5 when the move is present in the classification MultiPV search. 6 means
+  // "outside the top five". 0 means that no reliable rank was available.
   int played_rank{0};
 
   // Board-understanding evidence, measured in centipawn material units.
@@ -112,6 +166,30 @@ struct MoveClassifierInput {
   int material_loss_cp{0};
   int best_material_gain_cp{0};
   int played_material_gain_cp{0};
+  // Net material at the end of the analyzed continuation, from the mover's
+  // perspective.  Keep this distinct from transient capture swings.
+  int best_final_material_delta_cp{0};
+  int played_final_material_delta_cp{0};
+
+  // Multi-ply material-concession/recovery facts. These describe the whole
+  // best-defense continuation rather than only the piece on the destination
+  // square. They are intentionally policy-free; Update 4 decides whether the
+  // combination is worthy of the Brilliant label.
+  int played_material_concession_cp{0};
+  int played_material_recovered_cp{0};
+  int played_material_net_loss_after_pv_cp{0};
+  int played_material_net_gain_after_pv_cp{0};
+  bool played_material_fully_recovered{false};
+
+  // Root-position tactical exposure. Unlike the legacy direct-sacrifice fields
+  // above, these facts also cover a move that ignores a profitable capture of
+  // another own piece (for example a bishop left en prise while attacking).
+  bool material_exposure_present{false};
+  bool material_exposure_unprotected{false};
+  bool material_exposure_other_piece{false};
+  bool material_exposure_preexisting_piece{false};
+  int material_exposure_piece_value_cp{0};
+  int material_exposure_net_loss_cp{0};
 
   std::optional<double> best_expected_score;
   std::optional<double> played_expected_score;
@@ -138,8 +216,26 @@ std::optional<double> expected_score_side_to_move(const PositionEvaluation& eval
 std::optional<double> expected_score_mover_after_move(const PositionEvaluation& evaluation);
 std::optional<double> expected_score_loss(
     const std::optional<double>& best, const std::optional<double>& played);
+
+// Mate distance is categorical evidence, not a centipawn surrogate. A positive
+// value means the mover can force mate; a negative value means the mover is
+// being mated. The loss is measured only when both candidates preserve the
+// same mate result.
+std::optional<int> mate_distance_loss(
+    const std::optional<int>& best_mate_in,
+    const std::optional<int>& played_mate_in);
+bool mate_distance_equivalent(
+    const std::optional<int>& best_mate_in,
+    const std::optional<int>& played_mate_in,
+    int tolerance = 1);
+MoveSeverity classify_move_severity(
+    const std::optional<double>& best_expected,
+    const std::optional<double>& played_expected,
+    const std::optional<int>& best_evaluation_cp,
+    const std::optional<int>& played_evaluation_cp,
+    const MoveSeverityConfig& config = {});
 MoveCategory classify_move(
-    const MoveClassifierInput& input,
+    const MoveAnalysisFacts& input,
     const MoveClassifierConfig& config = {});
 std::string move_category_name(MoveCategory category);
 
@@ -151,6 +247,9 @@ bool root_move_is_tactical(const std::string& fen_before, const std::string& uci
 VerifiedSacrifice root_move_sacrifice_evidence(
     const std::string& fen_before,
     const std::vector<std::string>& principal_variation);
+MaterialExposureEvidence root_move_material_exposure_evidence(
+    const std::string& fen_before,
+    const std::string& uci_move);
 bool root_move_sacrifice_against_best_defense(
     const std::string& fen_before,
     const std::vector<std::string>& principal_variation,

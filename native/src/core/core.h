@@ -22,6 +22,7 @@
 #include "services/provider_service.h"
 #include "services/settings_service.h"
 #include "services/statistics_service.h"
+#include "theory/opening_line_graph.h"
 #include "theory/opening_name_index.h"
 #include "theory/opening_theory_provider.h"
 #include "training/training_service.h"
@@ -95,7 +96,6 @@ class Core {
   void clear_cached_month(const std::string& profile_id, const std::string& month);
 
   std::string start_provider_profile_json(ProfileType type, const std::string& username);
-  std::string start_scout_json(ProfileType type, const std::string& username);
   std::string start_scout_report_json(ProfileType type, const std::string& username);
   std::string start_provider_sync_json(
       const std::string& profile_id, int year, int month);
@@ -132,7 +132,7 @@ class Core {
   std::string variation_analysis_status_json(const std::string& job_id);
   void cancel_variation_analysis(const std::string& job_id);
 
-  std::string create_bot_game_json(int requested_elo);
+  std::string create_bot_game_json(int requested_elo, const std::string& player_color);
   std::string active_bot_game_json() const;
   std::string bot_game_json(const std::string& game_id) const;
   std::string bot_games_json() const;
@@ -162,6 +162,11 @@ class Core {
   std::string start_coach_ask_json(const std::string& request_json);
   std::string start_coach_automatic_json(const std::string& request_json);
   std::string coach_job_status_json(const std::string& job_id);
+  std::string coach_sessions_json(const std::string& profile_id) const;
+  std::string create_coach_session_json(const std::string& profile_id);
+  std::string coach_session_messages_json(const std::string& request_json) const;
+  std::string rename_coach_session_json(const std::string& request_json);
+  std::string delete_coach_session_json(const std::string& request_json);
   void cancel_coach_job(const std::string& job_id);
   std::string knowledge_inspector_json(const std::string& request_json);
 
@@ -195,6 +200,7 @@ class Core {
   ProviderService provider_service_;
   std::unique_ptr<OpeningTheoryProvider> opening_theory_;
   std::unique_ptr<OpeningNameIndex> opening_names_;
+  std::unique_ptr<OpeningLineGraph> opening_lines_;
   AnalysisService analysis_service_;
   StatisticsService statistics_service_;
   knowledge::KnowledgeRuntime knowledge_runtime_;

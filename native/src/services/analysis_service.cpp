@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "analysis/accuracy.h"
+#include "analysis/classifier_contract.h"
 #include "analysis/move_classifier.h"
 #include "analysis/move_classifier_sf19.h"
 #include "chess/move.h"
@@ -35,17 +36,15 @@ constexpr int kLiveStableIterations = 3;
 constexpr int kLiveStableEvalToleranceCp = 15;
 constexpr int kPreanalysisStableIterations = 3;
 constexpr int kPreanalysisStableEvalToleranceCp = 10;
-constexpr int kClassificationMultiPv = 4;
+constexpr int kClassificationMultiPv = 5;
 
-bool uses_stockfish19_classifier(const std::string& engine_version) {
-  return engine_version.rfind("Stockfish 19", 0) == 0;
+bool negative_move_category(const MoveCategory category) noexcept {
+  return category == MoveCategory::inaccuracy
+      || category == MoveCategory::miss
+      || category == MoveCategory::mistake
+      || category == MoveCategory::blunder;
 }
 
-int classifier_version_for_engine(const std::string& engine_version) {
-  return uses_stockfish19_classifier(engine_version)
-      ? MoveClassifierSf19Config::version
-      : MoveClassifierConfig::version;
-}
 
 // -----------------------------------------------------------------------------
 // Section: Stockfish 19 evaluation-bar projection
@@ -158,12 +157,14 @@ bool difficult_preanalysis_position(
 
   // Spend the full minimum budget near category boundaries, where a few
   // centipawns can change the user-visible label.
+  const MoveSeverityConfig severity;
   return near_threshold(*loss, classifier.excellent_loss, kPreanalysisBoundaryMargin)
       || near_threshold(*loss, classifier.good_loss, kPreanalysisBoundaryMargin)
       || near_threshold(*loss, classifier.okay_loss, kPreanalysisBoundaryMargin)
       || near_threshold(*loss, classifier.miss_loss, kPreanalysisBoundaryMargin)
-      || near_threshold(*loss, classifier.blunder_outcome_loss, kPreanalysisBoundaryMargin)
-      || near_threshold(*loss, classifier.blunder_severe_loss, kPreanalysisBoundaryMargin);
+      || near_threshold(*loss, severity.mistake_expected_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, severity.result_band_blunder_loss, kPreanalysisBoundaryMargin)
+      || near_threshold(*loss, severity.blunder_expected_loss, kPreanalysisBoundaryMargin);
 }
 
 int preanalysis_early_stop_min_depth(const AppSettings& settings) {
@@ -289,18 +290,17 @@ const EngineLine* line_for_move(
 
 std::string ranked_best_move(
     const std::vector<EngineLine>& lines,
-    const std::string& fallback) {
-  // The published rank-1 PV is the atomic best-move truth for both SF18 and
-  // SF19. A final bestmove callback can arrive after the last complete MultiPV
-  // report and therefore belong to a newer root ordering than the scores stored
-  // in `lines`. Mixing that callback with an older PV is exactly how the board
-  // arrow and move classification could disagree. Prefer rank 1 whenever a
-  // complete published line exists; the callback is only a terminal fallback.
+    const std::string& final_best_move) {
+  // A completed Stockfish search owns its recommendation through the final
+  // bestmove callback. MultiPV rank 1 is the live/provisional recommendation
+  // while the search is running, but it must not overwrite a usable final
+  // bestmove after completion.
+  if (usable_engine_move(final_best_move)) return final_best_move;
   if (!lines.empty()) {
     const auto move = lines.front().best_move();
     if (usable_engine_move(move)) return move;
   }
-  return usable_engine_move(fallback) ? fallback : std::string{};
+  return {};
 }
 
 const EngineLine* ranked_best_line(
@@ -511,6 +511,51 @@ Sf19BestMoveVerification verify_sf19_bestmove(
   return result;
 }
 
+struct Sf19TargetedBestMoveRecheck {
+  bool attempted{false};
+  bool completed{false};
+  bool agrees_with_published_root{false};
+  int reached_depth{0};
+};
+
+Sf19TargetedBestMoveRecheck recheck_sf19_published_bestmove(
+    ChessEngine& engine,
+    const std::string& fen_before,
+    const std::string& published_best_move,
+    const MoverEvaluationSample& published_best,
+    const AppSettings& settings,
+    const std::atomic_bool* cancel_requested) {
+  Sf19TargetedBestMoveRecheck outcome;
+  if (!usable_engine_move(published_best_move) || !published_best.has_score()) {
+    return outcome;
+  }
+  outcome.attempted = true;
+
+  AnalysisRequest request{
+      .fen = fen_before,
+      .depth = std::max(1, published_best.depth > 0 ? published_best.depth : settings.depth),
+      .multi_pv = 1,
+      .threads = settings.threads,
+      .hash_mb = settings.hash_mb,
+      .time_limit_seconds = settings.time_limit_seconds,
+      .search_moves = {published_best_move},
+      .require_exact_multipv_snapshot = true,
+      .cancel_requested = cancel_requested,
+  };
+  const auto result = engine.analyze(request);
+  if (result.interrupted || result.lines.empty()
+      || result.lines.front().best_move() != published_best_move) {
+    return outcome;
+  }
+
+  outcome.completed = true;
+  outcome.reached_depth = result.reached_depth;
+  const auto targeted = root_sample(&result.lines.front());
+  outcome.agrees_with_published_root =
+      !verify_sf19_bestmove(published_best, targeted).contradicted;
+  return outcome;
+}
+
 std::string fnv1a_hex(const std::string& value) {
   std::uint64_t hash = 14695981039346656037ULL;
   for (const unsigned char character : value) {
@@ -547,6 +592,30 @@ std::string canonical_position_cache_fen(const std::string& fen) {
   return result.str();
 }
 
+std::string analysis_snapshot_id(
+    const std::string& fen,
+    const std::string& engine_version,
+    const std::string& config_hash,
+    const int requested_depth,
+    const int requested_multi_pv,
+    const int reached_depth,
+    const std::string& rank1_move,
+    const std::uint64_t generation,
+    const std::string& search_mode) {
+  std::ostringstream canonical;
+  canonical << "analysis.snapshot.v1"
+            << "|fen=" << canonical_position_cache_fen(fen)
+            << "|engine=" << engine_version
+            << "|config=" << config_hash
+            << "|requestedDepth=" << requested_depth
+            << "|requestedMultiPv=" << requested_multi_pv
+            << "|reachedDepth=" << reached_depth
+            << "|rank1=" << rank1_move
+            << "|generation=" << generation
+            << "|mode=" << search_mode;
+  return "analysis.snapshot.v1:" + fnv1a_hex(canonical.str());
+}
+
 std::string variation_position_cache_key(
     const std::string& fen,
     const AppSettings& settings,
@@ -569,7 +638,170 @@ struct MoveAssessment {
   std::optional<double> second_expected;
   std::optional<double> loss;
   AccuracyMove accuracy;
+  // Classification is fail-closed across both engines. Cross-snapshot
+  // contradiction, mixed root iterations, incomparable search budgets or a
+  // boundary-sensitive early convergence withhold the public label instead of
+  // forcing a category from unstable evidence.
+  bool classification_unstable{false};
+  std::string classification_stability_reason;
+  bool played_score_from_after{false};
 };
+
+struct ClassificationStabilityDecision {
+  bool unstable{false};
+  std::string reason;
+};
+
+constexpr int kClassificationDepthSlack = 3;
+constexpr double kClassificationBoundaryHysteresis = 0.015;
+constexpr int kClassificationCpBoundaryHysteresis = 25;
+
+bool search_budget_complete(
+    const AnalysisResult* result,
+    const int requested_depth,
+    const int time_limit_seconds) {
+  if (result == nullptr || result->interrupted) return false;
+  // A completed time-limited search consumed the requested budget even when
+  // two positions naturally reach different depths. Depth comparability is
+  // therefore enforced only for depth-bounded searches.
+  if (time_limit_seconds > 0) return true;
+  if (requested_depth <= 0) return result->reached_depth > 0;
+  return result->reached_depth >= requested_depth;
+}
+
+bool near_classification_boundary(
+    const MoveAssessment& assessment,
+    const bool use_sf19_classifier) {
+  if (assessment.loss.has_value()) {
+    const double loss = *assessment.loss;
+    const MoveSeverityConfig severity;
+    if (near_threshold(
+            loss, severity.mistake_expected_loss,
+            kClassificationBoundaryHysteresis)
+        || near_threshold(
+            loss, severity.result_band_blunder_loss,
+            kClassificationBoundaryHysteresis)
+        || near_threshold(
+            loss, severity.blunder_expected_loss,
+            kClassificationBoundaryHysteresis)) {
+      return true;
+    }
+    if (use_sf19_classifier) {
+      const MoveClassifierSf19Config config;
+      return near_threshold(loss, config.equivalent_value_loss, kClassificationBoundaryHysteresis)
+          || near_threshold(loss, config.excellent_value_loss, kClassificationBoundaryHysteresis)
+          || near_threshold(loss, config.good_value_loss, kClassificationBoundaryHysteresis)
+          || near_threshold(loss, config.okay_value_loss, kClassificationBoundaryHysteresis)
+          || near_threshold(loss, config.miss_value_loss, kClassificationBoundaryHysteresis);
+    }
+    const MoveClassifierConfig config;
+    return near_threshold(loss, config.equivalent_loss, kClassificationBoundaryHysteresis)
+        || near_threshold(loss, config.excellent_loss, kClassificationBoundaryHysteresis)
+        || near_threshold(loss, config.good_loss, kClassificationBoundaryHysteresis)
+        || near_threshold(loss, config.okay_loss, kClassificationBoundaryHysteresis)
+        || near_threshold(loss, config.miss_loss, kClassificationBoundaryHysteresis);
+  }
+
+  // CP is fallback-only, but old/incomplete rows without WDL still need the
+  // same anti-flapping behavior at the severe compatibility thresholds.
+  if (assessment.accuracy.best.evaluation_cp.has_value()) {
+    const auto played_cp = assessment.played_score_from_after
+        ? assessment.accuracy.played_after.evaluation_cp
+        : assessment.accuracy.played_root.evaluation_cp;
+    if (played_cp.has_value()) {
+      const int cp_loss = std::max(
+          0, *assessment.accuracy.best.evaluation_cp - *played_cp);
+      const MoveSeverityConfig severity;
+      return std::abs(cp_loss - severity.fallback_mistake_cp_loss)
+              <= kClassificationCpBoundaryHysteresis
+          || std::abs(cp_loss - severity.fallback_blunder_cp_loss)
+              <= kClassificationCpBoundaryHysteresis;
+    }
+  }
+  return false;
+}
+
+ClassificationStabilityDecision classification_stability(
+    const MoveAssessment& assessment,
+    const AnalysisResult* before,
+    const AnalysisResult* after,
+    const bool use_sf19_classifier,
+    const int requested_depth,
+    const int time_limit_seconds) {
+  if (assessment.category == MoveCategory::theory
+      || assessment.category == MoveCategory::forced) {
+    return {};
+  }
+
+  if (assessment.classification_unstable) {
+    return {true, assessment.classification_stability_reason.empty()
+        ? "cross_snapshot_contradiction"
+        : assessment.classification_stability_reason};
+  }
+  if (before == nullptr || before->lines.empty()) {
+    return {true, "missing_root_snapshot"};
+  }
+
+  const auto published_rank1 = before->lines.front().best_move();
+  if (usable_engine_move(before->best_move)
+      && usable_engine_move(published_rank1)
+      && before->best_move != published_rank1) {
+    return {true, "rank1_iteration_mismatch"};
+  }
+
+  const bool before_complete = search_budget_complete(
+      before, requested_depth, time_limit_seconds);
+  const bool after_complete = !assessment.played_score_from_after
+      || search_budget_complete(after, requested_depth, time_limit_seconds);
+
+  if (!assessment.played_score_from_after) {
+    // MultiPV alternatives used for one classification must come from a
+    // coherent root iteration. Large depth spread means the adapter exposed a
+    // mixed snapshot and the label waits for a cleaner root result.
+    const int best_depth = assessment.accuracy.best.depth;
+    const int played_depth = assessment.accuracy.played_root.depth;
+    if (!assessment.accuracy.played_is_best
+        && best_depth > 0 && played_depth > 0
+        && std::abs(best_depth - played_depth) > kClassificationDepthSlack) {
+      return {true, "root_line_depth_mismatch"};
+    }
+  } else {
+    if (after == nullptr || assessment.accuracy.played_after.depth <= 0) {
+      return {true, "missing_played_move_verification"};
+    }
+    if (time_limit_seconds <= 0
+        && assessment.accuracy.best.depth > 0
+        && assessment.accuracy.played_after.depth > 0
+        && std::abs(assessment.accuracy.best.depth
+                    - assessment.accuracy.played_after.depth)
+            > kClassificationDepthSlack
+        && !(before_complete && after_complete)) {
+      return {true, "cross_search_depth_mismatch"};
+    }
+  }
+
+  const bool boundary_sensitive = near_classification_boundary(
+      assessment, use_sf19_classifier);
+  if (boundary_sensitive) {
+    // Dynamic early-stop is valid for clear positions. Near a public label
+    // boundary we require the hard configured depth/time budget so tiny search
+    // oscillations cannot flip the annotation on repeated visits.
+    if (!before_complete || !after_complete) {
+      return {true, "boundary_requires_full_budget"};
+    }
+  }
+
+  // Away from a category boundary an explicitly converged search is accepted.
+  // A non-converged partial search is not.
+  if (!before_complete && !before->converged_early) {
+    return {true, "root_budget_incomplete"};
+  }
+  if (assessment.played_score_from_after
+      && !after_complete && after != nullptr && !after->converged_early) {
+    return {true, "played_budget_incomplete"};
+  }
+  return {};
+}
 
 MoveAssessment assess_move(
     const std::string& fen_before,
@@ -601,11 +833,10 @@ MoveAssessment assess_move(
   }
 
   // There is no meaningful ranking choice with one legal move. For SF19 the
-  // final bestmove callback is normally authoritative, but it must not override
-  // a completed post-move verification that proves a large opposite swing.
-  // This matters when a late MultiPV reshuffle leaves the callback/root snapshot
-  // inconsistent: without this guard a losing sacrifice could be labelled
-  // Brilliant merely because its UCI move matched the stale final callback.
+  // published exact rank-1 root snapshot is authoritative for the decision. A
+  // materially contradictory after-position search is recorded below as
+  // cross-snapshot instability: it can withhold the label/Brilliant proof, but
+  // it must never transform the engine's own published arrow into a blunder.
   const bool engine_marked_best = context.legal_move_count == 1
       || (usable_engine_move(assessment.recommended_move_uci)
           && played_move == assessment.recommended_move_uci);
@@ -624,33 +855,52 @@ MoveAssessment assess_move(
   }
   const bool sf19_bestmove_contradicted = use_sf19_classifier
       && sf19_verification.contradicted;
+  assessment.classification_unstable = sf19_bestmove_contradicted;
+  if (sf19_bestmove_contradicted) {
+    assessment.classification_stability_reason = "sf19_cross_snapshot_contradiction";
+  }
 
-  const bool played_is_best = engine_marked_best && !sf19_bestmove_contradicted;
+  // Rank-1 coherence invariant: when the played move is the exact move that the
+  // published root snapshot recommended, the decision itself remains rank 1.
+  // An independent after-position disagreement is evidence that the two engine
+  // snapshots are unstable, not evidence that the user blundered by following
+  // the engine arrow. Accuracy therefore also stays lossless for that decision.
+  const bool played_is_best = engine_marked_best;
   assessment.accuracy.played_is_best = played_is_best;
 
   int played_rank = 0;
   if (played_is_best) {
     played_rank = 1;
-  } else if (!sf19_bestmove_contradicted
-             && played_line != nullptr && played_line->rank > 0) {
+  } else if (played_line != nullptr && played_line->rank > 0) {
     played_rank = played_line->rank;
   } else if (before_lines != nullptr
              && static_cast<int>(before_lines->size()) >= kClassificationMultiPv) {
-    // A completed four-line root search that does not contain the played move
-    // proves only "outside top four"; do not fabricate an exact rank 5.
+    // A completed five-line root search that does not contain the played move
+    // proves only "outside top five"; do not fabricate an exact rank 6.
     played_rank = kClassificationMultiPv + 1;
   }
 
-  const auto played_sample = sf19_bestmove_contradicted
-      ? played_after_sample
-      : resolved_played_sample(
-          played_is_best, best_sample, played_root_sample, played_after_sample);
+  const auto played_sample = resolved_played_sample(
+      played_is_best, best_sample, played_root_sample, played_after_sample);
+  if (!played_is_best && played_after_sample.has_score()) {
+    if (!played_root_sample.has_score()) {
+      assessment.played_score_from_after = true;
+    } else if (played_after_sample.depth
+                   >= played_root_sample.depth + AccuracyConfig{}.deeper_result_margin
+               || (!played_root_sample.mate_in.has_value()
+                   && played_after_sample.mate_in.has_value())) {
+      assessment.played_score_from_after = true;
+    }
+  }
 
   assessment.best_expected = best_sample.expected;
   assessment.played_expected = played_sample.expected;
   assessment.second_expected = second_sample.expected;
   assessment.loss = expected_score_loss(
       assessment.best_expected, assessment.played_expected);
+
+  const auto material_exposure = root_move_material_exposure_evidence(
+      fen_before, played_move);
 
   VerifiedSacrifice sacrifice;
   if (played_line != nullptr && played_line->best_move() == played_move) {
@@ -680,23 +930,6 @@ MoveAssessment assess_move(
         : pv_material_evidence(fen_before, best_line->moves, 6);
   }
 
-  const MoveClassifierConfig classifier;
-  bool unique_by_expected = false;
-  if (best_sample.expected.has_value() && second_sample.expected.has_value()) {
-    unique_by_expected = *best_sample.expected - *second_sample.expected
-        >= classifier.miss_unique_gap;
-  }
-  const bool unique_by_cp = best_sample.evaluation_cp.has_value()
-      && second_sample.evaluation_cp.has_value()
-      && *best_sample.evaluation_cp - *second_sample.evaluation_cp
-          >= classifier.critical_cp_gap;
-  const bool unique_forced_mate = best_sample.mate_in.has_value()
-      && *best_sample.mate_in > 0
-      && (!second_sample.mate_in.has_value() || *second_sample.mate_in <= 0);
-  const bool only_move_tactical = usable_engine_move(assessment.recommended_move_uci)
-      && (unique_by_expected || unique_by_cp || unique_forced_mate)
-      && root_move_is_tactical(fen_before, assessment.recommended_move_uci);
-
   const bool missed_forced_mate = !played_is_best
       && best_sample.mate_in.has_value() && *best_sample.mate_in > 0
       && (!played_sample.mate_in.has_value() || *played_sample.mate_in <= 0);
@@ -704,11 +937,12 @@ MoveAssessment assess_move(
       && played_sample.mate_in.has_value() && *played_sample.mate_in < 0
       && (!best_sample.mate_in.has_value() || *best_sample.mate_in >= 0);
 
-  const MoveClassifierInput classifier_input{
+  const MoveAnalysisFacts classifier_input{
+      .played_move_uci = played_move,
+      .best_move_uci = assessment.recommended_move_uci,
       .theory = theory.is_theory,
       .played_is_best = played_is_best,
       .sacrifice_against_best_defense = sacrifice.verified,
-      .only_move_tactical = only_move_tactical,
       .missed_forced_mate = missed_forced_mate,
       .allowed_forced_mate = allowed_forced_mate,
       .was_in_check_before_move = context.in_check,
@@ -716,9 +950,25 @@ MoveAssessment assess_move(
       .played_rank = played_rank,
       .sacrifice_piece_value_cp = sacrifice.offered_piece_value_cp,
       .sacrifice_net_material_loss_cp = sacrifice.net_material_loss_cp,
-      .material_loss_cp = played_material.maximum_loss_cp,
-      .best_material_gain_cp = best_material.maximum_gain_cp,
-      .played_material_gain_cp = played_material.maximum_gain_cp,
+      // Severity must never use a temporary capture inside the short PV as if
+      // it were a settled material loss. Use only net material at the end of
+      // the same analyzed continuation for both SF18 and SF19.
+      .material_loss_cp = std::max(0, -played_material.final_delta_cp),
+      .best_material_gain_cp = std::max(0, best_material.final_delta_cp),
+      .played_material_gain_cp = std::max(0, played_material.final_delta_cp),
+      .best_final_material_delta_cp = best_material.final_delta_cp,
+      .played_final_material_delta_cp = played_material.final_delta_cp,
+      .played_material_concession_cp = played_material.maximum_loss_cp,
+      .played_material_recovered_cp = played_material.recovered_from_maximum_loss_cp,
+      .played_material_net_loss_after_pv_cp = played_material.final_net_loss_cp,
+      .played_material_net_gain_after_pv_cp = played_material.final_net_gain_cp,
+      .played_material_fully_recovered = played_material.fully_recovered,
+      .material_exposure_present = material_exposure.present,
+      .material_exposure_unprotected = material_exposure.immediately_unprotected,
+      .material_exposure_other_piece = material_exposure.other_piece_than_mover,
+      .material_exposure_preexisting_piece = material_exposure.piece_was_already_on_square,
+      .material_exposure_piece_value_cp = material_exposure.exposed_piece_value_cp,
+      .material_exposure_net_loss_cp = material_exposure.estimated_net_loss_cp,
       .best_expected_score = best_sample.expected,
       .played_expected_score = played_sample.expected,
       .second_best_expected_score = second_sample.expected,
@@ -733,11 +983,13 @@ MoveAssessment assess_move(
     assessment.category = classify_move_sf19({
         .common = classifier_input,
         .best_move_verified_after = sf19_verification.confirmed_for_brilliant,
-        .played_final_material_delta_cp = played_material.final_delta_cp,
-        .best_final_material_delta_cp = best_material.final_delta_cp,
     });
+    // Cross-snapshot disagreement is diagnostic evidence only. A completed
+    // legal move must still keep the classifier's current category; deeper
+    // analysis may replace it later instead of withholding the label.
   } else {
-    // Stockfish 18 stays byte-for-byte on the established V11 classifier.
+    // Stockfish 18 uses the same outcome-first negative-severity contract as
+    // SF19 while retaining its own positive-label calibration.
     assessment.category = classify_move(classifier_input);
   }
 
@@ -764,23 +1016,11 @@ MoveAssessment assess_move(
   return assessment;
 }
 
-MoveCategory classify_variation_move(
-    const std::string& fen_before,
-    const std::string& played_move,
-    const std::string& fen_after,
-    const AnalysisResult& before,
-    const AnalysisResult& after,
-    const TheoryMoveInfo& theory,
-    const bool use_sf19_classifier) {
-  return assess_move(
-      fen_before, played_move, fen_after,
-      &before.lines, &before.best_move, &after.lines, theory,
-      use_sf19_classifier).category;
-}
-
 struct ClassifiedPersistedMove {
   MoveClassificationRecord record;
   AccuracyMove accuracy;
+  bool classification_unstable{false};
+  std::string classification_stability_reason;
 };
 
 ClassifiedPersistedMove classify_persisted_move(
@@ -791,7 +1031,9 @@ ClassifiedPersistedMove classify_persisted_move(
     const ParsedMove& move,
     const OpeningBookMetadata& book_metadata,
     const bool use_sf19_classifier,
-    const int classifier_version) {
+    const int classifier_version,
+    const int requested_depth,
+    const int time_limit_seconds) {
   // A move becomes decidable as soon as its before/after position slots exist.
   // Read the two adjacent position slots through one focused persistence query;
   // callers that need a final game-wide accuracy pass deliberately invoke this
@@ -804,7 +1046,7 @@ ClassifiedPersistedMove classify_persisted_move(
       && static_cast<std::uint32_t>(move.ply_index) < book_metadata.max_ply) {
     theory = opening_theory.lookup(move.fen_before, move.uci);
   }
-  const auto assessment = assess_move(
+  auto assessment = assess_move(
       move.fen_before,
       move.uci,
       move.fen_after,
@@ -813,6 +1055,19 @@ ClassifiedPersistedMove classify_persisted_move(
       after.has_value() ? &after->lines : nullptr,
       theory,
       use_sf19_classifier);
+  const auto stability = classification_stability(
+      assessment,
+      before.has_value() ? &*before : nullptr,
+      after.has_value() ? &*after : nullptr,
+      use_sf19_classifier,
+      requested_depth,
+      time_limit_seconds);
+  if (stability.unstable) {
+    // Stability diagnostics may explain why a later/deeper pass changes the
+    // label, but they must never turn a completed legal move into unknown.
+    assessment.classification_unstable = true;
+    assessment.classification_stability_reason = stability.reason;
+  }
 
   std::string recommended_move = assessment.recommended_move_uci;
   if (usable_engine_move(recommended_move)) {
@@ -828,6 +1083,10 @@ ClassifiedPersistedMove classify_persisted_move(
     if (assessment.loss.has_value()) {
       log_message << " loss=" << std::fixed << std::setprecision(4)
                   << *assessment.loss;
+    }
+    if (assessment.classification_unstable) {
+      log_message << " stability=unstable reason="
+                  << assessment.classification_stability_reason;
     }
     diagnostics::debug("classifier", log_message.str());
   }
@@ -849,6 +1108,8 @@ ClassifiedPersistedMove classify_persisted_move(
               ? 0.0 : move_accuracy_weight(assessment.accuracy),
       },
       .accuracy = assessment.accuracy,
+      .classification_unstable = assessment.classification_unstable,
+      .classification_stability_reason = assessment.classification_stability_reason,
   };
 }
 
@@ -1031,7 +1292,11 @@ std::string AnalysisService::analysis_config_hash(const AppSettings& settings) c
   const auto engine = create_stockfish_engine(settings.engine_id);
   // Classifier/Accuracy/Book versions remain independent from the engine
   // settings and are checked by rebuild_classification().
-  std::string config = engine->version();
+  // Cache compatibility is tied to the exact evaluator, not just the binary
+  // version string. The cache identity includes the NNUE network identity for
+  // both SF18 and SF19, so replacing a network cannot silently reuse an old
+  // arrow/classification snapshot.
+  std::string config = engine->cache_identity();
   // Only settings marked cache_relevant participate. Visual/app-only settings
   // therefore never force an expensive Stockfish re-analysis.
   for (const auto& descriptor : kSettingsRegistry) {
@@ -1092,26 +1357,26 @@ AnalysisService::AnalysisJobState AnalysisService::persisted_job_state(
   return AnalysisJobState::running;
 }
 
-PersistedAnalysis AnalysisService::stable_live_classification_snapshot(
+PersistedAnalysis AnalysisService::progressive_live_classification_snapshot(
     const std::string& game_id,
     const int ply,
     PersistedAnalysis analysis,
     const AnalysisJob* live_job) const {
-  // Maximum-depth engine rows are persisted position-by-position so the eval
-  // bar/PV can update live.  Classifications, however, are a game-wide
-  // coherent snapshot because adjacent positions affect each move.  Until
-  // the refinement queue finishes and rebuild_classification() commits the
-  // complete maximum-depth snapshot, keep showing the last published
-  // pre-analysis classification instead of exposing partial/null categories.
+  // Maximum-depth engine rows are persisted position-by-position. As soon as
+  // both adjacent position slots for this move are available, the refinement
+  // worker writes a new move-level classification into the deeper run. Keep
+  // that newer category immediately. Only while the deeper move is not yet
+  // decidable do we fall back to the last fully published shallow category.
   if (live_job == nullptr
       || live_job->state.load() == AnalysisJobState::completed
+      || analysis.classification.has_value()
       || live_job->published_classification_config_hash.empty()) {
     return analysis;
   }
 
   const auto published = database_.analysis(
       game_id, live_job->published_classification_config_hash, ply);
-  if (!published.has_value()) return analysis;
+  if (!published.has_value() || !published->classification.has_value()) return analysis;
 
   analysis.classification = published->classification;
   analysis.classifier_version = published->classifier_version;
@@ -1121,9 +1386,18 @@ PersistedAnalysis AnalysisService::stable_live_classification_snapshot(
   analysis.expected_score_played = published->expected_score_played;
   analysis.expected_score_loss = published->expected_score_loss;
   analysis.theory = published->theory;
+  analysis.classification_config_hash = published->config_hash;
+  analysis.classification_engine_version = published->engine_version;
+  analysis.classification_requested_depth = published->requested_depth;
+  analysis.classification_requested_multi_pv = published->requested_multi_pv;
+  analysis.classification_reached_depth = published->lines.empty()
+      ? published->summary.engine_depth
+      : published->lines.front().depth;
+  analysis.classification_rank1_move = ranked_best_move(
+      published->lines, published->best_move);
 
-  // Keep the live run's engine-depth metadata, but freeze all classification
-  // counters/accuracy values to the same published snapshot as the move label.
+  // Game-wide accuracy/counters remain atomic and therefore stay on the last
+  // fully published shallow summary until the deeper queue finishes.
   const int live_engine_depth = analysis.summary.engine_depth;
   analysis.summary = published->summary;
   analysis.summary.engine_depth = live_engine_depth;
@@ -1180,12 +1454,18 @@ std::string AnalysisService::analysis_json(
   else json << '"' << escape_json(analysis.error) << '"';
   json << ",\"recommendedMove\":\"" << escape_json(analysis.recommended_move)
        << "\",\"classification\":";
-  if (analysis.classification.has_value()) {
+  const bool classification_known = analysis.classification.has_value()
+      && *analysis.classification != MoveCategory::unknown;
+  if (classification_known) {
     json << '"' << move_category_name(*analysis.classification) << '"';
   } else {
     json << "null";
   }
-  json << ",\"classifierVersion\":" << analysis.classifier_version
+  const char* classification_status = classification_known
+      ? "stable"
+      : "pending";
+  json << ",\"classificationStatus\":\"" << classification_status << '"'
+       << ",\"classifierVersion\":" << analysis.classifier_version
        << ",\"expectedScoreBefore\":";
   append_optional_double(json, analysis.expected_score_before);
   json << ",\"expectedScoreBest\":";
@@ -1204,6 +1484,7 @@ std::string AnalysisService::analysis_json(
     json << "null";
   }
   std::string analyzed_fen;
+  std::string classification_played_move;
   if (const auto game = database_.game(game_id); game.has_value()) {
     analyzed_fen = game->starting_fen;
     if (!game->moves.empty() && analysis.latest_ply > 0) {
@@ -1212,8 +1493,117 @@ std::string AnalysisService::analysis_json(
           game->moves.size() - 1);
       analyzed_fen = game->moves[move_index].fen_after;
     }
+    if (analysis.latest_ply >= 0
+        && analysis.latest_ply < static_cast<int>(game->moves.size())) {
+      classification_played_move =
+          game->moves[static_cast<std::size_t>(analysis.latest_ply)].uci;
+    }
   }
   json << ",\"analyzedFen\":\"" << escape_json(analyzed_fen) << '\"';
+  const std::string engine_rank1 = ranked_best_move(analysis.lines, analysis.best_move);
+  const int engine_reached_depth = analysis.lines.empty()
+      ? analysis.summary.engine_depth
+      : analysis.lines.front().depth;
+  const auto engine_generation = live_job != nullptr
+      ? live_job->target_generation.load()
+      : std::uint64_t{0};
+  const std::string engine_search_mode = live_job != nullptr
+      ? "live_refinement"
+      : "persisted";
+  const std::string classification_config_hash =
+      analysis.classification_config_hash.empty()
+      ? analysis.config_hash
+      : analysis.classification_config_hash;
+  const std::string classification_engine_version =
+      analysis.classification_engine_version.empty()
+      ? analysis.engine_version
+      : analysis.classification_engine_version;
+  const int classification_requested_depth =
+      analysis.classification_requested_depth > 0
+      ? analysis.classification_requested_depth
+      : analysis.requested_depth;
+  const int classification_requested_multi_pv =
+      analysis.classification_requested_multi_pv > 0
+      ? analysis.classification_requested_multi_pv
+      : analysis.requested_multi_pv;
+  const int classification_reached_depth =
+      analysis.classification_reached_depth > 0
+      ? analysis.classification_reached_depth
+      : engine_reached_depth;
+  const std::string classification_rank1 =
+      analysis.classification_rank1_move.empty()
+      ? engine_rank1
+      : analysis.classification_rank1_move;
+  const bool classification_is_published_snapshot =
+      classification_config_hash != analysis.config_hash;
+  const auto classification_generation = classification_is_published_snapshot
+      ? std::uint64_t{0}
+      : engine_generation;
+  const std::string classification_search_mode = classification_is_published_snapshot
+      ? "published_preanalysis"
+      : engine_search_mode;
+  const auto engine_snapshot_id = analysis_snapshot_id(
+      analyzed_fen, analysis.engine_version, analysis.config_hash,
+      analysis.requested_depth, analysis.requested_multi_pv,
+      engine_reached_depth, engine_rank1, engine_generation,
+      engine_search_mode);
+  const auto classification_snapshot_id = analysis_snapshot_id(
+      analyzed_fen, classification_engine_version, classification_config_hash,
+      classification_requested_depth, classification_requested_multi_pv,
+      classification_reached_depth, classification_rank1,
+      classification_generation, classification_search_mode);
+  const bool snapshot_coherent = engine_snapshot_id == classification_snapshot_id;
+  const bool classification_matches_rank1 = usable_engine_move(classification_rank1)
+      && classification_played_move == classification_rank1;
+  const bool classification_renderable = classification_known;
+  const std::string classification_presentation_reason = classification_known
+      ? "classified"
+      : classification_status;
+  const bool arrow_has_move = usable_engine_move(engine_rank1);
+  const bool arrow_renderable = arrow_has_move && snapshot_coherent;
+  const std::string arrow_reason = !arrow_has_move
+      ? "no_rank1"
+      : (!snapshot_coherent ? "classification_snapshot_mismatch" : "coherent");
+  json << ",\"arrowContract\":{\"schema\":\"analysis.arrow.v1\""
+       << ",\"snapshotId\":\"" << escape_json(engine_snapshot_id) << '\"'
+       << ",\"fen\":\"" << escape_json(analyzed_fen) << '\"'
+       << ",\"move\":\"" << escape_json(engine_rank1) << '\"'
+       << ",\"renderable\":" << (arrow_renderable ? "true" : "false")
+       << ",\"reason\":\"" << arrow_reason << "\"}";
+  json << ",\"classificationContract\":{\"schema\":\"analysis.classification.v1\""
+       << ",\"snapshotId\":\"" << escape_json(classification_snapshot_id) << '\"'
+       << ",\"fen\":\"" << escape_json(analyzed_fen) << '\"'
+       << ",\"playedMove\":\"" << escape_json(classification_played_move) << '\"'
+       << ",\"rank1Move\":\"" << escape_json(classification_rank1) << '\"'
+       << ",\"playedMoveMatchesRank1\":"
+       << (classification_matches_rank1 ? "true" : "false")
+       << ",\"renderable\":" << (classification_renderable ? "true" : "false")
+       << ",\"reason\":\"" << escape_json(classification_presentation_reason)
+       << "\"}";
+  json << ",\"snapshotContract\":{\"schema\":\"analysis.snapshot.v1\""
+       << ",\"engineSnapshotId\":\"" << escape_json(engine_snapshot_id) << '\"'
+       << ",\"classificationSnapshotId\":\""
+       << escape_json(classification_snapshot_id) << '\"'
+       << ",\"coherent\":" << (snapshot_coherent ? "true" : "false")
+       << ",\"engineGeneration\":" << engine_generation
+       << ",\"classificationGeneration\":" << classification_generation
+       << ",\"engineConfigHash\":\"" << escape_json(analysis.config_hash) << '\"'
+       << ",\"classificationConfigHash\":\""
+       << escape_json(classification_config_hash) << '\"'
+       << ",\"engineVersion\":\"" << escape_json(analysis.engine_version) << '\"'
+       << ",\"classificationEngineVersion\":\""
+       << escape_json(classification_engine_version) << '\"'
+       << ",\"engineSearchMode\":\"" << engine_search_mode << '\"'
+       << ",\"classificationSearchMode\":\"" << classification_search_mode << '\"'
+       << ",\"engineRequestedDepth\":" << analysis.requested_depth
+       << ",\"classificationRequestedDepth\":" << classification_requested_depth
+       << ",\"engineRequestedMultiPv\":" << analysis.requested_multi_pv
+       << ",\"classificationRequestedMultiPv\":" << classification_requested_multi_pv
+       << ",\"engineReachedDepth\":" << engine_reached_depth
+       << ",\"classificationReachedDepth\":" << classification_reached_depth
+       << ",\"engineRank1Move\":\"" << escape_json(engine_rank1) << '\"'
+       << ",\"classificationRank1Move\":\""
+       << escape_json(classification_rank1) << "\"}";
   const bool line_is_white = analyzed_fen.empty() || white_to_move(analyzed_fen);
   json << ",\"lines\":[";
   const auto line_count = std::min(
@@ -1241,7 +1631,7 @@ std::string AnalysisService::analysis_json(
     }
     json << ",\"evaluationBarWhitePermille\":";
     append_optional_int(
-        json, uses_stockfish19_classifier(analysis.engine_version)
+        json, uses_stockfish19_classifier_contract(analysis.engine_version)
             ? sf19_evaluation_bar_white_permille(line, line_is_white)
             : std::nullopt);
     json << ",\"nodes\":" << line.nodes << ",\"moves\":[";
@@ -1279,6 +1669,7 @@ std::string AnalysisService::analysis_json(
            << ",\"best\":" << player.best
            << ",\"excellent\":" << player.excellent << ",\"good\":" << player.good
            << ",\"okay\":" << player.okay
+           << ",\"inaccuracy\":" << player.inaccuracy
            << ",\"miss\":" << player.miss << ",\"mistake\":" << player.mistake
            << ",\"blunder\":" << player.blunder << ",\"totalMoves\":"
            << player.total_moves << ",\"analyzedMoves\":" << player.analyzed_moves
@@ -1302,24 +1693,26 @@ std::string AnalysisService::analysis_json(
   return json.str();
 }
 
-void AnalysisService::update_classification_for_ply(
+std::string AnalysisService::update_classification_for_ply(
     const GameRecord& game,
     const std::string& game_id,
     const std::string& config_hash,
     const std::string& engine_version,
+    const int requested_depth,
+    const int time_limit_seconds,
     const int ply) {
   const ParsedMove* move = move_at_ply(game, ply);
-  if (move == nullptr) return;
+  if (move == nullptr) return {};
 
   const auto started = std::chrono::steady_clock::now();
   classification_requests_.fetch_add(1, std::memory_order_relaxed);
   classification_incremental_updates_.fetch_add(1, std::memory_order_relaxed);
-  const bool use_sf19_classifier = uses_stockfish19_classifier(engine_version);
-  const int classifier_version = classifier_version_for_engine(engine_version);
+  const bool use_sf19_classifier = uses_stockfish19_classifier_contract(engine_version);
+  const int classifier_version = current_classifier_version_for_engine(engine_version);
   const auto book_metadata = opening_theory_->metadata();
   const auto classified = classify_persisted_move(
       database_, *opening_theory_, game_id, config_hash, *move, book_metadata,
-      use_sf19_classifier, classifier_version);
+      use_sf19_classifier, classifier_version, requested_depth, time_limit_seconds);
   database_.persist_classifications(
       game_id, config_hash, {classified.record}, std::nullopt, std::nullopt,
       classifier_version, AccuracyConfig::version, opening_theory_->source_version(),
@@ -1334,6 +1727,9 @@ void AnalysisService::update_classification_for_ply(
   classification_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
   classification_incremental_total_ms_.fetch_add(elapsed, std::memory_order_relaxed);
   classification_last_ms_.store(elapsed, std::memory_order_relaxed);
+  return classified.classification_unstable
+      ? classified.classification_stability_reason
+      : std::string{};
 }
 
 void AnalysisService::rebuild_classification(
@@ -1346,8 +1742,8 @@ void AnalysisService::rebuild_classification(
   const std::string engine_version = run_metadata.has_value()
       ? run_metadata->engine_version
       : std::string{};
-  const bool use_sf19_classifier = uses_stockfish19_classifier(engine_version);
-  const int classifier_version = classifier_version_for_engine(engine_version);
+  const bool use_sf19_classifier = uses_stockfish19_classifier_contract(engine_version);
+  const int classifier_version = current_classifier_version_for_engine(engine_version);
   if (!force && database_.classification_is_current(
           game_id, config_hash, classifier_version,
           AccuracyConfig::version, book_version)) {
@@ -1373,7 +1769,9 @@ void AnalysisService::rebuild_classification(
   for (const auto& move : game->moves) {
     auto classified = classify_persisted_move(
         database_, *opening_theory_, game_id, config_hash, move, book_metadata,
-        use_sf19_classifier, classifier_version);
+        use_sf19_classifier, classifier_version,
+        run_metadata.has_value() ? run_metadata->requested_depth : 0,
+        run_metadata.has_value() ? run_metadata->requested_time_limit_seconds : 0);
     records.push_back(std::move(classified.record));
     auto& accuracy_moves = move.side_to_move == "black" ? black_moves : white_moves;
     accuracy_moves.push_back(std::move(classified.accuracy));
@@ -1409,6 +1807,8 @@ std::string AnalysisService::performance_diagnostics_json() const {
   return nlohmann::json({
       {"schema", "analysis.performance.v1"},
       {"classification", {
+          {"currentSf18ClassifierVersion", current_classifier_version_for_engine("Stockfish 18")},
+          {"currentSf19ClassifierVersion", current_classifier_version_for_engine("Stockfish 19")},
           {"requests", requests},
           {"fullRebuildRequests", full_requests},
           {"currentCacheHits", hits},
@@ -1494,8 +1894,46 @@ void AnalysisService::run_analysis(
         return;
       }
       if (!incrementally_classified_plies.insert(move_ply).second) return;
-      update_classification_for_ply(
-          *analysis_game, game_id, config_hash, classification_engine_version, move_ply);
+      const auto classification_stability_reason = update_classification_for_ply(
+          *analysis_game, game_id, config_hash, classification_engine_version,
+          settings.depth, settings.time_limit_seconds, move_ply);
+      if (classification_stability_reason != "sf19_cross_snapshot_contradiction"
+          || job->engine->id() != "stockfish19") {
+        return;
+      }
+
+      // A contradiction involving the published SF19 rank-1 move is not a
+      // severity signal. Re-run exactly that move from the original root as a
+      // bounded stability probe. The probe is diagnostic/verification only: it
+      // never turns the engine's own arrow into a negative classification.
+      const ParsedMove* move = move_at_ply(*analysis_game, move_ply);
+      if (move == nullptr) return;
+      try {
+        const auto [before, after] =
+            database_.adjacent_analysis_results(game_id, config_hash, move_ply);
+        (void)after;
+        if (!before.has_value() || before->lines.empty()) return;
+        const auto published_move = ranked_best_move(before->lines, before->best_move);
+        if (published_move != move->uci) return;
+        const auto* published_line = ranked_best_line(before->lines, published_move);
+        const auto published_sample = root_sample(published_line);
+        const auto recheck = recheck_sf19_published_bestmove(
+            *job->engine, move->fen_before, published_move, published_sample, settings,
+            &job->cancel_requested);
+        diagnostics::warning(
+            "classifier",
+            "game=" + game_id + " ply=" + std::to_string(move_ply)
+                + " sf19SnapshotUnstable=1 targetedRecheck="
+                + (recheck.completed ? "complete" : (recheck.attempted ? "incomplete" : "skipped"))
+                + " agreesWithPublishedRoot="
+                + (recheck.completed && recheck.agrees_with_published_root ? "1" : "0")
+                + " depth=" + std::to_string(recheck.reached_depth));
+      } catch (const std::exception& error) {
+        diagnostics::warning(
+            "classifier",
+            "game=" + game_id + " ply=" + std::to_string(move_ply)
+                + " sf19SnapshotUnstable=1 targetedRecheckError=" + error.what());
+      }
     };
 
     // For PGN preparation, slot i is the position before move i. Keep the
@@ -1727,7 +2165,7 @@ void AnalysisService::run_analysis(
             if (targeted_played_move) {
               auto played_line = std::move(played_result.lines.front());
               // searchmoves gives a score, not a trustworthy global rank. Keep
-              // rank=0 until the dedicated top-four resolution search below.
+              // rank=0 until the dedicated top-five resolution search below.
               played_line.rank = 0;
               scout->lines.push_back(std::move(played_line));
               scout->nodes = std::max(scout->nodes, played_result.nodes);
@@ -1747,10 +2185,10 @@ void AnalysisService::run_analysis(
             }
           }
 
-          // Resolve ranks 3/4 explicitly when the played move was outside the
+          // Resolve ranks 3/4/5 explicitly when the played move was outside the
           // top-two scout. This is classification-only MultiPV: the UI still
           // renders at most settings.multi_pv lines. If the move is absent from
-          // the top four, append its targeted score with rank 5 meaning "5+".
+          // the top five, append its targeted score with rank 6 meaning "6+".
           if (!played_move.empty() && !std::any_of(
                   scout->lines.begin(), scout->lines.end(), [&](const EngineLine& line) {
                     return line.rank > 0 && line.best_move() == played_move;
@@ -1777,11 +2215,11 @@ void AnalysisService::run_analysis(
                 }
                 continue;
               }
-              const bool played_is_top_four = std::any_of(
+              const bool played_is_top_five = std::any_of(
                   ranked.lines.begin(), ranked.lines.end(), [&](const EngineLine& line) {
                     return line.best_move() == played_move;
                   });
-              if (!played_is_top_four && targeted_line != nullptr) {
+              if (!played_is_top_five && targeted_line != nullptr) {
                 auto outside_line = *targeted_line;
                 outside_line.rank = kClassificationMultiPv + 1;
                 ranked.lines.push_back(std::move(outside_line));
@@ -1867,9 +2305,12 @@ void AnalysisService::run_analysis(
     }
     rebuild_classification(game_id, config_hash, true);
     database_.set_analysis_status(game_id, config_hash, "complete");
-    // This completed run supersedes every older/lower saved run for the game.
-    // Position-cache entries remain available independently.
-    database_.prune_game_analyses_except(game_id, config_hash);
+    // This completed run supersedes older/lower saved runs only inside the
+    // same engine namespace. The other Stockfish generation remains reusable
+    // when the user switches the Analysis setting back later. Position-cache
+    // entries remain independently namespaced by exact engine identity.
+    database_.prune_game_analyses_except(
+        game_id, job->engine->version(), config_hash);
     database_.notify_ai_profile_analysis_changed(game_id);
     job->state = AnalysisJobState::completed;
     diagnostics::info("analysis", "game=" + game_id + " completed");
@@ -1998,6 +2439,39 @@ void AnalysisService::run_refinement_queue(
           skipped_result, unix_time_seconds());
     }
     job->completed_moves = contiguous_completed_moves();
+
+    std::optional<GameRecord> refinement_game;
+    std::string classification_engine_version;
+    std::unordered_set<int> incrementally_classified_plies;
+    if (!is_fen_position_only) {
+      refinement_game = database_.game(game_id);
+      if (!refinement_game.has_value()) {
+        throw std::runtime_error("Game not found during refinement classification");
+      }
+      classification_engine_version = job->engine->version();
+    }
+
+    auto classify_ready_ply = [&](const int move_ply) {
+      if (is_fen_position_only || !refinement_game.has_value() || move_ply < 0) return;
+      if (!completed_slots.contains(move_ply)
+          || !completed_slots.contains(move_ply + 1)) {
+        return;
+      }
+      if (!incrementally_classified_plies.insert(move_ply).second) return;
+      (void)update_classification_for_ply(
+          *refinement_game, game_id, config_hash, classification_engine_version,
+          settings.depth, settings.time_limit_seconds, move_ply);
+    };
+
+    // Resumed refinement runs may already contain adjacent deep slots. Publish
+    // their move-level categories immediately instead of waiting for the final
+    // game-wide rebuild.
+    if (!is_fen_position_only) {
+      for (int move_ply = 0; move_ply + 1 < static_cast<int>(positions.size()); ++move_ply) {
+        classify_ready_ply(move_ply);
+      }
+    }
+
     auto next_slot = [&]() -> int {
       if (positions.empty()) return -1;
       int focus = job->requested_position_slot.load();
@@ -2086,9 +2560,12 @@ void AnalysisService::run_refinement_queue(
       database_.persist_engine_result(
           game_id, config_hash, slot, completed_moves, *result, unix_time_seconds());
 
-      // Do not publish a partially recomputed classification here. Engine
-      // results remain live, while move categories are published once, after
-      // every position in this refinement queue has finished.
+      // Progressive-depth contract: once the newly persisted deep slot makes
+      // either adjacent move decidable, publish that move's deeper category
+      // immediately. The final rebuild below remains the atomic game-wide
+      // accuracy/summary commit.
+      classify_ready_ply(slot - 1);
+      classify_ready_ply(slot);
     }
 
     if (job->cancel_requested) {
@@ -2098,7 +2575,8 @@ void AnalysisService::run_refinement_queue(
     } else {
       rebuild_classification(game_id, config_hash, true);
       database_.set_analysis_status(game_id, config_hash, "complete");
-      database_.prune_game_analyses_except(game_id, config_hash);
+      database_.prune_game_analyses_except(
+          game_id, job->engine->version(), config_hash);
       database_.notify_ai_profile_analysis_changed(game_id);
       job->state = AnalysisJobState::completed;
       diagnostics::info("analysis", "game=" + game_id + " refinement queue completed");
@@ -2170,7 +2648,8 @@ AnalysisService::ensure_shared_profile_analysis(
   if (auto cached = shared_cached_analysis(game_id, settings);
       cached.has_value() && cached->status == "complete") {
     rebuild_classification(game_id, cached->config_hash);
-    database_.prune_game_analyses_except(game_id, cached->config_hash);
+    database_.prune_game_analyses_except(
+        game_id, cached->engine_version, cached->config_hash);
     return SharedProfileAnalysisRequestResult::cache_ready;
   }
   if (has_active_work()) {
@@ -2251,7 +2730,8 @@ std::string AnalysisService::start_analysis_with_settings_json(
       reusable.has_value() && reusable->status == "complete") {
     diagnostics::info("cache", "game=" + game_id + " complete analysis reused");
     rebuild_classification(game_id, reusable->config_hash);
-    database_.prune_game_analyses_except(game_id, reusable->config_hash);
+    database_.prune_game_analyses_except(
+        game_id, reusable->engine_version, reusable->config_hash);
     return analysis_json(game_id, database_.analysis(
         game_id, reusable->config_hash).value());
   }
@@ -2344,7 +2824,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
       refinement_job = job->second;
       if (auto refined = database_.analysis(game_id, refinement_job->config_hash, ply);
           refined.has_value() && (!refined->lines.empty() || refined->latest_ply == ply)) {
-        auto visible = stable_live_classification_snapshot(
+        auto visible = progressive_live_classification_snapshot(
             game_id, ply, std::move(*refined), refinement_job.get());
         return analysis_json(game_id, visible, refinement_job.get());
       }
@@ -2354,7 +2834,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
   auto maximum_settings = database_.settings();
   if (auto refined = shared_cached_analysis(game_id, maximum_settings, ply);
       refined.has_value() && (!refined->lines.empty() || refined->latest_ply == ply)) {
-    auto visible = stable_live_classification_snapshot(
+    auto visible = progressive_live_classification_snapshot(
         game_id, ply, std::move(*refined), refinement_job.get());
     return analysis_json(game_id, visible, refinement_job.get());
   }
@@ -2427,7 +2907,7 @@ std::string AnalysisService::move_analysis_status_json(const std::string& game_i
     }
   }
   if (refinement_job != nullptr && live_job == refinement_job) {
-    *result = stable_live_classification_snapshot(
+    *result = progressive_live_classification_snapshot(
         game_id, ply, std::move(*result), refinement_job.get());
   }
   return analysis_json(game_id, *result, live_job.get());
@@ -2471,8 +2951,10 @@ std::string AnalysisService::start_move_refinement_json(
   if (auto reusable = shared_cached_analysis(game_id, settings, ply);
       reusable.has_value() && reusable->status == "complete") {
     rebuild_classification(game_id, reusable->config_hash);
-    database_.prune_game_analyses_except(game_id, reusable->config_hash);
-    return analysis_json(game_id, *reusable);
+    database_.prune_game_analyses_except(
+        game_id, reusable->engine_version, reusable->config_hash);
+    const auto refreshed = database_.analysis(game_id, reusable->config_hash, ply);
+    return analysis_json(game_id, refreshed.value_or(*reusable));
   }
   const auto config_hash = analysis_config_hash(settings);
   const int public_total_plies = game->kind == "fen"
@@ -2799,6 +3281,20 @@ std::string AnalysisService::start_variation_job_json(
   job->visible_multi_pv = settings.multi_pv;
   job->engine = acquire_variation_engine(settings.engine_id);
 
+  // Resolve the complete after-position root width before the worker starts so
+  // every status response can expose stable provenance for the arrow.  Flutter
+  // never derives this contract from visible lines.
+  auto arrow_settings = settings;
+  const auto arrow_context = position_context(job->fen);
+  if (arrow_context.legal_move_count > 0) {
+    arrow_settings.multi_pv = std::max(
+        settings.multi_pv,
+        std::min(arrow_context.legal_move_count, kClassificationMultiPv));
+  }
+  job->arrow_requested_depth = arrow_settings.depth;
+  job->arrow_requested_multi_pv = arrow_settings.multi_pv;
+  job->arrow_config_hash = analysis_config_hash(arrow_settings);
+
   // SF19 sideline engines are intentionally reused across consecutive moves to
   // preserve their expensive TT/NNUE state. Its public live snapshot belongs
   // to exactly one root position, though. Clear only that transient snapshot
@@ -2818,22 +3314,16 @@ std::string AnalysisService::start_variation_job_json(
       // sideline move so evaluation/PV immediately correspond to the board the
       // user is looking at. Classification is finalized afterwards.
       //
-      // SF19 must use the same root search width for the arrow shown now and
-      // for classification if the user follows that arrow on the next ply. A
-      // MultiPV-1 arrow followed by a separate MultiPV-4 classifier search can
-      // legitimately produce a different rank-1 move at the same depth. Keep
-      // the extra SF19 lines internal; variation_analysis_status_json() still
-      // exposes only the user's requested MultiPV count. SF18 intentionally
-      // retains its established search behavior.
+      // The visible rank-1 arrow and the next-ply classifier must share the
+      // same root ordering for BOTH Stockfish 18 and Stockfish 19. Running a
+      // MultiPV-1 visible search and then a separate MultiPV-4 classification
+      // search can legitimately reshuffle rank 1 at the same nominal depth.
+      // That old SF18 split is the root cause of "follow the arrow, get a
+      // blunder" contradictions. Search the classification width once and
+      // keep the additional lines internal; variation_analysis_status_json()
+      // still exposes only the user's requested MultiPV count.
       auto after_settings = settings;
-      if (job->engine->id() == "stockfish19") {
-        const auto after_context = position_context(job->fen);
-        if (after_context.legal_move_count > 0) {
-          after_settings.multi_pv = std::max(
-              settings.multi_pv,
-              std::min(after_context.legal_move_count, kClassificationMultiPv));
-        }
-      }
+      after_settings.multi_pv = job->arrow_requested_multi_pv;
       auto after_request = analysis_request(job->fen, after_settings);
       if (job->engine->id() == "stockfish19") {
         after_request.require_exact_multipv_snapshot = true;
@@ -2843,6 +3333,7 @@ std::string AnalysisService::start_variation_job_json(
       {
         std::lock_guard lock(job->state_mutex);
         job->result = after;
+        job->arrow_snapshot_complete = !after.interrupted;
       }
       if (job->cancel_requested || after.interrupted) {
         std::lock_guard lock(job->state_mutex);
@@ -2856,7 +3347,7 @@ std::string AnalysisService::start_variation_job_json(
       {
         std::lock_guard lock(variation_jobs_mutex_);
         variation_position_results_[variation_position_cache_key(
-            job->fen, settings, job->engine->cache_identity())] = after;
+            job->fen, after_settings, job->engine->cache_identity())] = after;
       }
 
       // A move category compares the played move with the best alternatives in
@@ -2918,12 +3409,64 @@ std::string AnalysisService::start_variation_job_json(
       if (opening_theory_ != nullptr) {
         theory = opening_theory_->lookup(job->fen_before, job->played_move);
       }
-      const auto category = classify_variation_move(
-          job->fen_before, job->played_move, job->fen, *before, after, theory,
-          job->engine->id() == "stockfish19");
+      const bool use_sf19_classifier = job->engine->id() == "stockfish19";
+      auto assessment = assess_move(
+          job->fen_before, job->played_move, job->fen,
+          &before->lines, &before->best_move, &after.lines, theory,
+          use_sf19_classifier);
+      const auto stability = classification_stability(
+          assessment, &*before, &after, use_sf19_classifier,
+          settings.depth, settings.time_limit_seconds);
+      if (stability.unstable) {
+        // Keep the finished move classified. This reason is retained only as
+        // internal diagnostic context for later/deeper reclassification.
+        assessment.classification_unstable = true;
+        assessment.classification_stability_reason = stability.reason;
+      }
+
+      if (use_sf19_classifier
+          && assessment.classification_stability_reason
+              == "sf19_cross_snapshot_contradiction") {
+        const auto published_move = ranked_best_move(before->lines, before->best_move);
+        const auto* published_line = ranked_best_line(before->lines, published_move);
+        const auto published_sample = root_sample(published_line);
+        const auto recheck = recheck_sf19_published_bestmove(
+            *job->engine, job->fen_before, published_move, published_sample, settings,
+            &job->cancel_requested);
+        diagnostics::warning(
+            "classifier",
+            "variation=" + job->id + " sf19SnapshotUnstable=1 targetedRecheck="
+                + (recheck.completed ? "complete" : (recheck.attempted ? "incomplete" : "skipped"))
+                + " agreesWithPublishedRoot="
+                + (recheck.completed && recheck.agrees_with_published_root ? "1" : "0")
+                + " depth=" + std::to_string(recheck.reached_depth));
+      }
+      const auto classification_rank1 = ranked_best_move(before->lines, before->best_move);
+      const auto classification_snapshot_id = analysis_snapshot_id(
+          job->fen_before, job->engine->version(), analysis_config_hash(before_settings),
+          before_settings.depth, before_settings.multi_pv, before->reached_depth,
+          classification_rank1, 0, "variation_before");
+      const bool played_matches_rank1 = usable_engine_move(classification_rank1)
+          && job->played_move == classification_rank1;
+      const bool negative_rank1_conflict = !assessment.classification_unstable
+          && played_matches_rank1 && negative_move_category(assessment.category);
+      if (negative_rank1_conflict) {
+        diagnostics::warning(
+            "classifier",
+            "variation=" + job->id
+                + " presentationInvariant=published_rank1_negative_classification"
+                + " move=" + job->played_move);
+      }
       {
         std::lock_guard lock(job->state_mutex);
-        job->classification = category;
+        job->classification = assessment.category;
+        job->classification_unstable = false;
+        job->classification_stability_reason = assessment.classification_stability_reason;
+        job->classification_snapshot_id = classification_snapshot_id;
+        job->classification_rank1_move = classification_rank1;
+        job->played_move_matches_published_rank1 = played_matches_rank1;
+        job->classification_presentation_coherent = true;
+        job->classification_presentation_reason = "classified";
         job->status = "complete";
       }
     } catch (const std::exception& error) {
@@ -2968,12 +3511,37 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
   std::string error;
   AnalysisResult result;
   std::optional<MoveCategory> classification;
+  bool classification_unstable = false;
+  std::string classification_stability_reason;
+  bool arrow_snapshot_complete = false;
+  std::string arrow_config_hash;
+  int arrow_requested_depth = 0;
+  int arrow_requested_multi_pv = 0;
+  std::string classification_snapshot_id;
+  std::string classification_rank1_move;
+  bool played_move_matches_published_rank1 = false;
+  bool classification_presentation_coherent = true;
+  std::string classification_presentation_reason;
   {
     std::lock_guard lock(job->state_mutex);
     status = job->status;
     error = job->error;
     result = job->result;
     classification = job->classification;
+    classification_unstable = job->classification_unstable;
+    classification_stability_reason = job->classification_stability_reason;
+    arrow_snapshot_complete = job->arrow_snapshot_complete;
+    arrow_config_hash = job->arrow_config_hash;
+    arrow_requested_depth = job->arrow_requested_depth;
+    arrow_requested_multi_pv = job->arrow_requested_multi_pv;
+    classification_snapshot_id = job->classification_snapshot_id;
+    classification_rank1_move = job->classification_rank1_move;
+    played_move_matches_published_rank1 =
+        job->played_move_matches_published_rank1;
+    classification_presentation_coherent =
+        job->classification_presentation_coherent;
+    classification_presentation_reason =
+        job->classification_presentation_reason;
   }
   // Side-line analysis is genuinely live: while Stockfish is thinking, expose
   // its latest complete PV iteration instead of waiting for the hard depth.
@@ -2981,6 +3549,17 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
     auto live = job->engine->current_result();
     if (!live.lines.empty()) result = std::move(live);
   }
+
+  const auto arrow_move = ranked_best_move(result.lines, result.best_move);
+  const bool arrow_renderable = arrow_snapshot_complete
+      && !result.interrupted && usable_engine_move(arrow_move);
+  const auto arrow_snapshot_id = analysis_snapshot_id(
+      job->fen, job->engine->version(), arrow_config_hash,
+      arrow_requested_depth, arrow_requested_multi_pv, result.reached_depth,
+      arrow_move, 0, "variation_after");
+  const std::string arrow_reason = !arrow_snapshot_complete
+      ? "search_incomplete"
+      : (!usable_engine_move(arrow_move) ? "no_rank1" : "coherent");
 
   nlohmann::json json{
       {"jobId", job->id},
@@ -2990,13 +3569,38 @@ std::string AnalysisService::variation_analysis_status_json(const std::string& j
       {"fen", job->fen},
       {"position", nlohmann::json::parse(position_view_json(job->fen))},
       {"error", error.empty() ? nlohmann::json(nullptr) : nlohmann::json(error)},
-      {"bestMove", ranked_best_move(result.lines, result.best_move)},
+      {"bestMove", arrow_move},
+      {"arrowContract", {
+          {"schema", "analysis.arrow.v1"},
+          {"snapshotId", arrow_snapshot_id},
+          {"fen", job->fen},
+          {"move", arrow_move},
+          {"renderable", arrow_renderable},
+          {"reason", arrow_reason},
+      }},
       {"engineVersion", job->engine->version()},
       {"liveDepth", result.reached_depth},
       {"moverEvaluationCp", nullptr},
       {"moverMateIn", nullptr},
       {"classification", classification.has_value()
           ? nlohmann::json(move_category_name(*classification)) : nlohmann::json(nullptr)},
+      {"classificationStatus", classification.has_value() ? "stable" : "pending"},
+      {"classificationStabilityReason", classification_stability_reason.empty()
+          ? nlohmann::json(nullptr)
+          : nlohmann::json(classification_stability_reason)},
+      {"classificationContract", {
+          {"schema", "analysis.classification.v1"},
+          {"snapshotId", classification_snapshot_id},
+          {"fen", job->fen_before},
+          {"playedMove", job->played_move},
+          {"rank1Move", classification_rank1_move},
+          {"playedMoveMatchesRank1", played_move_matches_published_rank1},
+          {"renderable", classification.has_value()
+              && classification_presentation_coherent},
+          {"reason", classification_presentation_reason.empty()
+              ? (classification.has_value() ? "coherent" : "pending")
+              : classification_presentation_reason},
+      }},
       {"lines", nlohmann::json::array()},
   };
   if (!result.lines.empty()) {
@@ -3150,6 +3754,318 @@ std::string AnalysisService::coach_hint_json(const std::string& fen) {
     if (output["moves"].size() >= 2 || !equivalent(line)) continue;
     output["moves"].push_back(candidate);
   }
+  return output.dump();
+}
+
+// -----------------------------------------------------------------------------
+// Section: Explicit Coach verdict review
+// -----------------------------------------------------------------------------
+
+std::string AnalysisService::coach_move_review_json(
+    const std::string& fen, const std::string& move_uci) {
+  (void)apply_legal_uci_move(fen, move_uci);
+  stop_all_mainline_analysis_jobs();
+  stop_all_variation_jobs(true);
+
+  auto settings = database_.settings();
+  settings.depth = std::clamp(settings.sideline_depth, 10, 16);
+  settings.multi_pv = 1;
+  settings.threads = std::clamp(
+      settings.sideline_threads, 1, maximum_worker_threads());
+  settings.hash_mb = std::clamp(settings.sideline_hash_mb, 16, 512);
+
+  auto engine = create_stockfish_engine(settings.engine_id);
+  engine->validate_available();
+  engine->start();
+  const bool line_is_white = white_to_move(fen);
+  const auto serialize = [&](const EngineLine& line, const int rank) {
+    nlohmann::json value{
+        {"rank", rank},
+        {"uci", line.best_move()},
+        {"pv", line.moves},
+        {"evaluationCp", line.evaluation_cp.has_value()
+            ? nlohmann::json(line_is_white ? *line.evaluation_cp
+                                           : -*line.evaluation_cp)
+            : nlohmann::json(nullptr)},
+        {"mateIn", line.mate_in.has_value()
+            ? nlohmann::json(line_is_white ? *line.mate_in : -*line.mate_in)
+            : nlohmann::json(nullptr)},
+        {"wdl", nullptr},
+    };
+    if (line.wdl.has_value()) {
+      value["wdl"] = {
+          {"wins", line_is_white ? line.wdl->wins : line.wdl->losses},
+          {"draws", line.wdl->draws},
+          {"losses", line_is_white ? line.wdl->losses : line.wdl->wins},
+      };
+    }
+    return value;
+  };
+
+  nlohmann::json output{
+      {"status", "ok"},
+      {"fen", fen},
+      {"analysisMode", "verdict_review"},
+      {"reviewedMoveUci", move_uci},
+      {"candidates", nlohmann::json::array()},
+  };
+  try {
+    auto best_request = analysis_request(fen, settings);
+    best_request.multi_pv = 1;
+    best_request.dynamic_early_stop = true;
+    best_request.early_stop_min_depth = std::min(settings.depth, 10);
+    best_request.early_stop_stable_iterations = 2;
+    best_request.early_stop_eval_tolerance_cp = 10;
+    best_request.early_stop_score_gap_cp = 0;
+    const auto best_result = engine->analyze(best_request);
+    if (best_result.lines.empty()) {
+      engine->stop();
+      return output.dump();
+    }
+    const auto& best = best_result.lines.front();
+    output["candidates"].push_back(serialize(best, 1));
+
+    if (best.best_move() != move_uci) {
+      auto move_request = analysis_request(fen, settings);
+      move_request.multi_pv = 1;
+      move_request.search_moves = {move_uci};
+      move_request.dynamic_early_stop = false;
+      const auto move_result = engine->analyze(move_request);
+      if (!move_result.lines.empty()) {
+        const auto it = std::find_if(
+            move_result.lines.begin(), move_result.lines.end(),
+            [&](const EngineLine& line) { return line.best_move() == move_uci; });
+        const auto& selected = it != move_result.lines.end()
+            ? *it : move_result.lines.front();
+        if (!selected.best_move().empty()) {
+          output["candidates"].push_back(serialize(selected, 0));
+        }
+      }
+    }
+    output["engineVersion"] = engine->version();
+    output["depth"] = best_result.reached_depth;
+  } catch (...) {
+    engine->stop();
+    throw;
+  }
+  engine->stop();
+  return output.dump();
+}
+
+// -----------------------------------------------------------------------------
+// Section: Complete-root worst move / fastest-loss coach analysis
+// -----------------------------------------------------------------------------
+
+std::string AnalysisService::coach_extreme_move_json(
+    const std::string& fen, const bool fastest_loss) {
+  // This is an explicit foreground coach request, just like coach_hint_json().
+  // Keep one bounded engine owner and do not let hidden mainline/variation work
+  // compete with it. Results remain ephemeral and never enter persisted game
+  // analysis because their ranking semantics are intentionally inverted.
+  stop_all_mainline_analysis_jobs();
+  stop_all_variation_jobs(true);
+
+  const auto legal_moves = legal_uci_moves(fen);
+  auto settings = database_.settings();
+  const int refinement_depth = std::clamp(settings.sideline_depth, 10, 16);
+  const int scout_depth = std::clamp(refinement_depth - 5, 6, 9);
+  settings.threads = std::clamp(
+      settings.sideline_threads, 1, maximum_worker_threads());
+  settings.hash_mb = std::clamp(settings.sideline_hash_mb, 16, 512);
+
+  nlohmann::json output{
+      {"status", "ok"},
+      {"fen", fen},
+      {"analysisMode", fastest_loss ? "fastest_loss" : "worst_move"},
+      {"rootSide", white_to_move(fen) ? "white" : "black"},
+      {"legalMoveCount", legal_moves.size()},
+      {"scoutDepth", scout_depth},
+      {"refinementDepth", refinement_depth},
+      {"candidates", nlohmann::json::array()},
+      {"forcedLossFound", false},
+  };
+  if (legal_moves.empty()) return output.dump();
+
+  struct ExtremeLine {
+    std::string move_uci;
+    EngineLine line;
+    int reached_depth{0};
+    bool refined{false};
+  };
+
+  const auto root_expected_score = [](const EngineLine& line)
+      -> std::optional<double> {
+    if (!line.wdl.has_value()) return std::nullopt;
+    const double wins = line.wdl->wins;
+    const double draws = line.wdl->draws;
+    const double losses = line.wdl->losses;
+    const double total = wins + draws + losses;
+    if (total <= 0.0) return std::nullopt;
+    return std::clamp((wins + 0.5 * draws) / total, 0.0, 1.0);
+  };
+
+  const auto score_class = [](const EngineLine& line) {
+    if (line.mate_in.has_value() && *line.mate_in < 0) return 0;
+    if (line.evaluation_cp.has_value() || line.wdl.has_value()) return 1;
+    if (line.mate_in.has_value() && *line.mate_in > 0) return 2;
+    return 3;
+  };
+
+  const auto worse_than = [&](const ExtremeLine& left,
+                              const ExtremeLine& right) {
+    const int left_class = score_class(left.line);
+    const int right_class = score_class(right.line);
+    if (left_class != right_class) return left_class < right_class;
+
+    // An already proven forced loss dominates centipawn differences. For a
+    // fastest-loss question, and as a deterministic tie-break for worst-move,
+    // the shorter losing mate is the more severe move for the root player.
+    if (left_class == 0) {
+      return std::abs(*left.line.mate_in) < std::abs(*right.line.mate_in);
+    }
+    if (left_class == 2) {
+      // Both moves win by force for the root side. A longer mate is the less
+      // favorable of the two, therefore it ranks as the "worse" move.
+      return std::abs(*left.line.mate_in) > std::abs(*right.line.mate_in);
+    }
+
+    const auto left_expected = root_expected_score(left.line);
+    const auto right_expected = root_expected_score(right.line);
+    if (left_expected.has_value() && right_expected.has_value() &&
+        std::abs(*left_expected - *right_expected) > 0.0005) {
+      return *left_expected < *right_expected;
+    }
+    if (left.line.evaluation_cp.has_value() &&
+        right.line.evaluation_cp.has_value() &&
+        *left.line.evaluation_cp != *right.line.evaluation_cp) {
+      return *left.line.evaluation_cp < *right.line.evaluation_cp;
+    }
+    return left.move_uci < right.move_uci;
+  };
+
+  auto engine = create_stockfish_engine(settings.engine_id);
+  engine->validate_available();
+  engine->start();
+  output["engineVersion"] = engine->version();
+
+  const auto analyze_restricted = [&](const std::string& move,
+                                      const int depth,
+                                      const std::uint64_t node_limit,
+                                      const bool refinement)
+      -> std::optional<ExtremeLine> {
+    auto pass_settings = settings;
+    pass_settings.depth = depth;
+    pass_settings.multi_pv = 1;
+    auto request = analysis_request(fen, pass_settings);
+    request.multi_pv = 1;
+    request.search_moves = {move};
+    request.node_limit = node_limit;
+    request.dynamic_early_stop = refinement;
+    request.early_stop_min_depth = std::min(depth, 10);
+    request.early_stop_stable_iterations = 2;
+    request.early_stop_eval_tolerance_cp = 12;
+    request.early_stop_score_gap_cp = 0;
+    const auto result = engine->analyze(request);
+    if (result.lines.empty()) return std::nullopt;
+
+    const EngineLine* selected = nullptr;
+    for (const auto& line : result.lines) {
+      if (line.best_move() == move) {
+        selected = &line;
+        break;
+      }
+    }
+    if (selected == nullptr) selected = &result.lines.front();
+    if (selected->best_move().empty()) return std::nullopt;
+    return ExtremeLine{
+        .move_uci = move,
+        .line = *selected,
+        .reached_depth = result.reached_depth,
+        .refined = refinement,
+    };
+  };
+
+  std::vector<ExtremeLine> scout;
+  scout.reserve(legal_moves.size());
+  try {
+    // Stage 1 deliberately evaluates every legal root move. MultiPV cannot be
+    // used as a substitute here because a bounded top-N search can never prove
+    // which omitted move is objectively worst.
+    for (const auto& move : legal_moves) {
+      if (auto line = analyze_restricted(move, scout_depth, 24000, false)) {
+        scout.push_back(std::move(*line));
+      }
+    }
+    std::stable_sort(scout.begin(), scout.end(), worse_than);
+
+    // Stage 2 spends the deeper budget only on the shallow bottom candidates.
+    // Three is sufficient to detect shallow ordering noise without multiplying
+    // the full sideline cost by the number of legal moves.
+    const std::size_t refinement_count = std::min<std::size_t>(3, scout.size());
+    std::vector<ExtremeLine> finalists;
+    finalists.reserve(refinement_count);
+    for (std::size_t index = 0; index < refinement_count; ++index) {
+      auto refined = analyze_restricted(
+          scout[index].move_uci, refinement_depth, 180000, true);
+      finalists.push_back(refined.has_value()
+          ? std::move(*refined)
+          : scout[index]);
+    }
+    std::stable_sort(finalists.begin(), finalists.end(), worse_than);
+
+    const bool line_is_white = white_to_move(fen);
+    output["forcedLossFound"] = !finalists.empty() &&
+        finalists.front().line.mate_in.has_value() &&
+        *finalists.front().line.mate_in < 0;
+    output["selectionBasis"] = output["forcedLossFound"].get<bool>()
+        ? "forced_loss_shortest_mate"
+        : "lowest_root_evaluation";
+
+    for (std::size_t index = 0; index < finalists.size(); ++index) {
+      const auto& candidate = finalists[index];
+      const auto expected = root_expected_score(candidate.line);
+      nlohmann::json value{
+          {"rank", static_cast<int>(index + 1)},
+          {"uci", candidate.move_uci},
+          {"pv", candidate.line.moves},
+          {"depth", candidate.reached_depth},
+          {"refined", candidate.refined},
+          {"rootEvaluationCp", candidate.line.evaluation_cp.has_value()
+              ? nlohmann::json(*candidate.line.evaluation_cp)
+              : nlohmann::json(nullptr)},
+          {"evaluationCp", candidate.line.evaluation_cp.has_value()
+              ? nlohmann::json(line_is_white
+                    ? *candidate.line.evaluation_cp
+                    : -*candidate.line.evaluation_cp)
+              : nlohmann::json(nullptr)},
+          {"rootMateIn", candidate.line.mate_in.has_value()
+              ? nlohmann::json(*candidate.line.mate_in)
+              : nlohmann::json(nullptr)},
+          {"mateIn", candidate.line.mate_in.has_value()
+              ? nlohmann::json(line_is_white
+                    ? *candidate.line.mate_in
+                    : -*candidate.line.mate_in)
+              : nlohmann::json(nullptr)},
+          {"rootExpectedScore", expected.has_value()
+              ? nlohmann::json(*expected) : nlohmann::json(nullptr)},
+          {"wdl", nullptr},
+      };
+      if (candidate.line.wdl.has_value()) {
+        value["wdl"] = {
+            {"wins", line_is_white
+                ? candidate.line.wdl->wins : candidate.line.wdl->losses},
+            {"draws", candidate.line.wdl->draws},
+            {"losses", line_is_white
+                ? candidate.line.wdl->losses : candidate.line.wdl->wins},
+        };
+      }
+      output["candidates"].push_back(std::move(value));
+    }
+  } catch (...) {
+    engine->stop();
+    throw;
+  }
+  engine->stop();
   return output.dump();
 }
 

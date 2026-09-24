@@ -493,6 +493,13 @@ AnalysisResult StockfishEngine::analyze(const AnalysisRequest& request) {
   impl_->engine->set_on_bestmove([](const std::string_view, const std::string_view) {});
 
   AnalysisResult result = current_result();
+  {
+    std::lock_guard result_lock(impl_->live_result_mutex);
+    if (!impl_->live_best_move.empty()
+        && impl_->live_best_move != "(none)" && impl_->live_best_move != "0000") {
+      result.best_move = impl_->live_best_move;
+    }
+  }
   result.interrupted = impl_->cancelled.load();
   result.converged_early = converged_early;
   if (result.lines.empty()) {
@@ -518,12 +525,10 @@ AnalysisResult StockfishEngine::current_result() const {
   if (impl_->live_complete_lines.empty()) return result;
   result.lines = impl_->live_complete_lines;
   result.reached_depth = impl_->live_complete_depth;
-  // Preserve SF18's final bestmove callback for the existing difficulty
-  // audit; consumers of the recommendation use the coherent rank-1 PV.
-  result.best_move = !impl_->live_best_move.empty()
-      && impl_->live_best_move != "(none)" && impl_->live_best_move != "0000"
-      ? impl_->live_best_move
-      : result.lines.front().best_move();
+  // current_result() is the running-search view: publish the newest complete
+  // MultiPV rank-1 recommendation. analyze() replaces it with Stockfish's
+  // final bestmove once the search has actually completed.
+  result.best_move = result.lines.front().best_move();
   for (const auto& line : result.lines) {
     result.nodes = std::max(result.nodes, line.nodes);
   }

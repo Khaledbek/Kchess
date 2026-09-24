@@ -16,6 +16,10 @@ struct TeachingPlan {
   // 0 = do not reveal a concrete move, 1 = guided/partial reveal,
   // 2 = direct supported answer may reveal a concrete move.
   int reveal_level{2};
+  // Native hint-ladder step for the current board. 0 = general orientation,
+  // 1 = source piece, 2 = target square, 3 = tactical/strategic idea,
+  // 4 = reveal the verified move. Non-hint turns keep this at 0.
+  int hint_level{0};
   bool ask_question{false};
   int max_recommendations{2};
   int max_concepts{1};

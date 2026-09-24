@@ -46,7 +46,6 @@ class ProviderService {
   // Fetch a public player's profile + rating stats for a scouting comparison,
   // without creating a profile or writing any games to the database. The job
   // result is a ProviderOverview-shaped JSON for the target username.
-  std::string start_scout_json(ProfileType type, const std::string& username);
   // Deep scouting report: fetches recent archives and aggregates the target's
   // win/draw/loss by colour, time control, termination and opening (from the
   // PGN's own ECO tags) in memory, without persisting anything.
@@ -84,9 +83,6 @@ class ProviderService {
 
   std::unique_ptr<GameProvider> provider_for(ProfileType type);
   void run_provider_create(
-      ProfileType type, std::string username,
-      const std::shared_ptr<ProviderJob>& job) noexcept;
-  void run_scout(
       ProfileType type, std::string username,
       const std::shared_ptr<ProviderJob>& job) noexcept;
   void run_scout_report(

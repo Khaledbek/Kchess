@@ -20,6 +20,7 @@ using json = nlohmann::json;
 
 struct SuppliedGrounding {
   std::set<std::string> evidence_ids;
+  std::set<std::string> fact_ids;
   json profile;
   bool profile_supplied{false};
   bool malformed_profile{false};
@@ -30,6 +31,17 @@ SuppliedGrounding supplied_grounding(const std::vector<EvidenceItem>& supplied) 
   SuppliedGrounding result;
   for (const auto& item : supplied) {
     result.evidence_ids.insert(item.id);
+    if (item.kind == EvidenceKind::candidate_moves) {
+      const auto candidate_payload = json::parse(item.payload, nullptr, false);
+      if (candidate_payload.is_object() && candidate_payload.contains("facts") &&
+          candidate_payload["facts"].is_array()) {
+        for (const auto& fact : candidate_payload["facts"]) {
+          if (!fact.is_object()) continue;
+          const auto id = fact.value("fact_id", "");
+          if (!id.empty()) result.fact_ids.insert(id);
+        }
+      }
+    }
     if (item.kind != EvidenceKind::user_profile) continue;
     if (result.profile_supplied || item.id != "profile.context.v3") {
       result.malformed_profile = true;
@@ -359,6 +371,7 @@ std::set<std::string> supplied_coordinate_moves(
       }
     };
     if (payload.contains("best")) add_candidate(payload["best"]);
+    if (payload.contains("focus")) add_candidate(payload["focus"]);
     if (payload.contains("user_move")) add_candidate(payload["user_move"]);
     if (payload.contains("alternatives") && payload["alternatives"].is_array())
       for (const auto& candidate : payload["alternatives"])
@@ -393,11 +406,54 @@ std::string assembled_text(const std::vector<CoachAnswerSegment>& segments) {
   return result;
 }
 
+std::string assembled_answer(const StructuredCoachContent& content) {
+  std::string result = content.verdict_summary;
+  const auto explanation = assembled_text(content.answer_segments);
+  if (!explanation.empty()) {
+    if (!result.empty()) result += ' ';
+    result += explanation;
+  }
+  return result;
+}
+
+void validate_verdict_lock(
+    const StructuredCoachContent& content,
+    const std::optional<ChessVerdictContract>* expected_verdict,
+    const std::optional<ChessVerdictReview>* expected_review,
+    std::vector<std::string>& issues) {
+  const bool expected_active = expected_verdict != nullptr &&
+      expected_verdict->has_value() && (*expected_verdict)->authoritative;
+  const std::string expected_position = expected_active
+      ? std::string(position_verdict_name((*expected_verdict)->position_verdict))
+      : std::string{"unknown"};
+  const std::string expected_move = expected_active
+      ? std::string(move_verdict_name((*expected_verdict)->move_verdict))
+      : std::string{"unknown"};
+  const std::string expected_review_outcome =
+      expected_review != nullptr && expected_review->has_value() &&
+          (*expected_review)->active
+      ? std::string(verdict_review_outcome_name((*expected_review)->outcome))
+      : std::string{"none"};
+
+  if (content.verdict_lock.active != expected_active ||
+      content.verdict_lock.position_verdict != expected_position ||
+      content.verdict_lock.move_verdict != expected_move ||
+      content.verdict_lock.review_outcome != expected_review_outcome) {
+    issues.push_back("native_verdict_lock_mismatch");
+  }
+  if (expected_active) {
+    if (content.verdict_summary.empty() || content.verdict_summary.size() > 240)
+      issues.push_back("native_verdict_summary_required");
+  } else if (!content.verdict_summary.empty()) {
+    issues.push_back("native_verdict_summary_without_verdict");
+  }
+}
+
 void validate_segments(const StructuredCoachContent& content,
-                       const bool personal_or_position,
+                       const SuppliedGrounding& grounding,
                        std::vector<std::string>& issues) {
-  if (content.answer_segments.empty() ||
-      assembled_text(content.answer_segments) != content.answer ||
+  if ((content.answer_segments.empty() && content.verdict_summary.empty()) ||
+      assembled_answer(content) != content.answer ||
       assembled_text(content.follow_up_segments) != content.follow_up_question) {
     issues.push_back("answer_segments_missing_or_mismatched");
     return;
@@ -405,30 +461,37 @@ void validate_segments(const StructuredCoachContent& content,
   std::vector<bool> linked(content.claims.size(), false);
   const auto inspect = [&](const std::vector<CoachAnswerSegment>& segments) {
     for (const auto& segment : segments) {
+      for (const auto& fact_id : segment.fact_ids) {
+        if (!grounding.fact_ids.contains(fact_id))
+          issues.push_back("segment_fact_reference_not_supplied");
+      }
+
       if (segment.kind == CoachSegmentKind::factual) {
-        if (segment.claim_indices.size() != 1 ||
-            segment.claim_indices.front() >= content.claims.size()) {
-          issues.push_back("factual_segment_claim_required");
+        const bool has_native_facts = !segment.fact_ids.empty();
+        const bool has_typed_claim = segment.claim_indices.size() == 1 &&
+            segment.claim_indices.front() < content.claims.size();
+        if (!has_native_facts && !has_typed_claim) {
+          issues.push_back("grounded_segment_reference_required");
           continue;
         }
-        const auto index = segment.claim_indices.front();
-        const auto& claim = content.claims[index];
-        if (claim.kind == CoachClaimKind::general ||
-            claim.answer_quote != segment.text) {
-          issues.push_back("factual_segment_quote_mismatch");
+        if (segment.claim_indices.size() > 1) {
+          issues.push_back("grounded_segment_claim_limit");
           continue;
         }
-        linked[index] = true;
-        continue;
+        if (has_typed_claim) {
+          const auto index = segment.claim_indices.front();
+          const auto& claim = content.claims[index];
+          if (claim.kind == CoachClaimKind::general ||
+              claim.answer_quote != segment.text) {
+            issues.push_back("grounded_segment_claim_mismatch");
+            continue;
+          }
+          linked[index] = true;
+        }
+      } else if (!segment.claim_indices.empty() || !segment.fact_ids.empty()) {
+        issues.push_back("ungrounded_segment_has_grounding_metadata");
       }
-      if (!segment.claim_indices.empty() ||
-          (personal_or_position && segment.kind == CoachSegmentKind::general) ||
-          (personal_or_position &&
-           std::any_of(segment.text.begin(), segment.text.end(),
-                       [](unsigned char byte) { return std::isdigit(byte); })) ||
-          prose_has_ungrounded_coordinate_move(segment.text, {})) {
-        issues.push_back("nonfactual_segment_contains_concrete_claim");
-      }
+
       if (segment.kind == CoachSegmentKind::dialogue &&
           segment.text.size() > 100) {
         issues.push_back("dialogue_segment_too_long");
@@ -455,15 +518,16 @@ ResponseValidationReport ResponseValidator::validate(
     const std::vector<EvidenceItem>* supplied_evidence,
     const bool profile_requested,
     const bool require_grounded_segments,
-    const bool position_relevant) const {
+    const std::optional<ChessVerdictContract>* expected_verdict,
+    const std::optional<ChessVerdictReview>* expected_review) const {
   ResponseValidationReport report;
   const auto grounding = supplied_grounding(
       supplied_evidence ? *supplied_evidence : evidence);
   const auto& visible_evidence = supplied_evidence ? *supplied_evidence : evidence;
   report.issues = profile_contract_issues(content, grounding, profile_requested);
+  validate_verdict_lock(content, expected_verdict, expected_review, report.issues);
   if (require_grounded_segments)
-    validate_segments(content, profile_requested || position_relevant,
-                      report.issues);
+    validate_segments(content, grounding, report.issues);
 
   const auto check_refs = [&](const std::vector<std::string>& ids) {
     if (!references_supplied(ids, grounding)) {

@@ -733,35 +733,6 @@ void ProviderService::run_provider_create(
   }
 }
 
-void ProviderService::run_scout(
-    const ProfileType type,
-    std::string username,
-    const std::shared_ptr<ProviderJob>& job) noexcept {
-  try {
-    auto provider = provider_for(type);
-    auto remote_profile = provider->fetch_profile(username, {}, job->cancel);
-    if (!remote_profile.value.has_value()) {
-      throw ProviderException(HttpError::invalid_response, "provider returned no profile");
-    }
-    std::string stats_json = "[]";
-    const auto stats = provider->fetch_stats(username, {}, job->cancel);
-    if (stats.value.has_value()) {
-      stats_json = normalized_stats_json(*stats.value);
-    }
-    std::ostringstream json;
-    json << "{\"profile\":" << scout_profile_object(*remote_profile.value).dump()
-         << ",\"stats\":" << stats_json << ",\"availableMonths\":[]"
-         << ",\"offlineReady\":false,\"retryAfterSeconds\":0}";
-    finish_provider_job(job, "complete", json.str());
-  } catch (const ProviderException& error) {
-    finish_provider_job(job, "error", {}, http_error_name(error.kind()), error.what());
-  } catch (const std::exception& error) {
-    finish_provider_job(job, "error", {}, "internal", error.what());
-  } catch (...) {
-    finish_provider_job(job, "error", {}, "internal", "unknown provider error");
-  }
-}
-
 void ProviderService::run_scout_report(
     const ProfileType type,
     std::string username,
@@ -964,23 +935,6 @@ std::string ProviderService::start_provider_profile_json(
   }
   job->worker = std::thread(
       [this, type, username, job] { run_provider_create(type, username, job); });
-  return "{\"jobId\":\"" + escape_json(job->id) + "\"}";
-}
-
-std::string ProviderService::start_scout_json(
-    const ProfileType type, const std::string& username) {
-  if (type != ProfileType::chess_com && type != ProfileType::lichess) {
-    throw std::invalid_argument("online provider required");
-  }
-  validate_token(username, "provider username");
-  auto job = std::make_shared<ProviderJob>();
-  job->id = "scout-" + std::to_string(next_provider_job_id_++);
-  {
-    std::lock_guard lock(provider_jobs_mutex_);
-    provider_jobs_.emplace(job->id, job);
-  }
-  job->worker = std::thread(
-      [this, type, username, job] { run_scout(type, username, job); });
   return "{\"jobId\":\"" + escape_json(job->id) + "\"}";
 }
 

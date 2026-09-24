@@ -1,0 +1,8 @@
+KChess Opening Arena KCL runtime diagnostic hotfix 1/1
+
+Purpose:
+- Preserve the concrete OpeningLineGraph availability reason at Practice start.
+- Include the exact runtime opening_lines.kcl path when the asset is missing.
+- Log the runtime KCL path and existence state during Core initialization.
+
+No build/test/analyze/run commands were executed while preparing this hotfix.

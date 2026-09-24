@@ -8,7 +8,6 @@
 
 #include "hybrid_retrieval.h"
 #include "knowledge_quality_store.h"
-#include "text_semantic_retrieval.h"
 
 namespace kchess::knowledge {
 
@@ -35,11 +34,9 @@ struct KnowledgeQueryExecutionPlan {
   KnowledgeRankingWeights ranking_weights;
   std::size_t max_ranked_nodes{24};
   std::size_t max_ranked_chunks{8};
-  std::size_t rerank_candidate_limit{20};
   bool complex_query{false};
   bool prefer_recent{false};
   bool prefer_evidence{false};
-  bool allow_text_reranker{true};
   std::string statistic_metric{"games"};
   bool prefer_low_statistic{false};
 };
@@ -97,8 +94,7 @@ struct RankedKnowledgeRetrieval {
 class KnowledgeRetrievalRanker {
  public:
   explicit KnowledgeRetrievalRanker(
-      const KnowledgeQualityStore* quality_store = nullptr,
-      const TextReranker* reranker = nullptr);
+      const KnowledgeQualityStore* quality_store = nullptr);
 
   [[nodiscard]] RankedKnowledgeRetrieval rank(
       const HybridRetrievalResult& candidates, std::string_view query_text,
@@ -106,7 +102,6 @@ class KnowledgeRetrievalRanker {
 
  private:
   const KnowledgeQualityStore* quality_store_{nullptr};
-  const TextReranker* reranker_{nullptr};
 };
 
 }  // namespace kchess::knowledge

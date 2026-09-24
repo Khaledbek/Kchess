@@ -6,6 +6,7 @@
 
 #include "../coach_types.h"
 #include "evidence.h"
+#include "evidence_plan.h"
 
 namespace kchess::ai {
 
@@ -31,12 +32,28 @@ struct ProfileQueryScope {
 // Section: Query planning contract
 // -----------------------------------------------------------------------------
 
+// Describes where the current positional analysis mode came from. Free-text
+// phrase matching is a compatibility fallback; structural/native signals remain
+// authoritative.
+enum class AnalysisModeSource {
+  none,
+  native_state,
+  request_mode,
+  legacy_text_fallback,
+  intent_default,
+};
+
 struct QueryPlan {
   QueryFamily query_family{QueryFamily::unknown};
   CoachIntent intent{CoachIntent::unknown};
   CoachIntent context_intent{CoachIntent::unknown};
   double routing_confidence{0.0};
   EngineBudget engine_budget{EngineBudget::none};
+  PositionAnalysisMode analysis_mode{PositionAnalysisMode::none};
+  AnalysisModeSource analysis_mode_source{AnalysisModeSource::none};
+  // True when the current turn selected the mode rather than inheriting a
+  // generic positional default.
+  bool analysis_mode_explicit{false};
   ResponseDepth response_depth{ResponseDepth::standard};
   bool needs_position{false};
   bool needs_profile{false};
@@ -47,6 +64,8 @@ struct QueryPlan {
   ProfileQueryScope profile_scope;
   std::size_t concept_limit{5};
   std::vector<EvidenceKind> evidence;
+  // Compositional information-needs contract produced by deterministic planning.
+  EvidencePlan evidence_plan;
 };
 
 }  // namespace kchess::ai

@@ -158,6 +158,22 @@ std::vector<std::string> legal_promotion_choices(
   return result;
 }
 
+std::vector<std::string> legal_uci_moves(const std::string& fen) {
+  const auto validation = validate_fen(fen);
+  if (!validation.valid) throw std::invalid_argument(validation.error);
+  initialize_stockfish_runtime();
+  std::deque<Stockfish::StateInfo> states(1);
+  Stockfish::Position position;
+  position.set(validation.normalized, false, &states.back());
+
+  std::vector<std::string> result;
+  result.reserve(Stockfish::MoveList<Stockfish::LEGAL>(position).size());
+  for (const auto move : Stockfish::MoveList<Stockfish::LEGAL>(position)) {
+    result.push_back(Stockfish::UCIEngine::move(move, false));
+  }
+  return result;
+}
+
 
 PositionOutcome position_outcome(const std::string& fen) {
   const auto validation = validate_fen(fen);

@@ -19,6 +19,9 @@ LLMProviderRequest make_llm_provider_request(
   provider_request.locale = context.locale;
   provider_request.intent = plan.intent;
   provider_request.query_family = plan.query_family;
+  provider_request.analysis_mode = plan.analysis_mode;
+  provider_request.analysis_mode_explicit = plan.analysis_mode_explicit;
+  provider_request.evidence_plan = plan.evidence_plan;
   provider_request.needs_profile = plan.needs_profile;
   if (plan.needs_profile) provider_request.profile_scope = plan.profile_scope;
   provider_request.mode = request.mode;
@@ -38,10 +41,11 @@ LLMProviderRequest make_llm_provider_request(
   provider_request.session_summary = context.session_summary;
   provider_request.pgn_excerpt = context.pgn_excerpt;
   provider_request.evidence = optimize_provider_evidence(
-      evidence, plan.response_depth, context.estimated_tokens, &plan,
-      optimization_stats);
+      evidence, plan.response_depth, request.mode, context.estimated_tokens, &plan,
+      &teaching_plan, optimization_stats);
   provider_request.input_token_budget = context.input_token_budget;
   provider_request.automatic_turn = request.automatic_turn;
+  provider_request.move_attribution = request.move_attribution;
   return provider_request;
 }
 

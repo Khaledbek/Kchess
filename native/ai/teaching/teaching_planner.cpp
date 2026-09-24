@@ -46,6 +46,67 @@ std::string objective_for_intent(const CoachIntent topic) {
   }
 }
 
+
+std::string objective_for_analysis_mode(const PositionAnalysisMode mode) {
+  switch (mode) {
+    case PositionAnalysisMode::best_move:
+      return "identify_best_move";
+    case PositionAnalysisMode::worst_move:
+      return "identify_worst_move";
+    case PositionAnalysisMode::fastest_loss:
+      return "identify_fastest_loss";
+    case PositionAnalysisMode::avoid_trade:
+      return "avoid_unwanted_trade";
+    case PositionAnalysisMode::threat:
+      return "identify_immediate_threat";
+    case PositionAnalysisMode::explain_move:
+      return "explain_move_consequences";
+    case PositionAnalysisMode::what_if_move:
+      return "analyze_move_consequences";
+    case PositionAnalysisMode::compare_candidates:
+      return "compare_candidate_tradeoffs";
+    case PositionAnalysisMode::learner_move_evaluation:
+      return "evaluate_learner_move";
+    case PositionAnalysisMode::position_overview:
+      return "understand_position_priority";
+    case PositionAnalysisMode::none:
+    default:
+      return {};
+  }
+}
+
+std::string skill_for_analysis_mode(const PositionAnalysisMode mode) {
+  switch (mode) {
+    case PositionAnalysisMode::worst_move:
+    case PositionAnalysisMode::fastest_loss:
+      return "calculation.error_avoidance";
+    case PositionAnalysisMode::avoid_trade:
+      return "strategy.trade_decision";
+    case PositionAnalysisMode::threat:
+      return "calculation.threat_detection";
+    case PositionAnalysisMode::explain_move:
+    case PositionAnalysisMode::what_if_move:
+    case PositionAnalysisMode::learner_move_evaluation:
+      return "calculation.move_consequences";
+    case PositionAnalysisMode::position_overview:
+      return "strategy.position_assessment";
+    case PositionAnalysisMode::best_move:
+    case PositionAnalysisMode::compare_candidates:
+      return "calculation.candidate_selection";
+    case PositionAnalysisMode::none:
+    default:
+      return {};
+  }
+}
+
+int next_hint_level(const CoachRequest& request, const CoachSessionState* session) {
+  if (request.mode != CoachMode::hint || !request.position_fen || session == nullptr) {
+    return 0;
+  }
+  if (session->hint_board != *request.position_fen) return 0;
+  return std::clamp(session->hint_level, 0, 4);
+}
+
 std::int64_t unix_time_seconds() {
   using namespace std::chrono;
   return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
@@ -170,6 +231,56 @@ TeachingPlan TeachingPlanner::plan(const CoachRequest& request,
       break;
   }
 
+  // Explicit current-question analysis is authoritative over a stale lesson
+  // motif. The teaching layer describes *how* to explain the already-resolved
+  // native analysis mode; it must not reinterpret a worst-move/fastest-loss
+  // question as the motif from the previous exercise.
+  const bool direct_extreme_answer =
+      query_plan.analysis_mode_explicit &&
+      (query_plan.analysis_mode == PositionAnalysisMode::best_move ||
+       query_plan.analysis_mode == PositionAnalysisMode::worst_move ||
+       query_plan.analysis_mode == PositionAnalysisMode::fastest_loss);
+  if (query_plan.analysis_mode_explicit &&
+      (direct_extreme_answer ||
+       (request.mode != CoachMode::quiz && request.mode != CoachMode::hint))) {
+    if (const auto objective = objective_for_analysis_mode(query_plan.analysis_mode);
+        !objective.empty()) {
+      result.objective_id = objective;
+    }
+    if (const auto analysis_skill = skill_for_analysis_mode(query_plan.analysis_mode);
+        !analysis_skill.empty()) {
+      result.skill_id = analysis_skill;
+      const auto separator = analysis_skill.find('.');
+      result.skill_family = separator == std::string::npos
+          ? analysis_skill
+          : analysis_skill.substr(0, separator);
+    }
+    result.delivery_mode =
+        query_plan.analysis_mode == PositionAnalysisMode::compare_candidates
+            ? "candidate_comparison"
+            : "grounded_analysis_answer";
+    result.reveal_level = 2;
+    result.ask_question = false;
+    result.max_recommendations =
+        query_plan.analysis_mode == PositionAnalysisMode::compare_candidates ? 2 : 1;
+  }
+
+  if (request.mode == CoachMode::hint) {
+    result.hint_level = next_hint_level(request, session);
+    // The ladder reveals progressively more native information while preserving
+    // the original scored question in session memory. Only the final step may
+    // expose the verified move itself.
+    if (result.hint_level >= 4) {
+      result.objective_id = "reveal_verified_solution";
+      result.delivery_mode = "hint_reveal";
+      result.reveal_level = 2;
+      result.ask_question = false;
+      result.max_recommendations = 1;
+    } else {
+      result.target = "hint_level:" + std::to_string(result.hint_level);
+    }
+  }
+
   if (request.automatic_turn) {
     result.objective_id = "explain_one_critical_point";
     result.delivery_mode = "critical_point";
@@ -182,8 +293,12 @@ TeachingPlan TeachingPlanner::plan(const CoachRequest& request,
   // A completed move that answered an open question is a feedback turn, not
   // another unsolicited lesson. Let the provider address the actual attempt
   // before the session opens a new exercise or hides the played solution.
+  const bool current_turn_is_completed_move =
+      request.user_move_uci.has_value() || request.user_move_success_confirmed ||
+      request.user_move_error_confirmed;
   if (session != nullptr && !session->last_attempt_status.empty() &&
-      request.mode != CoachMode::quiz && request.mode != CoachMode::hint) {
+      current_turn_is_completed_move && request.mode != CoachMode::quiz &&
+      request.mode != CoachMode::hint) {
     result.objective_id = "explain_verified_learner_attempt";
     const bool has_contrast = std::any_of(
         evidence.begin(), evidence.end(), [](const EvidenceItem& item) {

@@ -1064,7 +1064,7 @@ class _SelfComparisonH2HCard extends StatelessWidget {
 
 Widget _comparisonAvatar(AppProfile profile, {double iconSize = 24}) {
   Widget asset() => Image.asset(
-    '../img/${profile.avatarAsset}',
+    'assets/analysis_img/${profile.avatarAsset}',
     fit: BoxFit.cover,
     errorBuilder: (_, _, _) => Icon(Icons.person, size: iconSize),
   );

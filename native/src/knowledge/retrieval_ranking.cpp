@@ -224,75 +224,6 @@ void sort_chunks(std::vector<RankedKnowledgeChunk>& chunks) {
                    });
 }
 
-void apply_reranker(std::vector<RankedKnowledgeChunk>& chunks,
-                    std::string_view query_text,
-                    const KnowledgeQueryExecutionPlan& plan,
-                    const TextReranker* reranker) {
-  if (!plan.allow_text_reranker || reranker == nullptr || !reranker->available() ||
-      query_text.empty() || chunks.empty()) {
-    return;
-  }
-
-  const std::size_t limit = std::min(
-      {plan.rerank_candidate_limit, plan.retrieval_budgets.max_rerank_candidates,
-       chunks.size()});
-  if (limit == 0) return;
-
-  std::vector<TextRerankCandidate> candidates;
-  candidates.reserve(limit);
-  for (std::size_t i = 0; i < limit; ++i) {
-    const auto& item = chunks[i];
-    const float vector_score = item.candidate.signals.vector_score.value_or(0.0F);
-    candidates.push_back({item.candidate.chunk.metadata.id,
-                          item.candidate.chunk.content,
-                          item.candidate.chunk.metadata.type,
-                          item.candidate.chunk.metadata.topic,
-                          vector_score});
-  }
-
-  std::vector<TextRerankScore> scores;
-  try {
-    scores = reranker->score(query_text, candidates);
-  } catch (...) {
-    return;
-  }
-
-  std::unordered_map<std::string, double> raw_by_id;
-  raw_by_id.reserve(scores.size());
-  double minimum = std::numeric_limits<double>::infinity();
-  double maximum = -std::numeric_limits<double>::infinity();
-  for (const auto& score : scores) {
-    if (score.chunk_id.empty() || !std::isfinite(score.score)) continue;
-    const auto present = std::find_if(
-        candidates.begin(), candidates.end(), [&](const auto& candidate) {
-          return candidate.chunk_id == score.chunk_id;
-        });
-    if (present == candidates.end()) continue;
-    raw_by_id.emplace(score.chunk_id.value, score.score);
-    minimum = std::min(minimum, score.score);
-    maximum = std::max(maximum, score.score);
-  }
-
-  std::unordered_map<std::string, double> by_id;
-  by_id.reserve(raw_by_id.size());
-  const bool has_range = maximum > minimum;
-  for (const auto& [id, raw] : raw_by_id) {
-    const double normalized = has_range ? (raw - minimum) / (maximum - minimum)
-                                        : 0.5;
-    by_id.emplace(id, clamp01(normalized));
-  }
-
-  for (std::size_t i = 0; i < limit; ++i) {
-    auto& item = chunks[i];
-    const auto it = by_id.find(item.candidate.chunk.metadata.id.value);
-    if (it == by_id.end()) continue;
-    item.breakdown.rerank_relevance = it->second;
-    item.score = clamp01((1.0 - kRerankBlend) * item.score +
-                         kRerankBlend * it->second);
-  }
-  sort_chunks(chunks);
-}
-
 }  // namespace
 
 // -----------------------------------------------------------------------------
@@ -304,7 +235,6 @@ KnowledgeQueryExecutionPlan KnowledgeQueryPlanner::plan(
     const HybridRetrievalBudgets& requested_budgets) const {
   KnowledgeQueryExecutionPlan out;
   out.retrieval_budgets = bounded_budgets(requested_budgets);
-  out.rerank_candidate_limit = out.retrieval_budgets.max_rerank_candidates;
   const bool weaknesses = std::find(route.profile_scope.topics.begin(),
       route.profile_scope.topics.end(), "weaknesses") != route.profile_scope.topics.end();
   if (weaknesses) { out.statistic_metric = "scorePercent"; out.prefer_low_statistic = true; }
@@ -324,7 +254,6 @@ KnowledgeQueryExecutionPlan KnowledgeQueryPlanner::plan(
       out.ranking_weights.exact_statistics *= 2.6;
       out.ranking_weights.semantic_relevance *= 0.45;
       out.ranking_weights.position_similarity = 0.0;
-      out.allow_text_reranker = false;
       break;
     case KnowledgeQueryIntent::kRelationship:
       out.complex_query = true;
@@ -404,11 +333,11 @@ KnowledgeQueryExecutionPlan KnowledgeQueryPlanner::plan(
 // -----------------------------------------------------------------------------
 
 KnowledgeRetrievalRanker::KnowledgeRetrievalRanker(
-    const KnowledgeQualityStore* quality_store, const TextReranker* reranker)
-    : quality_store_(quality_store), reranker_(reranker) {}
+    const KnowledgeQualityStore* quality_store)
+    : quality_store_(quality_store) {}
 
 RankedKnowledgeRetrieval KnowledgeRetrievalRanker::rank(
-    const HybridRetrievalResult& candidates, std::string_view query_text,
+    const HybridRetrievalResult& candidates, std::string_view,
     const KnowledgeQueryExecutionPlan& plan) const {
   RankedKnowledgeRetrieval out;
   const auto weights = normalized_policy_weights(plan.ranking_weights, plan);
@@ -478,7 +407,6 @@ RankedKnowledgeRetrieval KnowledgeRetrievalRanker::rank(
     out.chunks.push_back(std::move(ranked));
   }
   sort_chunks(out.chunks);
-  apply_reranker(out.chunks, query_text, plan, reranker_);
   if (out.chunks.size() > plan.max_ranked_chunks) {
     out.chunks.resize(plan.max_ranked_chunks);
   }

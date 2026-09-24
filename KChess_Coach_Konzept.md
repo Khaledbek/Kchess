@@ -97,7 +97,6 @@ Der Coach kann kleine portable Modelle aus dem vorhandenen Model-Root laden:
 
 - `intent_linear.json` für mehrdeutiges Intent-Routing,
 - `context_planner_linear.json` für begrenzte Context-Plan-Verfeinerung,
-- `embedding_projection.json` für den bestehenden gemeinsamen `EmbeddingModel`-Vertrag.
 
 Diese Modelle sind **optional**. Fehlen sie oder sind sie ungültig, bleibt der deterministische C++-Pfad vollständig funktionsfähig. Tiny Models dürfen keine Engine-Arbeit erzwingen, keine Schachwahrheit erzeugen und keinen zweiten Router/Retriever bilden. Das Embedding-Modell wird gemeinsam von Concept Retrieval und Knowledge Graph genutzt; exakte/kräftige lexikalische Treffer bleiben bevorzugt.
 
@@ -159,3 +158,61 @@ Flutter                 → UI/Interaktion/Lokalisierung
 ```
 
 Keine dieser Komponenten soll durch eine parallele Implementierung in Flutter, Python oder einem zweiten Coach-Pfad dupliziert werden.
+
+## Grounded Coach Architecture (Updates 187–198)
+
+Der aktuelle Coach trennt Schachwahrheit, Unterrichtslogik und Sprache strikt. Eine konkrete Nutzerfrage hat Vorrang vor einem älteren Trainingsmotiv und wird nativ in einen `PositionAnalysisMode` aufgelöst. Dazu gehören unter anderem `best_move`, `worst_move`, `fastest_loss`, `avoid_trade`, `threat`, `what_if_move`, Kandidatenvergleich und die Bewertung eines verifizierten Nutzerzuges.
+
+Für `worst_move` und `fastest_loss` genügt ein gewöhnlicher Top-N-Hint nicht. KChess prüft deshalb alle legalen Root-Züge mit einem begrenzten Scout und vertieft nur die schlechtesten Kandidaten. Ein nachgewiesener Verlust durch Matt hat Vorrang vor Centipawn-Verlust; bei `fastest_loss` wird der kürzeste nachgewiesene Verlust bevorzugt. Fertige Extreme-Ergebnisse dürfen nur prozesslokal für exakt dieselbe FEN, Engine-Einstellung und denselben Analysemodus wiederverwendet werden.
+
+Konkrete Schachbehauptungen werden als native `coach.chess_facts.v1`-Fakten mit stabilen Fact-/Candidate-IDs transportiert. Gemini erhält keine Autorität, neue aktuelle Brettzüge zu erfinden, sondern formuliert didaktische Sprache über freigegebene Referenzen. `coach_response.v7` verwendet deshalb rhetorische Segmente mit Fact-Referenzen statt einer providerseitigen factual/nonfactual-Klassifikation. Der native Verified-Fact-Renderer löst diese Referenzen in konkrete Darstellung auf; Validierung und sichere Fallbacks bleiben nativ.
+
+Der Provider-Repair-Pass ist kein Standardpfad mehr. Automatische Coach-Turns bleiben bei höchstens einem Provider-Aufruf, und wenn verifizierte native Evidenz einen sicheren Fallback erlaubt, wird kein zweiter LLM-Aufruf für bloße Formulierungsreparatur verbraucht. Provider-sichtbare Kandidaten-/PV-/Fact-Daten dürfen kompakt übertragen werden, während die vollständige native Evidenz für Validierung, Session-State und Fallback unverändert bleibt.
+
+### Update 202 – Evidence-Plan Contract
+
+Der `EvidencePlan` beschreibt kompositionell, welche Quellen und Informationstypen eine freie Schachfrage benötigt. Perspektive, Analyseumfang, Tiefe, Freshness, Interaktionsart und Elo-Ziel sind Planungsmetadaten und keine Schachwahrheit. Dadurch muss KChess nicht für jede mögliche Nutzerformulierung einen neuen festen Intent erfinden.
+
+### Update 203 – Chess Expert Registry
+
+### Update 204 – Existing Analysis Expert
+Bereits vorhandene KChess-Analyse wird jetzt als eigener Expert mit expliziter Coverage behandelt. Cache/MultiPV darf neue Engine-Arbeit nur dann ersetzen, wenn die vom Evidence Plan verlangten Engine-Fakten tatsächlich vorhanden sind. Unvollständige Top-N-Analyse gilt ausdrücklich nicht als Beweis für alle legalen Züge oder materielle Konsequenzen.
+
+### Update 205 – Stockfish Expert
+
+Stockfish bleibt objektive Schachwahrheit, wird aber als gezielt budgetierte Expert-Quelle hinter dem EvidencePlan behandelt. Bestehende Analyse hat Vorrang, sofern ihre Coverage die angeforderten Needs wirklich erfüllt; exhaustive oder ausdrücklich frische Anforderungen dürfen weiterhin neue native Analyse auslösen. Engine-Nutzung steuert niemals Gesprächsabsicht oder Formulierung.
+
+### Update 206: Human/Elo Bot Expert
+KChess exposes the existing Elo bot policy as a separate `human_model` expert. It projects verified candidate moves into human-likelihood evidence for a requested rating while keeping Stockfish/existing analysis as the only objective source of move quality. The human expert does not launch searches; it consumes already-evaluated candidates so practical prediction stays cheap and cannot replace engine truth.
+
+## Update 207 – Gemeinsames Expert-Evidence-Format
+
+Position-, Taktik-, Opening- und Profilwissen werden nicht neu berechnet, sondern aus den bereits bestehenden KChess-Evidenzströmen in `ExpertEvidence` normalisiert. Jede Einheit trägt ihre `EvidenceSource`, die erfüllbaren `EvidenceNeed`-Anforderungen und die Kennzeichnung, ob sie objektive Brettwahrheit oder heuristische/praktische Evidenz ist. Damit kann der nächste Aggregator mehrere Experten kombinieren, ohne deren ursprüngliche Verantwortlichkeiten zu duplizieren.
+
+## Update 208 – Evidence Aggregator
+
+Der Coach besitzt jetzt eine deterministische Aggregationsgrenze für Ergebnisse mehrerer Schachexperten. Bereits erzeugte Expert-Evidence wird anhand des aktuellen Evidence-Plans nach Informationsbedarf, angeforderter Quelle, Konfidenz und objektiver Wahrheit priorisiert. Identische Evidenz wird dedupliziert; widersprüchliche Payloads mit derselben stabilen Evidence-ID werden nicht gemeinsam an das LLM weitergereicht, sondern deterministisch aufgelöst und diagnostisch gezählt. Nach der finalen Auswahl werden erfüllte und fehlende EvidenceNeeds neu berechnet. Der Aggregator führt selbst keine Engine-, Bot-, Datenbank- oder Providerarbeit aus und erzeugt keine neuen Schachfakten.
+
+## Update 209 – Coach LLM Context v2
+
+Der Provider erhält pro Turn gemeinsam die aktuelle Nutzerfrage, den kanonischen Brettkontext, die relevante Session-Zusammenfassung, den `EvidencePlan` und die tatsächlich ausgewählte native Evidenz. Der `EvidencePlan` beschreibt ausschließlich den Informationsbedarf und ist kein Beweis für eine Schachbehauptung. Dadurch kann das LLM Frage, Gespräch und Schachinformationen als einen zusammenhängenden Coaching-Kontext interpretieren, während konkrete Brettfakten weiterhin ausschließlich aus nativer Evidenz stammen.
+
+### Update 210 – Conversation Understanding
+
+Explizite Folgefragen behalten ihren neu erkannten aktuellen Intent, erhalten aber trotzdem den kompakten vorherigen Nutzerzweck und die letzte akzeptierte Coach-Antwort als Gesprächskontext. Nur echte elliptische Follow-ups erben den vorherigen Intent. Frühere Coach-Texte bleiben ausdrücklich nicht autoritative Schachevidenz; Brettfakten müssen weiterhin aus nativen Evidence-Quellen stammen.
+
+### Update 212 – vereinfachtes Grounding
+
+Mit `coach_response.v8` existiert für konkrete aktuelle Brettwahrheit nur noch ein primärer Grounding-Pfad: native `coach.chess_facts.v1`-Referenzen. Das LLM darf Züge, Schach/Matt, Bewertungen, Figurenfelder und taktische Motive nicht mehr über einen parallelen freien Claim-Vertrag beschreiben. Typisierte Claims bleiben vorübergehend nur für Opening-, Profil- und Move-Contrast-Domänen bestehen, bis auch diese vollständig über native Fact-IDs gerendert werden. Dadurch sinkt die Schema-Komplexität und ein semantisch identischer Schachfakt kann nicht mehr gleichzeitig in zwei konkurrierenden Repräsentationen auftreten.
+
+### Update 213 – Optimierung
+
+Die neue Evidence-Schicht wird unter Kontext- und Latenzbudgets coverage-first verdichtet: zuerst bleibt pro angefordertem Informationsbedarf mindestens die stärkste verfügbare Evidenz erhalten, danach werden Restplätze nach Relevanz gefüllt. Dadurch kann Kontextkompression keine seltene, aber für die aktuelle Frage notwendige Information verdrängen. Die Engine-Tiefe orientiert sich zusätzlich am EvidencePlan; automatische/background Turns werden nicht unnötig auf Deep-Analyse hochgestuft, während explizit tiefe Foreground-Anfragen weiterhin Deep-Budget erhalten können. Bereits vorhandene Analyse bleibt vor neuer Engine-Arbeit priorisiert.
+
+## Update 214 – Learned Chess Evidence Planning abgeschlossen
+
+Die Expert-Schicht vereinheitlicht vorhandene Analyse, Stockfish, Human/Elo-Projektionen, Position/Taktik, Opening, Profil/Historie, Gespräch und Konzepte. Vorhandene Analyse wird nach Coverage wiederverwendet; Freshness kann gezielt frische Engine-Arbeit verlangen oder optionalen Cache-only-Betrieb wählen. Human/Elo-Evidenz beschreibt nur menschliche Wahrscheinlichkeit und ersetzt niemals objektive Engine-Wahrheit. Der Aggregator dedupliziert und priorisiert Evidenz, bevor sie den LLM-Kontext erreicht, während vollständige native Evidenz für Validation und Fallback erhalten bleibt.
+
+Der Coach erhält damit freie Nutzerfrage, kanonischen Brettzustand, bounded Conversation Context, den EvidencePlan und die passende Schachevidenz als getrennte strukturierte Eingaben. Gemini bleibt für Sprachverständnis, Kombination und Coaching-Formulierung zuständig; konkrete aktuelle Brettfakten müssen weiterhin aus nativer Evidenz stammen. Unaufgelöste interne Referenzmarker werden hart blockiert. Diagnosefelder machen Planner-Ausgabe und Evidence-Coverage sichtbar, ohne Entscheidungen zu beeinflussen.
+
+Python bleibt ausschließlich Training/Export des kleinen Modells. Das portable Student-Modell wird später als lokale KChess-Assetdatei eingebunden; normale Source-Update-ZIPs enthalten weder Modellbinary noch `third_party` oder Secrets. Der finale Provider-Kontext dieser Serie verwendet `CoachPrompt v12` mit `coach_response.v8`.

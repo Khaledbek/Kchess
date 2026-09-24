@@ -27,6 +27,8 @@ struct PositionStructureProjectionReport {
   std::size_t positions_projected{0};
   std::size_t nodes_upserted{0};
   std::size_t edges_upserted{0};
+  std::size_t background_yield_count{0};
+  std::uint64_t background_yield_ms{0};
   std::vector<KnowledgeInvalidation> invalidated_entries;
   std::vector<KnowledgeEntryRef> changed_entries;
   std::vector<KnowledgeEntryRef> removed_entries;

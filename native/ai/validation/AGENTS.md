@@ -39,3 +39,15 @@ The production provider path requires a non-general typed claim to carry a short
 ## Update 175 - segmented production validation
 
 Production Gemini responses require joined answer/follow-up segments. Each factual segment must link exactly one non-general claim whose `answer_quote` equals its full text; every non-general claim must be linked. General/uncertainty/dialogue segments cannot carry claim indices, coordinate moves or numbers in a personal/position question. Continue to validate claim semantics against the exact provider-visible evidence; segment shape alone is not a semantic entailment proof. Contrast outcome claims can cite `verifiedAnalysis` scalars only when that object was supplied.
+
+## Update 178 - candidate ID validation
+
+When a structured claim/recommendation carries `candidate_id`, validate the ID/UCI pair against the exact provider-visible `engine.candidates.v1` payload before applying ordinary legality/evaluation checks. The production Gemini adapter always supplies this metadata for move-bound output; move-only validation remains only for compatible native/local callers.
+
+## Update 192 - fact-reference segment validation
+
+Production segment validation no longer rejects prose because the provider labelled it general/nonfactual. A grounded segment is established natively by at least one supplied `fact_id` or one valid typed claim. Every `fact_id` must occur in the exact provider-visible `engine.candidates.v1` facts array. The old `nonfactual_segment_contains_concrete_claim` / `factual_segment_claim_required` classification path is retired for v7; semantic chess authority remains native and the coordinate-move trust boundary remains enforced independently.
+
+## Update 195 - validation failure hand-off
+
+Validation remains the trust boundary. When structured/provider prose fails it, orchestration may discard that prose and hand only already-native candidate/fact state to a safe fallback. This is not validation repair and must not convert an extreme-analysis focus into a recommendation. Renderer authority failures are likewise non-authoritative provider output and may expose only native fallback state.

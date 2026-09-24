@@ -28,7 +28,7 @@ class BotService {
   BotService(const BotService&) = delete;
   BotService& operator=(const BotService&) = delete;
 
-  std::string create_game_json(int requested_elo);
+  std::string create_game_json(int requested_elo, const std::string& player_color);
   std::string active_game_json() const;
   std::string game_json(const std::string& game_id) const;
   std::string games_json() const;

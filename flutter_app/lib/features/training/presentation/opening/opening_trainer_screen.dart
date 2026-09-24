@@ -46,6 +46,7 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen> {
 
   PracticeSnapshot? _snapshot;
   bool _busy = true, _error = false;
+  String? _errorDetails;
   int _generation = 0;
 
   @override
@@ -82,6 +83,7 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen> {
     setState(() {
       _busy = true;
       _error = false;
+      _errorDetails = null;
     });
     final previous = _snapshot?.id;
     if (previous != null) await _cancel(previous);
@@ -95,11 +97,12 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen> {
         _snapshot = result;
         _busy = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted && generation == _generation) {
         setState(() {
           _busy = false;
           _error = true;
+          _errorDetails = error is CoreGatewayException ? error.message : error.toString();
         });
       }
     }
@@ -127,11 +130,12 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen> {
         _snapshot = result;
         _busy = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted && generation == _generation) {
         setState(() {
           _busy = false;
           _error = true;
+          _errorDetails = error is CoreGatewayException ? error.message : error.toString();
         });
       }
     }
@@ -191,10 +195,26 @@ class _OpeningTrainerScreenState extends State<OpeningTrainerScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _DrillMessage(
-            icon: Icons.error_outline,
-            text: strings.trainingOpeningTreeLoadFailed,
-            action: TextButton(onPressed: _restart, child: Text(strings.trainingRestart)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DrillMessage(
+                icon: Icons.error_outline,
+                text: strings.trainingOpeningTreeLoadFailed,
+                action: TextButton(onPressed: _restart, child: Text(strings.trainingRestart)),
+              ),
+              if (_errorDetails != null && _errorDetails!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SelectableText(
+                  _errorDetails!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       );

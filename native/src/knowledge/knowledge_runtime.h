@@ -17,9 +17,6 @@
 namespace kchess {
 class Database;
 class StatisticsService;
-namespace ai {
-class EmbeddingModel;
-}
 }
 
 namespace kchess::knowledge {
@@ -49,6 +46,9 @@ struct KnowledgeRefreshReport {
   std::size_t changed_entries{0};
   std::size_t chunk_nodes_processed{0};
   bool full_maintenance{false};
+  bool game_graph_projection_skipped{false};
+  std::size_t background_yield_count{0};
+  std::uint64_t background_yield_ms{0};
   std::int64_t refreshed_at_ms{0};
 };
 
@@ -70,7 +70,8 @@ class KnowledgeRuntime {
   [[nodiscard]] bool is_open() const noexcept;
 
   [[nodiscard]] KnowledgeRefreshReport refresh_active_profile(
-      std::int64_t observed_at_ms);
+      std::int64_t observed_at_ms,
+      const std::string& graph_source_signature = {});
 
   [[nodiscard]] KnowledgeGapActiveLearningPlan active_learning_plan(
       const std::string& profile_id, std::int64_t evaluated_at_ms);
@@ -80,8 +81,7 @@ class KnowledgeRuntime {
   // engine work, corpus indexing or graph writes are allowed here. When graph
   // maintenance owns the mutex, live facts use the same packet pipeline alone.
   [[nodiscard]] std::optional<ai::EvidenceItem> coach_evidence(
-      const ai::CoachRequest& request, const ai::QueryPlan& plan,
-      const ai::EmbeddingModel* embeddings = nullptr);
+      const ai::CoachRequest& request, const ai::QueryPlan& plan);
 
   // Developer/diagnostic endpoint. request_json may contain profileId, query,
   // nodeId and limit. Output is bounded JSON; it never exposes provider secrets.
@@ -129,6 +129,9 @@ class KnowledgeRuntime {
   std::atomic_uint64_t refresh_changed_entries_{0};
   std::atomic_uint64_t refresh_chunk_nodes_processed_{0};
   std::atomic_uint64_t refresh_quality_entries_processed_{0};
+  std::atomic_uint64_t refresh_game_graph_projection_skips_{0};
+  std::atomic_uint64_t refresh_background_yield_count_{0};
+  std::atomic_uint64_t refresh_background_yield_ms_{0};
   std::atomic_uint64_t coach_evidence_requests_{0};
   std::atomic_uint64_t coach_graph_available_{0};
   std::atomic_uint64_t coach_graph_busy_fallbacks_{0};

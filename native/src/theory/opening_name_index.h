@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "chess/pgn.h"
+#include "theory/position_key.h"
 
 namespace kchess {
 
@@ -36,6 +37,7 @@ class OpeningNameIndex {
   virtual std::optional<OpeningName> lookup(std::uint64_t position_key) const = 0;
   virtual std::uint32_t max_ply() const = 0;
   virtual std::string source_version() const = 0;
+  virtual std::uint64_t position_key_fingerprint() const = 0;
   virtual OpeningNameMetadata metadata() const = 0;
 };
 
@@ -44,6 +46,7 @@ class UnavailableOpeningNameIndex final : public OpeningNameIndex {
   std::optional<OpeningName> lookup(std::uint64_t) const override { return std::nullopt; }
   std::uint32_t max_ply() const override { return 0; }
   std::string source_version() const override { return "not-installed"; }
+  std::uint64_t position_key_fingerprint() const override { return 0; }
   OpeningNameMetadata metadata() const override { return {}; }
 };
 
@@ -54,6 +57,7 @@ class KcoOpeningNameIndex final : public OpeningNameIndex {
   std::optional<OpeningName> lookup(std::uint64_t position_key) const override;
   std::uint32_t max_ply() const override { return metadata_.max_ply; }
   std::string source_version() const override;
+  std::uint64_t position_key_fingerprint() const override { return position_key_fingerprint_; }
   OpeningNameMetadata metadata() const override { return metadata_; }
 
  private:
@@ -65,6 +69,7 @@ class KcoOpeningNameIndex final : public OpeningNameIndex {
   };
 
   OpeningNameMetadata metadata_;
+  std::uint64_t position_key_fingerprint_{kPositionKeyFingerprintSeed};
   std::vector<Entry> entries_;
   std::string string_table_;
 };

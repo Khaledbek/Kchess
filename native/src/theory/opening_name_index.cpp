@@ -131,6 +131,8 @@ KcoOpeningNameIndex::KcoOpeningNameIndex(const std::filesystem::path& path) {
         || string_table_.find('\0', entry.name_offset) == std::string::npos) {
       throw std::runtime_error("KCO entry name offset is invalid");
     }
+    position_key_fingerprint_ = extend_position_key_fingerprint(
+        position_key_fingerprint_, entry.position_key);
     previous_key = entry.position_key;
     has_previous = true;
     entries_.push_back(std::move(entry));

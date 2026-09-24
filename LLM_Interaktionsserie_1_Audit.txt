@@ -1,0 +1,23 @@
+KChess LLM-Interaktionsserie 1 - Abschlussaudit
+Updates: 1-5
+
+Statisch geprueft, ohne Build/Test/flutter analyze/flutter run:
+- Action-aware Routing fuer direkte Produkt-/Sessionaktionen.
+- Native clientActions fuer start/resume/resign statt LLM-Prosa.
+- Gemischte Action+Coach-Turns behalten native Aktion und getrennten Sprachauftrag.
+- Produktaktions-Fulfillment wird getrennt von Provider/Grounding-Validation diagnostiziert.
+- Alte unverdrahtete interaction_diagnostics.* werden physisch entfernt.
+- Start-Game-Regressionsuite fuer Deutsch, Englisch und Arabisch ist als CTest-Target verdrahtet.
+- Negative Nicht-Action-Beispiele sind enthalten.
+- Explizites Game-Elo ist Aktionsparameter, kein Rating-Prediction-Intent.
+- Explizite Spielerfarbe wird nativ als white/black validiert und bis zur Bot-Session transportiert.
+- C ABI / Flutter ABI stehen beide auf Version 10.
+- CoachPrompt = v13; Provider-Kontext = coach_llm_context.v3.
+- Keine produktiven smallModels-/Local-Model-Diagnostics oder interaction_diagnostics Includes gefunden.
+
+Nicht ausgefuehrt:
+- Build
+- CTest/native tests
+- flutter analyze
+- flutter test
+- flutter run

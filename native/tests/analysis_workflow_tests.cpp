@@ -26,6 +26,24 @@ nlohmann::json take_json(char* value, const kc_core_handle core) {
   return nlohmann::json::parse(text);
 }
 
+bool negative_classification(const nlohmann::json& value) {
+  if (value.is_null()) return false;
+  const auto category = value.get<std::string>();
+  return category == "miss" || category == "mistake" || category == "blunder";
+}
+
+void expect_presentation_contracts(
+    const nlohmann::json& snapshot,
+    const char* arrow_message,
+    const char* classification_message) {
+  const auto& arrow = snapshot.at("arrowContract");
+  const auto& classification = snapshot.at("classificationContract");
+  expect(arrow.at("schema") == "analysis.arrow.v1", arrow_message);
+  expect(
+      classification.at("schema") == "analysis.classification.v1",
+      classification_message);
+}
+
 }  // namespace
 
 int main() {
@@ -131,6 +149,12 @@ int main() {
           kc_variation_analysis_status_json(core, job_id.c_str()), core);
     }
     expect(variation.at("status") == "complete", "temporary variation completed");
+    expect_presentation_contracts(
+        variation,
+        "SF18 variation exposes the native arrow presentation contract",
+        "SF18 variation exposes the native classification presentation contract");
+    expect(variation.at("arrowContract").at("renderable") == true,
+           "completed SF18 arrow contract is renderable");
     expect(!variation.at("bestMove").get<std::string>().empty(),
            "temporary variation exposes a best move");
     expect(!variation.at("lines").empty() && variation.at("lines").size() <= 2,
@@ -139,6 +163,39 @@ int main() {
            "SF18 keeps the legacy evaluation-bar projection");
     expect(!variation.at("classification").is_null(),
            "completed variation exposes its move classification");
+
+    // SF18 coherence regression: the visible rank-1 arrow is produced by the
+    // same internal root search that will classify the move on the next ply.
+    // Following KChess' own arrow must therefore never turn into a negative
+    // move label merely because classification asks for a wider MultiPV set.
+    const auto sf18_arrow = variation.at("bestMove").get<std::string>();
+    const auto sf18_next_fen = variation.at("fen").get<std::string>();
+    auto sf18_follow = take_json(
+        kc_start_variation_analysis_json(core, sf18_next_fen.c_str(), sf18_arrow.c_str()),
+        core);
+    const auto sf18_follow_job_id = sf18_follow.at("jobId").get<std::string>();
+    for (int attempt = 0;
+         sf18_follow.at("status") == "running" && attempt < 500; ++attempt) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      sf18_follow = take_json(
+          kc_variation_analysis_status_json(core, sf18_follow_job_id.c_str()), core);
+    }
+    expect(sf18_follow.at("status") == "complete",
+           "SF18 follow-arrow variation completed");
+    expect_presentation_contracts(
+        sf18_follow,
+        "SF18 follow-arrow response keeps native arrow provenance",
+        "SF18 follow-arrow response keeps native classification provenance");
+    expect(
+        !negative_classification(sf18_follow.at("classification")),
+        "following the published SF18 rank-1 arrow is never classified negatively");
+    if (sf18_follow.at("classificationContract").at("playedMoveMatchesRank1") == true) {
+      expect(
+          sf18_follow.at("classificationContract").at("renderable") == true
+              && !sf18_follow.at("classification").is_null(),
+          "SF18 completed own rank-1 move always keeps a renderable classification");
+    }
+
     expect(take_json(kc_game_json(core, pgn_game_id.c_str()), core) == original_detail,
            "temporary analysis leaves the original PGN and game moves unchanged");
 
@@ -157,6 +214,31 @@ int main() {
     const auto cached = take_json(kc_start_analysis_json(core, pgn_game_id.c_str()), core);
     expect(cached.at("status") == "complete" && cached.at("progress") == 1.0,
            "second open returns compatible complete cache immediately");
+
+    // Rapid sideline requests are latest-request-wins. The second legal move
+    // cancels/joins the first worker before it can publish stale board truth.
+    auto superseded = take_json(
+        kc_start_variation_analysis_with_settings_json(
+            core, start_fen, "e2e4", 64, 2, 1, 64),
+        core);
+    const auto superseded_job_id = superseded.at("jobId").get<std::string>();
+    auto latest = take_json(
+        kc_start_variation_analysis_with_settings_json(
+            core, start_fen, "d2d4", 5, 2, 1, 64),
+        core);
+    const auto latest_job_id = latest.at("jobId").get<std::string>();
+    expect(latest_job_id != superseded_job_id,
+           "rapid sideline sequence allocates a fresh authoritative job");
+    expect(kc_variation_analysis_status_json(core, superseded_job_id.c_str()) == nullptr,
+           "superseded sideline job is no longer a readable analysis source");
+    for (int attempt = 0; latest.at("status") == "running" && attempt < 500; ++attempt) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      latest = take_json(
+          kc_variation_analysis_status_json(core, latest_job_id.c_str()), core);
+    }
+    expect(latest.at("status") == "complete"
+               && latest.at("arrowContract").at("move") == latest.at("bestMove"),
+           "latest rapid sideline request completes with its own final arrow truth");
 
     char* illegal = kc_start_variation_analysis_json(core, start_fen, "g1g4");
     expect(illegal == nullptr, "illegal board move rejected by native chess rules");
@@ -185,8 +267,8 @@ int main() {
            "SF19 FEN main-line analysis completed for eval-bar regression");
     expect(sf19_main.at("analyzedFen") == start_fen,
            "SF19 main-line snapshot is explicitly bound to its analyzed FEN");
-    expect(sf19_main.at("bestMove") == sf19_main.at("lines").front().at("moves").front(),
-           "SF19 main-line best move agrees with coherent rank 1");
+    expect(sf19_main.at("arrowContract").at("move") == sf19_main.at("bestMove"),
+           "completed SF19 main-line arrow follows final Stockfish bestmove");
     const auto& sf19_main_line = sf19_main.at("lines").front();
     expect(!sf19_main_line.at("evaluationBarWhitePermille").is_null(),
            "SF19 main-line publishes its native WDL evaluation-bar projection");
@@ -202,6 +284,12 @@ int main() {
     }
     expect(sf19_variation.at("status") == "complete",
            "SF19 temporary variation completed");
+    expect_presentation_contracts(
+        sf19_variation,
+        "SF19 variation exposes the native arrow presentation contract",
+        "SF19 variation exposes the native classification presentation contract");
+    expect(sf19_variation.at("arrowContract").at("renderable") == true,
+           "completed SF19 arrow contract is renderable");
     expect(!sf19_variation.at("bestMove").get<std::string>().empty(),
            "SF19 temporary variation exposes a position-local best move");
     expect(sf19_variation.at("engineVersion").get<std::string>().rfind("Stockfish 19", 0) == 0,
@@ -218,8 +306,8 @@ int main() {
     }
     expect(coherent_sf19_lines,
            "SF19 sideline publishes one exact coherent MultiPV iteration");
-    expect(sf19_variation.at("bestMove") == sf19_lines.front().at("moves").front(),
-           "SF19 sideline best move agrees with coherent rank 1");
+    expect(sf19_variation.at("arrowContract").at("move") == sf19_variation.at("bestMove"),
+           "completed SF19 sideline arrow follows final Stockfish bestmove");
     const auto& sf19_principal = sf19_lines.front();
     expect(!sf19_principal.at("evaluationBarWhitePermille").is_null(),
            "SF19 sideline publishes its native WDL evaluation-bar projection");
@@ -234,6 +322,42 @@ int main() {
     expect(sf19_principal.at("evaluationBarWhitePermille").get<int>()
                == expected_sf19_bar,
            "SF19 evaluation bar follows White-perspective WDL expected score");
+
+    // SF19 invariant: exactly following the completed native arrow must reuse
+    // the full classification-width BEFORE snapshot. Completed legal moves
+    // always keep a normal classification; deeper analysis may revise it later.
+    const auto sf19_arrow = sf19_variation.at("bestMove").get<std::string>();
+    const auto sf19_next_fen = sf19_variation.at("fen").get<std::string>();
+    auto sf19_follow = take_json(
+        kc_start_variation_analysis_json(
+            core, sf19_next_fen.c_str(), sf19_arrow.c_str()),
+        core);
+    const auto sf19_follow_job_id = sf19_follow.at("jobId").get<std::string>();
+    for (int attempt = 0;
+         sf19_follow.at("status") == "running" && attempt < 500; ++attempt) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      sf19_follow = take_json(
+          kc_variation_analysis_status_json(core, sf19_follow_job_id.c_str()), core);
+    }
+    expect(sf19_follow.at("status") == "complete",
+           "SF19 follow-arrow variation completed");
+    expect_presentation_contracts(
+        sf19_follow,
+        "SF19 follow-arrow response keeps native arrow provenance",
+        "SF19 follow-arrow response keeps native classification provenance");
+    expect(
+        !negative_classification(sf19_follow.at("classification")),
+        "following the published SF19 rank-1 arrow is never classified negatively");
+    expect(
+        sf19_follow.at("classificationContract").at("rank1Move") == sf19_arrow,
+        "SF19 follow-arrow classification reuses the published root rank-1 move");
+    expect(
+        sf19_follow.at("classificationContract").at("playedMoveMatchesRank1") == true,
+        "SF19 follow-arrow classification recognizes the exact published arrow");
+    expect(
+        sf19_follow.at("classificationContract").at("renderable") == true
+            && !sf19_follow.at("classification").is_null(),
+        "SF19 completed own rank-1 move always keeps a renderable classification");
 
     constexpr auto mate_setup_fen =
         "7k/5Q2/6K1/8/8/8/8/8 w - - 0 1";
@@ -255,6 +379,29 @@ int main() {
            "terminal SF19 sideline completes normally");
     expect(sf19_mate.at("bestMove").get<std::string>().empty(),
            "terminal SF19 sideline keeps an empty best move");
+
+    // Settings switching is a hard engine namespace boundary. Returning to
+    // SF18 must create/reuse SF18 truth rather than carrying SF19 PV/WDL/labels
+    // across the setting transition.
+    expect(kc_set_engine_id(core, "stockfish18") == KC_STATUS_OK,
+           "Stockfish 18 can be selected again after SF19");
+    auto switched_back = take_json(
+        kc_start_variation_analysis_with_settings_json(
+            core, start_fen, "c2c4", 5, 2, 1, 64),
+        core);
+    const auto switched_back_job_id = switched_back.at("jobId").get<std::string>();
+    for (int attempt = 0;
+         switched_back.at("status") == "running" && attempt < 500; ++attempt) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      switched_back = take_json(
+          kc_variation_analysis_status_json(core, switched_back_job_id.c_str()), core);
+    }
+    expect(switched_back.at("status") == "complete"
+               && switched_back.at("engineVersion").get<std::string>().rfind("Stockfish 18", 0) == 0,
+           "engine switch-back publishes only SF18 analysis truth");
+    expect(switched_back.at("classificationStatus") == "stable"
+               && !switched_back.at("classification").is_null(),
+           "engine switch-back still gives the completed legal move a normal class");
 
     kc_core_destroy(core);
     core = nullptr;

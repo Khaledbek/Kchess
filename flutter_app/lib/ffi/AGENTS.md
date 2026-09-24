@@ -66,3 +66,7 @@ The Graph Inspector is diagnostic and must never wait behind a long KnowledgeRun
 ## Update 173 - Coach diagnostics transport
 
 `CoreGateway.coachPerformanceDiagnostics` / `kc_coach_performance_diagnostics_json` is an additive read-only pass-through to the existing Coach service performance report. Dart must not reconstruct trace timings or provider decisions from UI state.
+
+## Coach Series 2 Update 5 - session-management FFI
+
+ABI 11 adds thin JSON exports for Coach session list/create/messages/rename/delete. Dart must treat native session IDs, names, timestamps, transcript payloads and `currentPositionFen` as transport data only. Default-name sequencing and mutation authority remain in C++/SQLite; no duplicate Dart persistence or numbering is allowed.

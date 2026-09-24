@@ -105,3 +105,45 @@ Flutter may map native `safeFallbackKind` values to fixed ARB strings when rejec
 ## Update 173 - Trainer diagnostics and conversation copy
 
 The Coach output header exposes localized copy and diagnostics actions. Copy serializes only the currently visible UI conversation to the clipboard after the user clicks; it never uploads or persists it. Diagnostics display the native, read-only Coach performance snapshot through FFI with refresh/copy controls. All fixed visible labels belong in the three ARB sources.
+
+## Update 176 - Coach failure presentation
+
+Flutter maps the native Coach status classes (`validation_failed`, `provider_response_invalid`, `evidence_unavailable`, `provider_rate_limited`, `provider_daily_limit`, `provider_deferred`, `provider_error`, `provider_unavailable`) to localized ARB copy only. It must not inspect `providerErrorCode` or validation issues to reclassify a failure. This keeps "language model unavailable" reserved for actual native unavailability instead of validation or malformed-output failures.
+
+## Update 180 - pending quiz presentation
+
+`quiz_question_pending` is a native session-state fallback, not a Flutter training decision. Map it to ARB copy, do not create a second trainer question, and avoid appending the same pending notice repeatedly. The original native quiz remains the scoring authority until a legal learner move resolves it.
+
+
+## Update 181 - degraded native position answers
+
+`position_explanation` and `candidate_comparison` are native safe-fallback kinds. Flutter maps them to ARB copy and may render only the `boardMoves` already supplied by native C++; it must not select candidates, infer an evaluation or construct replacement chess advice. The generated explanation itself has already been discarded when these states are shown.
+
+## Update 195 - extreme-analysis safe fallback
+
+`worst_move_analysis` and `fastest_loss_analysis` are native safe-fallback kinds. Flutter only localizes their fixed ARB wording and renders the native `boardMoves` overlay already returned by C++; the marked move is analysis focus, not a recommendation. Flutter must not infer whether a forced loss exists or choose a replacement move.
+
+## LLM Interaction Series 1 - Update 2 native client actions
+
+Coach replies may contain native `clientActions`. Flutter executes only those supplied IDs through the app-level `CoachClientActionScope`; it must never infer an action from the user's or provider's text. Game navigation and the existing thin FFI calls are presentation/integration work; action selection and parameters remain native C++ authority. A successful action-only reply may have an empty `answer` and must not be displayed as provider unavailability.
+
+## LLM Interaction Series 1 - Update 4
+
+Flutter executes `clientActions` only when the native `actionFulfillment.passed` contract permits them. Execution is intentionally independent of Gemini prose status for mixed turns: a native start/resume/resign action may complete even if the optional language response fails. Flutter must never infer fulfillment from text or revalidate native action parameters.
+
+## LLM Interaction Series 1 - Update 5
+
+`CoachClientAction` may carry typed `elo` and `color` parameters selected by native C++. Flutter must forward those values only; it must not infer a color from prose or choose a default based on locale/user wording. When `open_bot_game` omits Elo, the existing 1500 UI integration default remains presentation plumbing; when color is omitted, the existing white default remains the bot-play default.
+
+### Native deterministic Coach replies
+
+Successful provider-free analysis replies may carry `nativeAnswerKind` with native `boardMoves` instead of provider prose. Flutter only maps the machine kind to existing ARB presentation text (for example `best_move` -> `bestMoveText(move)` and `worst_move` -> `worstMoveText(move)`) and displays the move supplied by C++; it must not derive chess semantics itself. Such replies are normal `status=ok` responses.
+
+## Coach Series 2 Update 5 - durable session UI
+
+Coach session history is presentation-only in Flutter. `coach_sessions_sheet.dart` may list native session summaries, request native create/rename/delete operations, and return the selected native session ID. It must not allocate `Sitzung N`, infer ordering semantics, persist transcript data, or rebuild continuation state. The general Coach tab may reopen the most recently updated native session; context-specific launches start a new native session. Restored transcript rows and `currentPositionFen` are rendered through existing Coach UI/board DTO paths only.
+
+### Coach Answer Quality Serie 3 - Update 4 UI boundary
+
+`verdict_grounding_unavailable` is a native safe-fallback kind for evaluative questions whose required C++/engine verdict could not be established. The screen only maps it to `coachVerdictGroundingUnavailable` in ARB and preserves the persisted transcript payload; it must never manufacture `good/bad`, `blunder`, or side-to-move judgments in Dart.
+

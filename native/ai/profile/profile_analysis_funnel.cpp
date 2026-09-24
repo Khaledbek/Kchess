@@ -211,6 +211,7 @@ double position_classification_score(const std::string& classification) {
   if (classification == "blunder") return 1.00;
   if (classification == "mistake") return 0.82;
   if (classification == "miss") return 0.68;
+  if (classification == "inaccuracy") return 0.56;
   if (classification == "critical") return 0.50;
   if (classification == "brilliant") return 0.38;
   return 0.0;
@@ -218,7 +219,8 @@ double position_classification_score(const std::string& classification) {
 
 bool decisive_existing_classification(const std::string& classification) {
   return classification == "blunder" || classification == "mistake" ||
-      classification == "miss" || classification == "critical";
+      classification == "miss" || classification == "inaccuracy" ||
+      classification == "critical";
 }
 
 bool profile_interest_match(

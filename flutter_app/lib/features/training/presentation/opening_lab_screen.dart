@@ -85,15 +85,19 @@ class _OpeningLabScreenState extends State<OpeningLabScreen> {
           ),
         ),
       );
-    } catch (_) {
-      if (mounted) _showError();
+    } catch (error) {
+      if (mounted) _showError(error);
     }
   }
 
-  void _showError() {
+  void _showError([Object? error]) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(AppLocalizations.of(context).trainingOpeningTreeLoadFailed),
+        content: Text(
+          error == null
+              ? AppLocalizations.of(context).trainingOpeningTreeLoadFailed
+              : '${AppLocalizations.of(context).trainingOpeningTreeLoadFailed}\n${error is CoreGatewayException ? error.message : error}',
+        ),
       ),
     );
   }

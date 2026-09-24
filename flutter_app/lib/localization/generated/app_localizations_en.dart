@@ -331,6 +331,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get excellent => 'Excellent';
 
   @override
+  String get inaccuracy => 'Inaccuracy';
+
+  @override
   String get okay => 'Okay';
 
   @override
@@ -392,6 +395,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String bestMoveText(String move) {
     return '$move is the best move.';
+  }
+
+  @override
+  String worstMoveText(String move) {
+    return '$move is the worst move.';
   }
 
   @override
@@ -1705,6 +1713,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'The coach language model is not available yet.';
 
   @override
+  String get coachProviderError =>
+      'The coach service could not complete this request.';
+
+  @override
+  String get coachProviderResponseInvalid =>
+      'The language model returned an unusable response, so KChess did not show it.';
+
+  @override
+  String get coachEvidenceUnavailable =>
+      'There is not enough verified position evidence for this trainer request yet.';
+
+  @override
+  String get coachRateLimited =>
+      'The coach request limit has been reached temporarily. Try again shortly.';
+
+  @override
+  String get coachDailyLimit =>
+      'The coach has reached its daily language-model limit.';
+
+  @override
+  String get coachDeferred =>
+      'This coach request was deferred to preserve capacity for interactive questions.';
+
+  @override
   String get coachOffTopic =>
       'The coach can only answer chess-related questions.';
 
@@ -1719,8 +1751,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get coachSafeQuizFallbackQuestion => 'What move would you play here?';
 
   @override
+  String get coachQuizQuestionPending =>
+      'The current training question is still open. Play your move on the board, or use Hint if you want help.';
+
+  @override
   String get coachSafeHintFallbackAnswer =>
       'Check forcing moves first: checks, captures, and direct threats. Which of your pieces can become active immediately?';
+
+  @override
+  String get coachSafePositionFallbackAnswer =>
+      'The generated explanation could not be verified safely. The board shows only a verified engine candidate; KChess will not invent another move.';
+
+  @override
+  String get coachVerdictGroundingUnavailable =>
+      'I cannot give a reliable chess verdict for this question yet because the required native engine evidence is unavailable. I will not guess or replace the missing analysis with an LLM opinion.';
+
+  @override
+  String get coachSafeComparisonFallbackAnswer =>
+      'The detailed comparison could not be verified safely. The board shows only verified engine candidates for this position.';
 
   @override
   String get coachHintRequest => 'Give me a hint for this position.';
@@ -1984,4 +2032,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String playerProfileLiveCurrentGame(int percent) {
     return 'Current game $percent%';
   }
+
+  @override
+  String get coachSafeWorstMoveFallbackAnswer =>
+      'The generated explanation could not be verified safely. The board marks only the natively verified worst move found for this position; it is not a recommendation.';
+
+  @override
+  String get coachSafeFastestLossFallbackAnswer =>
+      'The generated explanation could not be verified safely. The board marks only the native focus of the fastest-loss analysis. A forced loss is claimed only when the engine proves one.';
+
+  @override
+  String get coachSessionsTitle => 'Coach sessions';
+
+  @override
+  String get coachNewSession => 'New session';
+
+  @override
+  String get coachRenameSession => 'Rename';
+
+  @override
+  String get coachDeleteSession => 'Delete';
+
+  @override
+  String get coachDeleteSessionConfirm =>
+      'Delete this coach session permanently?';
+
+  @override
+  String get coachSessionCancel => 'Cancel';
+
+  @override
+  String get coachSessionSave => 'Save';
+
+  @override
+  String get coachSessionEmpty => 'No saved coach sessions yet.';
 }

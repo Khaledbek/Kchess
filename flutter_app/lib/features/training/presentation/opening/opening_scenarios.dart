@@ -93,6 +93,7 @@ class OpeningScenarioList extends StatefulWidget {
 class _OpeningScenarioListState extends State<OpeningScenarioList> {
   List<OpeningTreeNode>? _nodes;
   bool _error = false;
+  String? _errorDetails;
   bool _busy = false;
 
   @override
@@ -103,6 +104,12 @@ class _OpeningScenarioListState extends State<OpeningScenarioList> {
 
   Future<void> _load() async {
     try {
+      // Do not preflight the native opening graph here. `practiceCommand` is a
+      // synchronous FFI call wrapped in a Future, so an extra status request
+      // can block the UI isolate before the catalogue has rendered anything.
+      // The authoritative families/nodes/start operations surface their own
+      // native errors and keep the diagnostics attached to the operation that
+      // actually failed.
       final parent = widget.parent;
       final result = await widget.gateway.practiceCommand(
         parent == null ? {'op': 'families'} : {'op': 'nodes', 'parent': parent},
@@ -115,10 +122,16 @@ class _OpeningScenarioListState extends State<OpeningScenarioList> {
         setState(() {
           _nodes = nodes;
           _error = false;
+          _errorDetails = null;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _error = true);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = true;
+          _errorDetails = error is CoreGatewayException ? error.message : error.toString();
+        });
+      }
     }
   }
 
@@ -164,10 +177,24 @@ class _OpeningScenarioListState extends State<OpeningScenarioList> {
               strings.trainingOpeningTreeLoadFailed,
               style: const TextStyle(color: OpeningStudio.textPrimary),
             ),
+            if (_errorDetails != null && _errorDetails!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SelectableText(
+                  _errorDetails!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: OpeningStudio.textMuted, fontSize: 12),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () {
-                setState(() => _error = false);
+                setState(() {
+                  _error = false;
+                  _errorDetails = null;
+                });
                 unawaited(_load());
               },
               child: Text(strings.trainingRestart),

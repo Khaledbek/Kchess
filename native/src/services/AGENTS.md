@@ -24,7 +24,6 @@ Nur den betroffenen Service lesen; andere Services erst bei konkretem Call. Head
 
 Services orchestrieren Domain-/Persistence-Komponenten. Keine DB-SQL-Duplikate in Services einführen, wenn `Database` bereits eine passende Operation besitzt. Fehler-/Kompatibilitätspfade nicht ohne Aufrufer- und Migrationsprüfung löschen.
 
-
 ## Coach Service
 
 `coach_service.*` ist nur die App-/Persistenzbrücke zum `native/ai/CoachOrchestrator`: Transport-JSON parsen, vorhandenen PGN-/Profilkontext anbinden und strukturierte Antwort serialisieren. Keine zweite Coach-Pipeline, Prompt-Logik oder Schachalgorithmen im Service anlegen.
@@ -36,7 +35,6 @@ Services orchestrieren Domain-/Persistence-Komponenten. Keine DB-SQL-Duplikate i
 ## Coach User Profile
 
 `coach_profile_bridge.*` is the only service-side mapping from persisted KChess profile/game/analysis data into `native/ai/profile/`. It may refresh the versioned learned JSON and map it into coach evidence/practicality, but learning rules stay in `native/ai/profile/`.
-
 
 ## Coach Context Preview
 
@@ -55,7 +53,6 @@ Provider-Quota-/Transportfehler bleiben native Statuswerte: `provider_rate_limit
 
 Der Engine-Hint läuft als nicht blockierender Coach-Job. `CoachService` delegiert die Schachsuche an den vorhandenen `AnalysisService`; bis zu zwei nahezu gleichwertige Kandidaten dürfen als strukturierte UCI-/Eval-Daten an Flutter gehen. Das LLM bestimmt niemals den Hint-Zug.
 
-
 ### Shared analysis cache contract
 
 `AnalysisService::shared_cached_analysis(...)` is the common read gate for persisted game analysis. Normal analysis and player-profile maintenance must both ask this gate before starting Stockfish. A complete run at equal-or-higher engine quality is reused; weaker requests must never create a duplicate run or downgrade/prune a stronger compatible result. Only explicit user deletion may remove the authoritative saved game analysis. Profile orchestration may request work through `AnalysisService`, but it must not own a second engine-analysis store. Whenever a shared run completes/upgrades, `AnalysisService` invalidates the corresponding profile queue generation so `PlayerProfileService` re-reads the stronger cache and rebuilds derived evidence/graph state without another engine call.
@@ -71,11 +68,9 @@ Persistent queue recovery is part of this service contract: cold owner activatio
 
 `coach_profile_bridge.*` may expose cheap metadata/sample/relevance/candidate stages to services. Candidate selection loads only persisted move evidence; it never starts Stockfish. Coach profile delivery uses only the bounded `profile.context.v3` KnowledgeRuntime path. `PlayerProfileService` remains the owner of background orchestration and persistent resume state. Fast/verification/deep budgets are pure `native/ai/profile/` planning signals; when the funnel promotes a game to engine work, `PlayerProfileService` requests the cheapest sufficient **full-game** quality through `AnalysisService::ensure_shared_profile_analysis(...)`. That request reads/writes only the same `analysis_runs`/`move_analysis` cache used by the Analysis UI. Foreground engine work always wins; profile maintenance must never persist a second engine result.
 
-
 ### Profile progress semantics
 
 `PlayerProfileService` must keep metadata indexing distinct from relevant evidence resolution. Metadata-only rows finish as `indexed`; promoted rows finish as `done`. The profile snapshot exposes library-index coverage, relevant-game resolution and reused full analyses separately. Never infer "all games analyzed" from a completed metadata sweep. A profile-triggered shared AnalysisService job keeps `currentGameId` ownership until that job actually stops. Snapshot reads may overlay fresh queue counters plus read-only live AnalysisService progress (`overallProgress`, `currentGameProgress`, ply/depth fields) without rebuilding or persisting the learned model; this is presentation telemetry only and must not change queue/evidence semantics.
-
 
 ### Profile evidence-library synchronization
 
@@ -126,7 +121,6 @@ A shared-analysis `cache_ready` result resolves the current `ai_profile_queue` g
 
 `PlayerProfileService` is the only runtime orchestrator that advances persisted `ai_profile_queue.pipeline_stage`. The domain funnel defines Stage 1..9; service code records reached boundaries while continuing to execute all engine work through `AnalysisService`. Stage 3 is reserved for the representative historical sampler introduced by the next updates; Flutter navigation must never advance a stage.
 
-
 ## Update 97 - Stage-3 gate for expensive profile work
 
 `PlayerProfileService::sync_queue(...)` must build Stage 4 only from the Stage-3 representative historical sample plus genuinely new post-bootstrap games. Stage 1 is a subset of that representative historical sample and is not an extra bypass. Historical games outside the hard Stage-3 budget remain metadata/index work even when generic complexity/relevance signals are high; they must not reach move-candidate, existing-evidence or engine stages merely because the player is strong. The existing Stage-2 relevance score is allowed to steer Stage-3 sampling, not bypass it. New games remain outside the historical ceiling so personalization can keep learning incrementally.
@@ -138,7 +132,6 @@ A shared-analysis `cache_ready` result resolves the current `ai_profile_queue` g
 ## Update 99 - nine-stage progress diagnostics
 
 `PlayerProfileService::snapshot_json()` exposes native funnel telemetry only: total metadata-scanned games, current historical Stage-3 sample size/budget, current Stage-4 interesting-game count, games that reached the shared-engine promotion stage, relevant/resolved queue work and live shared-analysis progress. Flutter may display these values but must not recompute sample membership or pipeline stages. Overall work progress remains separate from Coach-readiness confidence.
-
 
 ## Update 100 - profile-owned engine resources
 
@@ -156,7 +149,6 @@ Analysis- und Variation-JSON geben `bestMove` aus der publizierten Rang-1-PV aus
 
 `CoachService` verwendet für `EvidenceKind::user_profile` ausschließlich `KnowledgeRuntime::coach_evidence(...)`. Der frühere `coach_profile_context_resolver.*`-Pfad ist gelöscht. Neue persönliche Coach-Retrieval-Logik gehört in `src/knowledge`, nicht zurück in die Service-Schicht.
 
-
 ## Cleanup Update 124 - retired profile stores removed
 
 - `coach_profile_context_resolver.*` is deleted and must not return.
@@ -167,7 +159,6 @@ Analysis- und Variation-JSON geben `bestMove` aus der publizierten Rang-1-PV aus
 
 - `PlayerProfileService::sync_queue` maps persisted `termination_type` into `ProfileGameMetadata` and marks games below 16 plies as ineligible for the historical Stage-3 sample. This does not change metadata indexing or remove queue/source rows.
 - Service code must not derive termination from PGN or recalculate statistics; persistence supplies the already-normalized metadata and `native/ai/profile/` owns sampling decisions.
-
 
 ## Update 129 - hierarchical Stage-3 selection boundary
 
@@ -181,7 +172,6 @@ Analysis- und Variation-JSON geben `bestMove` aus der publizierten Rang-1-PV aus
 - The old `recent <= 30 days` shortcut is not a definition of a new game and must never bypass the historical sample cap. Incremental games must also satisfy sampling eligibility, so very short games remain metadata-only.
 - A lifetime profile may eventually contain evidence from more than 500 games because genuinely new post-bootstrap games continue learning. The *initial historical bootstrap* itself must never exceed the Stage-3 maximum.
 
-
 ## Update 131 - profile completion/readiness telemetry
 
 - `PlayerProfileService` publishes the persisted adaptive sampling recommendation as `historicalSampleBudget` and exposes structural `samplingCoverage` separately from learned `ChessProfile::confidence`.
@@ -193,7 +183,6 @@ Analysis- und Variation-JSON geben `bestMove` aus der publizierten Rang-1-PV aus
 - `PlayerProfileService::diagnostics_json()` is the authoritative read-only background snapshot for the Graph Inspector. It reads queue, adaptive Stage-3 sampling state, provider history and shared AnalysisService state directly, so diagnostics also work before the first learned-profile payload exists.
 - The diagnostic snapshot exposes current/pending operation (`provider_history_sync`, `profile_engine_analysis`, `waiting_for_foreground_analysis`, `profile_knowledge_refresh`, `profile_queue`, `idle`) plus adaptive sample counts, 500-game historical hard cap, cap state and live profile-engine progress.
 - Diagnostics must not advance the queue, rerun the sampler, trigger provider sync or start engine work.
-
 
 ## Update 133 - profile sampling/diagnostic cleanup
 
@@ -250,7 +239,6 @@ The UI's ephemeral `playedMoveFenBefore`/`playedMoveUci` markers are checked aga
 - Cache insertion is allowed only when the source revision stayed unchanged across the aggregation. Concurrent source changes may still satisfy the current caller but the stale result must not be retained for a later Coach question.
 - Performance diagnostics expose cache hits/misses and the current source revision. Flutter must not implement another cache or invent cache state.
 
-
 ## Cleanup Update 145 - final service boundaries
 
 - `AnalysisService` owns incremental move classification plus the single final game-wide accuracy/classification pass; `PlayerProfileService` owns queue/profile orchestration and one-shot source-snapshot hand-off; `StatisticsService` owns the bounded revision-invalidated read cache. None of these responsibilities move to Flutter or KnowledgeRuntime.
@@ -279,7 +267,6 @@ The UI's ephemeral `playedMoveFenBefore`/`playedMoveUci` markers are checked aga
 - Only natively verified quiz attempts update the schedule. An independent success advances the interval; a natively verified weak move resets the streak and schedules a near-term revisit. Ungraded legal alternatives still do not become attempts.
 - Historical coarse motif rows remain compatible cold-start priors. New namespaced skill IDs share the same table and scheduling contract.
 
-
 ## Update 157 - foreground-first Coach execution
 
 - `CoachService` remains the single serialization boundary for Coach provider/session execution. Manual asks and explicit hints are foreground work; Automatic Coach is background work.
@@ -292,9 +279,6 @@ The UI's ephemeral `playedMoveFenBefore`/`playedMoveUci` markers are checked aga
 - `CoachService` supplies the Automatic Coach gate with bounded due-practice relevance from the existing `ai_coach_skill_progress` rows and a bounded process-local last-delivery timestamp keyed by session/profile. No second persistence store is introduced.
 - Only a successfully delivered unsolicited automatic response updates the recency history. Verified quiz-answer feedback does not count as an interruption. Provider errors, cancelled jobs and skipped events do not update it.
 
-## Update 162 - Coach small-model wiring
-
-- `CoachService` may load one optional `SmallModelSuite` at construction and pass it into the existing orchestrator. The service does not perform inference or duplicate route/context policy.
 - Coach diagnostics may report model presence, availability, id/version and stable load error codes only; filesystem paths and model inputs are not diagnostic payload.
 
 ## Update 164 - personal Coach training hydration
@@ -303,9 +287,6 @@ The UI's ephemeral `playedMoveFenBefore`/`playedMoveUci` markers are checked aga
 - Do not persist a second exercise queue or copy profile example payloads into Coach-owned storage. If no suitable learned example exists, the normal supplied-board quiz path remains available.
 
 ## Update 167 - final Coach service boundary
-
-`CoachService` is the only app-integration/scheduling boundary for Coach turns. It hydrates existing persistence/profile/analysis context, loads optional small-model assets, applies foreground-over-automatic serialization, records read-only diagnostics and delegates chess/teaching/provider policy to `native/ai/`. It must not grow a second router, teaching policy, response cache or engine client.
-
 
 ## Fix Update 168 - personal training hydration boundary
 
@@ -322,3 +303,104 @@ A move that answers an open Coach board question may arrive through `coachAutoma
 ## Update 175 - completed move cache bridge
 
 `CoachService` may read the authoritative `AnalysisService` move record for a proved learner attempt only after matching persisted game ID, ply, UCI and before/after FEN. Require completed quality and existing score/classification fields. Supply that record privately to native `move_contrast.*`; the Coach provider sees only the bounded contrast packet. This callback must never request engine work or create Coach-owned analysis persistence.
+
+## Update 176 - Coach failure taxonomy and contract diagnostics
+
+- `CoachService` owns the transport-status taxonomy exposed to Flutter. Keep native validation failures distinct from provider unavailability, malformed/empty provider output, local evidence unavailability, quota/backoff deferral and generic provider transport errors.
+- `status` remains machine-only. Flutter may translate the returned class but must not infer a different failure reason from `providerErrorCode`, answer text or validation prose.
+- Read-only Coach performance diagnostics expose the status class per recent trace plus stable prompt/response/status contract versions. Diagnostics must remain free of user text, FEN/PGN, session/profile identifiers, secrets and filesystem paths.
+
+## Update 182 - malformed provider output diagnostics
+
+`CoachService` keeps all detailed `gemini_response_*` parse/schema failures in diagnostics but maps them to the single user-facing `provider_response_invalid` status. Flutter must not receive model/parser internals as presentation policy, and malformed provider output must not be reported as provider unavailability.
+
+## Update 189 - Coach extreme-search ownership
+
+`AnalysisService` owns the bounded Stockfish work for explicit worst-move / fastest-loss questions. It enumerates the complete legal root move set, performs shallow restricted scouts, and deepens only the bottom candidates. `CoachService` may route the resolved native analysis mode into that service and package its ephemeral result as Coach evidence, but it must not implement a second engine loop, persist the extreme ranking, or reuse the ordinary top-N hint cache as proof of a worst move.
+
+## Update 195 - Coach grounding diagnostics v3
+
+Coach performance diagnostics now report the resolved native `analysisMode`, `analysisModeExplicit`, native candidate/fact counts, extreme `focusKind`, and stable `fallbackReason`. `coach.status.v3` adds these read-only classifications and the dedicated worst-move/fastest-loss safe-fallback states; diagnostics remain free of FEN, user text, session IDs and secrets.
+
+## Update 197 - Coach engine-result reuse
+
+- `CoachService` keeps separate process-local engine evidence entries for ordinary hints, `worst_move`, and `fastest_loss`. Cache identity is exact FEN plus the engine/sideline settings key; an extreme result is never reused as an ordinary best-move hint or across the two inverted analysis modes.
+- Stockfish work runs outside the cache mutex. The mutex protects only immutable result/snapshot publication and reads, so a long foreground engine search cannot block unrelated cache readers.
+- Extreme-move cache entries are ephemeral optimization only. They are not persisted as game analysis and do not weaken the complete-root requirement that produced them.
+
+## kchess_update_serie_1 - Coach request generations
+
+- `CoachService` owns the monotonic request generation used for Latest-Request-Wins. Flutter must not implement a parallel generation/cancellation policy.
+- The generation key is the Coach session (or the single default session when no session id exists). Starting newer work cancels unfinished same-session work only within the same scheduling class; foreground work also preempts Automatic Coach work. Automatic work must never supersede a running foreground ask/hint.
+- Cacheable native evidence produced before cancellation may remain reusable, but a superseded job must never publish provider/Coach output to the UI.
+- Native Coach context state (analysis/profile/history availability, ratings and last move) is hydrated from authoritative native/SQLite state before orchestration; request JSON is not trusted for those fields.
+
+- Background derived-knowledge refresh must not start while `SqliteWritePriorityGate` reports foreground waiters or foreground sessions. Requeue the profile refresh instead; foreground analysis/Coach work always wins.
+- Provider `output_invalid` / schema mismatch gets at most one identical bounded retry; if it still fails, use the native safe fallback and never surface malformed provider JSON.
+
+## LLM Interaction Series 1 - Update 4
+
+Coach performance diagnostics now expose an `interaction` block and an `actionFulfillment` block per recent production trace. `actionFulfillmentFailures` is counted separately from provider/content `validationFailures`; do not merge the two metrics. A fulfillment failure maps to the existing `validation_failed` UI status class, so no parallel user-facing status taxonomy is introduced. Mixed action/language turns may still transport a valid native client action when the provider prose fails.
+
+## Coach-Serie 2 / Update 2 - Automatic interruption delivery history
+
+- `CoachService` remains the owner of process-local successful-delivery recency. It passes only elapsed seconds into `AutomaticCoachTrigger`; it must not duplicate trigger thresholds or chess criticality.
+- Only delivered unsolicited `status=ok` turns update recency. Skipped, cancelled, provider-failed, and verified quiz-answer turns do not consume the quiet window.
+- Automatic JSON may expose the native `triggerGate` decision metadata for diagnostics, but never prompts, FEN history, or provider secrets.
+
+## Coach Series 2 Update 4 - session persistence bridge
+
+`CoachService` is the only bridge between durable Coach-session storage and `CoachOrchestrator`. For a session-backed request it resolves the active/profile owner, ensures the durable session row, restores an existing compact native continuation state before orchestration, then persists the resulting compact state and visible transcript rows after the turn. Synthetic Automatic-Coach prompt text is not stored as a user message; accepted visible Automatic-Coach replies may be stored as assistant transcript rows. Persistence does not create a second Coach pipeline and does not change provider priority.
+
+## Coach Answer Quality Serie 3 - Update 2 move review engine path
+
+`AnalysisService::coach_move_review_json()` owns fresh foreground re-evaluation of one challenged legal root move. It analyzes the native best root move and, when different, the challenged root via Stockfish `search_moves`. `CoachService` only packages that result into the existing candidate/evidence contract; it must not implement a second engine loop or persist this ephemeral review as normal game analysis.
+
+## Classification/Arrow Coherence Series - Update 2: canonical snapshot contract
+
+- `AnalysisService` exposes `analysis.snapshot.v1` for every main-line response. The contract carries separate engine/PV and classification snapshot IDs, config hashes, generations, search modes, requested/reached depth, MultiPV and rank-1 move.
+- A live-refinement response that still shows the last published pre-analysis classification is intentionally marked `coherent=false`; do not hide or recompute that mismatch in Flutter. Later coherence updates must resolve it natively.
+- Snapshot identity is derived from canonical FEN + exact engine/config identity + search budget/result + rank-1 + live generation. `analysis_config_hash(...)` now starts from `ChessEngine::cache_identity()` so NNUE replacement cannot reuse an analysis namespace produced by another evaluator.
+- `PersistedAnalysis::classification_*` fields are response provenance only. They are populated when the live service freezes a published classification source; they are not a second persistence model.
+
+## Classification/Arrow coherence series — Update 3/9 (SF18)
+
+- Stockfish 18 sideline analysis must no longer publish a visible MultiPV-1 rank-1 arrow and then classify the same root from a separate MultiPV-4 search. The sideline root is searched once at `max(user visible MultiPV, classification MultiPV)` and Flutter still receives only the user-visible line count.
+- The completed after-position result is the authoritative SF18 rank ordering reused by the next sideline ply. Additional hidden lines exist only to classify alternatives; they must not replace rank 1 after the arrow has been published.
+- Regression invariant: following KChess' own published SF18 rank-1 arrow on the next sideline ply must never become `miss`, `mistake` or `blunder` solely because classification needs more root alternatives.
+
+## Classification/Arrow Coherence Series - Update 4/9 (SF19)
+
+`AnalysisService` is the single owner of SF19 root-vs-after stability diagnostics. When the played move equals the published rank-1 move and the after-position search materially disagrees, keep the decision rank/accuracy coherent with rank 1 and optionally run one bounded `searchmoves` root recheck for that exact move. The recheck is diagnostic evidence only; it must not overwrite the canonical root snapshot, suppress the completed category, or manufacture a negative classification.
+
+## Classification publication contract — current
+
+`AnalysisService` must publish a normal native category for every completed legal move. Search-budget completion, root/played depth comparability, boundary proximity and cross-snapshot disagreement remain diagnostic inputs only; they must not persist `MoveCategory::unknown`, `classification=null`, or `classificationStatus=unstable` for completed work. Running work may still be `pending`. Deeper analysis is allowed to replace an earlier category. Flutter must never manufacture or preserve a label independently.
+
+## Classification/Arrow Coherence Series - Update 7/9
+
+Classifier-version bumps are derived-data invalidations, not reasons to rerun Stockfish. `AnalysisService::rebuild_classification(...)` is the reuse path over persisted adjacent engine slots. Shared cached analysis, Statistics maintenance and profile maintenance must rebuild stale SF18/SF19 labels through that path and then reread the freshly persisted snapshot before returning UI JSON. Diagnostics report the current classifier versions from the centralized contract. The always-classify publication contract uses SF18 v15 and SF19 v1907.
+
+## Classification/Arrow Coherence Series - Update 8/9
+
+`AnalysisService` owns both presentation contracts. `analysis.arrow.v1` contains the exact native snapshot ID, analyzed FEN, published rank-1 move, `renderable` and a machine reason. `analysis.classification.v1` contains the classification snapshot ID, classification root FEN, played move, published rank-1 move, `playedMoveMatchesRank1`, `renderable` and a reason. Main-line live refinement publishes no arrow while engine/PV and classification provenance are mixed. Sideline arrows become renderable only after the complete after-position search finishes. Store that result in `variation_position_results_` under the *actual widened internal search settings* (not the narrower visible MultiPV settings), so the next sideline ply finds and reuses the exact published arrow snapshot as its BEFORE-position classification root. A completed classification is never withheld. Rank-1 contradictions are diagnostic invariant violations that must be corrected by native reclassification/refinement, not by returning `null` or asking Flutter to choose a replacement. Flutter only enforces renderability/FEN and never invents chess policy.
+
+### Classification/Arrow Coherence Series - final invariant
+
+The end-to-end invariant is strict for both engines: when a completed side-line result publishes rank 1 as an `analysis.arrow.v1` move, playing that exact move must reuse that authoritative BEFORE-position root snapshot for classification. It always retains a normal completed classification and must never depend on `unknown/unstable` as a durable safety fallback. `analysis.classification.v1` is the presentation provenance for the native label; missing provenance is not a compatibility fallback.
+### Best-move authority
+
+For a running engine search, the newest complete native MultiPV rank-1 PV is the provisional recommendation. For a completed search, `AnalysisResult.best_move` from the selected Stockfish engine is authoritative; service helpers must not replace a usable final `bestmove` with `lines.front()`. Exact MultiPV lines remain the score/WDL/PV evidence associated with their captured snapshot.
+## Best-Move / Reclassification Series — Update 3/6
+
+- Maximum-depth refinement reclassifies each move as soon as both deeper adjacent position slots are available. A shallow completed category remains visible only until that deeper move becomes decidable; deeper analysis may then replace it in either direction.
+- Move-level classifier currentness is checked from the move row itself, independently of the run-level final summary version. This permits progressive categories while game-wide accuracy/counters remain atomic until the final rebuild.
+- `pending` is only a temporary state when neither a deeper category nor a previously published shallow category exists. Flutter does not preserve old labels or choose between depths.
+Completed compatible engine runs are raw evidence and must be reused across classifier-contract updates: rebuild classification from persisted position slots before returning a complete cached run, without scheduling Stockfish again. Incremental refinement labels may replace the shallow published label as soon as the deeper run has both adjacent slots; the final rebuild is the atomic summary/accuracy commit. UI consumers must receive the terminal refined snapshot so neither a stale `pending`/missing label nor the penultimate best move survives completion.
+
+
+## Unified Move Classification Series — Update 5/7
+
+- Classification-only root analysis resolves up to five MultiPV candidates. This width exists so native quality clustering can distinguish several engine-equivalent Best moves from the next Excellent/Good cluster; it does not increase the number of lines Flutter must render.
+- A played move absent from the completed five-line classification root is represented only as `rank 6+`; never fabricate an exact sixth rank from a targeted `searchmoves` score.
+- The service publishes raw rank/score facts only. Great/Best/Excellent cluster decisions remain in native classifier policy, not in `AnalysisService` or Flutter.

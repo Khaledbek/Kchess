@@ -162,13 +162,13 @@ Core::Core(std::filesystem::path data_directory)
       provider_service_(database_, profile_service_, data_directory_),
       opening_theory_(std::make_unique<UnavailableOpeningTheoryProvider>()),
       opening_names_(std::make_unique<UnavailableOpeningNameIndex>()),
+      opening_lines_(std::make_unique<UnavailableOpeningLineGraph>()),
       analysis_service_(database_, *opening_theory_),
       statistics_service_(database_),
       knowledge_runtime_(database_, statistics_service_, data_directory_),
       player_profile_service_(database_, analysis_service_, provider_service_, knowledge_runtime_),
       bot_service_(database_),
-      coach_service_(database_, analysis_service_, knowledge_runtime_,
-                     data_directory_ / "models"),
+      coach_service_(database_, analysis_service_, knowledge_runtime_),
       training_service_(database_),
       practice_service_(database_, training_service_, bot_service_) {
   initialize_process_runtime_diagnostics();
@@ -192,6 +192,7 @@ void Core::initialize() {
       {"databaseOpenAndMigrateMs", 0},
       {"openingBookLoadMs", 0},
       {"openingNamesLoadMs", 0},
+      {"openingLinesLoadMs", 0},
       {"pendingOpeningClassification",
        {{"limit", 256}, {"processed", 0}, {"durationMs", 0}}},
       {"knowledgeRuntimeOpenMs", 0},
@@ -228,6 +229,43 @@ void Core::initialize() {
     }
   }
   startup["openingNamesLoadMs"] = elapsed_ms(phase_started);
+
+  phase_started = Clock::now();
+  const auto lines_path = data_directory_ / "opening_lines.kcl";
+  diagnostics::info(
+      "core",
+      std::string("Opening lines runtime path: ") + lines_path.string()
+          + " | exists=" + (std::filesystem::exists(lines_path) ? "true" : "false"));
+  if (std::filesystem::exists(lines_path)) {
+    try {
+      opening_lines_ = std::make_unique<KclOpeningLineGraph>(lines_path);
+      const auto names_metadata = opening_names_->metadata();
+      if (names_metadata.entry_count > 0
+          && (opening_lines_->metadata().node_count != names_metadata.entry_count
+              || opening_lines_->position_key_fingerprint()
+                  != opening_names_->position_key_fingerprint())) {
+        // KCL owns training topology; KCO is only optional naming metadata.
+        // A stale/differently scoped name index must never disable an otherwise
+        // valid training graph. Keep both readers alive, let unmatched KCO
+        // lookups simply return no label, and surface the contract drift only
+        // through diagnostics. This also allows future KCL/KCO coverage to
+        // evolve independently while retaining the shared position-key codec.
+        diagnostics::warning(
+            "core",
+            "KCL/KCO coverage differs; opening training remains enabled and "
+            "destination names may be unavailable for unmatched graph nodes");
+      }
+    } catch (const std::exception& error) {
+      opening_lines_ = std::make_unique<UnavailableOpeningLineGraph>(error.what());
+      last_error_ = std::string("Opening lines disabled: ") + error.what();
+    }
+  } else {
+    opening_lines_ = std::make_unique<UnavailableOpeningLineGraph>(
+        std::string("opening_lines.kcl is missing from runtime path: ")
+            + lines_path.string());
+  }
+  startup["openingLinesLoadMs"] = elapsed_ms(phase_started);
+  practice_service_.set_opening_sources(*opening_lines_, *opening_names_, *opening_theory_);
 
   // Keep the legacy bounded opening-classification maintenance visible in the
   // inspector. It is synchronous startup work, so its measured duration is
@@ -479,11 +517,6 @@ std::string Core::start_provider_profile_json(
   return provider_service_.start_provider_profile_json(type, username);
 }
 
-std::string Core::start_scout_json(
-    const ProfileType type, const std::string& username) {
-  return provider_service_.start_scout_json(type, username);
-}
-
 std::string Core::start_scout_report_json(
     const ProfileType type, const std::string& username) {
   return provider_service_.start_scout_report_json(type, username);
@@ -677,8 +710,9 @@ void Core::cancel_variation_analysis(const std::string& job_id) {
 // Section: Local bot play orchestration
 // -----------------------------------------------------------------------------
 
-std::string Core::create_bot_game_json(const int requested_elo) {
-  return bot_service_.create_game_json(requested_elo);
+std::string Core::create_bot_game_json(
+    const int requested_elo, const std::string& player_color) {
+  return bot_service_.create_game_json(requested_elo, player_color);
 }
 
 std::string Core::active_bot_game_json() const {
@@ -810,6 +844,29 @@ std::string Core::start_coach_hint_json(const std::string& request_json) {
 std::string Core::coach_job_status_json(const std::string& job_id) {
   validate_token(job_id, "coach job id");
   return coach_service_.job_status_json(job_id);
+}
+
+std::string Core::coach_sessions_json(const std::string& profile_id) const {
+  validate_token(profile_id, "profile id");
+  return coach_service_.sessions_json(profile_id);
+}
+
+std::string Core::create_coach_session_json(const std::string& profile_id) {
+  validate_token(profile_id, "profile id");
+  return coach_service_.create_session_json(profile_id);
+}
+
+std::string Core::coach_session_messages_json(
+    const std::string& request_json) const {
+  return coach_service_.session_messages_json(request_json);
+}
+
+std::string Core::rename_coach_session_json(const std::string& request_json) {
+  return coach_service_.rename_session_json(request_json);
+}
+
+std::string Core::delete_coach_session_json(const std::string& request_json) {
+  return coach_service_.delete_session_json(request_json);
 }
 
 void Core::cancel_coach_job(const std::string& job_id) {

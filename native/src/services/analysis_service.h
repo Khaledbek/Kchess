@@ -98,6 +98,16 @@ class AnalysisService {
   std::string variation_analysis_status_json(const std::string& job_id);
   void cancel_variation_analysis(const std::string& job_id);
   std::string coach_hint_json(const std::string& fen);
+  // Re-evaluate one explicitly challenged legal root move against the fresh
+  // native best root move. This is foreground Coach evidence only.
+  std::string coach_move_review_json(
+      const std::string& fen, const std::string& move_uci);
+  // Evaluate the complete legal root move set and return the objectively worst
+  // candidates for the side to move. When fastest_loss is true, an available
+  // forced loss is ordered by shortest mate distance before ordinary eval loss.
+  // This is ephemeral coach evidence and is never persisted as game analysis.
+  std::string coach_extreme_move_json(
+      const std::string& fen, bool fastest_loss);
 
  private:
   enum class AnalysisJobState {
@@ -120,9 +130,10 @@ class AnalysisService {
     std::shared_ptr<ChessEngine> engine;
     std::shared_ptr<persistence::ForegroundSqlitePriorityLease> foreground_sqlite_priority;
     std::string config_hash;
-    // Classifications shown while maximum-depth refinement is running come
-    // from the last fully published pre-analysis run.  This keeps the UI
-    // stable until the entire live queue can publish one atomic reclassification.
+    // During maximum-depth refinement, a move keeps the last published
+    // shallow classification only until both deeper adjacent position slots
+    // are available. The deeper per-move classification then replaces it
+    // immediately; the whole game need not wait for the queue to finish.
     std::string published_classification_config_hash;
     std::thread worker;
   };
@@ -140,6 +151,21 @@ class AnalysisService {
     std::string error;
     AnalysisResult result;
     std::optional<MoveCategory> classification;
+    bool classification_unstable{false};
+    std::string classification_stability_reason;
+    // Native presentation provenance for the best-move arrow on fen.  The
+    // arrow is published only after the complete after-position search has
+    // finished, so the next sideline move can reuse this exact result as its
+    // BEFORE-position classification root.
+    std::string arrow_config_hash;
+    int arrow_requested_depth{0};
+    int arrow_requested_multi_pv{0};
+    bool arrow_snapshot_complete{false};
+    std::string classification_snapshot_id;
+    std::string classification_rank1_move;
+    bool played_move_matches_published_rank1{false};
+    bool classification_presentation_coherent{true};
+    std::string classification_presentation_reason;
     int visible_multi_pv{1};
     std::atomic_bool expose_live_result{true};
     std::shared_ptr<ChessEngine> engine;
@@ -163,18 +189,20 @@ class AnalysisService {
   std::string analysis_json(
       const std::string& game_id, const PersistedAnalysis& analysis,
       const AnalysisJob* live_job = nullptr) const;
-  PersistedAnalysis stable_live_classification_snapshot(
+  PersistedAnalysis progressive_live_classification_snapshot(
       const std::string& game_id,
       int ply,
       PersistedAnalysis analysis,
       const AnalysisJob* live_job) const;
   static const char* job_state_name(AnalysisJobState state) noexcept;
   static AnalysisJobState persisted_job_state(const PersistedAnalysis& analysis) noexcept;
-  void update_classification_for_ply(
+  std::string update_classification_for_ply(
       const GameRecord& game,
       const std::string& game_id,
       const std::string& config_hash,
       const std::string& engine_version,
+      int requested_depth,
+      int time_limit_seconds,
       int ply);
   void rebuild_classification(
       const std::string& game_id,

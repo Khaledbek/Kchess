@@ -13,7 +13,6 @@
 #include <unordered_map>
 
 #include "ai/coach_orchestrator.h"
-#include "ai/models/portable_small_models.h"
 #include "persistence/database.h"
 #include "services/analysis_service.h"
 
@@ -28,8 +27,7 @@ namespace knowledge { class KnowledgeRuntime; }
 class CoachService {
  public:
   CoachService(Database& database, AnalysisService& analysis_service,
-               knowledge::KnowledgeRuntime& knowledge_runtime,
-               std::filesystem::path small_model_root = {});
+               knowledge::KnowledgeRuntime& knowledge_runtime);
   ~CoachService();
 
   CoachService(const CoachService&) = delete;
@@ -37,13 +35,19 @@ class CoachService {
 
   [[nodiscard]] std::string ask_json(const std::string& request_json);
   [[nodiscard]] std::string context_json(const std::string& request_json) const;
-  [[nodiscard]] std::string automatic_json(const std::string& request_json) const;
+  [[nodiscard]] std::string automatic_json(const std::string& request_json);
 
   [[nodiscard]] std::string start_ask_json(const std::string& request_json);
   [[nodiscard]] std::string start_automatic_json(const std::string& request_json);
   [[nodiscard]] std::string start_hint_json(const std::string& request_json);
   [[nodiscard]] std::string job_status_json(const std::string& job_id);
   [[nodiscard]] std::string performance_diagnostics_json() const;
+  [[nodiscard]] std::string sessions_json(const std::string& profile_id) const;
+  [[nodiscard]] std::string create_session_json(const std::string& profile_id);
+  [[nodiscard]] std::string session_messages_json(
+      const std::string& request_json) const;
+  [[nodiscard]] std::string rename_session_json(const std::string& request_json);
+  [[nodiscard]] std::string delete_session_json(const std::string& request_json);
   void cancel_job(const std::string& job_id);
 
  private:
@@ -53,6 +57,7 @@ class CoachService {
     std::string id;
     std::string session_id;
     JobKind kind{JobKind::ask};
+    std::uint64_t request_generation{0};
     std::atomic_bool finished{false};
     std::atomic_bool cancelled{false};
     mutable std::mutex state_mutex;
@@ -67,8 +72,9 @@ class CoachService {
   [[nodiscard]] std::string ask_json_impl(
       const std::string& request_json, const std::atomic_bool* cancelled);
   [[nodiscard]] std::string automatic_json_impl(
-      const std::string& request_json, const std::atomic_bool* cancelled) const;
+      const std::string& request_json, const std::atomic_bool* cancelled);
   void cancel_superseded_automatic_jobs(const std::string& session_id);
+  [[nodiscard]] bool is_latest_request(const CoachJob& job) const;
   void cancel_automatic_jobs_for_foreground();
   [[nodiscard]] bool acquire_execution_slot(
       JobKind kind, const std::atomic_bool* cancelled = nullptr) const;
@@ -86,6 +92,7 @@ class CoachService {
     std::uint64_t automatic_requests{0};
     std::uint64_t accepted_requests{0};
     std::uint64_t validation_failures{0};
+    std::uint64_t action_fulfillment_failures{0};
     std::uint64_t repaired_responses{0};
     std::uint64_t provider_errors{0};
     std::uint64_t provider_calls{0};
@@ -106,6 +113,8 @@ class CoachService {
     std::uint64_t provider_evidence_input_items{0};
     std::uint64_t provider_evidence_selected_items{0};
     std::uint64_t provider_exact_duplicates_dropped{0};
+    std::uint64_t provider_compacted_items{0};
+    std::uint64_t provider_compaction_savings_tokens{0};
     std::uint64_t provider_estimated_input_tokens{0};
     std::uint64_t provider_estimated_selected_tokens{0};
     std::uint64_t provider_request_ms{0};
@@ -120,7 +129,6 @@ class CoachService {
   Database& database_;
   AnalysisService& analysis_service_;
   std::shared_ptr<CoachHintCache> hint_cache_;
-  ai::LoadedSmallModelSuite small_models_;
   ai::CoachOrchestrator orchestrator_;
   mutable std::mutex execution_state_mutex_;
   mutable std::condition_variable execution_cv_;
@@ -139,7 +147,9 @@ class CoachService {
   std::deque<ai::CoachPipelineTrace> recent_performance_;
   mutable std::mutex jobs_mutex_;
   std::unordered_map<std::string, std::shared_ptr<CoachJob>> jobs_;
+  std::unordered_map<std::string, std::uint64_t> latest_request_generation_;
   std::atomic_uint64_t next_job_id_{1};
+  std::atomic_uint64_t next_request_generation_{1};
 };
 
 }  // namespace kchess

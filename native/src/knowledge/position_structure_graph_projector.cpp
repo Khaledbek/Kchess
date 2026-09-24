@@ -3,6 +3,7 @@
 #include "position_similarity.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <iomanip>
 #include <map>
@@ -10,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -410,6 +412,16 @@ PositionStructureGraphProjector::project_active_profile(
   ai::PositionFeatureExtractor extractor;
   std::vector<KnowledgeSourceRef> sources;
 
+  // Position feature extraction is intentionally background maintenance. Keep
+  // this long scan below a sustained full-core duty cycle so an account switch
+  // can refresh derived knowledge without making the desktop app audibly busy.
+  // The graph mutation still remains serialized; this only yields CPU between
+  // small source batches and never changes deterministic projection results.
+  constexpr std::size_t kBackgroundGamesPerYield = 4;
+  constexpr std::uint64_t kMaximumYieldMs = 80;
+  std::size_t games_since_yield = 0;
+  auto budget_window_started = std::chrono::steady_clock::now();
+
   for (const auto& source_row : source_rows) {
     const auto game_value = database_.game(source_row.game_id);
     if (!game_value || game_value->moves.empty()) continue;
@@ -428,6 +440,20 @@ PositionStructureGraphProjector::project_active_profile(
     for (const auto& move : game.moves) {
       project_position(pending, move.fen_after, source, extractor, graph_,
                        position_similarity_, observed_at_ms, report);
+    }
+
+    ++games_since_yield;
+    if (games_since_yield >= kBackgroundGamesPerYield) {
+      const auto before_sleep = std::chrono::steady_clock::now();
+      const auto work_ms = static_cast<std::uint64_t>(
+          std::max<std::int64_t>(1, std::chrono::duration_cast<std::chrono::milliseconds>(
+              before_sleep - budget_window_started).count()));
+      const auto yield_ms = std::min(work_ms, kMaximumYieldMs);
+      std::this_thread::sleep_for(std::chrono::milliseconds(yield_ms));
+      ++report.background_yield_count;
+      report.background_yield_ms += yield_ms;
+      games_since_yield = 0;
+      budget_window_started = std::chrono::steady_clock::now();
     }
   }
 

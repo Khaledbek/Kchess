@@ -35,6 +35,7 @@ String _classificationLabel(
   MoveClassification.excellent => strings.excellent,
   MoveClassification.good => strings.good,
   MoveClassification.okay => strings.okay,
+  MoveClassification.inaccuracy => strings.inaccuracy,
   MoveClassification.miss => strings.miss,
   MoveClassification.mistake => strings.mistake,
   MoveClassification.blunder => strings.blunder,
@@ -50,6 +51,7 @@ String? _analysisClassificationAsset(MoveClassification classification) =>
       MoveClassification.excellent => 'assets/analysis_img/move_excellent.png',
       MoveClassification.good => 'assets/analysis_img/move_okay.png',
       MoveClassification.okay => 'assets/analysis_img/move_okay.png',
+      MoveClassification.inaccuracy => 'assets/analysis_img/move_inaccuracy.png',
       MoveClassification.miss => 'assets/analysis_img/move_miss.png',
       MoveClassification.mistake => 'assets/analysis_img/move_mistake.png',
       MoveClassification.blunder => 'assets/analysis_img/move_blunder.png',
@@ -105,6 +107,7 @@ Color _classificationColor(
     MoveClassification.excellent => const Color(0x9966BB6A),
     MoveClassification.good => const Color(0x8A81C784),
     MoveClassification.okay => const Color(0x80A5D6A7),
+    MoveClassification.inaccuracy => const Color(0x8AFFA726),
     MoveClassification.miss => const Color(0x80FFB74D),
     MoveClassification.mistake => const Color(0x99EF5350),
     MoveClassification.blunder => const Color(0xB3D32F2F),
@@ -678,12 +681,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         _controller.snapshot?.isRunning == true ||
         _controller.displayedSnapshot?.isRunning == true;
     if (_afterMoveLoadingSlot == slot) return;
-    if (_afterMoveSlot == slot &&
-        _afterMoveSnapshot != null &&
-        !analysisRunning) {
-      return;
-    }
 
+    // Do not short-circuit the final refresh merely because refinement has
+    // just transitioned to complete. The controller notifies listeners with
+    // that terminal snapshot exactly once; reloading here reconciles the
+    // adjacent-position panel with the final native bestmove/classification
+    // instead of leaving the last running checkpoint on screen. While a
+    // refinement is running, the same path continues to refresh progressively.
     final generation = ++_afterMoveLoadGeneration;
     _afterMoveLoadingSlot = slot;
     try {
@@ -1499,20 +1503,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ? (displayed?.lines ?? const <EngineLine>[])
         : (afterMoveSnapshot?.lines ?? const <EngineLine>[]);
     final lines = variation?.lines ?? mainPositionLines;
-    final resultBestMove =
-        variation?.bestMove ??
-        (move == null ? displayed?.bestMove : afterMoveSnapshot?.bestMove) ??
-        '';
-    final arrowAnalysisFen = variation != null
-        ? variation.fen
-        : (move == null
-              ? (displayed?.analyzedFen ?? '')
-              : (afterMoveSnapshot?.analyzedFen ?? ''));
+    final arrowContract = variation?.arrowContract ??
+        (move == null ? displayed?.arrowContract : afterMoveSnapshot?.arrowContract);
     final arrowMove = resolveAnalysisArrowMove(
-      lines: lines,
-      resultBestMove: resultBestMove,
+      contract: arrowContract,
       boardFen: position.fen,
-      analysisFen: arrowAnalysisFen,
     );
     final profileSide =
         snapshot?.summary?.profileSide ?? gameSummary.profileColor;
@@ -1637,6 +1632,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 final minDepth = _settings.minAnalysisDepth;
                 final maxDepth = _settings.depth;
                 final theoryMove =
+                    displayed?.classificationContract?.presentationRenderable == true &&
                     displayed?.classification == MoveClassification.theory;
                 double depthProgress(int depth, bool qualityComplete) =>
                     qualityComplete || maxDepth <= minDepth
@@ -1767,8 +1763,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   currentMoveClassification:
                       _settings.showClassifications && !atInitialPosition
                       ? (variation != null
-                            ? variation.classification
-                            : displayed?.classification)
+                            ? (variation.classificationContract?.presentationRenderable == true
+                                  ? variation.classification
+                                  : null)
+                            : (displayed?.classificationContract?.presentationRenderable == true
+                                  ? displayed?.classification
+                                  : null))
                       : null,
                   suppressLastMoveFallback:
                       _settings.showClassifications && !atInitialPosition,
@@ -2847,7 +2847,10 @@ class _AnalysisDetails extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final value = variation;
-    final variationClassification = value?.classification;
+    final variationClassification =
+        value?.classificationContract?.presentationRenderable == true
+        ? value?.classification
+        : null;
     return Card(
       key: const Key('variation-analysis'),
       margin: EdgeInsets.zero,
@@ -3290,7 +3293,10 @@ class _AnalysisDetails extends StatelessWidget {
         : '${move!.moveNumber}${move!.sideToMove == 'black' ? '…' : '.'}';
     final playedMove = move?.san ?? 'FEN';
     final shownLines = variation?.lines ?? currentPositionLines;
-    final rawClassification = displayed?.classification;
+    final rawClassification =
+        displayed?.classificationContract?.presentationRenderable == true
+        ? displayed?.classification
+        : null;
     final classification = rawClassification == MoveClassification.unknown
         ? null
         : rawClassification;
@@ -3884,6 +3890,7 @@ class _PlayerSummaryBlock extends StatelessWidget {
       (MoveClassification.excellent, summary.excellent),
       (MoveClassification.good, summary.good),
       (MoveClassification.okay, summary.okay),
+      (MoveClassification.inaccuracy, summary.inaccuracy),
       (MoveClassification.miss, summary.miss),
       (MoveClassification.mistake, summary.mistake),
       (MoveClassification.blunder, summary.blunder),

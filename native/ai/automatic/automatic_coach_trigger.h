@@ -47,6 +47,10 @@ struct AutomaticCoachDecision {
   double practice_relevance{0.0};
   double interruption_cost{0.0};
   double teaching_value{0.0};
+  double minimum_teaching_value{0.72};
+  bool primary_reason_present{false};
+  bool critical_override{false};
+  bool recency_blocked{false};
   std::vector<AutomaticCoachReason> reasons;
 };
 

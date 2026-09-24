@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "../coach_types.h"
+#include "chess_verdict.h"
 #include "../teaching/spaced_repetition_scheduler.h"
 
 namespace kchess::ai {
@@ -13,6 +14,34 @@ namespace kchess::ai {
 // -----------------------------------------------------------------------------
 // Section: Coach request contract
 // -----------------------------------------------------------------------------
+
+// Native-only Coach context state. These fields are hydrated from authoritative
+// C++/SQLite state and are never trusted from Flutter/provider JSON.
+struct CoachNativeContextState {
+  std::string analysis_state{"unknown"};
+  std::string profile_state{"unknown"};
+  std::string history_state{"unknown"};
+  std::optional<int> user_rating;
+  std::optional<int> opponent_rating;
+  std::optional<std::string> last_move_uci;
+};
+
+// Native attribution for one completed move that caused a Coach turn. This is
+// role/context metadata, not an additional source of chess truth. Concrete move
+// quality claims still require supplied evidence.
+struct CoachMoveAttribution {
+  std::optional<std::string> previous_fen;
+  std::optional<std::string> current_fen;
+  std::optional<std::string> played_move_uci;
+  std::optional<std::string> mover_color;
+  std::optional<std::string> learner_color;
+  std::string mover_role{"unknown"};
+  std::optional<std::string> classification;
+  std::optional<double> expected_score_before;
+  std::optional<double> expected_score_played;
+  std::optional<double> expected_score_loss;
+  bool verified_learner_move{false};
+};
 
 struct CoachRequest {
   std::string user_text;
@@ -50,6 +79,11 @@ struct CoachRequest {
   // full personal Knowledge packet again merely to ask the quiz question.
   bool personal_training_position_selected{false};
   bool automatic_turn{false};
+  std::optional<CoachMoveAttribution> move_attribution;
+  // Native-only review of a previous authoritative judgment. User prose may
+  // trigger this contract but never supplies the chess conclusion.
+  std::optional<ChessVerdictChallenge> verdict_challenge;
+  CoachNativeContextState native_context_state;
 };
 
 }  // namespace kchess::ai

@@ -10,9 +10,13 @@ namespace kchess::ai::router_terms {
 
 inline constexpr std::string_view follow_up[]{
     "why", "why not", "what about", "and then", "and in", "and for",
-    "show examples", "instead", "that move", "this move", "warum", "wieso",
-    "weshalb", "woher", "und dann", "und im", "und bei", "zeig beispiele",
-    "stattdessen", "dieser zug", "der zug", "لماذا", "وماذا", "بدلا"};
+    "show examples", "instead", "that move", "this move", "how can i prevent",
+    "how do i prevent", "how can i avoid", "how do i avoid", "can i avoid",
+    "warum", "wieso", "weshalb", "woher", "und dann", "und im", "und bei",
+    "zeig beispiele", "stattdessen", "dieser zug", "der zug",
+    "wie kann ich verhindern", "wie verhindere ich", "kann ich verhindern",
+    "wie kann ich vermeiden", "wie vermeide ich", "kann ich vermeiden",
+    "لماذا", "وماذا", "بدلا"};
 
 // -----------------------------------------------------------------------------
 // Section: Chess-domain anchors
@@ -37,14 +41,20 @@ inline constexpr std::string_view player_names[]{
 // -----------------------------------------------------------------------------
 
 inline constexpr std::string_view move_explanation[]{
-    "best move", "better move", "worse move", "why is", "why was",
-    "bester zug", "besserer zug", "schlechter zug", "warum ist", "warum war",
-    "أفضل نقلة", "نقلة أفضل", "لماذا هذه النقلة"};
+    "best move", "better move", "worse move", "worst move", "fastest loss",
+    "lose fastest", "loses fastest", "why is", "why was",
+    "bester zug", "besserer zug", "schlechter zug", "schlechtester zug",
+    "schlechteste zug", "schlechtesten zug", "schnellster verlust",
+    "schneller verlust", "schnelleren verlust", "am schnellsten verlieren",
+    "warum ist", "warum war", "أفضل نقلة", "نقلة أفضل",
+    "لماذا هذه النقلة"};
 
 inline constexpr std::string_view plan[]{
     "plan", "strategy", "strategic", "attack", "improve the position",
-    "exploit", "target", "strategie", "planen", "angreifen", "angriff",
-    "ausnutzen", "ziel", "خطة", "استراتيجية", "هجوم"};
+    "exploit", "target", "prevent", "avoid", "stop", "keep", "preserve",
+    "strategie", "planen", "angreifen", "angriff", "ausnutzen", "ziel",
+    "verhindern", "vermeiden", "behalten", "erhalten", "خطة", "استراتيجية",
+    "هجوم"};
 
 inline constexpr std::string_view tactic[]{
     "tactic", "tactical", "fork", "royal fork", "pin", "skewer", "deflection",

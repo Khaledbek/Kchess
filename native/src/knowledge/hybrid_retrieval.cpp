@@ -389,9 +389,8 @@ void merge_chunk_candidate(std::vector<HybridChunkCandidate>& out,
 
 HybridRetrievalEngine::HybridRetrievalEngine(
     GraphStore& graph, ChunkRegistry& chunks,
-    const SemanticChunkSearch* semantic_search,
     const PositionSimilarityIndex* position_similarity)
-    : graph_(graph), chunks_(chunks), semantic_search_(semantic_search),
+    : graph_(graph), chunks_(chunks),
       position_similarity_(position_similarity) {}
 
 HybridRetrievalResult HybridRetrievalEngine::retrieve(
@@ -512,34 +511,6 @@ HybridRetrievalResult HybridRetrievalEngine::retrieve(
       HybridRetrievalSignals signals;
       signals.lexical = true;
       signals.lexical_score = hit.lexical_score;
-      merge_chunk_candidate(result.chunks, std::move(hit.chunk), signals,
-                            budgets.max_candidate_chunks,
-                            &result.chunk_budget_exhausted);
-    }
-  }
-
-  if (request.route.channels.vector && semantic_search_ != nullptr &&
-      !request.player_id.empty() && budgets.max_vector_chunks > 0 &&
-      budgets.max_candidate_chunks > 0) {
-    SemanticChunkSearchRequest semantic;
-    semantic.player_id = request.player_id;
-    semantic.query_text = request.query_text;
-    semantic.limit = std::min(budgets.max_vector_chunks, budgets.max_candidate_chunks);
-    semantic.candidate_limit = std::min<std::size_t>(20, budgets.max_candidate_chunks);
-    for (const auto& candidate : result.chunks) {
-      const auto links = chunks_.graph_links(candidate.chunk.metadata.id);
-      if (!std::any_of(links.begin(), links.end(), [&](const auto& link) {
-        if (link.entry.kind != KnowledgeEntryKind::kNode) return false;
-        const auto node = graph_.node({link.entry.id});
-        return node && eligible_for_player_scope(*node, request) && knowledge_node_matches_scope(*node, request.route);
-      })) continue;
-      semantic.current_candidates.push_back(candidate.chunk);
-      if (semantic.current_candidates.size() >= 8) break;
-    }
-    for (auto& hit : semantic_search_->search(semantic)) {
-      HybridRetrievalSignals signals;
-      signals.vector = true;
-      signals.vector_score = hit.vector_score;
       merge_chunk_candidate(result.chunks, std::move(hit.chunk), signals,
                             budgets.max_candidate_chunks,
                             &result.chunk_budget_exhausted);

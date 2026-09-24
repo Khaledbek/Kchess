@@ -114,9 +114,22 @@ temp/
 # Temporary Kchess update folders
 Kchess_Update_*/
 
-# Python build-tool caches (tools/opening_book, tools/opening_names)
+# Python developer/training caches and generated interpreter artifacts
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Editor/patch scratch residue
+*.tmp
+*.swp
+*.swo
+*.orig
+*.rej
 # Prevent accidental nested project copies
 /Kchess/
 /flutter_app/flutter_app/
@@ -125,3 +138,35 @@ __pycache__/
 # Local coding-agent scratch artifacts
 /codex_changes.patch
 /codex_status.txt
+
+# =========================================================
+# Repository hygiene: private/local dependencies and AI assets
+# =========================================================
+
+# Entire local secret store is private. Keep examples/templates elsewhere.
+/secrets/
+**/.secrets/
+**/secrets.local/
+**/credentials.json
+**/service-account*.json
+**/*credentials*.json
+
+# Local third-party payloads are intentionally not distributed in update ZIPs.
+# Dependency/model manifests and documentation belong in source-controlled
+# locations outside this local payload tree.
+/third_party/
+
+
+# Model weights / compiled inference artifacts must stay local unless a future
+# release explicitly moves them to a dedicated artifact/LFS workflow.
+
+# Common local ML/download caches.
+**/.huggingface/
+**/.torch/
+**/.cache/huggingface/
+**/*.key
+**/*.ppk
+**/id_rsa
+**/id_ed25519
+**/token.json
+**/oauth*.json

@@ -6,7 +6,6 @@
 #include <deque>
 #include <cmath>
 #include <filesystem>
-#include <map>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -194,11 +193,9 @@ class Stockfish19Engine::Impl {
   std::atomic_bool cancelled{false};
   std::atomic_int current_depth{0};
   mutable std::mutex live_result_mutex;
-  std::map<int, EngineLine> live_lines;
   // Raw callbacks remain available for diagnostics, but SF19 live consumers
   // must never combine ranks from different search iterations. The published
   // live snapshot below is replaced only by one complete exact MultiPV report.
-  std::map<std::string, EngineLine> live_lines_by_move;
   std::vector<EngineLine> live_complete_lines;
   int live_complete_depth{0};
   std::string live_best_move;
@@ -308,8 +305,6 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
   }
   {
     std::lock_guard live_lock(impl_->live_result_mutex);
-    impl_->live_lines.clear();
-    impl_->live_lines_by_move.clear();
     impl_->live_complete_lines.clear();
     impl_->live_complete_depth = 0;
     impl_->live_best_move.clear();
@@ -357,16 +352,13 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
     bool should_stop = false;
     {
       std::lock_guard result_lock(impl_->live_result_mutex);
-      auto& line = impl_->live_lines[static_cast<int>(info.multiPV)];
+      EngineLine line;
       line.rank = static_cast<int>(info.multiPV);
       line.depth = info.depth;
       line.nodes = static_cast<std::uint64_t>(info.nodes);
       line.wdl = parse_wdl(info.wdl);
       line.moves = split_moves(info.pv);
       apply_score(line, info.score);
-      if (!line.best_move().empty()) {
-        impl_->live_lines_by_move[line.best_move()] = line;
-      }
       // SF19 emits MultiPV as a rank sequence, and callbacks from a newer
       // iteration can arrive while older rank slots are still present. Always
       // build a complete exact snapshot, even for ordinary live refinement.
@@ -379,9 +371,9 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
         impl_->live_complete_depth = exact_snapshot.latest_depth();
       }
 
-      // Raw rank slots are still retained for diagnostics and compatibility,
-      // but they are no longer the public SF19 live-analysis truth. Equal-depth
-      // grouping below remains only for the optional convergence test.
+      // The exact accumulator is the only published SF19 MultiPV snapshot.
+      // Do not retain a second historical rank map that could later be promoted
+      // into a synthetic final ordering.
       const int depth = static_cast<int>(info.depth);
       if (request.dynamic_early_stop
           && depth >= request.early_stop_min_depth
@@ -464,15 +456,22 @@ AnalysisResult Stockfish19Engine::analyze(const AnalysisRequest& request) {
           "Stockfish 19 analysis returned no complete exact MultiPV iteration");
     }
 
-    // Preparation is persisted and later used as classification truth. Never
-    // combine ranks from different iterations, and never promote an older PV
-    // merely because a late bestmove callback disagrees with the exact snapshot.
+    // Keep the exact MultiPV snapshot as score/WDL/PV evidence. The completed
+    // search recommendation itself is still Stockfish's final bestmove and is
+    // restored below after the exact lines have been selected.
     result.lines = snapshot;
     result.best_move = result.lines.front().best_move();
     result.reached_depth = exact_snapshot.latest_depth();
     result.nodes = 0;
     for (const auto& line : result.lines) {
       result.nodes = std::max(result.nodes, line.nodes);
+    }
+  }
+  {
+    std::lock_guard result_lock(impl_->live_result_mutex);
+    if (!impl_->live_best_move.empty()
+        && impl_->live_best_move != "(none)" && impl_->live_best_move != "0000") {
+      result.best_move = impl_->live_best_move;
     }
   }
   result.interrupted = impl_->cancelled.load();
@@ -529,8 +528,6 @@ void Stockfish19Engine::clear_live_result() noexcept {
   // is position-specific, however, and must not survive into the next sideline
   // request. Clearing it here leaves Stockfish's search state/TT untouched.
   std::lock_guard result_lock(impl_->live_result_mutex);
-  impl_->live_lines.clear();
-  impl_->live_lines_by_move.clear();
   impl_->live_complete_lines.clear();
   impl_->live_complete_depth = 0;
   impl_->live_best_move.clear();

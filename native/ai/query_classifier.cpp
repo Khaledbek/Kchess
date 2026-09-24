@@ -203,7 +203,12 @@ ProfileQueryScope classify_profile_scope(std::string_view text) {
 CoachQueryClassification CoachQueryClassifier::classify(
     const CoachRequest& request, const DomainRoute& route) const {
   CoachQueryClassification out;
-  out.intent = route.context_intent != CoachIntent::unknown && route.follow_up
+  // An explicit follow-up may establish a new local goal (for example
+  // "wie kann ich den Damentausch verhindern?"). Only an elliptical route
+  // whose own intent is follow_up inherits the previous topic. Otherwise the
+  // user's current wording must win over the previous lesson skill/topic.
+  out.intent = route.intent == CoachIntent::follow_up &&
+                       route.context_intent != CoachIntent::unknown
       ? route.context_intent
       : route.intent;
   if (!route.chess_domain || out.intent == CoachIntent::off_topic ||

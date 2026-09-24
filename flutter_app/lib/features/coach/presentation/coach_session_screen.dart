@@ -6,11 +6,13 @@ import 'package:flutter/services.dart';
 import '../../../ffi/core_gateway.dart';
 import '../../../localization/generated/app_localizations.dart';
 import '../../../shared/models/models.dart';
+import '../../../ui/coach_client_action_scope.dart';
 import '../../../ui/shared/promotion_dialog.dart';
 import '../models/coach_ui_models.dart';
 import 'coach_context_dialogs.dart';
 import 'coach_diagnostics_dialog.dart';
 import 'coach_screen.dart';
+import 'coach_sessions_sheet.dart';
 
 // -----------------------------------------------------------------------------
 // Section: Native-backed coach session
@@ -46,7 +48,9 @@ class CoachSessionScreen extends StatefulWidget {
 
 class _CoachSessionScreenState extends State<CoachSessionScreen> {
   final List<CoachUiMessage> _messages = [];
-  late final String _sessionId;
+  String _sessionId = '';
+  CoachSessionSummary? _activeSession;
+  bool _sessionReady = false;
   late BoardPosition _position;
   late CoachSurface _surface;
   String? _contextId;
@@ -199,7 +203,221 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     unawaited(widget.gateway.cancelCoachSessionJobs(_sessionId).catchError((_) {}));
   }
 
+  Future<void> _initializePersistentSession() async {
+    final profileId = widget.profileId;
+    if (profileId == null || profileId.isEmpty) {
+      if (mounted) setState(() => _sessionReady = true);
+      return;
+    }
+    try {
+      CoachSessionSummary session;
+      final shouldResumeLatest =
+          _surface == CoachSurface.general && _contextId == null;
+      if (shouldResumeLatest) {
+        final reply = await widget.gateway.coachSessions(profileId);
+        final sessions = (reply['sessions'] as List<Object?>? ?? const [])
+            .whereType<Map>()
+            .map(
+              (value) => CoachSessionSummary.fromJson(
+                value.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .where((value) => value.id.isNotEmpty)
+            .toList(growable: false);
+        if (sessions.isNotEmpty) {
+          session = sessions.first;
+        } else {
+          session = await _createPersistentSession(profileId);
+        }
+      } else {
+        session = await _createPersistentSession(profileId);
+      }
+      await _activateSession(session, restoreBoard: shouldResumeLatest);
+    } catch (caught) {
+      if (!mounted) return;
+      setState(() {
+        _sessionReady = true;
+        _error = caught.toString();
+      });
+    }
+  }
+
+  Future<CoachSessionSummary> _createPersistentSession(String profileId) async {
+    final reply = await widget.gateway.createCoachSession(profileId);
+    final raw = reply['session'];
+    if (raw is! Map) {
+      throw StateError('Native coach session creation returned no session.');
+    }
+    return CoachSessionSummary.fromJson(
+      raw.map((key, value) => MapEntry(key.toString(), value)),
+    );
+  }
+
+  Future<void> _activateSession(
+    CoachSessionSummary session, {
+    bool restoreBoard = true,
+  }) async {
+    final profileId = widget.profileId;
+    if (profileId == null) return;
+    _cancelInFlightCoachJobs();
+    _cancelScheduledAutomaticCoach();
+    final reply = await widget.gateway.coachSessionMessages({
+      'profileId': profileId,
+      'sessionId': session.id,
+    });
+    final restoredMessages = _messagesFromTranscript(reply);
+    BoardPosition? restoredPosition;
+    final persistedFen = (reply['currentPositionFen'] as String? ?? '').trim();
+    if (restoreBoard && persistedFen.isNotEmpty) {
+      try {
+        final contextReply = await widget.gateway.coachContext({'fen': persistedFen});
+        final rawPosition = contextReply['position'];
+        if (rawPosition is Map<String, Object?>) {
+          restoredPosition = BoardPosition.fromJson(rawPosition);
+        } else if (rawPosition is Map) {
+          restoredPosition = BoardPosition.fromJson(
+            rawPosition.map((key, value) => MapEntry(key.toString(), value)),
+          );
+        }
+      } catch (_) {
+        // A stale board snapshot must not block reopening the transcript.
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _sessionId = session.id;
+      _activeSession = session;
+      _messages
+        ..clear()
+        ..addAll(restoredMessages);
+      if (restoredPosition != null) {
+        _position = restoredPosition;
+        _freeLinePositions
+          ..clear()
+          ..add(restoredPosition);
+        _freeLineIndex = 0;
+        _contextId = null;
+        _contextPly = null;
+        _gamePgn = null;
+      }
+      _sessionReady = true;
+      _error = null;
+    });
+  }
+
+  List<CoachUiMessage> _messagesFromTranscript(Map<String, Object?> reply) {
+    final strings = AppLocalizations.of(context);
+    final result = <CoachUiMessage>[];
+    for (final raw in reply['messages'] as List<Object?>? ?? const []) {
+      if (raw is! Map) continue;
+      final message = CoachSessionTranscriptMessage.fromJson(
+        raw.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      if (message.role == 'user') {
+        if (message.content.trim().isNotEmpty) {
+          result.add(
+            CoachUiMessage(
+              role: CoachMessageRole.user,
+              text: message.content.trim(),
+            ),
+          );
+        }
+        continue;
+      }
+      final payload = Map<String, Object?>.from(message.payload);
+      if (message.content.trim().isNotEmpty) {
+        payload['answer'] = message.content.trim();
+      }
+      final answer = (payload['answer'] as String? ?? '').trim();
+      if (answer.isEmpty &&
+          (payload['nativeAnswerKind'] == 'best_move' ||
+              payload['nativeAnswerKind'] == 'worst_move')) {
+        final moves = (payload['boardMoves'] as List<Object?>? ?? const [])
+            .whereType<String>()
+            .where((move) => move.trim().isNotEmpty)
+            .toList(growable: false);
+        if (moves.isNotEmpty) {
+          payload['answer'] = payload['nativeAnswerKind'] == 'worst_move'
+              ? strings.worstMoveText(moves.first)
+              : strings.bestMoveText(moves.first);
+        }
+      }
+      if ((payload['answer'] as String? ?? '').trim().isEmpty) {
+        final fallbackKind = payload['safeFallbackKind'] as String? ?? '';
+        if (fallbackKind == 'quiz_question') {
+          payload['answer'] = strings.coachSafeQuizFallbackAnswer;
+          payload['followUpQuestion'] = strings.coachSafeQuizFallbackQuestion;
+        } else if (fallbackKind == 'quiz_question_pending') {
+          payload['answer'] = strings.coachQuizQuestionPending;
+        } else if (fallbackKind == 'hint_prompt') {
+          payload['answer'] = strings.coachSafeHintFallbackAnswer;
+        } else if (fallbackKind == 'position_explanation') {
+          payload['answer'] = strings.coachSafePositionFallbackAnswer;
+        } else if (fallbackKind == 'verdict_grounding_unavailable') {
+          payload['answer'] = strings.coachVerdictGroundingUnavailable;
+        } else if (fallbackKind == 'candidate_comparison') {
+          payload['answer'] = strings.coachSafeComparisonFallbackAnswer;
+        } else if (fallbackKind == 'worst_move_analysis') {
+          payload['answer'] = strings.coachSafeWorstMoveFallbackAnswer;
+        } else if (fallbackKind == 'fastest_loss_analysis') {
+          payload['answer'] = strings.coachSafeFastestLossFallbackAnswer;
+        }
+      }
+      if ((payload['answer'] as String? ?? '').trim().isNotEmpty ||
+          (payload['followUpQuestion'] as String? ?? '').trim().isNotEmpty) {
+        result.add(CoachUiMessage.fromReply(payload));
+      }
+    }
+    return result;
+  }
+
+  Future<void> _manageSessions() async {
+    final profileId = widget.profileId;
+    if (profileId == null || !_sessionReady) return;
+    final selected = await showCoachSessionsSheet(
+      context,
+      gateway: widget.gateway,
+      profileId: profileId,
+      activeSessionId: _sessionId,
+    );
+    if (!mounted) return;
+    if (selected == null) {
+      try {
+        final reply = await widget.gateway.coachSessions(profileId);
+        for (final raw in reply['sessions'] as List<Object?>? ?? const []) {
+          if (raw is! Map) continue;
+          final session = CoachSessionSummary.fromJson(
+            raw.map((key, value) => MapEntry(key.toString(), value)),
+          );
+          if (session.id == _sessionId) {
+            setState(() => _activeSession = session);
+            break;
+          }
+        }
+      } catch (_) {
+        // Dismissing the manager must not disturb the active conversation.
+      }
+      return;
+    }
+    final isSameSession = selected.id == _sessionId;
+    if (isSameSession) {
+      setState(() => _activeSession = selected);
+      return;
+    }
+    try {
+      setState(() => _loading = true);
+      await _activateSession(selected);
+    } catch (caught) {
+      if (!mounted) return;
+      setState(() => _error = caught.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _initializeContext() async {
+    await _initializePersistentSession();
+    if (!mounted) return;
     final contextId = _contextId;
     if (contextId != null) {
       try {
@@ -242,6 +460,7 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
   }
 
   void _scheduleAutomaticCoach() {
+    if (!_sessionReady) return;
     final key = _automaticPositionKey();
     if (key == null || _automaticRequestedPositions.contains(key)) return;
     _cancelScheduledAutomaticCoach();
@@ -318,7 +537,7 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     String? hintMoveUci,
     bool personalTraining = false,
   }) async {
-    if (_loading || text.trim().isEmpty) return;
+    if (!_sessionReady || _loading || text.trim().isEmpty) return;
     final question = text.trim();
     final revision = _positionRevision;
     _cancelScheduledAutomaticCoach();
@@ -364,6 +583,36 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
       final strings = AppLocalizations.of(context);
       final status = reply['status'] as String? ?? 'provider_unavailable';
       final answer = (reply['answer'] as String? ?? '').trim();
+      final nativeAnswerKind =
+          (reply['nativeAnswerKind'] as String? ?? '').trim();
+      final nativeBoardMoves =
+          (reply['boardMoves'] as List<Object?>? ?? const <Object?>[])
+              .whereType<String>()
+              .where((move) => move.trim().isNotEmpty)
+              .toList(growable: false);
+      final clientActions = CoachClientAction.fromReply(reply);
+      final fulfillment = reply['actionFulfillment'];
+      final actionFulfillmentPassed = fulfillment is Map
+          ? (fulfillment['passed'] as bool? ?? true)
+          : true;
+      // Native product actions are independent from provider prose. A mixed
+      // action+language turn may still execute its validated client actions if
+      // Gemini fails; Flutter only obeys the native fulfillment contract and
+      // never infers actions from text.
+      if (clientActions.isNotEmpty && actionFulfillmentPassed) {
+        final actionScope = CoachClientActionScope.maybeOf(context);
+        if (actionScope == null) {
+          setState(() {
+            _loading = false;
+            _error = strings.coachUnavailable;
+          });
+          return;
+        }
+        for (final action in clientActions) {
+          await actionScope.onAction(context, action);
+          if (!mounted) return;
+        }
+      }
       CoachUiMessage? acceptedMessage;
       setState(() {
         _loading = false;
@@ -372,6 +621,20 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
           acceptedMessage = message;
           _messages.add(message);
           _applyBoardMessageOverlay(message);
+        } else if (status == 'ok' &&
+            (nativeAnswerKind == 'best_move' ||
+                nativeAnswerKind == 'worst_move') &&
+            nativeBoardMoves.isNotEmpty) {
+          final localizedReply = Map<String, Object?>.from(reply);
+          localizedReply['answer'] = nativeAnswerKind == 'worst_move'
+              ? strings.worstMoveText(nativeBoardMoves.first)
+              : strings.bestMoveText(nativeBoardMoves.first);
+          final message = CoachUiMessage.fromReply(localizedReply);
+          acceptedMessage = message;
+          _messages.add(message);
+          _applyBoardMessageOverlay(message);
+        } else if (status == 'ok' && clientActions.isNotEmpty) {
+          _error = null;
         } else if (status == 'safe_fallback') {
           final fallbackKind = reply['safeFallbackKind'] as String? ?? '';
           final localizedReply = Map<String, Object?>.from(reply);
@@ -379,17 +642,47 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
             localizedReply['answer'] = strings.coachSafeQuizFallbackAnswer;
             localizedReply['followUpQuestion'] =
                 strings.coachSafeQuizFallbackQuestion;
+          } else if (fallbackKind == 'quiz_question_pending') {
+            localizedReply['answer'] = strings.coachQuizQuestionPending;
+            localizedReply['followUpQuestion'] = '';
           } else if (fallbackKind == 'hint_prompt') {
             localizedReply['answer'] = strings.coachSafeHintFallbackAnswer;
+            localizedReply['followUpQuestion'] = '';
+          } else if (fallbackKind == 'position_explanation') {
+            localizedReply['answer'] =
+                strings.coachSafePositionFallbackAnswer;
+            localizedReply['followUpQuestion'] = '';
+          } else if (fallbackKind == 'verdict_grounding_unavailable') {
+            localizedReply['answer'] =
+                strings.coachVerdictGroundingUnavailable;
+            localizedReply['followUpQuestion'] = '';
+          } else if (fallbackKind == 'candidate_comparison') {
+            localizedReply['answer'] =
+                strings.coachSafeComparisonFallbackAnswer;
+            localizedReply['followUpQuestion'] = '';
+          } else if (fallbackKind == 'worst_move_analysis') {
+            localizedReply['answer'] =
+                strings.coachSafeWorstMoveFallbackAnswer;
+            localizedReply['followUpQuestion'] = '';
+          } else if (fallbackKind == 'fastest_loss_analysis') {
+            localizedReply['answer'] =
+                strings.coachSafeFastestLossFallbackAnswer;
             localizedReply['followUpQuestion'] = '';
           }
           final fallbackAnswer =
               (localizedReply['answer'] as String? ?? '').trim();
           if (fallbackAnswer.isNotEmpty) {
             final message = CoachUiMessage.fromReply(localizedReply);
-            acceptedMessage = message;
-            _messages.add(message);
-            _applyBoardMessageOverlay(message);
+            final duplicatePendingNotice =
+                fallbackKind == 'quiz_question_pending' &&
+                _messages.isNotEmpty &&
+                _messages.last.text == message.text &&
+                _messages.last.question == message.question;
+            if (!duplicatePendingNotice) {
+              acceptedMessage = message;
+              _messages.add(message);
+              _applyBoardMessageOverlay(message);
+            }
           } else {
             _error = strings.coachValidationFailed;
           }
@@ -397,6 +690,18 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
           _error = strings.coachOffTopic;
         } else if (status == 'validation_failed') {
           _error = strings.coachValidationFailed;
+        } else if (status == 'provider_response_invalid') {
+          _error = strings.coachProviderResponseInvalid;
+        } else if (status == 'evidence_unavailable') {
+          _error = strings.coachEvidenceUnavailable;
+        } else if (status == 'provider_rate_limited') {
+          _error = strings.coachRateLimited;
+        } else if (status == 'provider_daily_limit') {
+          _error = strings.coachDailyLimit;
+        } else if (status == 'provider_deferred') {
+          _error = strings.coachDeferred;
+        } else if (status == 'provider_error') {
+          _error = strings.coachProviderError;
         } else {
           _error = strings.coachUnavailable;
         }
@@ -1268,13 +1573,17 @@ class _CoachSessionScreenState extends State<CoachSessionScreen> {
     isLoading: _loading,
     errorMessage: _error,
     depth: _depth,
-    onSubmit: (value) => unawaited(_submit(value)),
+    onSubmit: _sessionReady ? (value) => unawaited(_submit(value)) : null,
     onShowBoard: (message) => unawaited(_showBoardMessage(message)),
     onPlayMove: (message) => unawaited(_playCoachMove(message)),
     onCopyConversation: () => unawaited(_copyConversation()),
     onDiagnostics: () => unawaited(
       showCoachDiagnosticsDialog(context, widget.gateway),
     ),
+    sessionTitle: _activeSession?.name,
+    onManageSessions: widget.profileId == null || !_sessionReady
+        ? null
+        : () => unawaited(_manageSessions()),
     onCompare: () => unawaited(_requestBoardLesson('compare')),
     onQuiz: () => unawaited(_requestBoardLesson('quiz')),
     onPersonalTraining: widget.profileId == null

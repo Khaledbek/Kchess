@@ -330,6 +330,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get excellent => 'ممتازة';
 
   @override
+  String get inaccuracy => 'عدم دقة';
+
+  @override
   String get okay => 'جيدة';
 
   @override
@@ -391,6 +394,11 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String bestMoveText(String move) {
     return '$move هي أفضل نقلة.';
+  }
+
+  @override
+  String worstMoveText(String move) {
+    return '$move هي أسوأ نقلة.';
   }
 
   @override
@@ -1697,6 +1705,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get coachUnavailable => 'نموذج اللغة الخاص بالمدرب غير متاح بعد.';
 
   @override
+  String get coachProviderError => 'تعذر على خدمة المدرب إكمال هذا الطلب.';
+
+  @override
+  String get coachProviderResponseInvalid =>
+      'أعاد نموذج اللغة استجابة غير صالحة للاستخدام، لذلك لم يعرضها KChess.';
+
+  @override
+  String get coachEvidenceUnavailable =>
+      'لا تتوفر بعد أدلة موثقة كافية عن الوضعية لهذا الطلب التدريبي.';
+
+  @override
+  String get coachRateLimited =>
+      'تم بلوغ حد طلبات المدرب مؤقتًا. حاول مرة أخرى بعد قليل.';
+
+  @override
+  String get coachDailyLimit => 'بلغ المدرب الحد اليومي لاستخدام نموذج اللغة.';
+
+  @override
+  String get coachDeferred =>
+      'تم تأجيل طلب المدرب هذا للحفاظ على السعة للأسئلة التفاعلية.';
+
+  @override
   String get coachOffTopic =>
       'يمكن للمدرب الإجابة عن الأسئلة المتعلقة بالشطرنج فقط.';
 
@@ -1710,8 +1740,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get coachSafeQuizFallbackQuestion => 'ما النقلة التي ستلعبها هنا؟';
 
   @override
+  String get coachQuizQuestionPending =>
+      'سؤال التدريب الحالي ما زال مفتوحًا. العب نقلتك على الرقعة، أو استخدم التلميح إذا أردت المساعدة.';
+
+  @override
   String get coachSafeHintFallbackAnswer =>
       'ابدأ بالنقلات القسرية: الكشوف والأخذ والتهديدات المباشرة. أي قطعة لديك يمكن أن تصبح أكثر نشاطًا فورًا؟';
+
+  @override
+  String get coachSafePositionFallbackAnswer =>
+      'تعذر التحقق بأمان من الشرح المُنشأ. تعرض الرقعة مرشحًا واحدًا فقط تم التحقق منه بواسطة المحرك، ولن يخترع KChess نقلة أخرى.';
+
+  @override
+  String get coachVerdictGroundingUnavailable =>
+      'لا يمكنني إصدار حكم شطرنجي موثوق على هذا السؤال الآن لأن دليل المحرك الأصلي المطلوب غير متاح. لن يخمّن KChess ولن يستبدل التحليل المفقود برأي من نموذج لغوي.';
+
+  @override
+  String get coachSafeComparisonFallbackAnswer =>
+      'تعذر التحقق بأمان من المقارنة التفصيلية. تعرض الرقعة فقط مرشحات المحرك التي تم التحقق منها لهذه الوضعية.';
 
   @override
   String get coachHintRequest => 'أعطني تلميحًا لهذه الوضعية.';
@@ -1972,4 +2018,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String playerProfileLiveCurrentGame(int percent) {
     return 'المباراة الحالية $percent%';
   }
+
+  @override
+  String get coachSafeWorstMoveFallbackAnswer =>
+      'تعذر التحقق بأمان من الشرح المُنشأ. تعرض الرقعة فقط أسوأ نقلة تحققت منها التحليلات الأصلية لهذه الوضعية؛ وهي ليست توصية.';
+
+  @override
+  String get coachSafeFastestLossFallbackAnswer =>
+      'تعذر التحقق بأمان من الشرح المُنشأ. تعرض الرقعة فقط التركيز الأصلي لتحليل أسرع خسارة. لا تُعد الخسارة إجبارية إلا إذا أثبتها المحرك.';
+
+  @override
+  String get coachSessionsTitle => 'جلسات المدرب';
+
+  @override
+  String get coachNewSession => 'جلسة جديدة';
+
+  @override
+  String get coachRenameSession => 'إعادة التسمية';
+
+  @override
+  String get coachDeleteSession => 'حذف';
+
+  @override
+  String get coachDeleteSessionConfirm =>
+      'هل تريد حذف جلسة المدرب هذه نهائيًا؟';
+
+  @override
+  String get coachSessionCancel => 'إلغاء';
+
+  @override
+  String get coachSessionSave => 'حفظ';
+
+  @override
+  String get coachSessionEmpty => 'لا توجد جلسات مدرب محفوظة بعد.';
 }

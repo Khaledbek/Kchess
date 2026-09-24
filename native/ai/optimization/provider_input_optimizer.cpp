@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "../dto/query_plan.h"
+#include "../teaching/teaching_plan.h"
 
 namespace kchess::ai {
 namespace {
@@ -24,6 +25,7 @@ int priority(EvidenceKind kind) {
       return -1;
     case EvidenceKind::engine:
     case EvidenceKind::existing_analysis:
+    case EvidenceKind::human_model:
       return 0;
     case EvidenceKind::position_features:
     case EvidenceKind::tactical_motifs:
@@ -66,6 +68,135 @@ std::size_t estimated_tokens(std::string_view text) {
 
 std::size_t item_cost(const EvidenceItem& item) {
   return estimated_tokens(item.payload) + estimated_tokens(item.id) + 12;
+}
+
+std::size_t candidate_pv_limit(ResponseDepth depth) {
+  switch (depth) {
+    case ResponseDepth::concise: return 4;
+    case ResponseDepth::detailed: return 10;
+    case ResponseDepth::standard: return 6;
+  }
+  return 6;
+}
+
+std::size_t candidate_alternative_limit(
+    CoachMode mode, const TeachingPlan* teaching_plan) {
+  if (mode == CoachMode::compare || mode == CoachMode::quiz ||
+      mode == CoachMode::hint) {
+    return 2;
+  }
+  if (teaching_plan != nullptr && teaching_plan->max_recommendations <= 1) {
+    return 1;
+  }
+  return 2;
+}
+
+void trim_candidate_line(nlohmann::json& line, const std::size_t pv_limit) {
+  if (!line.is_object() || !line.contains("pv_uci") ||
+      !line["pv_uci"].is_array()) {
+    return;
+  }
+  auto& pv = line["pv_uci"];
+  while (pv.size() > pv_limit) pv.erase(pv.end() - 1);
+}
+
+std::set<std::string> retained_candidate_ids(const nlohmann::json& payload) {
+  std::set<std::string> ids;
+  const auto collect = [&](const nlohmann::json& candidate) {
+    if (!candidate.is_object()) return;
+    const auto id = candidate.value("candidate_id", "");
+    if (!id.empty()) ids.insert(id);
+  };
+  if (payload.contains("best")) collect(payload["best"]);
+  if (payload.contains("focus")) collect(payload["focus"]);
+  if (payload.contains("user_move")) collect(payload["user_move"]);
+  if (payload.contains("alternatives") && payload["alternatives"].is_array()) {
+    for (const auto& candidate : payload["alternatives"]) collect(candidate);
+  }
+  return ids;
+}
+
+void trim_candidate_facts(nlohmann::json& payload, const std::size_t pv_limit,
+                          bool& changed) {
+  if (!payload.contains("facts") || !payload["facts"].is_array()) return;
+  auto& facts = payload["facts"];
+  const auto retained = retained_candidate_ids(payload);
+  for (auto it = facts.begin(); it != facts.end();) {
+    if (!it->is_object()) {
+      it = facts.erase(it);
+      changed = true;
+      continue;
+    }
+    const auto candidate_id = it->value("candidate_id", "");
+    if (!candidate_id.empty() && !retained.contains(candidate_id)) {
+      it = facts.erase(it);
+      changed = true;
+      continue;
+    }
+    if (it->value("kind", "") == "principal_variation" &&
+        it->contains("pv_uci") && (*it)["pv_uci"].is_array()) {
+      auto& pv = (*it)["pv_uci"];
+      while (pv.size() > pv_limit) {
+        pv.erase(pv.end() - 1);
+        changed = true;
+      }
+    }
+    ++it;
+  }
+}
+
+std::optional<EvidenceItem> compact_provider_item(
+    const EvidenceItem& item, ResponseDepth depth, CoachMode mode,
+    const TeachingPlan* teaching_plan) {
+  using json = nlohmann::json;
+  if (item.kind != EvidenceKind::candidate_moves &&
+      item.kind != EvidenceKind::tactical_motifs) {
+    return std::nullopt;
+  }
+
+  auto payload = json::parse(item.payload, nullptr, false);
+  if (!payload.is_object()) return std::nullopt;
+  bool changed = false;
+
+  if (item.kind == EvidenceKind::candidate_moves) {
+    const auto pv_limit = candidate_pv_limit(depth);
+    const auto trim_line = [&](json& line) {
+      const auto before = line.dump().size();
+      trim_candidate_line(line, pv_limit);
+      changed = changed || line.dump().size() != before;
+    };
+    if (payload.contains("best")) trim_line(payload["best"]);
+    if (payload.contains("focus")) trim_line(payload["focus"]);
+    if (payload.contains("user_move")) trim_line(payload["user_move"]);
+    if (payload.contains("alternatives") && payload["alternatives"].is_array()) {
+      auto& alternatives = payload["alternatives"];
+      const auto keep = candidate_alternative_limit(mode, teaching_plan);
+      while (alternatives.size() > keep) {
+        alternatives.erase(alternatives.end() - 1);
+        changed = true;
+      }
+      for (auto& candidate : alternatives) trim_line(candidate);
+    }
+    // Facts duplicate the candidate/PV payload by design for grounded response
+    // references. Keep only facts for candidates that survived provider-side
+    // compaction and trim PV facts to the same bound, while full native
+    // evidence remains untouched for validation/fallback.
+    trim_candidate_facts(payload, pv_limit, changed);
+  } else if (payload.contains("motifs") && payload["motifs"].is_array()) {
+    auto& motifs = payload["motifs"];
+    const std::size_t keep = depth == ResponseDepth::concise
+        ? 3
+        : depth == ResponseDepth::detailed ? 8 : 5;
+    while (motifs.size() > keep) {
+      motifs.erase(motifs.end() - 1);
+      changed = true;
+    }
+  }
+
+  if (!changed) return std::nullopt;
+  EvidenceItem compacted = item;
+  compacted.payload = payload.dump();
+  return compacted;
 }
 
 bool chunk_matches_scope_value(const nlohmann::json& chunk,
@@ -283,36 +414,54 @@ std::optional<EvidenceItem> fit_profile(const EvidenceItem& item,
 std::vector<EvidenceItem> optimize_provider_evidence(
     const std::vector<EvidenceItem>& evidence,
     ResponseDepth depth,
+    CoachMode mode,
     std::size_t context_tokens,
     const QueryPlan* plan,
+    const TeachingPlan* teaching_plan,
     ProviderInputOptimizationStats* stats) {
   ProviderInputOptimizationStats local_stats;
   local_stats.input_items = evidence.size();
-  std::vector<const EvidenceItem*> ordered;
-  ordered.reserve(evidence.size());
+  std::vector<EvidenceItem> working;
+  working.reserve(evidence.size());
   for (const auto& item : evidence) {
     if (item.payload.empty()) {
       ++local_stats.empty_items;
       continue;
     }
-    local_stats.estimated_input_tokens += item_cost(item);
+    const auto original_cost = item_cost(item);
+    local_stats.estimated_input_tokens += original_cost;
     if (plan && item.kind == EvidenceKind::user_profile &&
         (!plan->needs_profile || plan->query_family == QueryFamily::general_chess)) {
       ++local_stats.profile_filtered_items;
       continue;
     }
     const bool duplicate = std::any_of(
-        ordered.begin(), ordered.end(), [&](const EvidenceItem* existing) {
-          return existing->kind == item.kind && existing->id == item.id &&
-              existing->payload == item.payload &&
-              existing->confidence == item.confidence;
+        working.begin(), working.end(), [&](const EvidenceItem& existing) {
+          return existing.kind == item.kind && existing.id == item.id &&
+              existing.payload == item.payload &&
+              existing.confidence == item.confidence;
         });
     if (duplicate) {
       ++local_stats.exact_duplicate_items;
       continue;
     }
-    ordered.push_back(&item);
+
+    if (auto compacted = compact_provider_item(
+            item, depth, mode, teaching_plan)) {
+      const auto compacted_cost = item_cost(*compacted);
+      if (compacted_cost < original_cost) {
+        ++local_stats.compacted_items;
+        local_stats.estimated_compaction_savings_tokens +=
+            original_cost - compacted_cost;
+      }
+      working.push_back(std::move(*compacted));
+    } else {
+      working.push_back(item);
+    }
   }
+  std::vector<const EvidenceItem*> ordered;
+  ordered.reserve(working.size());
+  for (const auto& item : working) ordered.push_back(&item);
   std::stable_sort(ordered.begin(), ordered.end(), [plan](const auto* a, const auto* b) {
     const auto rank = [plan](EvidenceKind kind) {
       return plan && plan->needs_profile && kind == EvidenceKind::user_profile

@@ -103,6 +103,7 @@
   "critical": "Great Move",
   "best": "Best",
   "excellent": "Excellent",
+  "inaccuracy": "Inaccuracy",
   "okay": "Okay",
   "miss": "Miss",
   "mistake": "Mistake",
@@ -134,6 +135,14 @@
   "openAnalysis": "Open analysis",
   "bestMoveText": "{move} is the best move.",
   "@bestMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "worstMoveText": "{move} is the worst move.",
+  "@worstMoveText": {
     "placeholders": {
       "move": {
         "type": "String"
@@ -923,11 +932,21 @@
   "coachDepthBalanced": "Balanced",
   "coachDepthDeep": "Deep",
   "coachUnavailable": "The coach language model is not available yet.",
+  "coachProviderError": "The coach service could not complete this request.",
+  "coachProviderResponseInvalid": "The language model returned an unusable response, so KChess did not show it.",
+  "coachEvidenceUnavailable": "There is not enough verified position evidence for this trainer request yet.",
+  "coachRateLimited": "The coach request limit has been reached temporarily. Try again shortly.",
+  "coachDailyLimit": "The coach has reached its daily language-model limit.",
+  "coachDeferred": "This coach request was deferred to preserve capacity for interactive questions.",
   "coachOffTopic": "The coach can only answer chess-related questions.",
   "coachValidationFailed": "The coach answer could not be verified safely.",
   "coachSafeQuizFallbackAnswer": "The training position is ready.",
   "coachSafeQuizFallbackQuestion": "What move would you play here?",
+  "coachQuizQuestionPending": "The current training question is still open. Play your move on the board, or use Hint if you want help.",
   "coachSafeHintFallbackAnswer": "Check forcing moves first: checks, captures, and direct threats. Which of your pieces can become active immediately?",
+  "coachSafePositionFallbackAnswer": "The generated explanation could not be verified safely. The board shows only a verified engine candidate; KChess will not invent another move.",
+  "coachVerdictGroundingUnavailable": "I cannot give a reliable chess verdict for this question yet because the required native engine evidence is unavailable. I will not guess or replace the missing analysis with an LLM opinion.",
+  "coachSafeComparisonFallbackAnswer": "The detailed comparison could not be verified safely. The board shows only verified engine candidates for this position.",
   "coachHintRequest": "Give me a hint for this position.",
   "coachFen": "FEN",
   "coachPgn": "PGN",
@@ -1173,5 +1192,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "coachSafeWorstMoveFallbackAnswer": "The generated explanation could not be verified safely. The board marks only the natively verified worst move found for this position; it is not a recommendation.",
+  "coachSafeFastestLossFallbackAnswer": "The generated explanation could not be verified safely. The board marks only the native focus of the fastest-loss analysis. A forced loss is claimed only when the engine proves one.",
+  "coachSessionsTitle": "Coach sessions",
+  "coachNewSession": "New session",
+  "coachRenameSession": "Rename",
+  "coachDeleteSession": "Delete",
+  "coachDeleteSessionConfirm": "Delete this coach session permanently?",
+  "coachSessionCancel": "Cancel",
+  "coachSessionSave": "Save",
+  "coachSessionEmpty": "No saved coach sessions yet."
 }

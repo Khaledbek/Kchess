@@ -44,3 +44,24 @@ A pending quiz answer may be accepted as a successful attempt when completed nat
 
 A validated Automatic-Coach `followUpQuestion` with native candidates may retain the original board and candidate set as an ephemeral pending move question. The next legal move from that FEN can be compared for conversational feedback, but this question is not a scored learner exercise unless the originating request was explicit `CoachMode::quiz`. Keep scored-vs-unscored state in this existing session object; do not create another training store.
 
+## Update 180 - pending trainer-question state
+
+A scored quiz question remains the single authoritative open exercise for its original FEN until a legal learner move resolves it. Reissuing quiz mode on that same board must not replace the expected move/candidate set or create another provider-generated question. Hint/explain requests may continue the lesson, but only the original pending quiz owns scoring.
+
+
+## Update 194 - hint continuity
+
+A hint continues the existing scored quiz rather than replacing it. Preserve the original question FEN, expected move, acceptable alternatives, skill ID and scoring flag across hint turns. Hint level is ephemeral board-local session state and resets when the board changes or a new quiz is established.
+
+## Update 210: explicit-question continuity
+
+A session-backed explicit chess question may consume the immediately preceding compact goal/answer even when the router assigns a new concrete current intent. Conversation continuity and intent inheritance are separate concepts: only elliptical `follow_up` turns inherit the prior intent; explicit turns keep their own intent. Previous answers remain labelled non-authoritative and can never ground current-board claims.
+
+
+## Update 214 - bounded conversation continuity
+
+Keep at most eight compact recent dialogue entries per Coach session. Store manual user turns and accepted manual assistant replies, but mark prior assistant prose as non-authoritative and never use it as chess evidence. Do not append automatic trainer narration to this buffer; automatic turns would otherwise drown out the user's actual conversational thread. Explicit current questions keep their own intent while still receiving relevant session context; only genuinely elliptical follow-ups may inherit prior intent.
+
+## Coach Series 2 Update 4 - restart continuity
+
+`CoachSessionMemory` remains compact and in-memory, but it can now be restored from and snapshotted to a persistence-neutral `CoachSessionState`. The AI layer still does not own SQLite or the durable transcript. `CoachService` restores the compact snapshot before a resumed turn and persists the new snapshot after orchestration. Full user-visible messages live in the persistence layer and must never be injected wholesale into routing, planning, evidence, or provider context.

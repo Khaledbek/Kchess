@@ -9,12 +9,14 @@ class BotGameScreen extends StatefulWidget {
     required this.gateway,
     required this.botElo,
     this.gameId,
+    this.playerColor = 'white',
     super.key,
   });
 
   final CoreGateway gateway;
   final int botElo;
   final String? gameId;
+  final String playerColor;
 
   @override
   State<BotGameScreen> createState() => _BotGameScreenState();
@@ -67,7 +69,10 @@ class _BotGameScreenState extends State<BotGameScreen> {
   Future<void> _loadGame() async {
     try {
       final start = widget.gameId == null
-          ? await widget.gateway.createBotGame(widget.botElo)
+          ? await widget.gateway.createBotGame(
+              widget.botElo,
+              playerColor: widget.playerColor,
+            )
           : await widget.gateway.botGame(widget.gameId!);
       if (!mounted) return;
       setState(() {

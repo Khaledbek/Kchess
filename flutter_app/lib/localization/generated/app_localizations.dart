@@ -718,6 +718,12 @@ abstract class AppLocalizations {
   /// **'Excellent'**
   String get excellent;
 
+  /// No description provided for @inaccuracy.
+  ///
+  /// In en, this message translates to:
+  /// **'Inaccuracy'**
+  String get inaccuracy;
+
   /// No description provided for @okay.
   ///
   /// In en, this message translates to:
@@ -837,6 +843,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{move} is the best move.'**
   String bestMoveText(String move);
+
+  /// No description provided for @worstMoveText.
+  ///
+  /// In en, this message translates to:
+  /// **'{move} is the worst move.'**
+  String worstMoveText(String move);
 
   /// No description provided for @sidelineEngineTitle.
   ///
@@ -3129,6 +3141,42 @@ abstract class AppLocalizations {
   /// **'The coach language model is not available yet.'**
   String get coachUnavailable;
 
+  /// No description provided for @coachProviderError.
+  ///
+  /// In en, this message translates to:
+  /// **'The coach service could not complete this request.'**
+  String get coachProviderError;
+
+  /// No description provided for @coachProviderResponseInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The language model returned an unusable response, so KChess did not show it.'**
+  String get coachProviderResponseInvalid;
+
+  /// No description provided for @coachEvidenceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'There is not enough verified position evidence for this trainer request yet.'**
+  String get coachEvidenceUnavailable;
+
+  /// No description provided for @coachRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'The coach request limit has been reached temporarily. Try again shortly.'**
+  String get coachRateLimited;
+
+  /// No description provided for @coachDailyLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'The coach has reached its daily language-model limit.'**
+  String get coachDailyLimit;
+
+  /// No description provided for @coachDeferred.
+  ///
+  /// In en, this message translates to:
+  /// **'This coach request was deferred to preserve capacity for interactive questions.'**
+  String get coachDeferred;
+
   /// No description provided for @coachOffTopic.
   ///
   /// In en, this message translates to:
@@ -3153,11 +3201,35 @@ abstract class AppLocalizations {
   /// **'What move would you play here?'**
   String get coachSafeQuizFallbackQuestion;
 
+  /// No description provided for @coachQuizQuestionPending.
+  ///
+  /// In en, this message translates to:
+  /// **'The current training question is still open. Play your move on the board, or use Hint if you want help.'**
+  String get coachQuizQuestionPending;
+
   /// No description provided for @coachSafeHintFallbackAnswer.
   ///
   /// In en, this message translates to:
   /// **'Check forcing moves first: checks, captures, and direct threats. Which of your pieces can become active immediately?'**
   String get coachSafeHintFallbackAnswer;
+
+  /// No description provided for @coachSafePositionFallbackAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'The generated explanation could not be verified safely. The board shows only a verified engine candidate; KChess will not invent another move.'**
+  String get coachSafePositionFallbackAnswer;
+
+  /// No description provided for @coachVerdictGroundingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'I cannot give a reliable chess verdict for this question yet because the required native engine evidence is unavailable. I will not guess or replace the missing analysis with an LLM opinion.'**
+  String get coachVerdictGroundingUnavailable;
+
+  /// No description provided for @coachSafeComparisonFallbackAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'The detailed comparison could not be verified safely. The board shows only verified engine candidates for this position.'**
+  String get coachSafeComparisonFallbackAnswer;
 
   /// No description provided for @coachHintRequest.
   ///
@@ -3577,6 +3649,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Current game {percent}%'**
   String playerProfileLiveCurrentGame(int percent);
+
+  /// No description provided for @coachSafeWorstMoveFallbackAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'The generated explanation could not be verified safely. The board marks only the natively verified worst move found for this position; it is not a recommendation.'**
+  String get coachSafeWorstMoveFallbackAnswer;
+
+  /// No description provided for @coachSafeFastestLossFallbackAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'The generated explanation could not be verified safely. The board marks only the native focus of the fastest-loss analysis. A forced loss is claimed only when the engine proves one.'**
+  String get coachSafeFastestLossFallbackAnswer;
+
+  /// No description provided for @coachSessionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Coach sessions'**
+  String get coachSessionsTitle;
+
+  /// No description provided for @coachNewSession.
+  ///
+  /// In en, this message translates to:
+  /// **'New session'**
+  String get coachNewSession;
+
+  /// No description provided for @coachRenameSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get coachRenameSession;
+
+  /// No description provided for @coachDeleteSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get coachDeleteSession;
+
+  /// No description provided for @coachDeleteSessionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this coach session permanently?'**
+  String get coachDeleteSessionConfirm;
+
+  /// No description provided for @coachSessionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get coachSessionCancel;
+
+  /// No description provided for @coachSessionSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get coachSessionSave;
+
+  /// No description provided for @coachSessionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved coach sessions yet.'**
+  String get coachSessionEmpty;
 }
 
 class _AppLocalizationsDelegate

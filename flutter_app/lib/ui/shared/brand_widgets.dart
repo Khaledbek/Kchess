@@ -29,7 +29,7 @@ class BrandLogo extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size * 0.26),
         child: Image.asset(
-          '../img/app_logo.png',
+          'assets/analysis_img/app_logo.png',
           width: size,
           height: size,
           fit: BoxFit.cover,

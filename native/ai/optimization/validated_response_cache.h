@@ -38,7 +38,7 @@ class ValidatedResponseCache {
   explicit ValidatedResponseCache(std::size_t capacity = 96);
 
   [[nodiscard]] PreparedValidatedResponseCacheKey prepare_key(
-      std::string_view provider_id, const LLMProviderRequest& request,
+      std::string_view provider_cache_identity, const LLMProviderRequest& request,
       const std::vector<EvidenceItem>& validation_evidence) const;
   [[nodiscard]] std::optional<StructuredCoachContent> lookup(
       const PreparedValidatedResponseCacheKey& key) const;
@@ -52,7 +52,7 @@ class ValidatedResponseCache {
   };
 
   [[nodiscard]] static std::string key_for(
-      std::string_view provider_id, const LLMProviderRequest& request,
+      std::string_view provider_cache_identity, const LLMProviderRequest& request,
       const std::vector<EvidenceItem>& validation_evidence);
 
   std::size_t capacity_{96};

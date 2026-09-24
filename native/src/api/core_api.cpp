@@ -374,18 +374,6 @@ char* kc_start_provider_profile_json(
   });
 }
 
-char* kc_start_scout_json(
-    const kc_core_handle handle,
-    const int32_t profile_type,
-    const char* username_utf8) {
-  if (username_utf8 == nullptr)
-    return invalid_string_argument(core_from(handle), "Provider username is required");
-  return string_call(core_from(handle), [=] {
-    return core_from(handle)->start_scout_json(
-        static_cast<kchess::ProfileType>(profile_type), username_utf8);
-  });
-}
-
 char* kc_start_scout_report_json(
     const kc_core_handle handle,
     const int32_t profile_type,
@@ -657,9 +645,17 @@ kc_status kc_cancel_variation_analysis(
 }
 
 char* kc_create_bot_game_json(
-    const kc_core_handle handle, const int32_t requested_elo) {
+    const kc_core_handle handle, const int32_t requested_elo,
+    const char* player_color_utf8) {
+  if (player_color_utf8 == nullptr) {
+    return invalid_string_argument(core_from(handle), "Player color is required");
+  }
+  const std::string player_color{player_color_utf8};
+  if (player_color != "white" && player_color != "black") {
+    return invalid_string_argument(core_from(handle), "Player color must be white or black");
+  }
   return string_call(core_from(handle), [=] {
-    return core_from(handle)->create_bot_game_json(requested_elo);
+    return core_from(handle)->create_bot_game_json(requested_elo, player_color);
   });
 }
 
@@ -895,6 +891,59 @@ char* kc_coach_job_status_json(
   }
   return string_call(core_from(handle), [=] {
     return core_from(handle)->coach_job_status_json(job_id_utf8);
+  });
+}
+
+char* kc_coach_sessions_json(
+    const kc_core_handle handle, const char* profile_id_utf8) {
+  if (profile_id_utf8 == nullptr || profile_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Profile id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_sessions_json(profile_id_utf8);
+  });
+}
+
+char* kc_create_coach_session_json(
+    const kc_core_handle handle, const char* profile_id_utf8) {
+  if (profile_id_utf8 == nullptr || profile_id_utf8[0] == '\0') {
+    return invalid_string_argument(core_from(handle), "Profile id is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->create_coach_session_json(profile_id_utf8);
+  });
+}
+
+char* kc_coach_session_messages_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(
+        core_from(handle), "Coach session messages request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->coach_session_messages_json(request_json_utf8);
+  });
+}
+
+char* kc_rename_coach_session_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(
+        core_from(handle), "Coach session rename request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->rename_coach_session_json(request_json_utf8);
+  });
+}
+
+char* kc_delete_coach_session_json(
+    const kc_core_handle handle, const char* request_json_utf8) {
+  if (request_json_utf8 == nullptr || request_json_utf8[0] == '\0') {
+    return invalid_string_argument(
+        core_from(handle), "Coach session delete request is required");
+  }
+  return string_call(core_from(handle), [=] {
+    return core_from(handle)->delete_coach_session_json(request_json_utf8);
   });
 }
 

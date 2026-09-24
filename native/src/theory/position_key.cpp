@@ -37,9 +37,19 @@ std::uint64_t stockfish_position_key(const std::string& fen) {
   return position.key();
 }
 
+std::uint64_t extend_position_key_fingerprint(
+    std::uint64_t fingerprint, const std::uint64_t position_key) noexcept {
+  constexpr std::uint64_t kFnvPrime = 1099511628211ULL;
+  for (int byte = 0; byte < 8; ++byte) {
+    fingerprint ^= (position_key >> (byte * 8)) & 0xffULL;
+    fingerprint *= kFnvPrime;
+  }
+  return fingerprint;
+}
+
 std::uint16_t encode_book_move(const std::string& uci_move) {
   if (uci_move.size() != 4 && uci_move.size() != 5) {
-    throw std::invalid_argument("KCB move must be four or five UCI characters");
+    throw std::invalid_argument("Book move must be four or five UCI characters");
   }
   const int from = square_index(uci_move[0], uci_move[1]);
   const int to = square_index(uci_move[2], uci_move[3]);

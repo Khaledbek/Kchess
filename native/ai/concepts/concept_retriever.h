@@ -9,8 +9,6 @@
 
 namespace kchess::ai {
 
-class EmbeddingModel;
-
 // -----------------------------------------------------------------------------
 // Section: Retrieval result
 // -----------------------------------------------------------------------------
@@ -29,11 +27,9 @@ struct ConceptMatch {
 class ConceptRetriever {
  public:
   [[nodiscard]] std::vector<ConceptMatch> retrieve(
-      std::string_view query, std::size_t limit = 5,
-      const EmbeddingModel* embeddings = nullptr) const;
+      std::string_view query, std::size_t limit = 5) const;
   [[nodiscard]] EvidenceItem evidence(
-      std::string_view query, std::size_t limit = 5,
-      const EmbeddingModel* embeddings = nullptr) const;
+      std::string_view query, std::size_t limit = 5) const;
 };
 
 }  // namespace kchess::ai

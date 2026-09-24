@@ -504,11 +504,14 @@ class FakeCoreGateway implements CoreGateway {
   );
 
   @override
-  Future<BotGameSession> createBotGame(int requestedElo) async => BotGameSession(
+  Future<BotGameSession> createBotGame(
+    int requestedElo, {
+    String playerColor = 'white',
+  }) async => BotGameSession(
     gameId: 'bot-game-fixture',
     botElo: requestedElo,
-    playerColor: 'white',
-    botColor: 'black',
+    playerColor: playerColor,
+    botColor: playerColor == 'white' ? 'black' : 'white',
     status: 'active',
     result: '*',
     position: _fixtureBotStartPosition,

@@ -27,7 +27,8 @@ class ResponseValidator {
       const std::vector<EvidenceItem>* supplied_evidence = nullptr,
       bool profile_requested = false,
       bool require_grounded_segments = false,
-      bool position_relevant = false) const;
+      const std::optional<ChessVerdictContract>* expected_verdict = nullptr,
+      const std::optional<ChessVerdictReview>* expected_review = nullptr) const;
 
   // Removes only invalid optional board/move metadata from an already repaired
   // provider response. Profile grounding failures remain fatal because dropping

@@ -1,0 +1,20 @@
+KChess Coach-Serie 2 – Abschlussaudit
+=====================================
+
+Serie: Update 1–7
+Audit-Art: ausschließlich statisch; keine Builds, Tests, flutter analyze oder flutter run ausgeführt.
+
+Ergebnis:
+- Provider-freie best_move-Antworten besitzen einen nativen sichtbaren Antwortvertrag (`nativeAnswerKind=best_move`) und ARB-Texte in Deutsch/Englisch/Arabisch.
+- Automatic-Coach besitzt ein natives Anti-Spam-/Recency-Gate und dedizierte Regression-Cases im nativen Test-Target; Tests wurden nicht ausgeführt.
+- Automatische Coach-Turns tragen native Move-Attribution, damit Learner-/Opponent-Züge nicht vermischt werden.
+- Coach-Sitzungen sind profilgebunden in SQLite persistent, datiert, fortsetzbar, umbenennbar und löschbar. Standardnamen `Sitzung N` werden profilbezogen monoton vergeben; gelöschte Nummern werden nicht wiederverwendet.
+- Native C-ABI und Flutter-FFI erwarten beide ABI 11.
+- SQLite-Schema endet bei user_version 44; Knowledge-Maintenance besitzt persistenten Game-Graph-Fingerprint sowie Skip-/Yield-Diagnostics.
+- Profil-/Kontowechsel darf weiterhin einen nötigen Refresh auslösen; unveränderte Game-Graph-Quellen können übersprungen werden, echte Projektionen yielden kooperativ.
+- Der alte KChess-App-Icon-Satz wurde explizit aus dem ursprünglichen Projektstand wiederhergestellt: app_logo.png, fünf Android ic_launcher.png und Windows app_icon.ico sind byte-identisch zum alten Projekt-ZIP.
+- Produktive Local-Model-/smallModels-Diagnostics wurden im statischen Suchlauf nicht gefunden.
+- `secrets/` ist nicht Bestandteil dieses Pakets und wurde nicht verändert.
+
+Hinweis:
+Die vorhandenen nativen Test-Targets wurden nur ergänzt/verdrahtet. Gemäß Projektvorgabe wurde kein Test oder Build gestartet.

@@ -54,4 +54,22 @@ enum class EngineBudget {
   deep,
 };
 
+// Native semantic position-analysis request. Structural request state may select
+// one of these modes authoritatively; free-text selection is a compatibility
+// fallback. The enum describes an available analysis operation, not the complete
+// meaning of a user's question.
+enum class PositionAnalysisMode {
+  none,
+  position_overview,
+  best_move,
+  worst_move,
+  fastest_loss,
+  avoid_trade,
+  threat,
+  explain_move,
+  what_if_move,
+  compare_candidates,
+  learner_move_evaluation,
+};
+
 }  // namespace kchess::ai

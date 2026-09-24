@@ -187,3 +187,21 @@ Python wird nicht in der App ausgeliefert. Es erzeugt reproduzierbare Entwicklun
 - nlohmann/json
 
 Details stehen in `docs/LICENSE_COMPLIANCE.md` und `THIRD_PARTY_NOTICES.md`.
+
+## 17. Cleanup-Architekturstand
+
+Die Cleanup-Serie vereinheitlicht vorhandene Pfade, ohne Ersatzarchitekturen neben
+dem produktiven System aufzubauen. Flutter bleibt auf Darstellung, View-State und
+dünne FFI-Aufrufe beschränkt; fachliche Produktlogik bleibt in C++20. Python wird nur
+offline für Training, Evaluation, Export und Entwicklerwerkzeuge eingesetzt.
+
+Für Scouting existiert nur noch die Report-Pipeline
+`kc_start_scout_report_json -> ProviderService::run_scout_report`. Der frühere
+leichte Scout-Endpunkt ist entfernt und darf nicht als paralleler Fallback zurückkehren.
+
+besteht und ausdrücklich integriert wird. Entwicklungszweige dürfen nicht still als
+Fallback oder zweite Produktionspipeline eingebunden werden.
+
+Migrationen, ABI-/Daten-Kompatibilität und aktive Stockfish-/Prebuilt-Pfade sind nicht
+mit totem Code gleichzusetzen. Sie werden nur entfernt, wenn ihre aktuellen Verbraucher
+und Upgrade-/Kompatibilitätsanforderungen nachweislich entfallen sind.

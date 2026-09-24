@@ -27,7 +27,7 @@ C++20
   Active Learning, Coach Evidence Packets
 
 Python
-  Offline-Evaluierung, Benchmarks, Modellvergleich, ONNX-Export,
+  Offline-Evaluierung und reproduzierbare Entwicklerwerkzeuge,
   Test-/Hilfstools; keine zweite App-Runtime
 ```
 
@@ -217,7 +217,7 @@ Nutzerfrage
        - Lexical
        - Text Vector
        - Position Similarity
-  -> Hybrid Ranking / optionaler Reranker
+  -> deterministisches Hybrid Ranking
   -> Answerability Gate
   -> Evidence Packet
   -> Provider

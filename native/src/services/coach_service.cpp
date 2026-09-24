@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "ai/automatic/automatic_coach_trigger.h"
+#include "ai/model_versions.h"
 #include "ai/providers/gemini_provider.h"
 #include "ai/teaching/personal_training_selector.h"
 #include "ai/teaching/spaced_repetition_scheduler.h"
@@ -23,10 +24,21 @@
 
 namespace kchess {
 // Section: Last engine hint, shared with the existing evidence retrieval hook
-struct CoachHintCache {
-  std::mutex mutex;
+struct CoachEngineCacheEntry {
   std::string fen;
   std::string settings_key;
+  std::string result;
+  ai::CandidateMoveSnapshot candidates;
+};
+
+struct CoachHintCache {
+  std::mutex mutex;
+  CoachEngineCacheEntry hint;
+  CoachEngineCacheEntry worst_move;
+  CoachEngineCacheEntry fastest_loss;
+};
+
+struct CachedCoachEngineResult {
   std::string result;
   ai::CandidateMoveSnapshot candidates;
 };
@@ -93,6 +105,25 @@ std::optional<double> root_expected_score(const json& value,
   return fen_white_to_move(fen) ? white_score : 1.0 - white_score;
 }
 
+ai::CandidateMoveSnapshot candidate_snapshot_from_json(
+    const json& payload, std::string_view fen) {
+  ai::CandidateMoveSnapshot snapshot;
+  for (const auto& move : payload.value("candidates", json::array())) {
+    if (!move.is_object()) continue;
+    ai::CandidateLineInput line;
+    line.rank = move.value("rank", 0);
+    line.move_uci = move.value("uci", "");
+    line.pv_uci = move.value("pv", std::vector<std::string>{});
+    if (move.contains("evaluationCp") && move["evaluationCp"].is_number_integer())
+      line.evaluation_cp = move["evaluationCp"].get<int>();
+    if (move.contains("mateIn") && move["mateIn"].is_number_integer())
+      line.mate_in = move["mateIn"].get<int>();
+    line.expected_score = root_expected_score(move, fen);
+    if (!line.move_uci.empty()) snapshot.root_lines.push_back(std::move(line));
+  }
+  return snapshot;
+}
+
 ai::CoachRequest parse_request(const json& value, Database& database) {
   ai::CoachRequest request;
   request.user_text = value.value("text", "");
@@ -112,7 +143,9 @@ ai::CoachRequest parse_request(const json& value, Database& database) {
     request.context_ply = value["contextPly"].get<int>();
   }
   request.profile_id = optional_string(value, "profileId");
-  if (!request.profile_id && request.mode == ai::CoachMode::quiz) {
+  if (!request.profile_id && request.session_id) {
+    if (const auto active = database.active_profile()) request.profile_id = active->id;
+  } else if (!request.profile_id && request.mode == ai::CoachMode::quiz) {
     if (const auto active = database.active_profile()) request.profile_id = active->id;
   }
   request.player_color = optional_string(value, "playerColor");
@@ -126,6 +159,52 @@ ai::CoachRequest parse_request(const json& value, Database& database) {
     }
   }
   return request;
+}
+
+void hydrate_coach_native_context_state(Database& database, ai::CoachRequest& request) {
+  auto& state = request.native_context_state;
+
+  if (request.context_id) {
+    if (const auto game = database.game(*request.context_id)) {
+      state.analysis_state = game->analyzed ? "available" : "unavailable";
+      if (request.player_color) {
+        const auto color = *request.player_color;
+        if (color == "white") { state.user_rating = game->white_rating; state.opponent_rating = game->black_rating; }
+        else if (color == "black") { state.user_rating = game->black_rating; state.opponent_rating = game->white_rating; }
+      }
+    }
+  } else if (request.position_fen) {
+    // Without a concrete game/config key we cannot claim a cache hit here.
+    // Keep unknown rather than turning UI presence into analysis truth.
+    state.analysis_state = "unknown";
+  } else {
+    state.analysis_state = "unavailable";
+  }
+
+  if (request.profile_id) {
+    const auto owner = database.player_profile_owner_id(*request.profile_id);
+    state.profile_state = database.ai_chess_profile_payload(owner).has_value() ? "available" : "unavailable";
+    const auto sources = database.player_profile_game_sources(owner);
+    state.history_state = sources.empty() ? "unavailable" : "available";
+    if (request.context_id) {
+      if (const auto source = database.player_profile_game_source(owner, *request.context_id)) {
+        if (!state.user_rating) state.user_rating = source->player_rating;
+        if (!state.opponent_rating) state.opponent_rating = source->opponent_rating;
+      }
+    } else if (!sources.empty()) {
+      const auto& latest = sources.front();
+      state.user_rating = latest.player_rating;
+      state.opponent_rating = latest.opponent_rating;
+    }
+  } else {
+    state.profile_state = "unavailable";
+    state.history_state = "unavailable";
+  }
+
+  if (request.game_pgn) {
+    const auto parsed = parse_pgn(*request.game_pgn);
+    if (parsed.valid && !parsed.game.moves.empty()) state.last_move_uci = parsed.game.moves.back().uci;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -191,32 +270,69 @@ std::string hint_settings_key(Database& database) {
       std::to_string(settings.sideline_hash_mb);
 }
 
-std::string cached_hint(Database& database, AnalysisService& service,
-                        CoachHintCache& cache, const std::string& fen) {
+CachedCoachEngineResult cached_hint(Database& database, AnalysisService& service,
+                                    CoachHintCache& cache, const std::string& fen) {
   const auto settings_key = hint_settings_key(database);
-  std::lock_guard lock(cache.mutex);
-  if (cache.fen == fen && cache.settings_key == settings_key && !cache.result.empty())
-    return cache.result;
+  {
+    std::lock_guard lock(cache.mutex);
+    if (cache.hint.fen == fen && cache.hint.settings_key == settings_key &&
+        !cache.hint.result.empty() && !cache.hint.candidates.root_lines.empty()) {
+      return {.result = cache.hint.result, .candidates = cache.hint.candidates};
+    }
+  }
+
+  // Never hold the cache mutex while Stockfish is running. Foreground engine
+  // ownership already serializes the expensive work; the cache only protects
+  // immutable snapshots shared with retrieval.
   const auto result = service.coach_hint_json(fen);
   const auto hint = json::parse(result);
-  ai::CandidateMoveSnapshot snapshot;
-  for (const auto& move : hint.value("candidates", hint.value("moves", json::array()))) {
-    ai::CandidateLineInput line;
-    line.rank = move.value("rank", 0);
-    line.move_uci = move.value("uci", "");
-    line.pv_uci = move.value("pv", std::vector<std::string>{});
-    if (move.contains("evaluationCp") && move["evaluationCp"].is_number_integer())
-      line.evaluation_cp = move["evaluationCp"].get<int>();
-    if (move.contains("mateIn") && move["mateIn"].is_number_integer())
-      line.mate_in = move["mateIn"].get<int>();
-    line.expected_score = root_expected_score(move, fen);
-    snapshot.root_lines.push_back(std::move(line));
+  auto snapshot = candidate_snapshot_from_json(hint, fen);
+  if (snapshot.root_lines.empty() && hint.contains("moves")) {
+    json legacy = hint;
+    legacy["candidates"] = hint["moves"];
+    snapshot = candidate_snapshot_from_json(legacy, fen);
   }
-  cache.fen = fen;
-  cache.settings_key = settings_key;
-  cache.result = result;
-  cache.candidates = std::move(snapshot);
-  return result;
+  {
+    std::lock_guard lock(cache.mutex);
+    cache.hint = {
+        .fen = fen,
+        .settings_key = settings_key,
+        .result = result,
+        .candidates = snapshot,
+    };
+  }
+  return {.result = result, .candidates = std::move(snapshot)};
+}
+
+CachedCoachEngineResult cached_extreme_move(
+    Database& database, AnalysisService& service, CoachHintCache& cache,
+    const std::string& fen, const bool fastest_loss) {
+  const auto settings_key = hint_settings_key(database);
+  {
+    std::lock_guard lock(cache.mutex);
+    const auto& entry = fastest_loss ? cache.fastest_loss : cache.worst_move;
+    if (entry.fen == fen && entry.settings_key == settings_key &&
+        !entry.result.empty() && !entry.candidates.root_lines.empty()) {
+      return {.result = entry.result, .candidates = entry.candidates};
+    }
+  }
+
+  const auto result = service.coach_extreme_move_json(fen, fastest_loss);
+  const auto payload = json::parse(result);
+  auto snapshot = candidate_snapshot_from_json(payload, fen);
+  if (snapshot.root_lines.empty()) return {.result = result};
+
+  {
+    std::lock_guard lock(cache.mutex);
+    auto& entry = fastest_loss ? cache.fastest_loss : cache.worst_move;
+    entry = {
+        .fen = fen,
+        .settings_key = settings_key,
+        .result = result,
+        .candidates = snapshot,
+    };
+  }
+  return {.result = result, .candidates = std::move(snapshot)};
 }
 
 json position_analysis(const ai::CoachRequest& request, AnalysisService& service) {
@@ -237,17 +353,53 @@ ai::EvidenceSources make_sources(Database& database, AnalysisService& analysis_s
                                 std::shared_ptr<CoachHintCache> hint_cache) {
   ai::EvidenceSources sources;
   sources.engine_candidates = [&database, &analysis_service, hint_cache](
-      const ai::CoachRequest& request, const ai::QueryPlan&)
+      const ai::CoachRequest& request, const ai::QueryPlan& plan)
       -> std::optional<ai::EngineCandidateBundle> {
     // Only an explicit user's question may spend fresh engine work. Automatic
     // coaching consumes the analysis that triggered it and never starts a search.
     if (!request.position_fen || request.automatic_turn) return std::nullopt;
     try {
-      const auto result = cached_hint(database, analysis_service, *hint_cache, *request.position_fen);
-      std::lock_guard lock(hint_cache->mutex);
+      if (request.verdict_challenge.has_value()) {
+        std::string result;
+        if (request.verdict_challenge->challenged_move_uci.has_value()) {
+          result = analysis_service.coach_move_review_json(
+              *request.position_fen,
+              *request.verdict_challenge->challenged_move_uci);
+        } else {
+          result = analysis_service.coach_hint_json(*request.position_fen);
+        }
+        const auto payload = json::parse(result);
+        auto snapshot = candidate_snapshot_from_json(payload, *request.position_fen);
+        if (snapshot.root_lines.empty()) return std::nullopt;
+        return ai::EngineCandidateBundle{
+            .engine_evidence = {
+                .kind = ai::EvidenceKind::engine,
+                .payload = std::move(result),
+                .confidence = 1.0},
+            .candidate_snapshot = std::move(snapshot)};
+      }
+      if (plan.analysis_mode == ai::PositionAnalysisMode::worst_move ||
+          plan.analysis_mode == ai::PositionAnalysisMode::fastest_loss) {
+        auto cached = cached_extreme_move(
+            database, analysis_service, *hint_cache, *request.position_fen,
+            plan.analysis_mode == ai::PositionAnalysisMode::fastest_loss);
+        if (cached.candidates.root_lines.empty()) return std::nullopt;
+        return ai::EngineCandidateBundle{
+            .engine_evidence = {
+                .kind = ai::EvidenceKind::engine,
+                .payload = std::move(cached.result),
+                .confidence = 1.0},
+            .candidate_snapshot = std::move(cached.candidates)};
+      }
+      auto cached = cached_hint(
+          database, analysis_service, *hint_cache, *request.position_fen);
+      if (cached.candidates.root_lines.empty()) return std::nullopt;
       return ai::EngineCandidateBundle{
-          .engine_evidence = {.kind = ai::EvidenceKind::engine, .payload = result, .confidence = 1.0},
-          .candidate_snapshot = hint_cache->candidates};
+          .engine_evidence = {
+              .kind = ai::EvidenceKind::engine,
+              .payload = std::move(cached.result),
+              .confidence = 1.0},
+          .candidate_snapshot = std::move(cached.candidates)};
     } catch (...) {
       return std::nullopt;
     }
@@ -257,9 +409,10 @@ ai::EvidenceSources make_sources(Database& database, AnalysisService& analysis_s
     const auto key = hint_settings_key(database);
     {
       std::lock_guard lock(hint_cache->mutex);
-      if (request.position_fen && *request.position_fen == hint_cache->fen &&
-          key == hint_cache->settings_key && !hint_cache->candidates.root_lines.empty()) {
-        return hint_cache->candidates;
+      if (request.position_fen && *request.position_fen == hint_cache->hint.fen &&
+          key == hint_cache->hint.settings_key &&
+          !hint_cache->hint.candidates.root_lines.empty()) {
+        return hint_cache->hint.candidates;
       }
     }
     if (!request.position_fen) return std::nullopt;
@@ -357,9 +510,8 @@ ai::EvidenceSources make_sources(Database& database, AnalysisService& analysis_s
     };
   };
   sources.user_profile = [&knowledge_runtime](const ai::CoachRequest& request,
-                                     const ai::QueryPlan& plan,
-                                     const ai::EmbeddingModel* embeddings) {
-    return knowledge_runtime.coach_evidence(request, plan, embeddings);
+                                     const ai::QueryPlan& plan) {
+    return knowledge_runtime.coach_evidence(request, plan);
   };
   sources.practicality_player = [&database](const ai::CoachRequest& request,
                                             const ai::QueryPlan&) {
@@ -387,13 +539,72 @@ std::string provider_status(const std::string& error_code) {
       error_code.find("backoff") != std::string::npos) {
     return "provider_rate_limited";
   }
-  return "provider_unavailable";
+  if (error_code == "gemini_output_empty" ||
+      error_code.starts_with("gemini_response_")) {
+    return "provider_response_invalid";
+  }
+  if (error_code == "quiz_candidate_evidence_unavailable") {
+    return "evidence_unavailable";
+  }
+  if (error_code == "provider_unavailable" ||
+      error_code == "remote_transport_unavailable" ||
+      error_code.find("config_") != std::string::npos ||
+      error_code.find("api_key_missing") != std::string::npos ||
+      error_code.find("provider_disabled") != std::string::npos) {
+    return "provider_unavailable";
+  }
+  return "provider_error";
+}
+
+bool renderable_native_answer(const ai::CoachResponse& response) {
+  return !response.native_answer_kind.empty() && !response.board_moves.empty();
+}
+
+bool renderable_response(const ai::CoachResponse& response) {
+  return !response.answer.empty() || !response.follow_up_question.empty() ||
+      !response.client_actions.empty() || renderable_native_answer(response);
+}
+
+std::string response_status(const ai::CoachResponse& response) {
+  if (!response.accepted) return "off_topic";
+  if (response.action_fulfillment_required &&
+      !response.action_fulfillment_passed) {
+    return "validation_failed";
+  }
+  if (!response.safe_fallback_kind.empty()) return "safe_fallback";
+  if (!response.validation_passed && !response.validation_issues.empty()) {
+    return "validation_failed";
+  }
+  if (!response.provider_error_code.empty()) {
+    return provider_status(response.provider_error_code);
+  }
+  if (!response.validation_passed) return "validation_failed";
+  if (!renderable_response(response)) return "provider_unavailable";
+  return "ok";
+}
+
+std::string trace_status(const ai::CoachPipelineTrace& trace) {
+  if (!trace.accepted) return "off_topic";
+  if (trace.action_fulfillment_required && !trace.action_fulfillment_passed) {
+    return "validation_failed";
+  }
+  if (!trace.safe_fallback_kind.empty()) return "safe_fallback";
+  if (!trace.validation_passed && !trace.validation_issues.empty()) {
+    return "validation_failed";
+  }
+  if (!trace.provider_error_code.empty()) {
+    return provider_status(trace.provider_error_code);
+  }
+  if (!trace.validation_passed) return "validation_failed";
+  if (!trace.response_renderable) return "provider_unavailable";
+  return "ok";
 }
 
 json response_value(const ai::CoachResponse& response) {
   json output = {
       {"accepted", response.accepted},
       {"answer", response.answer},
+      {"nativeAnswerKind", response.native_answer_kind},
       {"followUpQuestion", response.follow_up_question},
       {"validationPassed", response.validation_passed},
       {"validationRepaired", response.validation_repaired},
@@ -401,13 +612,58 @@ json response_value(const ai::CoachResponse& response) {
       {"evidenceIds", response.evidence_references},
       {"providerErrorCode", response.provider_error_code},
       {"safeFallbackKind", response.safe_fallback_kind},
+      {"actionFulfillment", {
+          {"required", response.action_fulfillment_required},
+          {"passed", response.action_fulfillment_passed},
+          {"issues", response.action_fulfillment_issues},
+      }},
   };
+  if (response.chess_verdict) {
+    const auto& verdict = *response.chess_verdict;
+    output["chessVerdict"] = {
+        {"authoritative", verdict.authoritative},
+        {"positionScope", verdict.position_scope},
+        {"positionVerdict", std::string(ai::position_verdict_name(verdict.position_verdict))},
+        {"moveVerdict", std::string(ai::move_verdict_name(verdict.move_verdict))},
+        {"evaluatedMoveUci", verdict.evaluated_move_uci.value_or("")},
+        {"basis", verdict.basis},
+    };
+    if (verdict.white_evaluation_cp) {
+      output["chessVerdict"]["whiteEvaluationCp"] = *verdict.white_evaluation_cp;
+    }
+    if (verdict.white_mate_in) {
+      output["chessVerdict"]["whiteMateIn"] = *verdict.white_mate_in;
+    }
+    if (verdict.move_loss_cp) {
+      output["chessVerdict"]["moveLossCp"] = *verdict.move_loss_cp;
+    }
+    if (verdict.move_loss_expected_score) {
+      output["chessVerdict"]["moveLossExpectedScore"] =
+          *verdict.move_loss_expected_score;
+    }
+  }
   output["boardMoves"] = json::array();
   output["focusSquares"] = json::array();
+  output["clientActions"] = json::array();
+  for (const auto& action : response.client_actions) {
+    json value{{"id", action.id}};
+    if (action.elo.has_value()) value["elo"] = *action.elo;
+    if (action.color.has_value()) value["color"] = *action.color;
+    output["clientActions"].push_back(std::move(value));
+  }
   if (response.accepted && response.validation_passed) {
+    for (const auto& move : response.board_moves) {
+      if (!move.empty() && output["boardMoves"].size() < 2 &&
+          std::find(output["boardMoves"].begin(), output["boardMoves"].end(),
+                    json(move)) == output["boardMoves"].end()) {
+        output["boardMoves"].push_back(move);
+      }
+    }
     for (const auto& move : response.recommendations) {
       if (response.answer_type != ai::CoachAnswerType::quiz &&
-          !move.move_uci.empty() && output["boardMoves"].size() < 2) {
+          !move.move_uci.empty() && output["boardMoves"].size() < 2 &&
+          std::find(output["boardMoves"].begin(), output["boardMoves"].end(),
+                    json(move.move_uci)) == output["boardMoves"].end()) {
         output["boardMoves"].push_back(move.move_uci);
       }
     }
@@ -420,18 +676,300 @@ json response_value(const ai::CoachResponse& response) {
           output["focusSquares"].size() < 4) output["focusSquares"].push_back(claim.subject);
     }
   }
-  if (!response.accepted) {
-    output["status"] = "off_topic";
-  } else if (!response.safe_fallback_kind.empty()) {
-    output["status"] = "safe_fallback";
-  } else if (!response.validation_passed) {
-    output["status"] = "validation_failed";
-  } else if (response.answer.empty()) {
-    output["status"] = provider_status(response.provider_error_code);
-  } else {
-    output["status"] = "ok";
-  }
+  output["status"] = response_status(response);
   return output;
+}
+
+
+// -----------------------------------------------------------------------------
+// Section: Durable Coach session persistence
+// -----------------------------------------------------------------------------
+
+json chess_verdict_state_value(const ai::ChessVerdictContract& verdict) {
+  json out{
+      {"authoritative", verdict.authoritative},
+      {"positionScope", verdict.position_scope},
+      {"positionVerdict", static_cast<int>(verdict.position_verdict)},
+      {"moveVerdict", static_cast<int>(verdict.move_verdict)},
+      {"basis", verdict.basis},
+  };
+  if (verdict.evaluated_move_uci) out["evaluatedMoveUci"] = *verdict.evaluated_move_uci;
+  if (verdict.white_evaluation_cp) out["whiteEvaluationCp"] = *verdict.white_evaluation_cp;
+  if (verdict.white_mate_in) out["whiteMateIn"] = *verdict.white_mate_in;
+  if (verdict.move_loss_cp) out["moveLossCp"] = *verdict.move_loss_cp;
+  if (verdict.move_loss_expected_score)
+    out["moveLossExpectedScore"] = *verdict.move_loss_expected_score;
+  return out;
+}
+
+std::optional<ai::ChessVerdictContract> chess_verdict_state_from_value(
+    const json& value) {
+  if (!value.is_object()) return std::nullopt;
+  ai::ChessVerdictContract verdict;
+  verdict.authoritative = value.value("authoritative", false);
+  verdict.position_scope = value.value("positionScope", "current_position");
+  const int position = value.value("positionVerdict", 0);
+  const int move = value.value("moveVerdict", 0);
+  if (position >= static_cast<int>(ai::PositionVerdict::unknown) &&
+      position <= static_cast<int>(ai::PositionVerdict::black_winning)) {
+    verdict.position_verdict = static_cast<ai::PositionVerdict>(position);
+  }
+  if (move >= static_cast<int>(ai::MoveVerdict::unknown) &&
+      move <= static_cast<int>(ai::MoveVerdict::losing)) {
+    verdict.move_verdict = static_cast<ai::MoveVerdict>(move);
+  }
+  verdict.evaluated_move_uci = optional_string(value, "evaluatedMoveUci");
+  if (value.contains("whiteEvaluationCp") && value["whiteEvaluationCp"].is_number_integer())
+    verdict.white_evaluation_cp = value["whiteEvaluationCp"].get<int>();
+  if (value.contains("whiteMateIn") && value["whiteMateIn"].is_number_integer())
+    verdict.white_mate_in = value["whiteMateIn"].get<int>();
+  if (value.contains("moveLossCp") && value["moveLossCp"].is_number_integer())
+    verdict.move_loss_cp = value["moveLossCp"].get<int>();
+  if (value.contains("moveLossExpectedScore") && value["moveLossExpectedScore"].is_number())
+    verdict.move_loss_expected_score = value["moveLossExpectedScore"].get<double>();
+  verdict.basis = value.value("basis", "");
+  return verdict.authoritative ? std::optional<ai::ChessVerdictContract>{verdict}
+                               : std::nullopt;
+}
+
+json move_attribution_state_value(const ai::CoachMoveAttribution& move) {
+  json out{
+      {"moverRole", move.mover_role},
+      {"verifiedLearnerMove", move.verified_learner_move},
+  };
+  if (move.previous_fen) out["previousFen"] = *move.previous_fen;
+  if (move.current_fen) out["currentFen"] = *move.current_fen;
+  if (move.played_move_uci) out["playedMoveUci"] = *move.played_move_uci;
+  if (move.mover_color) out["moverColor"] = *move.mover_color;
+  if (move.learner_color) out["learnerColor"] = *move.learner_color;
+  if (move.classification) out["classification"] = *move.classification;
+  if (move.expected_score_before) out["expectedScoreBefore"] = *move.expected_score_before;
+  if (move.expected_score_played) out["expectedScorePlayed"] = *move.expected_score_played;
+  if (move.expected_score_loss) out["expectedScoreLoss"] = *move.expected_score_loss;
+  return out;
+}
+
+std::optional<ai::CoachMoveAttribution> move_attribution_state_from_value(
+    const json& value) {
+  if (!value.is_object()) return std::nullopt;
+  ai::CoachMoveAttribution move;
+  move.previous_fen = optional_string(value, "previousFen");
+  move.current_fen = optional_string(value, "currentFen");
+  move.played_move_uci = optional_string(value, "playedMoveUci");
+  move.mover_color = optional_string(value, "moverColor");
+  move.learner_color = optional_string(value, "learnerColor");
+  move.classification = optional_string(value, "classification");
+  if (value.contains("expectedScoreBefore") && value["expectedScoreBefore"].is_number())
+    move.expected_score_before = value["expectedScoreBefore"].get<double>();
+  if (value.contains("expectedScorePlayed") && value["expectedScorePlayed"].is_number())
+    move.expected_score_played = value["expectedScorePlayed"].get<double>();
+  if (value.contains("expectedScoreLoss") && value["expectedScoreLoss"].is_number())
+    move.expected_score_loss = value["expectedScoreLoss"].get<double>();
+  move.mover_role = value.value("moverRole", "unknown");
+  move.verified_learner_move = value.value("verifiedLearnerMove", false);
+  if (!move.previous_fen && !move.current_fen && !move.played_move_uci &&
+      !move.classification) return std::nullopt;
+  return move;
+}
+
+json coach_session_state_value(const ai::CoachSessionState& state) {
+  return json{
+      {"profileId", state.profile_id.value_or("")},
+      {"queryFamily", static_cast<int>(state.query_family)},
+      {"profileScope", {
+          {"topics", state.profile_scope.topics},
+          {"timeControls", state.profile_scope.time_controls},
+          {"phases", state.profile_scope.phases},
+          {"playerColors", state.profile_scope.player_colors},
+          {"needsEndgameMaterialType", state.profile_scope.needs_endgame_material_type},
+          {"wantsProof", state.profile_scope.wants_proof},
+          {"compareScopes", state.profile_scope.compare_scopes},
+      }},
+      {"needsProfile", state.needs_profile},
+      {"currentBoard", state.current_board.value_or("")},
+      {"currentTopic", static_cast<int>(state.current_topic)},
+      {"currentGoal", state.current_goal},
+      {"recentDialogue", state.recent_dialogue},
+      {"lastClaim", state.last_claim},
+      {"lastRecommendation", state.last_recommendation},
+      {"referencedConcept", state.referenced_concept},
+      {"unresolvedQuestion", state.unresolved_question},
+      {"questionBoard", state.question_board},
+      {"expectedMove", state.expected_move},
+      {"expectedReply", state.expected_reply},
+      {"exerciseSkillId", state.exercise_skill_id},
+      {"hintBoard", state.hint_board},
+      {"hintLevel", state.hint_level},
+      {"scorePendingMoveQuestion", state.score_pending_move_question},
+      {"acceptableMoves", state.acceptable_moves},
+      {"lastAttemptStatus", state.last_attempt_status},
+      {"lastAttemptClassification", state.last_attempt_classification},
+      {"lastChessVerdict", state.last_chess_verdict
+          ? chess_verdict_state_value(*state.last_chess_verdict) : json(nullptr)},
+      {"lastMoveAttribution", state.last_move_attribution
+          ? move_attribution_state_value(*state.last_move_attribution) : json(nullptr)},
+      {"lastVerdictFen", state.last_verdict_fen.value_or("")},
+  };
+}
+
+std::optional<ai::CoachSessionState> coach_session_state_from_value(
+    const json& value, const std::string& profile_id) {
+  if (!value.is_object()) return std::nullopt;
+  ai::CoachSessionState state;
+  state.profile_id = profile_id;
+  const int family = value.value("queryFamily", 0);
+  if (family >= static_cast<int>(ai::QueryFamily::unknown) &&
+      family <= static_cast<int>(ai::QueryFamily::position)) {
+    state.query_family = static_cast<ai::QueryFamily>(family);
+  }
+  if (value.contains("profileScope") && value["profileScope"].is_object()) {
+    const auto& scope = value["profileScope"];
+    state.profile_scope.topics = scope.value("topics", std::vector<std::string>{});
+    state.profile_scope.time_controls =
+        scope.value("timeControls", std::vector<std::string>{});
+    state.profile_scope.phases = scope.value("phases", std::vector<std::string>{});
+    state.profile_scope.player_colors =
+        scope.value("playerColors", std::vector<std::string>{});
+    state.profile_scope.needs_endgame_material_type =
+        scope.value("needsEndgameMaterialType", false);
+    state.profile_scope.wants_proof = scope.value("wantsProof", false);
+    state.profile_scope.compare_scopes = scope.value("compareScopes", false);
+  }
+  state.needs_profile = value.value("needsProfile", false);
+  if (const auto board = optional_string(value, "currentBoard")) {
+    state.current_board = *board;
+  }
+  const int topic = value.value("currentTopic", 0);
+  if (topic >= static_cast<int>(ai::CoachIntent::unknown) &&
+      topic <= static_cast<int>(ai::CoachIntent::off_topic)) {
+    state.current_topic = static_cast<ai::CoachIntent>(topic);
+  }
+  state.current_goal = value.value("currentGoal", "");
+  state.recent_dialogue =
+      value.value("recentDialogue", std::vector<std::string>{});
+  if (state.recent_dialogue.size() > 8) {
+    state.recent_dialogue.erase(
+        state.recent_dialogue.begin(), state.recent_dialogue.end() - 8);
+  }
+  state.last_claim = value.value("lastClaim", "");
+  state.last_recommendation = value.value("lastRecommendation", "");
+  state.referenced_concept = value.value("referencedConcept", "");
+  state.unresolved_question = value.value("unresolvedQuestion", "");
+  state.question_board = value.value("questionBoard", "");
+  state.expected_move = value.value("expectedMove", "");
+  state.expected_reply = value.value("expectedReply", "");
+  state.exercise_skill_id = value.value("exerciseSkillId", "");
+  state.hint_board = value.value("hintBoard", "");
+  state.hint_level = std::clamp(value.value("hintLevel", 0), 0, 4);
+  state.score_pending_move_question =
+      value.value("scorePendingMoveQuestion", false);
+  state.acceptable_moves =
+      value.value("acceptableMoves", std::vector<std::string>{});
+  if (state.acceptable_moves.size() > 3) state.acceptable_moves.resize(3);
+  state.last_attempt_status = value.value("lastAttemptStatus", "");
+  state.last_attempt_classification =
+      value.value("lastAttemptClassification", "");
+  if (value.contains("lastChessVerdict"))
+    state.last_chess_verdict = chess_verdict_state_from_value(value["lastChessVerdict"]);
+  if (value.contains("lastMoveAttribution"))
+    state.last_move_attribution =
+        move_attribution_state_from_value(value["lastMoveAttribution"]);
+  if (const auto fen = optional_string(value, "lastVerdictFen"))
+    state.last_verdict_fen = *fen;
+  return state.empty() ? std::nullopt
+                       : std::optional<ai::CoachSessionState>(std::move(state));
+}
+
+void restore_persisted_coach_session(
+    Database& database, ai::CoachOrchestrator& orchestrator,
+    const std::optional<std::string>& session_id,
+    const std::optional<std::string>& profile_id) {
+  if (!session_id || !profile_id) return;
+  if (orchestrator.session_state(session_id, profile_id).has_value()) {
+    database.touch_coach_session(*profile_id, *session_id,
+                                 coach_unix_time_seconds());
+    return;
+  }
+  const auto record = database.coach_session(*profile_id, *session_id);
+  if (!record) return;
+  database.touch_coach_session(*profile_id, *session_id,
+                               coach_unix_time_seconds());
+  try {
+    const auto persisted = json::parse(record->compact_state_json);
+    if (auto state = coach_session_state_from_value(persisted, *profile_id)) {
+      orchestrator.restore_session(*session_id, *state);
+    }
+  } catch (...) {
+    // A damaged compact continuation snapshot must not make the durable chat
+    // transcript unusable. The next successful turn rewrites a valid snapshot.
+  }
+}
+
+void ensure_persistent_coach_session(
+    Database& database, const ai::CoachRequest& request) {
+  if (!request.session_id || !request.profile_id) return;
+  database.ensure_coach_session(*request.profile_id, *request.session_id,
+                                coach_unix_time_seconds());
+}
+
+void persist_coach_turn(Database& database, ai::CoachOrchestrator& orchestrator,
+                        const ai::CoachRequest& request,
+                        const ai::CoachResponse& response) {
+  if (!request.session_id || !request.profile_id) return;
+  const auto now = coach_unix_time_seconds();
+  database.ensure_coach_session(*request.profile_id, *request.session_id, now);
+
+  if (!request.automatic_turn && !request.user_text.empty()) {
+    database.append_coach_session_message(
+        *request.profile_id, *request.session_id, "user", request.user_text,
+        "{}", false, now);
+  }
+
+  const bool durable_assistant_message =
+      response.accepted &&
+      (!response.answer.empty() || !response.native_answer_kind.empty() ||
+       !response.safe_fallback_kind.empty());
+  if (durable_assistant_message) {
+    database.append_coach_session_message(
+        *request.profile_id, *request.session_id, "assistant", response.answer,
+        response_value(response).dump(), request.automatic_turn, now);
+  }
+
+  if (const auto state =
+          orchestrator.session_state(request.session_id, request.profile_id)) {
+    database.save_coach_session_state(
+        *request.profile_id, *request.session_id,
+        coach_session_state_value(*state).dump(), now);
+  }
+}
+
+json coach_session_record_value(const CoachSessionRecord& record) {
+  return json{
+      {"id", record.id},
+      {"sessionNumber", record.session_number},
+      {"name", record.name},
+      {"createdAt", record.created_at},
+      {"updatedAt", record.updated_at},
+      {"lastOpenedAt", record.last_opened_at},
+  };
+}
+
+json coach_session_message_value(const CoachSessionMessageRecord& record) {
+  json payload = json::object();
+  try {
+    const auto parsed = json::parse(record.payload_json);
+    if (parsed.is_object()) payload = parsed;
+  } catch (...) {
+    // Transcript text stays usable even if old structured metadata is damaged.
+  }
+  return json{
+      {"sequence", record.sequence},
+      {"role", record.role},
+      {"content", record.content},
+      {"payload", std::move(payload)},
+      {"automaticTurn", record.automatic_turn},
+      {"createdAt", record.created_at},
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -447,6 +985,14 @@ std::vector<std::string> reason_names(const ai::AutomaticCoachDecision& decision
   return names;
 }
 
+json automatic_gate_value(const ai::AutomaticCoachDecision& decision) {
+  return json{
+      {"primaryReasonPresent", decision.primary_reason_present},
+      {"criticalOverride", decision.critical_override},
+      {"recencyBlocked", decision.recency_blocked},
+      {"minimumTeachingValue", decision.minimum_teaching_value}};
+}
+
 bool strong_completed_move_classification(std::string_view classification) {
   return classification == "theory" || classification == "forced" ||
       classification == "brilliant" || classification == "critical" ||
@@ -458,8 +1004,8 @@ bool sound_completed_move_classification(std::string_view classification) {
 }
 
 bool weak_completed_move_classification(std::string_view classification) {
-  return classification == "mistake" || classification == "blunder" ||
-      classification == "miss";
+  return classification == "inaccuracy" || classification == "mistake" ||
+      classification == "blunder" || classification == "miss";
 }
 
 std::string automatic_prompt(const ai::AutomaticCoachDecision& decision,
@@ -524,14 +1070,12 @@ std::string automatic_prompt(const ai::AutomaticCoachDecision& decision,
 // -----------------------------------------------------------------------------
 
 CoachService::CoachService(Database& database, AnalysisService& analysis_service,
-                           knowledge::KnowledgeRuntime& knowledge_runtime,
-                           std::filesystem::path small_model_root)
+                           knowledge::KnowledgeRuntime& knowledge_runtime)
     : database_(database),
       analysis_service_(analysis_service),
       hint_cache_(std::make_shared<CoachHintCache>()),
-      small_models_(ai::load_optional_small_model_suite(std::move(small_model_root))),
       orchestrator_(make_sources(database, analysis_service, knowledge_runtime, hint_cache_),
-                    ai::make_gemini_provider(), small_models_.suite,
+                    ai::make_gemini_provider(),
                     [&database](const ai::CoachLearningAttempt& attempt) {
                       if (!attempt.profile_id || attempt.skill_id.empty()) return;
                       const auto owner =
@@ -583,6 +1127,98 @@ std::string CoachService::ask_json(const std::string& request_json) {
   return ask_json_impl(request_json, nullptr);
 }
 
+std::string CoachService::sessions_json(const std::string& profile_id) const {
+  if (profile_id.empty()) {
+    throw std::invalid_argument("Coach sessions require profile id");
+  }
+  json sessions = json::array();
+  for (const auto& record : database_.coach_sessions(profile_id)) {
+    sessions.push_back(coach_session_record_value(record));
+  }
+  return json{{"schema", "coach.sessions.v1"}, {"sessions", std::move(sessions)}}.dump();
+}
+
+std::string CoachService::create_session_json(const std::string& profile_id) {
+  if (profile_id.empty()) {
+    throw std::invalid_argument("Coach session requires profile id");
+  }
+  const auto record =
+      database_.create_coach_session(profile_id, coach_unix_time_seconds());
+  return json{{"schema", "coach.session.v1"},
+              {"session", coach_session_record_value(record)}}.dump();
+}
+
+std::string CoachService::session_messages_json(
+    const std::string& request_json) const {
+  const auto request = json::parse(request_json);
+  const auto profile_id = request.value("profileId", "");
+  const auto session_id = request.value("sessionId", "");
+  if (profile_id.empty() || session_id.empty()) {
+    throw std::invalid_argument(
+        "Coach session messages require profileId and sessionId");
+  }
+  const auto session = database_.coach_session(profile_id, session_id);
+  if (!session) {
+    throw std::invalid_argument("Coach session not found");
+  }
+  json messages = json::array();
+  for (const auto& record :
+       database_.coach_session_messages(profile_id, session_id)) {
+    messages.push_back(coach_session_message_value(record));
+  }
+  database_.touch_coach_session(profile_id, session_id,
+                                coach_unix_time_seconds());
+  std::string current_position_fen;
+  try {
+    const auto state = json::parse(session->compact_state_json);
+    current_position_fen = state.value("currentBoard", "");
+  } catch (...) {
+    // The transcript remains readable even if the continuation snapshot is bad.
+  }
+  return json{{"schema", "coach.session_messages.v1"},
+              {"session", coach_session_record_value(*session)},
+              {"currentPositionFen", current_position_fen},
+              {"messages", std::move(messages)}}.dump();
+}
+
+std::string CoachService::rename_session_json(
+    const std::string& request_json) {
+  const auto request = json::parse(request_json);
+  const auto profile_id = request.value("profileId", "");
+  const auto session_id = request.value("sessionId", "");
+  auto name = request.value("name", "");
+  const auto first = name.find_first_not_of(" \t\r\n");
+  const auto last = name.find_last_not_of(" \t\r\n");
+  name = first == std::string::npos ? std::string{}
+                                    : name.substr(first, last - first + 1);
+  if (profile_id.empty() || session_id.empty() || name.empty()) {
+    throw std::invalid_argument(
+        "Coach session rename requires profileId, sessionId and name");
+  }
+  database_.rename_coach_session(profile_id, session_id, name,
+                                 coach_unix_time_seconds());
+  const auto session = database_.coach_session(profile_id, session_id);
+  if (!session) throw std::invalid_argument("Coach session not found");
+  return json{{"schema", "coach.session.v1"},
+              {"session", coach_session_record_value(*session)}}.dump();
+}
+
+std::string CoachService::delete_session_json(
+    const std::string& request_json) {
+  const auto request = json::parse(request_json);
+  const auto profile_id = request.value("profileId", "");
+  const auto session_id = request.value("sessionId", "");
+  if (profile_id.empty() || session_id.empty()) {
+    throw std::invalid_argument(
+        "Coach session delete requires profileId and sessionId");
+  }
+  database_.delete_coach_session(profile_id, session_id);
+  return json{{"schema", "coach.session_delete.v1"},
+              {"deleted", true},
+              {"sessionId", session_id}}.dump();
+}
+
+
 std::string CoachService::ask_json_impl(
     const std::string& request_json, const std::atomic_bool* cancelled) {
   cancel_automatic_jobs_for_foreground();
@@ -591,13 +1227,19 @@ std::string CoachService::ask_json_impl(
   }
   const auto value = json::parse(request_json);
   auto request = parse_request(value, database_);
+  hydrate_coach_native_context_state(database_, request);
   load_practice_progress(database_, request);
   select_personal_quiz_position(database_, request);
+  ensure_persistent_coach_session(database_, request);
+  restore_persisted_coach_session(
+      database_, orchestrator_, request.session_id, request.profile_id);
   if (!acquire_execution_slot(JobKind::ask, cancelled)) {
     return json{{"status", "cancelled"}}.dump();
   }
   try {
-    auto output = response_value(orchestrator_.handle(request));
+    const auto response = orchestrator_.handle(request);
+    persist_coach_turn(database_, orchestrator_, request, response);
+    auto output = response_value(response);
     output["positionFen"] = request.position_fen.value_or("");
     release_execution_slot();
     return output.dump();
@@ -630,12 +1272,12 @@ std::string CoachService::context_json(const std::string& request_json) const {
   throw std::invalid_argument("Coach context requires FEN or PGN");
 }
 
-std::string CoachService::automatic_json(const std::string& request_json) const {
+std::string CoachService::automatic_json(const std::string& request_json) {
   return automatic_json_impl(request_json, nullptr);
 }
 
 std::string CoachService::automatic_json_impl(
-    const std::string& request_json, const std::atomic_bool* cancelled) const {
+    const std::string& request_json, const std::atomic_bool* cancelled) {
   const auto value = json::parse(request_json);
   const auto context_id = optional_string(value, "contextId");
   const auto variation_id = optional_string(value, "variationJobId");
@@ -647,6 +1289,8 @@ std::string CoachService::automatic_json_impl(
 
   ai::AutomaticCoachEvent event;
   std::string played_move;
+  std::optional<double> expected_score_before;
+  std::optional<double> expected_score_played;
   if (!variation_id) {
     event.previous_fen = ply == 1
         ? std::optional<std::string>(game->starting_fen)
@@ -670,6 +1314,14 @@ std::string CoachService::automatic_json_impl(
     }
     if (analysis.contains("classification") && analysis["classification"].is_string()) {
       event.classification = analysis["classification"].get<std::string>();
+    }
+    if (analysis.contains("expectedScoreBefore") &&
+        analysis["expectedScoreBefore"].is_number()) {
+      expected_score_before = analysis["expectedScoreBefore"].get<double>();
+    }
+    if (analysis.contains("expectedScorePlayed") &&
+        analysis["expectedScorePlayed"].is_number()) {
+      expected_score_played = analysis["expectedScorePlayed"].get<double>();
     }
     if (analysis.contains("expectedScoreLoss") &&
         analysis["expectedScoreLoss"].is_number()) {
@@ -730,7 +1382,23 @@ std::string CoachService::automatic_json_impl(
       // A UI selection or mismatched stale board is not a completed move.
     }
   }
-  const bool answering_question = user_played_move &&
+  const auto learner_color = optional_string(value, "playerColor");
+  std::optional<std::string> mover_color;
+  if (event.previous_fen) {
+    mover_color = fen_white_to_move(*event.previous_fen) ? "white" : "black";
+  }
+  std::string mover_role = "unknown";
+  if (mover_color && learner_color &&
+      (*learner_color == "white" || *learner_color == "black")) {
+    mover_role = *mover_color == *learner_color ? "learner" : "opponent";
+  }
+  const bool verified_learner_move = user_played_move && mover_role == "learner";
+  const auto persistent_profile_id = profile_id.empty()
+      ? std::nullopt
+      : std::optional<std::string>(profile_id);
+  restore_persisted_coach_session(
+      database_, orchestrator_, session_id, persistent_profile_id);
+  const bool answering_question = verified_learner_move &&
       orchestrator_.has_pending_move_question(
           session_id, profile_id.empty() ? std::nullopt
                                          : std::optional<std::string>(profile_id),
@@ -757,12 +1425,13 @@ std::string CoachService::automatic_json_impl(
             {"practiceRelevance", decision.practice_relevance},
             {"interruptionCost", decision.interruption_cost},
             {"value", decision.teaching_value}}},
+        {"triggerGate", automatic_gate_value(decision)},
     }.dump();
   }
 
   ai::CoachRequest request;
   request.user_text = automatic_prompt(decision, answering_question,
-                                       user_played_move, event.classification);
+                                       verified_learner_move, event.classification);
   // A move answering an open trainer question arrives through the Automatic
   // endpoint, but it is interactive foreground feedback, not an unsolicited
   // background Coach turn. Treat it as foreground for provider quota/teaching
@@ -772,25 +1441,44 @@ std::string CoachService::automatic_json_impl(
   request.mode = ai::CoachMode::explain;
   request.depth = ai::ResponseDepth::concise;
   request.position_fen = event.current_fen;
-  if (user_played_move) request.user_move_uci = played_move;
-  if (user_played_move && !event.classification.empty()) {
+  request.move_attribution = ai::CoachMoveAttribution{
+      .previous_fen = event.previous_fen,
+      .current_fen = event.current_fen,
+      .played_move_uci = played_move.empty()
+          ? std::nullopt
+          : std::optional<std::string>(played_move),
+      .mover_color = mover_color,
+      .learner_color = learner_color,
+      .mover_role = mover_role,
+      .classification = event.classification.empty()
+          ? std::nullopt
+          : std::optional<std::string>(event.classification),
+      .expected_score_before = expected_score_before,
+      .expected_score_played = expected_score_played,
+      .expected_score_loss = event.expected_score_loss,
+      .verified_learner_move = verified_learner_move,
+  };
+  if (verified_learner_move) request.user_move_uci = played_move;
+  if (verified_learner_move && !event.classification.empty()) {
     request.user_move_classification = event.classification;
   }
-  request.user_move_success_confirmed = user_played_move &&
+  request.user_move_success_confirmed = verified_learner_move &&
       strong_completed_move_classification(event.classification);
-  request.user_move_error_confirmed = user_played_move &&
+  request.user_move_error_confirmed = verified_learner_move &&
       !request.user_move_success_confirmed &&
       (weak_completed_move_classification(event.classification) ||
        event.expected_score_loss.value_or(0.0) >= 0.15);
   if (game && !game->pgn.empty()) request.game_pgn = game->pgn;
   request.session_id = session_id;
+  hydrate_coach_native_context_state(database_, request);
   // The played move belongs to previous_fen, never to the current candidate root.
   request.surface = optional_string(value, "surface");
   request.context_id = context_id;
   request.context_ply = ply;
   request.profile_id = profile_id.empty() ? std::nullopt : std::optional<std::string>(profile_id);
   request.variation_job_id = variation_id;
-  request.player_color = optional_string(value, "playerColor");
+  request.player_color = learner_color;
+  ensure_persistent_coach_session(database_, request);
 
   if (cancelled != nullptr && cancelled->load()) {
     return json{{"status", "cancelled"}, {"triggered", false},
@@ -811,6 +1499,7 @@ std::string CoachService::automatic_json_impl(
                   {"reasons", reasons}}.dump();
     }
     response = orchestrator_.handle(request);
+    persist_coach_turn(database_, orchestrator_, request, response);
     release_execution_slot();
   } catch (...) {
     release_execution_slot();
@@ -830,7 +1519,15 @@ std::string CoachService::automatic_json_impl(
       {"practiceRelevance", decision.practice_relevance},
       {"interruptionCost", decision.interruption_cost},
       {"value", decision.teaching_value}};
+  output["triggerGate"] = automatic_gate_value(decision);
   output["eventKind"] = event.classification;
+  output["moveAttribution"] = {
+      {"moverColor", mover_color.value_or("")},
+      {"learnerColor", learner_color.value_or("")},
+      {"moverRole", mover_role},
+      {"playedMoveUci", played_move},
+      {"verifiedLearnerMove", verified_learner_move},
+  };
   output["positionFen"] = event.current_fen.value_or("");
   if (!answering_question && output.value("status", "") == "ok") {
     record_automatic_delivery(automatic_history_key, now_seconds);
@@ -931,6 +1628,8 @@ void CoachService::record_performance_trace(
   performance_totals_.automatic_requests += trace.automatic_turn ? 1 : 0;
   performance_totals_.accepted_requests += trace.accepted ? 1 : 0;
   performance_totals_.validation_failures += trace.validation_passed ? 0 : 1;
+  performance_totals_.action_fulfillment_failures +=
+      trace.action_fulfillment_required && !trace.action_fulfillment_passed ? 1 : 0;
   performance_totals_.repaired_responses += trace.validation_repaired ? 1 : 0;
   performance_totals_.provider_errors += trace.provider_error_code.empty() ? 0 : 1;
   performance_totals_.provider_calls +=
@@ -960,6 +1659,10 @@ void CoachService::record_performance_trace(
       trace.provider_evidence_count;
   performance_totals_.provider_exact_duplicates_dropped +=
       trace.provider_exact_duplicates_dropped;
+  performance_totals_.provider_compacted_items +=
+      trace.provider_compacted_items;
+  performance_totals_.provider_compaction_savings_tokens +=
+      trace.provider_compaction_savings_tokens;
   performance_totals_.provider_estimated_input_tokens +=
       trace.provider_estimated_input_tokens;
   performance_totals_.provider_estimated_selected_tokens +=
@@ -992,11 +1695,73 @@ std::string CoachService::performance_diagnostics_json() const {
         {"validationPassed", trace.validation_passed},
         {"validationRepaired", trace.validation_repaired},
         {"providerErrorCode", trace.provider_error_code},
+        {"statusClass", trace_status(trace)},
         {"validationIssues", trace.validation_issues},
         {"safeFallbackKind", trace.safe_fallback_kind},
+        {"fallbackReason", trace.fallback_reason},
         {"learnerAttemptStatus", trace.learner_attempt_status},
         {"learnerMoveClassification", trace.learner_move_classification},
+        {"moveAttribution", {
+            {"moverColor", trace.move_mover_color},
+            {"learnerColor", trace.move_learner_color},
+            {"moverRole", trace.move_mover_role},
+            {"playedMoveUci", trace.move_played_uci},
+            {"verifiedLearnerMove", trace.move_verified_learner},
+        }},
         {"providerCalls", trace.provider_calls},
+        {"interaction", {
+            {"requestKind", trace.interaction_request_kind},
+            {"answerIntent", trace.interaction_answer_intent},
+            {"answerLlmUsed", trace.answer_llm_used},
+            {"responseRenderable", trace.response_renderable},
+            {"nativeAnswerKind", trace.native_answer_kind},
+        }},
+        {"chessVerdict", {
+            {"authoritative", trace.verdict_authoritative},
+            {"positionVerdict", trace.verdict_position},
+            {"moveVerdict", trace.verdict_move},
+            {"evaluatedMoveUci", trace.verdict_evaluated_move},
+            {"basis", trace.verdict_basis},
+            {"reviewOutcome", trace.verdict_review_outcome},
+            {"reviewedMoveUci", trace.verdict_review_move},
+            {"groundingRequired", trace.verdict_grounding_required},
+            {"groundingAvailable", trace.verdict_grounding_available},
+            {"groundingBlocked", trace.verdict_grounding_blocked},
+        }},
+        {"actionFulfillment", {
+            {"required", trace.action_fulfillment_required},
+            {"passed", trace.action_fulfillment_passed},
+            {"requestedActions", trace.requested_actions},
+            {"transportedClientActions", trace.transported_client_actions},
+            {"issues", trace.action_fulfillment_issues},
+        }},
+        {"routing", {
+            {"intent", trace.routed_intent},
+            {"contextIntent", trace.context_intent},
+            {"explicitCurrentIntent", trace.explicit_current_intent},
+            {"analysisMode", trace.analysis_mode},
+            {"analysisModeExplicit", trace.analysis_mode_explicit},
+        }},
+        {"evidencePlan", {
+            {"confidence", trace.evidence_plan_confidence},
+            {"sourceCount", trace.evidence_plan_source_count},
+            {"needCount", trace.evidence_plan_need_count},
+            {"freshness", trace.evidence_plan_freshness},
+            {"interaction", trace.evidence_plan_interaction},
+            {"eloTarget", trace.evidence_plan_elo_target},
+            {"satisfiedNeeds", trace.evidence_needs_satisfied},
+            {"missingNeeds", trace.evidence_needs_missing},
+        }},
+        {"aggregation", {
+            {"selectedItems", trace.aggregated_evidence_count},
+            {"duplicatesRemoved", trace.evidence_duplicates_removed},
+            {"conflictsResolved", trace.evidence_conflicts_resolved},
+        }},
+        {"nativeGrounding", {
+            {"candidateCount", trace.native_candidate_count},
+            {"factCount", trace.native_fact_count},
+            {"focusKind", trace.native_focus_kind},
+        }},
         {"teaching", {
             {"objective", trace.teaching_objective},
             {"deliveryMode", trace.teaching_delivery_mode},
@@ -1009,6 +1774,9 @@ std::string CoachService::performance_diagnostics_json() const {
             {"providerVisible", trace.provider_evidence_count},
             {"exactDuplicatesDropped",
              trace.provider_exact_duplicates_dropped},
+            {"compactedItems", trace.provider_compacted_items},
+            {"estimatedCompactionSavingsTokens",
+             trace.provider_compaction_savings_tokens},
             {"estimatedInputTokens",
              trace.provider_estimated_input_tokens},
             {"estimatedSelectedTokens",
@@ -1087,31 +1855,22 @@ std::string CoachService::performance_diagnostics_json() const {
   };
   const auto position_cache = orchestrator_.position_cache_stats();
   const auto response_cache = orchestrator_.response_cache_stats();
-  const auto component_json = [](const ai::SmallModelComponentStatus& component) {
-    return json{
-        {"filePresent", component.file_present},
-        {"available", component.available},
-        {"id", component.id},
-        {"version", component.version},
-        {"errorCode", component.error_code},
-    };
-  };
   return json{
       {"schema", "coach.performance.v1"},
+      {"contracts", {
+          {"statusSchema", "coach.status.v3"},
+          {"promptVersion",
+           std::string(ai::ModelVersionRegistry::version_of("CoachPrompt"))},
+          {"responseSchema", std::string(ai::kCoachResponseSchemaVersion)},
+      }},
       {"requests", totals.requests},
       {"automaticRequests", totals.automatic_requests},
       {"acceptedRequests", totals.accepted_requests},
       {"validationFailures", totals.validation_failures},
+      {"actionFulfillmentFailures", totals.action_fulfillment_failures},
       {"repairedResponses", totals.repaired_responses},
       {"providerErrors", totals.provider_errors},
       {"providerCalls", totals.provider_calls},
-      {"smallModels", {
-          {"schema", small_models_.status.schema},
-          {"source", small_models_.status.source},
-          {"intent", component_json(small_models_.status.intent)},
-          {"contextPlanner", component_json(small_models_.status.context_planner)},
-          {"embeddings", component_json(small_models_.status.embeddings)},
-      }},
       {"averageTimingMs", {
           {"total", average(totals.total_ms)},
           {"session", average(totals.session_ms)},
@@ -1149,6 +1908,9 @@ std::string CoachService::performance_diagnostics_json() const {
           {"selectedItems", totals.provider_evidence_selected_items},
           {"exactDuplicatesDropped",
            totals.provider_exact_duplicates_dropped},
+          {"compactedItems", totals.provider_compacted_items},
+          {"estimatedCompactionSavingsTokens",
+           totals.provider_compaction_savings_tokens},
           {"estimatedInputTokens", totals.provider_estimated_input_tokens},
           {"estimatedSelectedTokens",
            totals.provider_estimated_selected_tokens},
@@ -1203,10 +1965,31 @@ std::string CoachService::start_job(
   job->id = "coach-" + std::to_string(next_job_id_++);
   job->kind = kind;
   job->session_id = std::move(session_id);
+  job->request_generation = next_request_generation_++;
   {
     std::lock_guard lock(jobs_mutex_);
+    const std::string session_key = job->session_id.empty()
+                                        ? "__default_coach_session__"
+                                        : job->session_id;
+    const bool foreground = kind != JobKind::automatic;
+    const std::string generation_key = session_key +
+        (foreground ? "|foreground" : "|automatic");
+    latest_request_generation_[generation_key] = job->request_generation;
+    for (const auto& [existing_id, existing] : jobs_) {
+      (void)existing_id;
+      const std::string existing_session = existing->session_id.empty()
+                                               ? "__default_coach_session__"
+                                               : existing->session_id;
+      const bool existing_foreground = existing->kind != JobKind::automatic;
+      if (existing_session == session_key &&
+          existing_foreground == foreground &&
+          !existing->finished.load()) {
+        existing->cancelled = true;
+      }
+    }
     jobs_.emplace(job->id, job);
   }
+  execution_cv_.notify_all();
   job->worker = std::thread(
       [this, request_json = std::move(request_json), kind, job]() mutable {
         run_job(std::move(request_json), kind, job);
@@ -1216,7 +1999,8 @@ std::string CoachService::start_job(
 
 std::string CoachService::start_ask_json(const std::string& request_json) {
   cancel_automatic_jobs_for_foreground();
-  return start_job(request_json, JobKind::ask);
+  const auto session_id = optional_string(json::parse(request_json), "sessionId").value_or("");
+  return start_job(request_json, JobKind::ask, session_id);
 }
 
 void CoachService::cancel_superseded_automatic_jobs(
@@ -1251,6 +2035,17 @@ void CoachService::cancel_automatic_jobs_for_foreground() {
   }
 }
 
+bool CoachService::is_latest_request(const CoachJob& job) const {
+  std::lock_guard lock(jobs_mutex_);
+  const std::string session_key = job.session_id.empty()
+                                      ? "__default_coach_session__"
+                                      : job.session_id;
+  const std::string key = session_key +
+      (job.kind == JobKind::automatic ? "|automatic" : "|foreground");
+  const auto found = latest_request_generation_.find(key);
+  return found != latest_request_generation_.end() && found->second == job.request_generation;
+}
+
 std::string CoachService::start_automatic_json(const std::string& request_json) {
   // Latest-position-wins: rapid move sequences must never build an LLM backlog.
   const auto session_id = optional_string(json::parse(request_json), "sessionId")
@@ -1261,7 +2056,8 @@ std::string CoachService::start_automatic_json(const std::string& request_json) 
 
 std::string CoachService::start_hint_json(const std::string& request_json) {
   cancel_automatic_jobs_for_foreground();
-  return start_job(request_json, JobKind::hint);
+  const auto session_id = optional_string(json::parse(request_json), "sessionId").value_or("");
+  return start_job(request_json, JobKind::hint, session_id);
 }
 
 void CoachService::run_job(
@@ -1290,7 +2086,7 @@ void CoachService::run_job(
         return;
       }
       try {
-        result = cached_hint(database_, analysis_service_, *hint_cache_, *fen);
+        result = cached_hint(database_, analysis_service_, *hint_cache_, *fen).result;
         release_execution_slot();
       } catch (...) {
         release_execution_slot();
@@ -1299,9 +2095,15 @@ void CoachService::run_job(
     } else {
       result = ask_json_impl(request_json, &job->cancelled);
     }
+    const bool latest = is_latest_request(*job);
     std::lock_guard lock(job->state_mutex);
     if (job->cancelled) {
       job->state = "cancelled";
+    } else if (!latest) {
+      // Cacheable native evidence may already have been produced, but stale
+      // provider/Coach output must never be delivered to a newer board state.
+      job->state = "superseded";
+      job->result_json.clear();
     } else {
       job->state = "complete";
       job->result_json = result;

@@ -25,6 +25,7 @@ class RemoteProvider final : public LLMProvider {
                           RemoteCompletionFunction completion = {});
 
   [[nodiscard]] std::string_view id() const noexcept override;
+  [[nodiscard]] std::string cache_identity() const override;
   [[nodiscard]] bool available() const noexcept override;
   [[nodiscard]] LLMProviderResult complete(
       const LLMProviderRequest& request) const override;

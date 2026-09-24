@@ -1,0 +1,15 @@
+KChess Opening Arena Spinner Hotfix 1/1
+
+Cause:
+- OpeningScenarioList issued a separate openingStatus practiceCommand before families/nodes.
+- FfiCoreGateway.practiceCommand enters native synchronously on the Flutter UI isolate despite returning Future.
+- A diagnostic preflight on first render can therefore prevent the page from reaching its normal catalogue/error state.
+
+Fix:
+- Remove openingStatus preflight from OpeningScenarioList._load().
+- Load authoritative families/nodes directly.
+- Preserve detailed CoreGatewayException rendering on the real catalogue/start operations.
+- No KCL/KCO/KCB format or runtime topology changes.
+
+Verification policy:
+- Static audit only. No build/test/flutter analyze/flutter run executed.

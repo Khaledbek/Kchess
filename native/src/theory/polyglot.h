@@ -7,6 +7,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include "core/weighted_choice.h"
 
 namespace kchess {
 
@@ -27,29 +28,6 @@ struct PolyglotEntry {
   std::uint16_t weight;
   std::uint32_t learn;
 };
-
-// Draws one move, each candidate weighted by its share of the total. Drilling a
-// repertoire needs the opponent to vary rather than repeat one line, so the
-// reply is sampled instead of taken from the top. A set whose weights are all
-// zero degrades to a uniform draw; an empty set returns null. The pointer aims
-// into `moves` and lives as long as it does.
-template <typename Move>
-const Move* pick_weighted(const std::vector<Move>& moves, std::mt19937& random) {
-  if (moves.empty()) return nullptr;
-  std::uint64_t total = 0;
-  for (const auto& move : moves) total += move.weight;
-  if (total == 0) {
-    std::uniform_int_distribution<std::size_t> uniform(0, moves.size() - 1);
-    return &moves[uniform(random)];
-  }
-  std::uniform_int_distribution<std::uint64_t> distribution(0, total - 1);
-  std::uint64_t roll = distribution(random);
-  for (const auto& move : moves) {
-    if (roll < move.weight) return &move;
-    roll -= move.weight;
-  }
-  return &moves.back();
-}
 
 // Represents a PolyGlot .bin engine book.
 // Does not load the whole book into memory; uses fast binary search via seekg.

@@ -9,7 +9,6 @@
 
 #include "conversation/coach_session.h"
 #include "evidence_retriever.h"
-#include "models/small_models.h"
 #include "optimization/validated_response_cache.h"
 #include "dto/coach_request.h"
 #include "dto/coach_response.h"
@@ -51,6 +50,8 @@ struct CoachPipelineTrace {
   std::size_t provider_evidence_count{0};
   std::size_t provider_evidence_input_count{0};
   std::size_t provider_exact_duplicates_dropped{0};
+  std::size_t provider_compacted_items{0};
+  std::size_t provider_compaction_savings_tokens{0};
   std::size_t provider_estimated_input_tokens{0};
   std::size_t provider_estimated_selected_tokens{0};
   std::size_t provider_evidence_budget_tokens{0};
@@ -58,11 +59,56 @@ struct CoachPipelineTrace {
   std::string provider_error_code;
   std::vector<std::string> validation_issues;
   std::string safe_fallback_kind;
+  std::string fallback_reason;
+  std::string analysis_mode;
+  bool analysis_mode_explicit{false};
+  double evidence_plan_confidence{0.0};
+  std::size_t evidence_plan_source_count{0};
+  std::size_t evidence_plan_need_count{0};
+  std::string evidence_plan_freshness;
+  std::string evidence_plan_interaction;
+  std::string evidence_plan_elo_target;
+  std::size_t aggregated_evidence_count{0};
+  std::size_t evidence_needs_satisfied{0};
+  std::size_t evidence_needs_missing{0};
+  std::size_t evidence_duplicates_removed{0};
+  std::size_t evidence_conflicts_resolved{0};
+  std::size_t native_candidate_count{0};
+  std::size_t native_fact_count{0};
+  std::string native_focus_kind;
+  std::string routed_intent;
+  std::string context_intent;
+  bool explicit_current_intent{false};
   std::string teaching_objective;
   std::string teaching_delivery_mode;
   std::string teaching_skill_id;
   std::string learner_attempt_status;
   std::string learner_move_classification;
+  std::string move_mover_color;
+  std::string move_learner_color;
+  std::string move_mover_role;
+  std::string move_played_uci;
+  bool move_verified_learner{false};
+  std::string interaction_request_kind;
+  std::string interaction_answer_intent;
+  bool answer_llm_used{false};
+  bool response_renderable{false};
+  std::string native_answer_kind;
+  bool verdict_authoritative{false};
+  std::string verdict_position;
+  std::string verdict_move;
+  std::string verdict_evaluated_move;
+  std::string verdict_basis;
+  std::string verdict_review_outcome;
+  std::string verdict_review_move;
+  bool verdict_grounding_required{false};
+  bool verdict_grounding_available{true};
+  bool verdict_grounding_blocked{false};
+  bool action_fulfillment_required{false};
+  bool action_fulfillment_passed{true};
+  std::vector<std::string> requested_actions;
+  std::vector<std::string> transported_client_actions;
+  std::vector<std::string> action_fulfillment_issues;
 };
 
 // -----------------------------------------------------------------------------
@@ -74,7 +120,6 @@ class CoachOrchestrator {
   explicit CoachOrchestrator(
       EvidenceSources evidence_sources = {},
       std::shared_ptr<const LLMProvider> provider = {},
-      SmallModelSuite small_models = {},
       std::function<void(const CoachLearningAttempt&)> record_learning = {},
       std::function<void(const CoachPipelineTrace&)> record_diagnostics = {});
 
@@ -83,6 +128,11 @@ class CoachOrchestrator {
       const std::optional<std::string>& session_id,
       const std::optional<std::string>& profile_id,
       const std::optional<std::string>& question_fen) const;
+  void restore_session(const std::string& session_id,
+                       const CoachSessionState& state) const;
+  [[nodiscard]] std::optional<CoachSessionState> session_state(
+      const std::optional<std::string>& session_id,
+      const std::optional<std::string>& profile_id) const;
   [[nodiscard]] PositionAnalysisCacheStats position_cache_stats() const;
   [[nodiscard]] ValidatedResponseCacheStats response_cache_stats() const;
 
@@ -91,7 +141,6 @@ class CoachOrchestrator {
   mutable PositionAnalysisStage position_analysis_stage_;
   mutable ValidatedResponseCache response_cache_;
   std::shared_ptr<const LLMProvider> provider_;
-  SmallModelSuite small_models_;
   mutable CoachSessionMemory sessions_;
   std::function<void(const CoachLearningAttempt&)> record_learning_;
   std::function<void(const CoachPipelineTrace&)> record_diagnostics_;

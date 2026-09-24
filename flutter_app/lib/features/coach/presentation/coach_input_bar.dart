@@ -84,26 +84,35 @@ class _CoachInputBarState extends State<CoachInputBar> {
                     label: Text(strings.coachHint),
                   ),
                   const SizedBox(width: 8),
-                  DropdownButton<CoachResponseDepth>(
-                    key: const Key('coach-depth'),
-                    value: widget.depth,
-                    underline: const SizedBox.shrink(),
-                    borderRadius: BorderRadius.circular(12),
-                    items: CoachResponseDepth.values
-                        .map(
-                          (depth) => DropdownMenuItem(
-                            value: depth,
-                            child: Text(_depthLabel(strings, depth)),
-                          ),
-                        )
-                        .toList(growable: false),
-                    onChanged: widget.isLoading || widget.onDepthChanged == null
-                        ? null
-                        : (value) {
-                            if (value != null) widget.onDepthChanged!(value);
-                          },
+                  Expanded(
+                    child: DropdownButton<CoachResponseDepth>(
+                      key: const Key('coach-depth'),
+                      value: widget.depth,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      borderRadius: BorderRadius.circular(12),
+                      items: CoachResponseDepth.values
+                          .map(
+                            (depth) => DropdownMenuItem(
+                              value: depth,
+                              child: Text(
+                                _depthLabel(strings, depth),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged:
+                          widget.isLoading || widget.onDepthChanged == null
+                              ? null
+                              : (value) {
+                                  if (value != null) {
+                                    widget.onDepthChanged!(value);
+                                  }
+                                },
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 4),
                   PopupMenuButton<_CoachContextAction>(
                     key: const Key('coach-context-menu'),
                     tooltip: strings.coachMore,

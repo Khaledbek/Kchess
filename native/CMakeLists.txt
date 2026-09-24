@@ -169,6 +169,25 @@ add_library(kchess_core SHARED
   ai/domain_router.cpp
   ai/engine_budget.cpp
   ai/evidence_retriever.cpp
+  ai/interaction/semantic_dictionary.cpp
+  ai/interaction/action_catalog.cpp
+  ai/interaction/conversation_state.cpp
+  ai/interaction/follow_up_resolver.cpp
+  ai/interaction/semantic_selection.cpp
+  ai/interaction/primary_interaction_planner.cpp
+  ai/interaction/parameter_parser.cpp
+  ai/interaction/interaction_requirement_resolver.cpp
+  ai/interaction/action_chain_engine.cpp
+  ai/interaction/action_fulfillment_validator.cpp
+  ai/interaction/answer_gate.cpp
+  ai/interaction/interaction_regression_cases.cpp
+  ai/interaction/follow_up_suggestions.cpp
+  ai/interaction/coach_turn_view.cpp
+  ai/experts/chess_expert_registry.cpp
+  ai/experts/context_evidence_experts.cpp
+  ai/experts/evidence_aggregator.cpp
+  ai/experts/existing_analysis_expert.cpp
+  ai/experts/human_elo_bot_expert.cpp
   ai/position/exploitation_planner.cpp
   ai/position/plan_generator.cpp
   ai/position/position_features.cpp
@@ -196,9 +215,7 @@ add_library(kchess_core SHARED
   ai/profile/profile_updater.cpp
   ai/profile/sample_builder.cpp
   ai/profile/trend_engine.cpp
-  ai/models/model_versions.cpp
-  ai/models/portable_small_models.cpp
-  ai/models/small_models.cpp
+  ai/model_versions.cpp
   ai/optimization/provider_input_optimizer.cpp
   ai/optimization/validated_response_cache.cpp
   ai/providers/gemini_config.cpp
@@ -207,12 +224,15 @@ add_library(kchess_core SHARED
   ai/providers/remote_provider.cpp
   ai/query_classifier.cpp
   ai/query_planner.cpp
+  ai/rendering/verified_fact_renderer.cpp
   ai/teaching/skill_taxonomy.cpp
   ai/teaching/personal_training_selector.cpp
   ai/teaching/spaced_repetition_scheduler.cpp
   ai/teaching/teaching_planner.cpp
   ai/validation/chess_validator.cpp
   ai/validation/response_validator.cpp
+  ai/verdict/chess_verdict_builder.cpp
+  ai/verdict/chess_verdict_review.cpp
   src/api/core_api.cpp
   src/analysis/accuracy.cpp
   src/analysis/move_classifier.cpp
@@ -247,7 +267,6 @@ add_library(kchess_core SHARED
   src/knowledge/knowledge_quality_engine.cpp
   src/knowledge/conflict_resolver.cpp
   src/knowledge/vector_index.cpp
-  src/knowledge/text_semantic_retrieval.cpp
   src/knowledge/position_similarity.cpp
   src/knowledge/entity_extractor.cpp
   src/knowledge/query_router.cpp
@@ -284,6 +303,7 @@ add_library(kchess_core SHARED
   src/training/practice_position.cpp
   src/training/practice_service.cpp
   src/training/practice_session.cpp
+  src/theory/opening_line_graph.cpp
   src/theory/opening_name_index.cpp
   src/theory/opening_theory_provider.cpp
   src/theory/polyglot.cpp
@@ -299,6 +319,7 @@ target_include_directories(kchess_core
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/nlohmann/include
 )
@@ -383,6 +404,7 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     src/engine/stockfish_engine.cpp
     src/persistence/database.cpp
     src/providers/provider_models.cpp
+    src/theory/opening_line_graph.cpp
     src/theory/opening_name_index.cpp
     src/theory/opening_theory_provider.cpp
     src/theory/position_key.cpp
@@ -580,4 +602,49 @@ if(KCHESS_BUILD_TESTS AND NOT ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
   add_test(NAME kchess_sf19_result_coherence_tests COMMAND kchess_sf19_result_coherence_tests)
+
+  add_executable(kchess_interaction_action_routing_tests
+    tests/interaction_action_routing_tests.cpp
+  )
+  target_compile_features(kchess_interaction_action_routing_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_interaction_action_routing_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  target_link_libraries(kchess_interaction_action_routing_tests PRIVATE kchess_core)
+  add_test(
+    NAME kchess_interaction_action_routing_tests
+    COMMAND kchess_interaction_action_routing_tests
+  )
+
+  add_executable(kchess_coach_verdict_regression_tests
+    tests/coach_verdict_regression_tests.cpp
+  )
+  target_compile_features(kchess_coach_verdict_regression_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_coach_verdict_regression_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  target_link_libraries(kchess_coach_verdict_regression_tests PRIVATE kchess_core)
+  add_test(
+    NAME kchess_coach_verdict_regression_tests
+    COMMAND kchess_coach_verdict_regression_tests
+  )
+
+  add_executable(kchess_automatic_coach_trigger_tests
+    tests/automatic_coach_trigger_tests.cpp
+  )
+  target_compile_features(kchess_automatic_coach_trigger_tests PRIVATE cxx_std_20)
+  target_include_directories(kchess_automatic_coach_trigger_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  target_link_libraries(kchess_automatic_coach_trigger_tests PRIVATE kchess_core)
+  add_test(
+    NAME kchess_automatic_coach_trigger_tests
+    COMMAND kchess_automatic_coach_trigger_tests
+  )
 endif()

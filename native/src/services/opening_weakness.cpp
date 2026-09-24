@@ -23,7 +23,7 @@ constexpr int kRecurringMinimumGames = 2;
 int category_weight(const std::string& category) {
   if (category == "blunder") return 3;
   if (category == "mistake") return 2;
-  if (category == "miss") return 1;
+  if (category == "miss" || category == "inaccuracy") return 1;
   return 0;
 }
 

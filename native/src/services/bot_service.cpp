@@ -207,9 +207,11 @@ std::string BotService::session_json(const BotGameRecord& game) const {
   return json.dump();
 }
 
-std::string BotService::create_game_json(const int requested_elo) {
+std::string BotService::create_game_json(
+    const int requested_elo, const std::string& player_color) {
   const auto normalized_elo = bot_difficulty_profile(requested_elo).requested_elo;
-  return session_json(database_.create_bot_game(normalized_elo, kStartFen));
+  return session_json(database_.create_bot_game(
+      normalized_elo, kStartFen, player_color));
 }
 
 std::string BotService::active_game_json() const {

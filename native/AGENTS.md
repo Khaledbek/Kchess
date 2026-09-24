@@ -33,7 +33,6 @@ Keine automatischen Builds/Tests starten, wenn der Benutzer sie selbst ausführt
 - Knowledge node/edge identities are deterministic machine contracts. Persistence-facing enum names and schema versions may only change with an explicit migration/versioning decision.
 - `src/knowledge/` is the only graph/retrieval runtime for profile and Coach knowledge. The retired `ai/profile/profile_graph*` stack must not be recreated.
 
-
 ## Update 106 - source-aware Knowledge Graph invalidation
 
 - General Knowledge Graph provenance/dependency state is native C++ runtime logic under `src/knowledge/dependency_tracker.*`, persisted by migration 29.
@@ -74,7 +73,6 @@ Keine automatischen Builds/Tests starten, wenn der Benutzer sie selbst ausführt
 
 ## Update 116 - Knowledge Graph text semantic retrieval
 
-- `src/knowledge/text_semantic_retrieval.*` reuses the existing `ai::EmbeddingModel` contract to write/search text-semantic chunk vectors through `VectorIndex`; it must not introduce another model API or persist query embeddings.
 - Optional reranking is candidate-bounded and may only reorder already eligible semantic chunks. Hybrid multi-channel ranking remains a later Knowledge Graph responsibility.
 - Python/Hugging Face tooling under `tools/ai/embeddings/` is evaluation/export-only; the shipped native runtime must not depend on Python.
 
@@ -95,12 +93,10 @@ Keine automatischen Builds/Tests starten, wenn der Benutzer sie selbst ausführt
 - Personal graph traversal is profile-safe: explicitly foreign `profile_id` nodes are neither returned nor traversed through, and player-scoped chunks remain filtered by `player_id`. Shared semantic graph identities may still be reused.
 - Retrieval preserves per-channel evidence/signals and hard budgets; final hybrid ranking, query planning and reranking remain Update 120 responsibilities. Flutter and Python must not duplicate this runtime logic.
 
-
 ## Update 120 - Knowledge Graph ranking/query-planning ownership
 
 - `src/knowledge/retrieval_ranking.*` owns final native ranking over Update-119 candidates and the Knowledge-Graph-specific execution plan. It consumes the existing Update-118 route and must not duplicate/reclassify the Coach `ai::QueryPlan`.
 - Hybrid rank is explainable and combines query/channel relevance with Update-113 confidence/coverage/freshness/source quality and graph distance. Missing quality metadata is neutral, not silently interpreted as low quality.
-- Final text reranking reuses the existing bounded `TextReranker` contract and cannot broaden player scope, add candidate IDs or create graph truth. Flutter/Python must not implement a competing runtime ranking policy.
 
 ## Update 121 - Knowledge-gap active learning
 
@@ -115,13 +111,11 @@ The general Knowledge Graph may identify player-scoped knowledge gaps from persi
 
 `src/knowledge/knowledge_runtime.*` ist die gemeinsame native Integrationsgrenze für Knowledge Graph, Coach Retrieval, Active Learning und Inspector. Core konstruiert genau eine Runtime nach `StatisticsService` und vor `PlayerProfileService`/`CoachService`. Flutter bleibt Darstellung; Domainlogik und Query-Traces bleiben nativ.
 
-
 ## Cleanup Update 124 - retired profile graph removed
 
 - The profile-only graph sources and service-side profile context resolver are deleted.
 - Migration 35 removes their obsolete SQLite tables plus the old sparse profile-probe table.
 - Historical profile JSON may still read `processedGames` as a compatibility fallback, but active native/Flutter contracts use `indexedGames` and no probe-position telemetry.
-
 
 ## Update 146/148 - Windows build-cache ownership
 
@@ -134,3 +128,15 @@ The general Knowledge Graph may identify player-scoped knowledge gaps from persi
 
 - Core may expose a passive `processRuntime` snapshot through the existing Knowledge Inspector. On Windows it reports cumulative process CPU time plus normalized CPU use over the interval since Core creation and since the previous inspector sample, logical processor count and process handle count.
 - Process diagnostics sample only on inspector requests. Do not add a monitoring thread, timer, scheduler feedback or resource-policy decisions from these values.
+
+## Cleanup Update 3 - native runtime endpoint cleanup
+
+- The obsolete lightweight scout endpoint (`kc_start_scout_json` / `ProviderService::run_scout`) is removed. The product owns one scouting flow: `kc_start_scout_report_json` -> `ProviderService::run_scout_report`.
+- Do not reintroduce a second reduced scouting job beside the report pipeline. Flutter remains a thin FFI/UI consumer of the report endpoint.
+- Stockfish 18/19 build paths, migrations, background-profile controls and compatibility data reads remain because they still have active product/build consumers; cleanup must not remove them merely because they contain fallback or compatibility wording.
+
+## Unified Move Classification Series — Update 4/7
+
+- `analysis/move_classifier*` owns Brilliant policy. A material concession can be direct (the moved non-pawn piece is taken) or indirect (the move consciously leaves another own non-pawn piece profitably capturable). Do not reduce this back to destination-square-only sacrifice detection.
+- Brilliant remains Best/Near-Best plus sound compensation; Update-2 exposure and Update-3 PV recovery are supporting native facts, not separate classifiers. SF19 additionally requires its existing after-position best-move confirmation.
+- Classifier generations are SF18 v16 and SF19 v1908 after this policy change; raw Stockfish cache rows stay reusable and only derived classification must refresh.

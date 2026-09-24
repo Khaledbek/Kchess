@@ -1,0 +1,72 @@
+KChess — Unified Move Classification Series — Final Audit (Update 7/7)
+Date: 2026-09-19
+
+Scope
+-----
+This audit closes the seven-update classifier rewrite. It is a static source audit only.
+No build, CTest, Flutter test, flutter analyze, flutter run, or application execution was performed.
+
+Final classifier contract
+-------------------------
+1. Shared facts
+   - SF18 and SF19 consume the same native MoveAnalysisFacts record for engine rank,
+     final bestmove identity, WDL/expected score, CP/mate state, material, exposure,
+     and PV recovery/compensation.
+   - Flutter remains presentation-only.
+
+2. Brilliant
+   - Brilliant no longer requires the moved piece itself to be sacrificed.
+   - A Best/Near-Best move may qualify when it consciously accepts a real non-pawn
+     material concession elsewhere and engine evidence confirms compensation.
+   - Pawn-only concessions do not qualify.
+   - SF19 keeps its independent after-position confirmation requirement.
+   - Canonical ignored-threat regression fixture:
+     FEN: r4rk1/p4p1p/3p1npQ/1PpPpP2/4P3/2n4P/Pq2BP2/2R3RK w - - 0 22
+     Move: f5g6
+
+3. Great / Best / Excellent / Good / Okay
+   - Great is native category `critical` and is rank-1 strict.
+   - Great requires the next candidate to be meaningfully separated; 0.5 pawn is the
+     CP fallback boundary and WDL/value separation must agree when both are available.
+   - Best is an equivalence cluster, not a single fixed MultiPV rank.
+   - Excellent/Good/Okay are progressively wider objective-quality clusters.
+
+4. Mate-aware classification
+   - Mate distance is categorical evidence and is evaluated independently of saturated
+     CP/WDL values.
+   - Regression coverage includes M3 -> M5 and M3 -> M10.
+   - Losing an available forced mate remains Miss; newly allowing forced mate remains Blunder.
+
+5. Negative labels
+   - `inaccuracy` is now a durable visible class distinct from `miss`.
+   - Miss is reserved for a concrete missed opportunity without corresponding self-damage.
+   - Shared severity is Inaccuracy / Mistake / Blunder using WDL/expected-score loss first;
+     CP is fallback-only when normalized outcome evidence is unavailable.
+
+Visible class added by this series
+----------------------------------
+Class/string: inaccuracy
+Flutter enum: MoveClassification.inaccuracy
+Asset path: assets/analysis_img/move_inaccuracy.png
+ARB keys: inaccuracy (de/en/ar)
+
+The repository currently contains move_inaccuracy.png so the asset path is valid. It is a
+placeholder copy of move_miss.png. Replace it later with the desired Inaccuracy artwork
+without changing the filename/path.
+
+Static audit findings
+---------------------
+- No stale "Classifier V11/V12/V13" test banner remains in the classifier test source.
+- `inaccuracy` is wired through native enum/string conversion, persistence summaries,
+  service/profile/knowledge paths, Flutter JSON model, ARB strings, and analysis/coach icons.
+- The fxg6 ignored-threat fixture is present in both board-evidence and classifier regressions.
+- SF18 and SF19 both have mate-distance and distinct-Inaccuracy regression cases.
+- No old Brilliant rule remains that requires only the destination/moved piece to be the sacrifice.
+- No new runtime logic was moved into Flutter.
+- No ABI or SQLite schema migration was required by this series.
+- No repository files need physical deletion for this series; cleanup script is intentionally a no-op.
+
+Current classifier generations
+------------------------------
+SF18: v18
+SF19: v1910

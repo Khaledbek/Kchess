@@ -99,6 +99,7 @@ enum class MoveCategory {
   excellent,
   good,
   okay,
+  inaccuracy,
   miss,
   mistake,
   blunder,
@@ -114,6 +115,7 @@ struct PlayerAnalysisSummary {
   int excellent{0};
   int good{0};
   int okay{0};
+  int inaccuracy{0};
   int miss{0};
   int mistake{0};
   int blunder{0};

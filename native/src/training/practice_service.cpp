@@ -100,6 +100,32 @@ std::string PracticeService::command(const std::string& request) {
   const auto json = nlohmann::json::parse(request);
   const auto op = json.at("op").get<std::string>();
   if (op == "catalog") return catalog().dump();
+  if (op == "openingStatus") {
+    const auto line_metadata = opening_lines_ == nullptr
+        ? OpeningLineGraphMetadata{}
+        : opening_lines_->metadata();
+    const auto name_metadata = opening_names_ == nullptr
+        ? OpeningNameMetadata{}
+        : opening_names_->metadata();
+    const bool graph_available = opening_lines_ != nullptr && opening_lines_->available();
+    const bool same_coverage = graph_available && name_metadata.entry_count > 0
+        && line_metadata.node_count == name_metadata.entry_count
+        && opening_lines_->position_key_fingerprint()
+            == opening_names_->position_key_fingerprint();
+    return nlohmann::json({
+        {"graphAvailable", graph_available},
+        {"graphNodes", line_metadata.node_count},
+        {"graphEdges", line_metadata.edge_count},
+        {"graphMaxPly", line_metadata.max_ply},
+        {"graphSource", opening_lines_ == nullptr ? "not-installed" : opening_lines_->source_version()},
+        {"graphError", opening_lines_ == nullptr
+            ? "Opening-line graph source is not configured"
+            : opening_lines_->availability_error()},
+        {"namesEntries", name_metadata.entry_count},
+        {"namesSource", opening_names_ == nullptr ? "not-installed" : opening_names_->source_version()},
+        {"sameCoverage", same_coverage},
+    }).dump();
+  }
   if (op == "nodes" || op == "families") {
     auto nodes = op == "families"
         ? content_.families()
@@ -143,14 +169,17 @@ nlohmann::json PracticeService::snapshot(const Session& session) {
       {"progress", progress(session.key)}};
 
   if (session.kind == "opening") {
-    // The drill's own state: how deep this run is, what the book just played,
-    // and — only once it has been missed — the move it wanted.
+    // The drill's own state: how deep this run is, what the graph just played,
+    // and — only once it has been missed — the preferred continuation.
     result["depth"] = session.played;
     result["targetDepth"] = session.budget;
     result["attempts"] = session.attempts;
     result["bookExhausted"] = session.book_exhausted;
-    result["bookMoves"] = static_cast<int>(session.book.size());
+    result["bookMoves"] = static_cast<int>(session.continuations.size());
     result["openingMoves"] = session.opening_moves;
+    if (!session.opening_name.empty()) {
+      result["opening"] = {{"eco", session.opening_eco}, {"name", session.opening_name}};
+    }
     if (!session.opponent_uci.empty()) {
       result["opponentMove"] = {{"uci", session.opponent_uci},
           {"san", session.opponent_san}, {"side", session.opponent_side},

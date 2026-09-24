@@ -1,0 +1,34 @@
+KChess Opening Line Semantics Correction Series — Static Final Audit
+Date: 2026-09-19
+
+Scope
+- Correct KCL1 persisted-line semantics without changing KCB/KCO formats.
+- Keep Flutter presentation-only and all graph derivation in native C++20.
+- Preserve stable openings_*.inc catalogue IDs/hierarchy/progress compatibility.
+
+Verified from the shipped opening_lines.kcl bytes
+- Magic/version: KCL1 / v1
+- Persisted terminal-position records: 3,810
+- Packed move entries: 36,925 (2 bytes each)
+- Declared max ply: 36; observed max line length: 36
+- Every persisted move offset is 2-byte aligned.
+- Every persisted [byte offset, ply count] line range fits inside the move table.
+- Center Game prefix 1.e4 e5 2.d4 exd4 3.Qxd4 occurs in 8 stored lines; all 7 longer lines continue with b8c6 (...Nc6).
+- Bishop's Opening prefix 1.e4 e5 2.Bc4 occurs in 38 stored lines and branches to multiple replies, including ...Bc5 and ...Nf6.
+
+Runtime contract after this series
+- A KCL record is a complete standard-start-to-terminal line, not outgoing adjacency.
+- edge_offset is persisted in bytes and normalized to a move index at load time.
+- Native loader replays each stored line, validates its terminal Stockfish position key,
+  deduplicates shared prefix edges, and merges transpositions by canonical position key.
+- Practice sees only OpeningLineGraph::continuations(fen).
+- KCB only weights/sorts those derived edges; KCO only names canonical positions.
+
+Regression source coverage added/retained
+- Center Game after 3.Qxd4 must expose ...Nc6 and never e2e4/e7e5 as replies.
+- Bishop's Opening shared-prefix branches are merged.
+- Destination keys match the resulting FEN.
+- Equivalent move orders converge on one runtime graph node.
+
+Audit limitations
+- No native build, CTest, Flutter test, flutter analyze, flutter run, or app execution was performed by the assistant, per project workflow.

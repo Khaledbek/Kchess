@@ -18,6 +18,7 @@ enum class EvidenceKind {
   opening,
   user_profile,
   engine,
+  human_model,
   conversation,
   tactical_motifs,
   strategic_plans,

@@ -16,13 +16,31 @@
 
 #include "sqlite3.h"
 
+#include "analysis/classifier_contract.h"
 #include "engine/stockfish_factory.h"
 #include "services/termination.h"
 
 namespace kchess {
 namespace {
 
+
 using Statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
+
+std::string current_classifier_run_sql(const std::string_view alias) {
+  const std::string prefix(alias);
+  const int sf18 = current_classifier_version_for_engine("Stockfish 18");
+  const int sf19 = current_classifier_version_for_engine("Stockfish 19");
+  return "((" + prefix + ".engine_version LIKE 'Stockfish 19%' AND COALESCE(" + prefix
+      + ".classifier_version,0)=" + std::to_string(sf19) + ") OR (" + prefix
+      + ".engine_version NOT LIKE 'Stockfish 19%' AND COALESCE(" + prefix
+      + ".classifier_version,0)=" + std::to_string(sf18) + "))";
+}
+
+std::string latest_current_classified_run_sql(const std::string_view game_id_sql) {
+  return "(SELECT r.id FROM analysis_runs r WHERE r.game_id=" + std::string(game_id_sql)
+      + " AND r.status='complete' AND " + current_classifier_run_sql("r")
+      + " ORDER BY COALESCE(r.completed_at,0) DESC,r.started_at DESC LIMIT 1)";
+}
 
 // A single SQLite connection is shared by UI, analysis, cache and provider
 // worker threads. SQLITE_OPEN_FULLMUTEX serializes individual SQLite API
@@ -138,6 +156,7 @@ MoveCategory parse_category(const std::string& value) {
   if (value == "excellent") return MoveCategory::excellent;
   if (value == "good") return MoveCategory::good;
   if (value == "okay") return MoveCategory::okay;
+  if (value == "inaccuracy") return MoveCategory::inaccuracy;
   if (value == "miss") return MoveCategory::miss;
   if (value == "mistake") return MoveCategory::mistake;
   if (value == "blunder") return MoveCategory::blunder;
@@ -154,6 +173,7 @@ std::string category_name(const MoveCategory value) {
     case MoveCategory::excellent: return "excellent";
     case MoveCategory::good: return "good";
     case MoveCategory::okay: return "okay";
+    case MoveCategory::inaccuracy: return "inaccuracy";
     case MoveCategory::miss: return "miss";
     case MoveCategory::mistake: return "mistake";
     case MoveCategory::blunder: return "blunder";
@@ -172,6 +192,7 @@ void increment_category(PlayerAnalysisSummary& summary, const MoveCategory categ
     case MoveCategory::excellent: summary.excellent += count; break;
     case MoveCategory::good: summary.good += count; break;
     case MoveCategory::okay: summary.okay += count; break;
+    case MoveCategory::inaccuracy: summary.inaccuracy += count; break;
     case MoveCategory::miss: summary.miss += count; break;
     case MoveCategory::mistake: summary.mistake += count; break;
     case MoveCategory::blunder: summary.blunder += count; break;
@@ -319,10 +340,12 @@ constexpr const char* kGameColumns =
     "WHERE f.game_id=g.id AND c.name='Downloads' COLLATE NOCASE),(ar.id IS NOT NULL),"
     "g.opening_eco,g.opening_name,g.opening_ply";
 
-constexpr const char* kGameJoins =
+const std::string kGameJoins = std::string(
     " FROM games g LEFT JOIN game_sources gs ON gs.game_id=g.id "
     "LEFT JOIN analysis_runs ar ON ar.id=(SELECT a.id FROM analysis_runs a "
-    "WHERE a.game_id=g.id AND a.status='complete' ORDER BY a.completed_at DESC LIMIT 1) ";
+    "WHERE a.game_id=g.id AND a.status='complete' AND ")
+    + current_classifier_run_sql("a")
+    + " ORDER BY a.completed_at DESC LIMIT 1) ";
 
 GameRecord read_game_record(sqlite3_stmt* statement) {
   GameRecord game;
@@ -1553,6 +1576,55 @@ WHERE status='complete' AND classifier_version>0;
 PRAGMA user_version = 42;
 )sql";
 
+// Coach Series 2 Update 4: durable Coach conversations. Session numbering is
+// profile-local and monotonic so deleting an old session never reuses its
+// default `Sitzung N` identity. Full chat messages are persisted for the user
+// while compact_state_json contains only the bounded native continuation state.
+constexpr const char* kMigration43 = R"sql(
+CREATE TABLE ai_coach_session_counters (
+  profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  next_session_number INTEGER NOT NULL CHECK(next_session_number > 0)
+);
+CREATE TABLE ai_coach_sessions (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  session_number INTEGER NOT NULL CHECK(session_number > 0),
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  last_opened_at INTEGER NOT NULL,
+  compact_state_json TEXT NOT NULL DEFAULT '{}',
+  UNIQUE(profile_id, session_number)
+);
+CREATE INDEX idx_ai_coach_sessions_profile_updated
+ON ai_coach_sessions(profile_id, updated_at DESC, session_number DESC);
+CREATE TABLE ai_coach_session_messages (
+  session_id TEXT NOT NULL REFERENCES ai_coach_sessions(id) ON DELETE CASCADE,
+  sequence INTEGER NOT NULL CHECK(sequence > 0),
+  role TEXT NOT NULL CHECK(role IN ('user','assistant')),
+  content TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  automatic_turn INTEGER NOT NULL DEFAULT 0 CHECK(automatic_turn IN (0,1)),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(session_id, sequence)
+);
+PRAGMA user_version = 43;
+)sql";
+
+// Coach Series 2 Update 6: persist the expensive derived-knowledge maintenance
+// checkpoint per profile. This prevents an account/profile switch or process
+// restart from re-running the expensive opening/position/transition game-graph projections
+// when the authoritative game-source signature has not changed.
+constexpr const char* kMigration44 = R"sql(
+CREATE TABLE ai_knowledge_maintenance_state (
+  profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  graph_source_signature TEXT NOT NULL DEFAULT '',
+  last_full_maintenance_ms INTEGER NOT NULL DEFAULT 0,
+  updated_at_ms INTEGER NOT NULL DEFAULT 0
+);
+PRAGMA user_version = 44;
+)sql";
+
 
 }  // namespace
 
@@ -1658,6 +1730,8 @@ void Database::open_and_migrate() {
     if (version < 40) execute(kMigration40);
     if (version < 41) execute(kMigration41);
     if (version < 42) execute(kMigration42);
+    if (version < 43) execute(kMigration43);
+    if (version < 44) execute(kMigration44);
 
     // Older builds could leave several completed/cancelled analysis_runs for
     // the same game. At process startup there are no live workers, so collapse
@@ -2951,14 +3025,15 @@ void Database::set_game_opening(
 
 std::vector<GameStatRow> Database::games_for_statistics(
     const std::string& profile_id) const {
-  auto statement = prepare(
-      db_,
+  const std::string sql = std::string(
       "SELECT provider_outcome,result,white_name,black_name,time_control_type,"
       "opening_eco,opening_name,id,opening_ply,"
       "EXISTS(SELECT 1 FROM analysis_runs r WHERE r.game_id=games.id "
-      "AND r.status='complete' AND r.classifier_version>0) "
-      "FROM games WHERE profile_id=? "
-      "ORDER BY provider_ended_at DESC, created_at DESC;");
+      "AND r.status='complete' AND ")
+      + current_classifier_run_sql("r")
+      + ") FROM games WHERE profile_id=? "
+        "ORDER BY provider_ended_at DESC, created_at DESC;";
+  auto statement = prepare(db_, sql.c_str());
   sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   std::vector<GameStatRow> result;
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
@@ -2979,10 +3054,7 @@ std::vector<GameStatRow> Database::games_for_statistics(
 }
 
 namespace {
-// Read only the completed, classified run from the shared analysis cache.
-constexpr const char* kLatestClassifiedRun =
-    "(SELECT r.id FROM analysis_runs r WHERE r.game_id=g.id AND r.status='complete' "
-    "AND r.classifier_version>0 ORDER BY r.completed_at DESC LIMIT 1)";
+// Raw engine slots remain reusable even if their derived classifier contract is stale.
 constexpr const char* kLatestCompletedRun =
     "(SELECT r.id FROM analysis_runs r WHERE r.game_id=g.id AND r.status='complete' "
     "ORDER BY r.completed_at DESC LIMIT 1)";
@@ -2995,7 +3067,7 @@ std::vector<AccuracyGameRow> Database::accuracy_games_for_statistics(
       "g.time_control_type,"
       "CASE WHEN g.provider_ended_at>0 THEN g.provider_ended_at ELSE g.created_at END,"
       "r.white_local_accuracy,r.black_local_accuracy "
-      "FROM games g JOIN analysis_runs r ON r.id=") + kLatestClassifiedRun
+      "FROM games g JOIN analysis_runs r ON r.id=") + latest_current_classified_run_sql("g.id")
       + " WHERE g.profile_id=? "
       + "ORDER BY CASE WHEN g.provider_ended_at>0 THEN g.provider_ended_at "
       + "ELSE g.created_at END ASC, g.id ASC;";
@@ -3022,7 +3094,7 @@ std::vector<AccuracyMoveRow> Database::accuracy_moves_for_statistics(
     const std::string& profile_id) const {
   const std::string sql = std::string(
       "SELECT g.id,m.ply,m.category,m.is_theory,m.move_accuracy,m.accuracy_weight "
-      "FROM games g JOIN move_analysis m ON m.analysis_run_id=") + kLatestClassifiedRun
+      "FROM games g JOIN move_analysis m ON m.analysis_run_id=") + latest_current_classified_run_sql("g.id")
       + " WHERE g.profile_id=? AND m.category<>'unknown' ORDER BY g.id,m.ply;";
   auto statement = prepare(db_, sql.c_str());
   sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
@@ -3045,7 +3117,7 @@ std::vector<CachedAccuracyBackfillRow> Database::statistics_games_missing_move_a
   const std::string sql = std::string(
       "SELECT g.id,r.config_hash FROM games g JOIN analysis_runs r ON r.id=")
       + kLatestCompletedRun
-      + " WHERE g.profile_id=? AND (COALESCE(r.classifier_version,0)<=0 OR "
+      + " WHERE g.profile_id=? AND (NOT " + current_classifier_run_sql("r") + " OR "
         "EXISTS(SELECT 1 FROM move_analysis m "
         "WHERE m.analysis_run_id=r.id AND m.category<>'unknown' "
         "AND m.accuracy_weight IS NULL)) "
@@ -3065,18 +3137,16 @@ std::vector<GameMoveErrorRow> Database::move_errors_for_statistics(
     const std::string& profile_id, const int before_ply) const {
   // A game can hold several runs (other engine settings); only the latest
   // classified one speaks for it, so a re-analysis replaces old verdicts.
-  auto statement = prepare(
-      db_,
+  const std::string sql = std::string(
       "SELECT g.id,m.ply,m.category,gm.san,gm.fen_before,"
       "COALESCE(m.recommended_move,'') "
       "FROM games g "
-      "JOIN analysis_runs r ON r.id=(SELECT id FROM analysis_runs "
-      "  WHERE game_id=g.id AND status='complete' AND classifier_version>0 "
-      "  ORDER BY completed_at DESC LIMIT 1) "
-      "JOIN move_analysis m ON m.analysis_run_id=r.id AND m.ply<? "
-      "  AND m.category IN ('miss','mistake','blunder') "
-      "JOIN game_moves gm ON gm.game_id=g.id AND gm.ply_index=m.ply "
-      "WHERE g.profile_id=? ORDER BY g.id,m.ply;");
+      "JOIN analysis_runs r ON r.id=") + latest_current_classified_run_sql("g.id")
+      + " JOIN move_analysis m ON m.analysis_run_id=r.id AND m.ply<? "
+        "AND m.category IN ('miss','mistake','blunder') "
+        "JOIN game_moves gm ON gm.game_id=g.id AND gm.ply_index=m.ply "
+        "WHERE g.profile_id=? ORDER BY g.id,m.ply;";
+  auto statement = prepare(db_, sql.c_str());
   sqlite3_bind_int(statement.get(), 1, before_ply);
   sqlite3_bind_text(statement.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
   std::vector<GameMoveErrorRow> result;
@@ -3130,8 +3200,9 @@ std::vector<ProfileGameMetadataRow> Database::profile_games_metadata(
       "WHEN lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) THEN 'black' ELSE '' END) THEN 1 ELSE 0 END) "
       "FROM games g JOIN profiles p ON p.id=g.profile_id "
       "LEFT JOIN analysis_runs ar ON ar.id=(SELECT a.id FROM analysis_runs a "
-      "WHERE a.game_id=g.id AND a.status='complete' "
-      "ORDER BY COALESCE(a.completed_at,0) DESC,a.started_at DESC LIMIT 1) "
+      "WHERE a.game_id=g.id AND a.status='complete' AND "
+      + current_classifier_run_sql("a")
+      + " ORDER BY COALESCE(a.completed_at,0) DESC,a.started_at DESC LIMIT 1) "
       "LEFT JOIN move_analysis ma ON ma.analysis_run_id=ar.id "
       "LEFT JOIN game_moves gm ON gm.game_id=g.id AND gm.ply_index=ma.ply "
       "WHERE ") + kPlayerProfileGameScopeSql +
@@ -3204,12 +3275,14 @@ PlayerLearningStats Database::player_learning_stats(
       "avg(CASE "
       "WHEN lower(trim(g.white_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
       "THEN (SELECT ar.white_local_accuracy FROM analysis_runs ar "
-      "WHERE ar.game_id=g.id AND ar.status='complete' AND ar.white_local_accuracy IS NOT NULL "
-      "ORDER BY COALESCE(ar.completed_at,0) DESC,ar.started_at DESC LIMIT 1) "
+      "WHERE ar.game_id=g.id AND ar.status='complete' AND ar.white_local_accuracy IS NOT NULL AND "
+      + current_classifier_run_sql("ar")
+      + " ORDER BY COALESCE(ar.completed_at,0) DESC,ar.started_at DESC LIMIT 1) "
       "WHEN lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
       "THEN (SELECT ar.black_local_accuracy FROM analysis_runs ar "
-      "WHERE ar.game_id=g.id AND ar.status='complete' AND ar.black_local_accuracy IS NOT NULL "
-      "ORDER BY COALESCE(ar.completed_at,0) DESC,ar.started_at DESC LIMIT 1) END) "
+      "WHERE ar.game_id=g.id AND ar.status='complete' AND ar.black_local_accuracy IS NOT NULL AND "
+      + current_classifier_run_sql("ar")
+      + " ORDER BY COALESCE(ar.completed_at,0) DESC,ar.started_at DESC LIMIT 1) END) "
       "FROM games g JOIN profiles p ON p.id=g.profile_id WHERE ") +
       kPlayerProfileGameScopeSql + ";";
   auto overview = prepare(db_, overview_sql.c_str());
@@ -3223,12 +3296,13 @@ PlayerLearningStats Database::player_learning_stats(
 
   const std::string categories_sql = std::string(
       "SELECT ma.category,count(*) FROM move_analysis ma "
-      "JOIN analysis_runs ar ON ar.id=ma.analysis_run_id AND ar.status='complete' "
-      "JOIN games g ON g.id=ar.game_id "
+      "JOIN analysis_runs ar ON ar.id=ma.analysis_run_id AND ar.status='complete' AND "
+      + current_classifier_run_sql("ar")
+      + " JOIN games g ON g.id=ar.game_id "
       "JOIN profiles p ON p.id=g.profile_id "
       "JOIN game_moves gm ON gm.game_id=g.id AND gm.ply_index=ma.ply "
       "WHERE ") + kPlayerProfileGameScopeSql +
-      " AND ma.classifier_version IS NOT NULL AND ("
+      " AND ("
       "(lower(trim(g.white_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
       "AND gm.side_to_move='white') OR "
       "(lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
@@ -3247,6 +3321,9 @@ PlayerLearningStats Database::player_learning_stats(
       case MoveCategory::critical: result.critical += count; break;
       case MoveCategory::best: result.best += count; break;
       case MoveCategory::excellent: result.excellent += count; break;
+      case MoveCategory::good: result.good += count; break;
+      case MoveCategory::okay: result.okay += count; break;
+      case MoveCategory::inaccuracy: result.inaccuracy += count; break;
       case MoveCategory::miss: result.miss += count; break;
       case MoveCategory::mistake: result.mistake += count; break;
       case MoveCategory::blunder: result.blunder += count; break;
@@ -3336,15 +3413,15 @@ std::vector<PlayerProfileGameSourceRow> read_player_profile_game_sources(
       "avg(ma.expected_score_loss),max(ma.expected_score_loss),g.profile_id,COALESCE(g.termination_type,'unknown') "
       "FROM games g JOIN profiles p ON p.id=g.profile_id "
       "LEFT JOIN analysis_runs ar ON ar.id=(SELECT candidate.id FROM analysis_runs candidate "
-      "WHERE candidate.game_id=g.id AND candidate.status='complete' "
-      "ORDER BY candidate.depth DESC,COALESCE(candidate.completed_at,0) DESC LIMIT 1) "
+      "WHERE candidate.game_id=g.id AND candidate.status='complete' AND "
+      + current_classifier_run_sql("candidate")
+      + " ORDER BY candidate.depth DESC,COALESCE(candidate.completed_at,0) DESC LIMIT 1) "
       "LEFT JOIN game_moves gm ON gm.game_id=g.id AND (("
       "lower(trim(g.white_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
       "AND gm.side_to_move='white') OR ("
       "lower(trim(g.black_name))=lower(trim(COALESCE(NULLIF(p.provider_username,''),p.display_name))) "
       "AND gm.side_to_move='black')) "
       "LEFT JOIN move_analysis ma ON ma.analysis_run_id=ar.id AND ma.ply=gm.ply_index "
-      "AND ma.classifier_version IS NOT NULL "
       "WHERE ") + kPlayerProfileGameScopeSql +
       (game_id.has_value() ? " AND g.id=? " : " ") +
       "GROUP BY g.id "
@@ -3404,6 +3481,40 @@ std::vector<PlayerProfileGameSourceRow> read_player_profile_game_sources(
 
 }  // namespace
 
+
+std::optional<KnowledgeMaintenanceState> Database::knowledge_maintenance_state(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT profile_id,graph_source_signature,last_full_maintenance_ms,updated_at_ms "
+      "FROM ai_knowledge_maintenance_state WHERE profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
+  KnowledgeMaintenanceState state;
+  state.profile_id = text_column(statement.get(), 0);
+  state.graph_source_signature = text_column(statement.get(), 1);
+  state.last_full_maintenance_ms = sqlite3_column_int64(statement.get(), 2);
+  state.updated_at_ms = sqlite3_column_int64(statement.get(), 3);
+  return state;
+}
+
+void Database::set_knowledge_maintenance_state(
+    const KnowledgeMaintenanceState& state) {
+  auto statement = prepare(
+      db_,
+      "INSERT INTO ai_knowledge_maintenance_state("
+      "profile_id,graph_source_signature,last_full_maintenance_ms,updated_at_ms) "
+      "VALUES(?,?,?,?) ON CONFLICT(profile_id) DO UPDATE SET "
+      "graph_source_signature=excluded.graph_source_signature,"
+      "last_full_maintenance_ms=excluded.last_full_maintenance_ms,"
+      "updated_at_ms=excluded.updated_at_ms;");
+  sqlite3_bind_text(statement.get(), 1, state.profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, state.graph_source_signature.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 3, state.last_full_maintenance_ms);
+  sqlite3_bind_int64(statement.get(), 4, state.updated_at_ms);
+  check(sqlite3_step(statement.get()), db_, "persist knowledge maintenance state");
+}
+
 std::vector<PlayerProfileGameSourceRow> Database::player_profile_game_sources(
     const std::string& profile_id) const {
   return read_player_profile_game_sources(db_, profile_id, std::nullopt);
@@ -3424,17 +3535,18 @@ std::vector<PlayerProfileMoveSourceRow> Database::player_profile_move_sources(
     const std::string& game_id, const std::string& player_color) const {
   if (player_color != "white" && player_color != "black") return {};
   std::vector<PlayerProfileMoveSourceRow> result;
-  auto statement = prepare(
-      db_,
+  const std::string sql = std::string(
       "SELECT gm.ply_index,ma.category,ma.expected_score_before,ma.expected_score_best,"
       "ma.expected_score_played,ma.expected_score_loss,ma.is_theory,gm.fen_before,gm.uci "
       "FROM game_moves gm "
       "JOIN analysis_runs ar ON ar.id=(SELECT candidate.id FROM analysis_runs candidate "
-      "WHERE candidate.game_id=gm.game_id AND candidate.status='complete' "
-      "ORDER BY candidate.depth DESC,COALESCE(candidate.completed_at,0) DESC LIMIT 1) "
-      "JOIN move_analysis ma ON ma.analysis_run_id=ar.id AND ma.ply=gm.ply_index "
-      "WHERE gm.game_id=? AND gm.side_to_move=? AND ma.classifier_version IS NOT NULL "
-      "ORDER BY gm.ply_index ASC;");
+      "WHERE candidate.game_id=gm.game_id AND candidate.status='complete' AND ")
+      + current_classifier_run_sql("candidate")
+      + " ORDER BY candidate.depth DESC,COALESCE(candidate.completed_at,0) DESC LIMIT 1) "
+        "JOIN move_analysis ma ON ma.analysis_run_id=ar.id AND ma.ply=gm.ply_index "
+        "WHERE gm.game_id=? AND gm.side_to_move=? "
+        "ORDER BY gm.ply_index ASC;";
+  auto statement = prepare(db_, sql.c_str());
   sqlite3_bind_text(statement.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 2, player_color.c_str(), -1, SQLITE_TRANSIENT);
   while (sqlite3_step(statement.get()) == SQLITE_ROW) {
@@ -3670,6 +3782,264 @@ std::vector<AiCoachSkillProgressRow> Database::ai_coach_skill_progress(
         .next_practice_at = sqlite3_column_int64(statement.get(), 9)});
   }
   return result;
+}
+
+
+CoachSessionRecord Database::create_coach_session(
+    const std::string& profile_id, const std::int64_t now) {
+  if (profile_id.empty()) {
+    throw std::invalid_argument("Coach session requires profile id");
+  }
+  return ensure_coach_session(profile_id, make_uuid(), now);
+}
+
+CoachSessionRecord Database::ensure_coach_session(
+    const std::string& profile_id, const std::string& session_id,
+    const std::int64_t now) {
+  if (profile_id.empty() || session_id.empty()) {
+    throw std::invalid_argument("Coach session requires profile and session id");
+  }
+  SqliteConnectionTransactionLock transaction_lock(db_);
+  execute("BEGIN IMMEDIATE;");
+  try {
+    auto existing = prepare(
+        db_,
+        "SELECT profile_id,session_number,name,created_at,updated_at,last_opened_at,"
+        "compact_state_json FROM ai_coach_sessions WHERE id=?;");
+    sqlite3_bind_text(existing.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(existing.get()) == SQLITE_ROW) {
+      if (text_column(existing.get(), 0) != profile_id) {
+        throw std::runtime_error("Coach session belongs to another profile");
+      }
+      auto touch = prepare(
+          db_, "UPDATE ai_coach_sessions SET last_opened_at=? WHERE id=? AND profile_id=?;");
+      sqlite3_bind_int64(touch.get(), 1, now);
+      sqlite3_bind_text(touch.get(), 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(touch.get(), 3, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+      check(sqlite3_step(touch.get()), db_, "touch coach session");
+      CoachSessionRecord result{
+          .id = session_id,
+          .profile_id = profile_id,
+          .session_number = sqlite3_column_int(existing.get(), 1),
+          .name = text_column(existing.get(), 2),
+          .created_at = sqlite3_column_int64(existing.get(), 3),
+          .updated_at = sqlite3_column_int64(existing.get(), 4),
+          .last_opened_at = now,
+          .compact_state_json = text_column(existing.get(), 6)};
+      execute("COMMIT;");
+      return result;
+    }
+
+    auto init_counter = prepare(
+        db_, "INSERT OR IGNORE INTO ai_coach_session_counters(profile_id,next_session_number) VALUES(?,1);");
+    sqlite3_bind_text(init_counter.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(init_counter.get()), db_, "initialize coach session counter");
+
+    auto read_counter = prepare(
+        db_, "SELECT next_session_number FROM ai_coach_session_counters WHERE profile_id=?;");
+    sqlite3_bind_text(read_counter.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(read_counter.get()) != SQLITE_ROW) {
+      throw std::runtime_error("Coach session counter missing");
+    }
+    const int session_number = sqlite3_column_int(read_counter.get(), 0);
+    if (session_number <= 0) throw std::runtime_error("Invalid coach session counter");
+
+    auto advance_counter = prepare(
+        db_, "UPDATE ai_coach_session_counters SET next_session_number=? WHERE profile_id=?;");
+    sqlite3_bind_int(advance_counter.get(), 1, session_number + 1);
+    sqlite3_bind_text(advance_counter.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(advance_counter.get()), db_, "advance coach session counter");
+
+    const std::string name = "Sitzung " + std::to_string(session_number);
+    auto insert = prepare(
+        db_,
+        "INSERT INTO ai_coach_sessions(id,profile_id,session_number,name,created_at,updated_at,last_opened_at,compact_state_json) "
+        "VALUES(?,?,?,?,?,?,?,'{}');");
+    sqlite3_bind_text(insert.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(insert.get(), 3, session_number);
+    sqlite3_bind_text(insert.get(), 4, name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(insert.get(), 5, now);
+    sqlite3_bind_int64(insert.get(), 6, now);
+    sqlite3_bind_int64(insert.get(), 7, now);
+    check(sqlite3_step(insert.get()), db_, "create coach session");
+    execute("COMMIT;");
+    return CoachSessionRecord{
+        .id = session_id,
+        .profile_id = profile_id,
+        .session_number = session_number,
+        .name = name,
+        .created_at = now,
+        .updated_at = now,
+        .last_opened_at = now,
+        .compact_state_json = "{}"};
+  } catch (...) {
+    execute("ROLLBACK;");
+    throw;
+  }
+}
+
+std::optional<CoachSessionRecord> Database::coach_session(
+    const std::string& profile_id, const std::string& session_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT session_number,name,created_at,updated_at,last_opened_at,compact_state_json "
+      "FROM ai_coach_sessions WHERE id=? AND profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  if (sqlite3_step(statement.get()) != SQLITE_ROW) return std::nullopt;
+  return CoachSessionRecord{
+      .id = session_id,
+      .profile_id = profile_id,
+      .session_number = sqlite3_column_int(statement.get(), 0),
+      .name = text_column(statement.get(), 1),
+      .created_at = sqlite3_column_int64(statement.get(), 2),
+      .updated_at = sqlite3_column_int64(statement.get(), 3),
+      .last_opened_at = sqlite3_column_int64(statement.get(), 4),
+      .compact_state_json = text_column(statement.get(), 5)};
+}
+
+std::vector<CoachSessionRecord> Database::coach_sessions(
+    const std::string& profile_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT id,session_number,name,created_at,updated_at,last_opened_at,compact_state_json "
+      "FROM ai_coach_sessions WHERE profile_id=? ORDER BY updated_at DESC,session_number DESC;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<CoachSessionRecord> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back(CoachSessionRecord{
+        .id = text_column(statement.get(), 0),
+        .profile_id = profile_id,
+        .session_number = sqlite3_column_int(statement.get(), 1),
+        .name = text_column(statement.get(), 2),
+        .created_at = sqlite3_column_int64(statement.get(), 3),
+        .updated_at = sqlite3_column_int64(statement.get(), 4),
+        .last_opened_at = sqlite3_column_int64(statement.get(), 5),
+        .compact_state_json = text_column(statement.get(), 6)});
+  }
+  return result;
+}
+
+std::vector<CoachSessionMessageRecord> Database::coach_session_messages(
+    const std::string& profile_id, const std::string& session_id) const {
+  auto statement = prepare(
+      db_,
+      "SELECT m.sequence,m.role,m.content,m.payload_json,m.automatic_turn,m.created_at "
+      "FROM ai_coach_session_messages m JOIN ai_coach_sessions s ON s.id=m.session_id "
+      "WHERE s.profile_id=? AND s.id=? ORDER BY m.sequence;");
+  sqlite3_bind_text(statement.get(), 1, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
+  std::vector<CoachSessionMessageRecord> result;
+  while (sqlite3_step(statement.get()) == SQLITE_ROW) {
+    result.push_back(CoachSessionMessageRecord{
+        .session_id = session_id,
+        .sequence = sqlite3_column_int(statement.get(), 0),
+        .role = text_column(statement.get(), 1),
+        .content = text_column(statement.get(), 2),
+        .payload_json = text_column(statement.get(), 3),
+        .automatic_turn = sqlite3_column_int(statement.get(), 4) != 0,
+        .created_at = sqlite3_column_int64(statement.get(), 5)});
+  }
+  return result;
+}
+
+void Database::rename_coach_session(
+    const std::string& profile_id, const std::string& session_id,
+    const std::string& name, const std::int64_t updated_at) {
+  if (name.empty() || name.size() > 160) {
+    throw std::invalid_argument("Coach session name must contain 1-160 characters");
+  }
+  auto statement = prepare(
+      db_, "UPDATE ai_coach_sessions SET name=?,updated_at=? WHERE id=? AND profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, name.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 2, updated_at);
+  sqlite3_bind_text(statement.get(), 3, session_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 4, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "rename coach session");
+}
+
+void Database::delete_coach_session(
+    const std::string& profile_id, const std::string& session_id) {
+  auto statement = prepare(db_, "DELETE FROM ai_coach_sessions WHERE id=? AND profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "delete coach session");
+}
+
+void Database::touch_coach_session(
+    const std::string& profile_id, const std::string& session_id,
+    const std::int64_t opened_at) {
+  auto statement = prepare(
+      db_, "UPDATE ai_coach_sessions SET last_opened_at=? WHERE id=? AND profile_id=?;");
+  sqlite3_bind_int64(statement.get(), 1, opened_at);
+  sqlite3_bind_text(statement.get(), 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 3, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "touch coach session");
+}
+
+void Database::save_coach_session_state(
+    const std::string& profile_id, const std::string& session_id,
+    const std::string& compact_state_json, const std::int64_t updated_at) {
+  auto statement = prepare(
+      db_, "UPDATE ai_coach_sessions SET compact_state_json=?,updated_at=? WHERE id=? AND profile_id=?;");
+  sqlite3_bind_text(statement.get(), 1, compact_state_json.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 2, updated_at);
+  sqlite3_bind_text(statement.get(), 3, session_id.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 4, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+  check(sqlite3_step(statement.get()), db_, "persist coach session state");
+}
+
+void Database::append_coach_session_message(
+    const std::string& profile_id, const std::string& session_id,
+    const std::string& role, const std::string& content,
+    const std::string& payload_json, const bool automatic_turn,
+    const std::int64_t created_at) {
+  if (role != "user" && role != "assistant") {
+    throw std::invalid_argument("Unsupported coach message role");
+  }
+  if (content.empty() && (role == "user" || payload_json.empty() || payload_json == "{}")) {
+    return;
+  }
+  SqliteConnectionTransactionLock transaction_lock(db_);
+  execute("BEGIN IMMEDIATE;");
+  try {
+    auto verify = prepare(
+        db_, "SELECT 1 FROM ai_coach_sessions WHERE id=? AND profile_id=?;");
+    sqlite3_bind_text(verify.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(verify.get(), 2, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(verify.get()) != SQLITE_ROW) {
+      throw std::runtime_error("Coach session not found for message append");
+    }
+    auto next = prepare(
+        db_, "SELECT COALESCE(MAX(sequence),0)+1 FROM ai_coach_session_messages WHERE session_id=?;");
+    sqlite3_bind_text(next.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(next.get()) != SQLITE_ROW) {
+      throw std::runtime_error("Cannot allocate coach message sequence");
+    }
+    const int sequence = sqlite3_column_int(next.get(), 0);
+    auto insert = prepare(
+        db_, "INSERT INTO ai_coach_session_messages(session_id,sequence,role,content,payload_json,automatic_turn,created_at) VALUES(?,?,?,?,?,?,?);");
+    sqlite3_bind_text(insert.get(), 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(insert.get(), 2, sequence);
+    sqlite3_bind_text(insert.get(), 3, role.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert.get(), 4, content.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert.get(), 5, payload_json.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(insert.get(), 6, automatic_turn ? 1 : 0);
+    sqlite3_bind_int64(insert.get(), 7, created_at);
+    check(sqlite3_step(insert.get()), db_, "append coach session message");
+    auto touch = prepare(
+        db_, "UPDATE ai_coach_sessions SET updated_at=?,last_opened_at=? WHERE id=? AND profile_id=?;");
+    sqlite3_bind_int64(touch.get(), 1, created_at);
+    sqlite3_bind_int64(touch.get(), 2, created_at);
+    sqlite3_bind_text(touch.get(), 3, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(touch.get(), 4, profile_id.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(touch.get()), db_, "touch coach session after message");
+    execute("COMMIT;");
+  } catch (...) {
+    execute("ROLLBACK;");
+    throw;
+  }
 }
 
 
@@ -4095,9 +4465,13 @@ std::optional<GameRecord> Database::game(const std::string& game_id) const {
 // -----------------------------------------------------------------------------
 
 BotGameRecord Database::create_bot_game(
-    const int bot_elo, const std::string& starting_fen) {
+    const int bot_elo, const std::string& starting_fen,
+    const std::string& player_color) {
   if (bot_elo < 100 || bot_elo > 3200) {
     throw std::invalid_argument("Bot Elo must be between 100 and 3200");
+  }
+  if (player_color != "white" && player_color != "black") {
+    throw std::invalid_argument("Player color must be white or black");
   }
   if (active_bot_game().has_value()) {
     throw std::runtime_error("An unfinished bot game already exists");
@@ -4108,13 +4482,16 @@ BotGameRecord Database::create_bot_game(
       db_,
       "INSERT INTO bot_games(id,bot_elo,player_color,bot_color,status,result,"
       "starting_fen,current_fen,created_at,updated_at) "
-      "VALUES(?,?,'white','black','active','*',?,?,?,?);");
+      "VALUES(?,?,?,?,'active','*',?,?,?,?);");
+  const std::string bot_color = player_color == "white" ? "black" : "white";
   sqlite3_bind_text(statement.get(), 1, id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_int(statement.get(), 2, bot_elo);
-  sqlite3_bind_text(statement.get(), 3, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(statement.get(), 4, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_int64(statement.get(), 5, now);
-  sqlite3_bind_int64(statement.get(), 6, now);
+  sqlite3_bind_text(statement.get(), 3, player_color.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 4, bot_color.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 5, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(statement.get(), 6, starting_fen.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(statement.get(), 7, now);
+  sqlite3_bind_int64(statement.get(), 8, now);
   check(sqlite3_step(statement.get()), db_, "create bot game");
   return bot_game(id).value();
 }
@@ -4646,7 +5023,7 @@ void Database::persist_classifications(
   if (sqlite3_step(run.get()) != SQLITE_ROW) throw std::runtime_error("Analysis run not found");
   const std::string run_id = text_column(run.get(), 0);
 
-  std::array<int, 11> counts{};
+  std::array<int, 12> counts{};
   auto count_index = [](const MoveCategory category) -> int {
     switch (category) {
       case MoveCategory::theory: return 0;
@@ -4657,9 +5034,10 @@ void Database::persist_classifications(
       case MoveCategory::excellent: return 5;
       case MoveCategory::good: return 6;
       case MoveCategory::okay: return 7;
-      case MoveCategory::miss: return 8;
-      case MoveCategory::mistake: return 9;
-      case MoveCategory::blunder: return 10;
+      case MoveCategory::inaccuracy: return 8;
+      case MoveCategory::miss: return 9;
+      case MoveCategory::mistake: return 10;
+      case MoveCategory::blunder: return 11;
       case MoveCategory::unknown: return -1;
     }
     return -1;
@@ -4739,9 +5117,13 @@ void Database::persist_classifications(
       sqlite3_bind_int(summary.get(), 9, counts[4] + counts[1]);
       sqlite3_bind_int(summary.get(), 10, counts[5]);
       sqlite3_bind_int(summary.get(), 11, counts[7] + counts[6]);
-      sqlite3_bind_int(summary.get(), 12, counts[8]);
-      sqlite3_bind_int(summary.get(), 13, counts[9]);
-      sqlite3_bind_int(summary.get(), 14, counts[10]);
+      // The legacy run-summary table predates Inaccuracy and has no dedicated
+      // column for it. Current readers derive category counts from move rows;
+      // keep these compatibility columns semantically aligned rather than
+      // folding Inaccuracy into Miss/Mistake.
+      sqlite3_bind_int(summary.get(), 12, counts[9]);
+      sqlite3_bind_int(summary.get(), 13, counts[10]);
+      sqlite3_bind_int(summary.get(), 14, counts[11]);
       sqlite3_bind_text(summary.get(), 15, run_id.c_str(), -1, SQLITE_TRANSIENT);
       check(sqlite3_step(summary.get()), db_, "persist classification summary");
     } else {
@@ -4770,6 +5152,10 @@ void Database::persist_classifications(
     sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
     throw;
   }
+  if (finalize) {
+    statistics_source_revision_.fetch_add(1, std::memory_order_relaxed);
+    notify_ai_profile_analysis_changed(game_id);
+  }
 }
 
 std::optional<PersistedAnalysis> Database::analysis(
@@ -4779,8 +5165,9 @@ std::optional<PersistedAnalysis> Database::analysis(
   auto statement = prepare(
       db_,
       "SELECT id,status,config_hash,engine_version,completed_plies,total_plies,"
-      "error,depth,classifier_version,accuracy_algorithm_version,opening_book_version,"
-      "white_local_accuracy,black_local_accuracy FROM analysis_runs "
+      "error,depth,multi_pv,time_limit_seconds,adaptive_early_stop,classifier_version,"
+      "accuracy_algorithm_version,opening_book_version,white_local_accuracy,"
+      "black_local_accuracy FROM analysis_runs "
       "WHERE game_id=? AND config_hash=?;");
   sqlite3_bind_text(statement.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(statement.get(), 2, config_hash.c_str(), -1, SQLITE_TRANSIENT);
@@ -4793,12 +5180,23 @@ std::optional<PersistedAnalysis> Database::analysis(
   result.completed_plies = sqlite3_column_int(statement.get(), 4);
   result.total_plies = sqlite3_column_int(statement.get(), 5);
   result.error = text_column(statement.get(), 6);
-  result.summary.engine_depth = sqlite3_column_int(statement.get(), 7);
-  result.summary.classifier_version = sqlite3_column_int(statement.get(), 8);
-  result.summary.accuracy_algorithm_version = sqlite3_column_int(statement.get(), 9);
-  result.summary.opening_book_version = text_column(statement.get(), 10);
-  result.summary.white.local_accuracy = optional_double_column(statement.get(), 11);
-  result.summary.black.local_accuracy = optional_double_column(statement.get(), 12);
+  result.requested_depth = sqlite3_column_int(statement.get(), 7);
+  result.requested_multi_pv = sqlite3_column_int(statement.get(), 8);
+  result.requested_time_limit_seconds = sqlite3_column_int(statement.get(), 9);
+  result.adaptive_early_stop = sqlite3_column_int(statement.get(), 10) != 0;
+  result.summary.engine_depth = result.requested_depth;
+  const int stored_classifier_version = sqlite3_column_int(statement.get(), 11);
+  const bool classifier_current = current_classifier_contract(
+      result.engine_version, stored_classifier_version);
+  result.summary.classifier_version = classifier_current ? stored_classifier_version : 0;
+  result.summary.accuracy_algorithm_version = classifier_current
+      ? sqlite3_column_int(statement.get(), 12)
+      : 0;
+  result.summary.opening_book_version = text_column(statement.get(), 13);
+  if (classifier_current) {
+    result.summary.white.local_accuracy = optional_double_column(statement.get(), 14);
+    result.summary.black.local_accuracy = optional_double_column(statement.get(), 15);
+  }
 
   auto totals = prepare(
       db_, "SELECT side_to_move,count(*) FROM game_moves WHERE game_id=? GROUP BY side_to_move;");
@@ -4808,21 +5206,24 @@ std::optional<PersistedAnalysis> Database::analysis(
         ? result.summary.black : result.summary.white;
     player.total_moves = sqlite3_column_int(totals.get(), 1);
   }
-  auto category_counts = prepare(
-      db_,
-      "SELECT gm.side_to_move,ma.category,count(*) FROM move_analysis ma "
-      "JOIN game_moves gm ON gm.game_id=? AND gm.ply_index=ma.ply "
-      "WHERE ma.analysis_run_id=? AND ma.classifier_version IS NOT NULL "
-      "GROUP BY gm.side_to_move,ma.category;");
-  sqlite3_bind_text(category_counts.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(category_counts.get(), 2, run_id.c_str(), -1, SQLITE_TRANSIENT);
-  while (sqlite3_step(category_counts.get()) == SQLITE_ROW) {
-    auto& player = text_column(category_counts.get(), 0) == "black"
-        ? result.summary.black : result.summary.white;
-    const auto category = parse_category(text_column(category_counts.get(), 1));
-    const int count = sqlite3_column_int(category_counts.get(), 2);
-    increment_category(player, category, count);
-    if (category != MoveCategory::unknown) player.analyzed_moves += count;
+  if (classifier_current) {
+    auto category_counts = prepare(
+        db_,
+        "SELECT gm.side_to_move,ma.category,count(*) FROM move_analysis ma "
+        "JOIN game_moves gm ON gm.game_id=? AND gm.ply_index=ma.ply "
+        "WHERE ma.analysis_run_id=? AND ma.classifier_version=? "
+        "GROUP BY gm.side_to_move,ma.category;");
+    sqlite3_bind_text(category_counts.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(category_counts.get(), 2, run_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(category_counts.get(), 3, stored_classifier_version);
+    while (sqlite3_step(category_counts.get()) == SQLITE_ROW) {
+      auto& player = text_column(category_counts.get(), 0) == "black"
+          ? result.summary.black : result.summary.white;
+      const auto category = parse_category(text_column(category_counts.get(), 1));
+      const int count = sqlite3_column_int(category_counts.get(), 2);
+      increment_category(player, category, count);
+      if (category != MoveCategory::unknown) player.analyzed_moves += count;
+    }
   }
 
   // Engine rows use position slots: slot 0 is the position before move 0,
@@ -4846,16 +5247,19 @@ std::optional<PersistedAnalysis> Database::analysis(
   if (sqlite3_step(latest.get()) == SQLITE_ROW) {
     result.latest_ply = sqlite3_column_int(latest.get(), 0);
     result.best_move = text_column(latest.get(), 1);
-    if (sqlite3_column_type(latest.get(), 3) != SQLITE_NULL) {
+    const bool move_classifier_current = sqlite3_column_type(latest.get(), 3) != SQLITE_NULL
+        && current_classifier_contract(
+            result.engine_version, sqlite3_column_int(latest.get(), 3));
+    if (move_classifier_current) {
       result.classification = parse_category(text_column(latest.get(), 2));
       result.classifier_version = sqlite3_column_int(latest.get(), 3);
+      result.expected_score_before = optional_double_column(latest.get(), 4);
+      result.expected_score_best = optional_double_column(latest.get(), 5);
+      result.expected_score_played = optional_double_column(latest.get(), 6);
+      result.expected_score_loss = optional_double_column(latest.get(), 7);
+      result.recommended_move = text_column(latest.get(), 8);
     }
-    result.expected_score_before = optional_double_column(latest.get(), 4);
-    result.expected_score_best = optional_double_column(latest.get(), 5);
-    result.expected_score_played = optional_double_column(latest.get(), 6);
-    result.expected_score_loss = optional_double_column(latest.get(), 7);
-    result.recommended_move = text_column(latest.get(), 8);
-    if (sqlite3_column_int(latest.get(), 9) != 0) {
+    if (move_classifier_current && sqlite3_column_int(latest.get(), 9) != 0) {
       result.theory = TheoryMoveInfo{
           .is_theory = true,
           .games = static_cast<std::uint32_t>(sqlite3_column_int64(latest.get(), 10)),
@@ -4921,16 +5325,24 @@ std::optional<PersistedAnalysis> Database::compatible_analysis(
 
 
 void Database::prune_game_analyses_except(
-    const std::string& game_id, const std::string& keep_config_hash) {
+    const std::string& game_id, const std::string& engine_version,
+    const std::string& keep_config_hash) {
   SqliteConnectionTransactionLock transaction_lock(db_);
   execute("BEGIN IMMEDIATE;");
   try {
+    // Analysis-engine selection is a strict namespace boundary. A newer SF18
+    // run may supersede older SF18 settings for this game, but it must never
+    // delete a compatible SF19 run (and vice versa). Switching the selected
+    // engine can therefore reuse that engine's own persisted truth without
+    // falling back to data produced by the other engine.
     auto prune = prepare(
-        db_, "DELETE FROM analysis_runs WHERE game_id=? AND config_hash<>?;");
+        db_, "DELETE FROM analysis_runs WHERE game_id=? "
+             "AND engine_version=? AND config_hash<>?;");
     sqlite3_bind_text(prune.get(), 1, game_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(prune.get(), 2, engine_version.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(
-        prune.get(), 2, keep_config_hash.c_str(), -1, SQLITE_TRANSIENT);
-    check(sqlite3_step(prune.get()), db_, "prune superseded game analyses");
+        prune.get(), 3, keep_config_hash.c_str(), -1, SQLITE_TRANSIENT);
+    check(sqlite3_step(prune.get()), db_, "prune superseded same-engine game analyses");
     execute("COMMIT;");
   } catch (...) {
     sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);

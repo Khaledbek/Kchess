@@ -26,6 +26,10 @@ struct PersistedAnalysis {
   std::string status;
   std::string config_hash;
   std::string engine_version;
+  int requested_depth{0};
+  int requested_multi_pv{0};
+  int requested_time_limit_seconds{0};
+  bool adaptive_early_stop{false};
   int completed_plies{0};
   int total_plies{0};
   AnalysisSummary summary;
@@ -40,6 +44,17 @@ struct PersistedAnalysis {
   std::optional<double> expected_score_loss;
   std::optional<TheoryMoveInfo> theory;
   std::vector<EngineLine> lines;
+  // Response-only provenance for the move-classification snapshot. Ordinary
+  // persisted rows leave these empty and therefore use the engine snapshot
+  // above. Live refinement may intentionally freeze a classification from the
+  // last fully published pre-analysis run; AnalysisService records that source
+  // here so callers can detect the otherwise invisible mixed-snapshot state.
+  std::string classification_config_hash;
+  std::string classification_engine_version;
+  int classification_requested_depth{0};
+  int classification_requested_multi_pv{0};
+  int classification_reached_depth{0};
+  std::string classification_rank1_move;
   std::string error;
 };
 
@@ -196,6 +211,9 @@ struct PlayerLearningStats {
   int critical{0};
   int best{0};
   int excellent{0};
+  int good{0};
+  int okay{0};
+  int inaccuracy{0};
   int miss{0};
   int mistake{0};
   int blunder{0};
@@ -319,6 +337,27 @@ struct AiProfileSamplingState {
   std::int64_t updated_at{0};
 };
 
+struct CoachSessionRecord {
+  std::string id;
+  std::string profile_id;
+  int session_number{0};
+  std::string name;
+  std::int64_t created_at{0};
+  std::int64_t updated_at{0};
+  std::int64_t last_opened_at{0};
+  std::string compact_state_json{"{}"};
+};
+
+struct CoachSessionMessageRecord {
+  std::string session_id;
+  int sequence{0};
+  std::string role;
+  std::string content;
+  std::string payload_json{"{}"};
+  bool automatic_turn{false};
+  std::int64_t created_at{0};
+};
+
 struct AiCoachSkillProgressRow {
   std::string motif_id;
   int independent_successes{0};
@@ -366,6 +405,14 @@ struct BotGameSummaryRecord {
   std::int64_t updated_at{0};
   int move_count{0};
   std::optional<std::string> analysis_game_id;
+};
+
+
+struct KnowledgeMaintenanceState {
+  std::string profile_id;
+  std::string graph_source_signature;
+  std::int64_t last_full_maintenance_ms{0};
+  std::int64_t updated_at_ms{0};
 };
 
 struct TrainingProgressRecord {
@@ -491,7 +538,7 @@ class Database {
       const std::string& profile_id, const std::string& month) const;
   std::vector<GameRecord> favorite_games() const;
   std::optional<GameRecord> game(const std::string& game_id) const;
-  BotGameRecord create_bot_game(int bot_elo, const std::string& starting_fen);
+  BotGameRecord create_bot_game(int bot_elo, const std::string& starting_fen, const std::string& player_color);
   std::optional<BotGameRecord> active_bot_game() const;
   std::optional<BotGameRecord> bot_game(const std::string& game_id) const;
   std::vector<BotGameSummaryRecord> bot_games() const;
@@ -520,8 +567,9 @@ class Database {
       const std::string& profile_id) const;
   std::vector<AccuracyMoveRow> accuracy_moves_for_statistics(
       const std::string& profile_id) const;
-  // Existing complete shared analyses needing classification or whose old
-  // move rows lack phase-accuracy weights. No engine work is implied.
+  // Existing complete shared analyses whose derived classifier contract is stale
+  // or whose old move rows lack phase-accuracy weights. Raw engine slots are
+  // reused; no Stockfish work is implied.
   std::vector<CachedAccuracyBackfillRow> statistics_games_missing_move_accuracy(
       const std::string& profile_id, int limit) const;
   std::vector<ProfileGameMetadataRow> profile_games_metadata(
@@ -531,6 +579,11 @@ class Database {
   std::vector<GamePhaseRow> games_for_phases(const std::string& profile_id) const;
 
   PlayerLearningStats player_learning_stats(const std::string& profile_id) const;
+
+  std::optional<KnowledgeMaintenanceState> knowledge_maintenance_state(
+      const std::string& profile_id) const;
+  void set_knowledge_maintenance_state(
+      const KnowledgeMaintenanceState& state);
   std::vector<PlayerProfileGameSourceRow> player_profile_game_sources(
       const std::string& profile_id) const;
   // Monotonic in-process generation for source data consumed by the shared
@@ -557,6 +610,34 @@ class Database {
       std::int64_t practiced_at);
   std::vector<AiCoachSkillProgressRow> ai_coach_skill_progress(
       const std::string& profile_id) const;
+  CoachSessionRecord create_coach_session(
+      const std::string& profile_id, std::int64_t now);
+  CoachSessionRecord ensure_coach_session(
+      const std::string& profile_id, const std::string& session_id,
+      std::int64_t now);
+  std::optional<CoachSessionRecord> coach_session(
+      const std::string& profile_id, const std::string& session_id) const;
+  std::vector<CoachSessionRecord> coach_sessions(
+      const std::string& profile_id) const;
+  std::vector<CoachSessionMessageRecord> coach_session_messages(
+      const std::string& profile_id, const std::string& session_id) const;
+  void rename_coach_session(
+      const std::string& profile_id, const std::string& session_id,
+      const std::string& name, std::int64_t updated_at);
+  void delete_coach_session(
+      const std::string& profile_id, const std::string& session_id);
+  void touch_coach_session(
+      const std::string& profile_id, const std::string& session_id,
+      std::int64_t opened_at);
+  void save_coach_session_state(
+      const std::string& profile_id, const std::string& session_id,
+      const std::string& compact_state_json, std::int64_t updated_at);
+  void append_coach_session_message(
+      const std::string& profile_id, const std::string& session_id,
+      const std::string& role, const std::string& content,
+      const std::string& payload_json, bool automatic_turn,
+      std::int64_t created_at);
+
   // Freezes the latest already-known played-at timestamp on first Stage-3
   // synchronization. Older archive games discovered later stay historical;
   // only games played after this watermark are incremental profile learning.
@@ -675,7 +756,8 @@ class Database {
   // Keep only the authoritative saved analysis for a game.  Position-cache
   // entries are intentionally independent and survive this pruning.
   void prune_game_analyses_except(
-      const std::string& game_id, const std::string& keep_config_hash);
+      const std::string& game_id, const std::string& engine_version,
+      const std::string& keep_config_hash);
   void delete_game_analyses(const std::string& game_id);
 
   std::optional<AnalysisResult> compatible_position_analysis(

@@ -24,3 +24,7 @@ Datei nicht komplett lesen. Exportsymbol mit `rg` suchen und nur Funktion + dire
 ## Update 173 - Coach diagnostics export
 
 `kc_coach_performance_diagnostics_json` is a read-only string export through Core to `CoachService::performance_diagnostics_json()`. Keep the C-ABI thin and use the ordinary caller-owned string-free contract.
+
+## Coach Series 2 Update 5 - session exports
+
+ABI 11 adds `kc_coach_sessions_json`, `kc_create_coach_session_json`, `kc_coach_session_messages_json`, `kc_rename_coach_session_json` and `kc_delete_coach_session_json`. These are thin caller-owned-string transports to `Core`/`CoachService`; session persistence, naming and validation remain below the C-ABI boundary.

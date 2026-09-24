@@ -5,6 +5,7 @@
 #include "coach_types.h"
 #include "dto/coach_request.h"
 #include "dto/evidence.h"
+#include "dto/evidence_plan.h"
 #include "dto/query_plan.h"
 
 namespace kchess::ai {
@@ -28,7 +29,8 @@ class EngineBudgetSystem {
   [[nodiscard]] EngineBudgetDecision decide(
       const CoachRequest& request,
       const QueryPlan& plan,
-      const std::vector<EvidenceItem>& available) const;
+      const std::vector<EvidenceItem>& available,
+      const std::vector<EvidenceNeed>& satisfied_existing_needs = {}) const;
 };
 
 }  // namespace kchess::ai

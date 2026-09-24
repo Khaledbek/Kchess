@@ -1,0 +1,1 @@
+KCL1 edge_offset is a byte offset into the 2-byte move table. This hotfix validates alignment and normalizes it to a runtime move index.

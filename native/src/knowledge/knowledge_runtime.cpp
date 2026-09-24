@@ -17,7 +17,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "../../ai/models/small_models.h"
 #include "chunk_registry.h"
 #include "conflict_resolver.h"
 #include "dependency_tracker.h"
@@ -35,7 +34,6 @@
 #include "result_transition_graph_projector.h"
 #include "retrieval_ranking.h"
 #include "statistics_graph_projector.h"
-#include "text_semantic_retrieval.h"
 #include "vector_index.h"
 #include "../persistence/database.h"
 #include "../services/statistics_service.h"
@@ -418,8 +416,6 @@ struct KnowledgeRuntime::Impl {
   bool opened{false};
   std::string last_profile_id;
   std::int64_t last_refresh_ms{0};
-  std::string last_full_maintenance_profile_id;
-  std::int64_t last_full_maintenance_ms{0};
 };
 
 KnowledgeRuntime::KnowledgeRuntime(Database& database, StatisticsService& statistics,
@@ -520,6 +516,7 @@ std::string KnowledgeRuntime::activity_json() const {
       if (phase == "statistics") return "project_statistics_graph";
       if (phase == "openings") return "project_opening_graph_from_persisted_games";
       if (phase == "position_structures") return "project_position_structure_graph";
+      if (phase == "game_graph_reuse") return "reuse_unchanged_persisted_game_graph";
       if (phase == "result_transitions") return "project_result_transition_graph";
       if (phase == "profile_knowledge") return "project_learned_profile_graph";
       if (phase == "quality") return "refresh_knowledge_quality_metadata";
@@ -587,6 +584,9 @@ std::string KnowledgeRuntime::performance_json() const {
           {"changedEntries", refresh_changed_entries_.load(std::memory_order_relaxed)},
           {"chunkNodesProcessed", refresh_chunk_nodes_processed_.load(std::memory_order_relaxed)},
           {"qualityEntriesProcessed", refresh_quality_entries_processed_.load(std::memory_order_relaxed)},
+          {"gameGraphProjectionSkips", refresh_game_graph_projection_skips_.load(std::memory_order_relaxed)},
+          {"backgroundYieldCount", refresh_background_yield_count_.load(std::memory_order_relaxed)},
+          {"backgroundYieldMs", refresh_background_yield_ms_.load(std::memory_order_relaxed)},
       }},
       {"coachEvidence", {
           {"requests", coach_requests},
@@ -605,7 +605,8 @@ std::string KnowledgeRuntime::performance_json() const {
 // -----------------------------------------------------------------------------
 
 KnowledgeRefreshReport KnowledgeRuntime::refresh_active_profile(
-    const std::int64_t observed_at_ms) {
+    const std::int64_t observed_at_ms,
+    const std::string& graph_source_signature) {
   const auto wait_started = std::chrono::steady_clock::now();
   std::unique_lock lock(mutex_);
   const auto lock_acquired = std::chrono::steady_clock::now();
@@ -636,18 +637,40 @@ KnowledgeRefreshReport KnowledgeRuntime::refresh_active_profile(
   const auto stats = StatisticsGraphProjector(
       database_, statistics_, impl_->graph, impl_->dependencies)
                          .project_active_profile(observed_at_ms);
-  set_activity("knowledge_refresh", "openings", owner);
-  const auto openings = OpeningGraphProjector(
-      database_, impl_->graph, impl_->dependencies)
-                            .project_active_profile(observed_at_ms);
-  set_activity("knowledge_refresh", "position_structures", owner);
-  const auto structures = PositionStructureGraphProjector(
-      database_, impl_->graph, impl_->dependencies, &impl_->positions)
-                              .project_active_profile(observed_at_ms);
-  set_activity("knowledge_refresh", "result_transitions", owner);
-  const auto transitions = ResultTransitionGraphProjector(
-      database_, impl_->graph, impl_->dependencies)
-                               .project_active_profile(observed_at_ms);
+
+  const auto maintenance_state = database_.knowledge_maintenance_state(owner);
+  const bool unchanged_game_graph = !graph_source_signature.empty() &&
+      maintenance_state.has_value() &&
+      maintenance_state->graph_source_signature == graph_source_signature;
+
+  OpeningGraphProjectionReport openings;
+  PositionStructureProjectionReport structures;
+  ResultTransitionProjectionReport transitions;
+  if (unchanged_game_graph) {
+    report.game_graph_projection_skipped = true;
+    refresh_game_graph_projection_skips_.fetch_add(1, std::memory_order_relaxed);
+    set_activity("knowledge_refresh", "game_graph_reuse", owner, 1, 1);
+  } else {
+    set_activity("knowledge_refresh", "openings", owner);
+    openings = OpeningGraphProjector(
+        database_, impl_->graph, impl_->dependencies)
+                   .project_active_profile(observed_at_ms);
+    set_activity("knowledge_refresh", "position_structures", owner);
+    structures = PositionStructureGraphProjector(
+        database_, impl_->graph, impl_->dependencies, &impl_->positions)
+                     .project_active_profile(observed_at_ms);
+    report.background_yield_count += structures.background_yield_count;
+    report.background_yield_ms += structures.background_yield_ms;
+    refresh_background_yield_count_.fetch_add(
+        structures.background_yield_count, std::memory_order_relaxed);
+    refresh_background_yield_ms_.fetch_add(
+        structures.background_yield_ms, std::memory_order_relaxed);
+    set_activity("knowledge_refresh", "result_transitions", owner);
+    transitions = ResultTransitionGraphProjector(
+        database_, impl_->graph, impl_->dependencies)
+                      .project_active_profile(observed_at_ms);
+  }
+
   set_activity("knowledge_refresh", "profile_knowledge", owner);
   const auto profile = ProfileKnowledgeGraphProjector(
       database_, impl_->graph, impl_->dependencies)
@@ -689,12 +712,14 @@ KnowledgeRefreshReport KnowledgeRuntime::refresh_active_profile(
   collect_projection(profile);
 
   report.changed_entries = dirty_entries.size() + removed_entries.size();
-  const bool profile_changed = impl_->last_full_maintenance_profile_id != owner;
-  const bool clock_reset = impl_->last_full_maintenance_ms > observed_at_ms;
-  const bool full_interval_elapsed = impl_->last_full_maintenance_ms == 0 ||
-      observed_at_ms - impl_->last_full_maintenance_ms >=
+  const auto previous_full_maintenance_ms = maintenance_state.has_value()
+      ? maintenance_state->last_full_maintenance_ms
+      : 0;
+  const bool clock_reset = previous_full_maintenance_ms > observed_at_ms;
+  const bool full_interval_elapsed = previous_full_maintenance_ms == 0 ||
+      observed_at_ms - previous_full_maintenance_ms >=
           kFullKnowledgeMaintenanceIntervalMs;
-  report.full_maintenance = profile_changed || clock_reset || full_interval_elapsed;
+  report.full_maintenance = clock_reset || full_interval_elapsed;
   if (report.full_maintenance) {
     refresh_full_maintenance_.fetch_add(1, std::memory_order_relaxed);
   } else {
@@ -845,10 +870,16 @@ KnowledgeRefreshReport KnowledgeRuntime::refresh_active_profile(
   set_activity("knowledge_refresh", "knowledge_gaps", owner);
   const auto gaps = impl_->gaps.refresh_profile_gaps(owner, observed_at_ms);
   report.gaps = gaps.size();
-  if (report.full_maintenance) {
-    impl_->last_full_maintenance_profile_id = owner;
-    impl_->last_full_maintenance_ms = observed_at_ms;
-  }
+  KnowledgeMaintenanceState persisted_maintenance;
+  persisted_maintenance.profile_id = owner;
+  persisted_maintenance.graph_source_signature = graph_source_signature.empty()
+      ? (maintenance_state ? maintenance_state->graph_source_signature : std::string{})
+      : graph_source_signature;
+  persisted_maintenance.last_full_maintenance_ms = report.full_maintenance
+      ? observed_at_ms
+      : (maintenance_state ? maintenance_state->last_full_maintenance_ms : 0);
+  persisted_maintenance.updated_at_ms = observed_at_ms;
+  database_.set_knowledge_maintenance_state(persisted_maintenance);
   impl_->last_profile_id = owner;
   impl_->last_refresh_ms = observed_at_ms;
   clear_activity();
@@ -886,8 +917,7 @@ KnowledgeGapActiveLearningPlan KnowledgeRuntime::active_learning_plan(
 // -----------------------------------------------------------------------------
 
 std::optional<ai::EvidenceItem> KnowledgeRuntime::coach_evidence(
-    const ai::CoachRequest& request, const ai::QueryPlan& plan,
-    const ai::EmbeddingModel* embeddings) {
+    const ai::CoachRequest& request, const ai::QueryPlan& plan) {
   if (!needs_profile_evidence(plan)) return std::nullopt;
   const auto owner = owner_profile_id(database_, request.profile_id);
   if (owner.empty()) return std::nullopt;
@@ -911,15 +941,10 @@ std::optional<ai::EvidenceItem> KnowledgeRuntime::coach_evidence(
     impl_->last_profile_id = owner;
   }
 
-  std::unique_ptr<SemanticChunkSearch> semantic;
-  if (graph_available && embeddings != nullptr && embeddings->available()) {
-    semantic = std::make_unique<SemanticChunkSearch>(
-        impl_->chunks, impl_->vectors, *embeddings);
-  }
 
   const auto execution = impl_->planner.plan(route);
   HybridRetrievalEngine retrieval_engine(
-      impl_->graph, impl_->chunks, semantic.get(), &impl_->positions);
+      impl_->graph, impl_->chunks, &impl_->positions);
   HybridRetrievalResult retrieval;
   if (graph_available) retrieval = retrieval_engine.retrieve({
       .player_id = owner,

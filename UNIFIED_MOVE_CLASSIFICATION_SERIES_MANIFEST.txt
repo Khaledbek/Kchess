@@ -1,0 +1,20 @@
+KChess Unified Move Classification Series — cumulative overlay manifest
+
+Update 1/7  Unified Move-Facts Layer
+Update 2/7  Material Exposure & Tactical Threat Detection
+Update 3/7  PV Material Recovery & Compensation
+Update 4/7  Brilliant Classifier Rewrite
+Update 5/7  Great / Best / Excellent Quality Clusters
+Update 6/7  Mate-aware Pipeline + distinct Inaccuracy class
+Update 7/7  Regression Expansion + Static Audit + Cumulative ZIP
+
+Visible class added:
+  inaccuracy
+Asset contract:
+  flutter_app/assets/analysis_img/move_inaccuracy.png
+
+Reference Brilliant regression:
+  FEN  r4rk1/p4p1p/3p1npQ/1PpPpP2/4P3/2n4P/Pq2BP2/2R3RK w - - 0 22
+  UCI  f5g6
+
+No build/tests were executed by the assistant.

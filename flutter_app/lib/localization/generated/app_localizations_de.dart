@@ -332,6 +332,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get excellent => 'Ausgezeichnet';
 
   @override
+  String get inaccuracy => 'Ungenauigkeit';
+
+  @override
   String get okay => 'Okay';
 
   @override
@@ -393,6 +396,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String bestMoveText(String move) {
     return '$move ist der beste Zug.';
+  }
+
+  @override
+  String worstMoveText(String move) {
+    return '$move ist der schlechteste Zug.';
   }
 
   @override
@@ -1717,6 +1725,30 @@ class AppLocalizationsDe extends AppLocalizations {
       'Das Sprachmodell des Trainers ist noch nicht verfügbar.';
 
   @override
+  String get coachProviderError =>
+      'Der Trainerdienst konnte diese Anfrage nicht abschließen.';
+
+  @override
+  String get coachProviderResponseInvalid =>
+      'Das Sprachmodell hat eine unbrauchbare Antwort geliefert; KChess hat sie deshalb nicht angezeigt.';
+
+  @override
+  String get coachEvidenceUnavailable =>
+      'Für diese Traineranfrage liegen noch nicht genügend verifizierte Stellungsdaten vor.';
+
+  @override
+  String get coachRateLimited =>
+      'Das Anfragelimit des Trainers ist vorübergehend erreicht. Versuche es in Kürze erneut.';
+
+  @override
+  String get coachDailyLimit =>
+      'Der Trainer hat sein tägliches Sprachmodell-Limit erreicht.';
+
+  @override
+  String get coachDeferred =>
+      'Diese Traineranfrage wurde zurückgestellt, um Kapazität für interaktive Fragen freizuhalten.';
+
+  @override
   String get coachOffTopic =>
       'Der Trainer beantwortet ausschließlich Schachfragen.';
 
@@ -1732,8 +1764,24 @@ class AppLocalizationsDe extends AppLocalizations {
       'Welchen Zug würdest du hier spielen?';
 
   @override
+  String get coachQuizQuestionPending =>
+      'Die aktuelle Trainingsfrage ist noch offen. Spiele deinen Zug auf dem Brett oder nutze den Hinweis, wenn du Unterstützung möchtest.';
+
+  @override
   String get coachSafeHintFallbackAnswer =>
       'Prüfe zuerst Schachs, Schlagzüge und direkte Drohungen. Welche deiner Figuren kann sofort aktiver werden?';
+
+  @override
+  String get coachSafePositionFallbackAnswer =>
+      'Die erzeugte Erklärung konnte nicht sicher verifiziert werden. Auf dem Brett wird nur ein verifizierter Engine-Kandidat gezeigt; KChess erfindet keinen anderen Zug.';
+
+  @override
+  String get coachVerdictGroundingUnavailable =>
+      'Ich kann diese Schachbewertung noch nicht verlässlich abgeben, weil die erforderliche native Engine-Evidenz fehlt. KChess rät nicht und ersetzt die fehlende Analyse nicht durch eine LLM-Meinung.';
+
+  @override
+  String get coachSafeComparisonFallbackAnswer =>
+      'Der detaillierte Vergleich konnte nicht sicher verifiziert werden. Auf dem Brett werden nur verifizierte Engine-Kandidaten für diese Stellung gezeigt.';
 
   @override
   String get coachHintRequest => 'Gib mir einen Hinweis zu dieser Stellung.';
@@ -1999,4 +2047,37 @@ class AppLocalizationsDe extends AppLocalizations {
   String playerProfileLiveCurrentGame(int percent) {
     return 'Aktuelle Partie $percent%';
   }
+
+  @override
+  String get coachSafeWorstMoveFallbackAnswer =>
+      'Die erzeugte Erklärung konnte nicht sicher verifiziert werden. Auf dem Brett wird nur der nativ geprüfte schlechteste Zug der Analyse markiert; er ist keine Empfehlung.';
+
+  @override
+  String get coachSafeFastestLossFallbackAnswer =>
+      'Die erzeugte Erklärung konnte nicht sicher verifiziert werden. Auf dem Brett wird nur der native Fokus der Schnellverlust-Analyse markiert. Ein erzwungener Verlust wird nur behauptet, wenn die Engine ihn nachweist.';
+
+  @override
+  String get coachSessionsTitle => 'Coach-Sitzungen';
+
+  @override
+  String get coachNewSession => 'Neue Sitzung';
+
+  @override
+  String get coachRenameSession => 'Umbenennen';
+
+  @override
+  String get coachDeleteSession => 'Löschen';
+
+  @override
+  String get coachDeleteSessionConfirm =>
+      'Diese Coach-Sitzung dauerhaft löschen?';
+
+  @override
+  String get coachSessionCancel => 'Abbrechen';
+
+  @override
+  String get coachSessionSave => 'Speichern';
+
+  @override
+  String get coachSessionEmpty => 'Noch keine gespeicherten Coach-Sitzungen.';
 }

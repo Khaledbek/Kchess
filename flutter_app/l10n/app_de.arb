@@ -92,6 +92,7 @@
   "critical": "Großartiger Zug",
   "best": "Bester",
   "excellent": "Ausgezeichnet",
+  "inaccuracy": "Ungenauigkeit",
   "okay": "Okay",
   "miss": "Verpasst",
   "mistake": "Fehler",
@@ -123,6 +124,14 @@
   "openAnalysis": "Analyse öffnen",
   "bestMoveText": "{move} ist der beste Zug.",
   "@bestMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "worstMoveText": "{move} ist der schlechteste Zug.",
+  "@worstMoveText": {
     "placeholders": {
       "move": {
         "type": "String"
@@ -584,11 +593,21 @@
   "coachDepthBalanced": "Ausgewogen",
   "coachDepthDeep": "Tiefgehend",
   "coachUnavailable": "Das Sprachmodell des Trainers ist noch nicht verfügbar.",
+  "coachProviderError": "Der Trainerdienst konnte diese Anfrage nicht abschließen.",
+  "coachProviderResponseInvalid": "Das Sprachmodell hat eine unbrauchbare Antwort geliefert; KChess hat sie deshalb nicht angezeigt.",
+  "coachEvidenceUnavailable": "Für diese Traineranfrage liegen noch nicht genügend verifizierte Stellungsdaten vor.",
+  "coachRateLimited": "Das Anfragelimit des Trainers ist vorübergehend erreicht. Versuche es in Kürze erneut.",
+  "coachDailyLimit": "Der Trainer hat sein tägliches Sprachmodell-Limit erreicht.",
+  "coachDeferred": "Diese Traineranfrage wurde zurückgestellt, um Kapazität für interaktive Fragen freizuhalten.",
   "coachOffTopic": "Der Trainer beantwortet ausschließlich Schachfragen.",
   "coachValidationFailed": "Die Trainerantwort konnte nicht sicher geprüft werden.",
   "coachSafeQuizFallbackAnswer": "Die Trainingsstellung ist bereit.",
   "coachSafeQuizFallbackQuestion": "Welchen Zug würdest du hier spielen?",
+  "coachQuizQuestionPending": "Die aktuelle Trainingsfrage ist noch offen. Spiele deinen Zug auf dem Brett oder nutze den Hinweis, wenn du Unterstützung möchtest.",
   "coachSafeHintFallbackAnswer": "Prüfe zuerst Schachs, Schlagzüge und direkte Drohungen. Welche deiner Figuren kann sofort aktiver werden?",
+  "coachSafePositionFallbackAnswer": "Die erzeugte Erklärung konnte nicht sicher verifiziert werden. Auf dem Brett wird nur ein verifizierter Engine-Kandidat gezeigt; KChess erfindet keinen anderen Zug.",
+  "coachVerdictGroundingUnavailable": "Ich kann diese Schachbewertung noch nicht verlässlich abgeben, weil die erforderliche native Engine-Evidenz fehlt. KChess rät nicht und ersetzt die fehlende Analyse nicht durch eine LLM-Meinung.",
+  "coachSafeComparisonFallbackAnswer": "Der detaillierte Vergleich konnte nicht sicher verifiziert werden. Auf dem Brett werden nur verifizierte Engine-Kandidaten für diese Stellung gezeigt.",
   "coachHintRequest": "Gib mir einen Hinweis zu dieser Stellung.",
   "coachFen": "FEN",
   "coachPgn": "PGN",
@@ -834,5 +853,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "coachSafeWorstMoveFallbackAnswer": "Die erzeugte Erklärung konnte nicht sicher verifiziert werden. Auf dem Brett wird nur der nativ geprüfte schlechteste Zug der Analyse markiert; er ist keine Empfehlung.",
+  "coachSafeFastestLossFallbackAnswer": "Die erzeugte Erklärung konnte nicht sicher verifiziert werden. Auf dem Brett wird nur der native Fokus der Schnellverlust-Analyse markiert. Ein erzwungener Verlust wird nur behauptet, wenn die Engine ihn nachweist.",
+  "coachSessionsTitle": "Coach-Sitzungen",
+  "coachNewSession": "Neue Sitzung",
+  "coachRenameSession": "Umbenennen",
+  "coachDeleteSession": "Löschen",
+  "coachDeleteSessionConfirm": "Diese Coach-Sitzung dauerhaft löschen?",
+  "coachSessionCancel": "Abbrechen",
+  "coachSessionSave": "Speichern",
+  "coachSessionEmpty": "Noch keine gespeicherten Coach-Sitzungen."
 }

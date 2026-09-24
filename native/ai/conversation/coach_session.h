@@ -28,6 +28,10 @@ struct CoachSessionState {
   std::optional<std::string> current_board;
   CoachIntent current_topic{CoachIntent::unknown};
   std::string current_goal;
+  // Compact multi-turn dialogue memory for semantic continuity. User text is
+  // preserved as conversation intent; assistant text is explicitly labelled
+  // non-authoritative when serialized and can never ground board truth.
+  std::vector<std::string> recent_dialogue;
   std::string last_claim;
   std::string last_recommendation;
   std::string referenced_concept;
@@ -36,13 +40,25 @@ struct CoachSessionState {
   std::string expected_move;
   std::string expected_reply;
   std::string exercise_skill_id;
+  // Hint progression is board-local and independent from scoring. Repeated
+  // hint requests advance deterministically instead of asking the provider to
+  // rediscover which hint was already shown.
+  std::string hint_board;
+  int hint_level{0};
   bool score_pending_move_question{false};
   std::vector<std::string> acceptable_moves;
   std::string last_attempt_status;
   std::string last_attempt_classification;
+  // Last authoritative native judgment and its source context. Persisted so a
+  // later user objection can be rechecked against the same move/position.
+  std::optional<ChessVerdictContract> last_chess_verdict;
+  std::optional<CoachMoveAttribution> last_move_attribution;
+  std::optional<std::string> last_verdict_fen;
   std::uint64_t last_used{0};
 
   [[nodiscard]] bool empty() const;
+  [[nodiscard]] bool has_open_scored_question_for(
+      const CoachRequest& request) const;
 };
 
 struct CoachLearningAttempt {
@@ -71,6 +87,10 @@ class CoachSessionMemory {
       const std::optional<std::string>& session_id,
       const std::optional<std::string>& profile_id,
       const std::optional<std::string>& question_fen) const;
+  void restore(const std::string& session_id, const CoachSessionState& state);
+  [[nodiscard]] std::optional<CoachSessionState> snapshot(
+      const std::optional<std::string>& session_id,
+      const std::optional<std::string>& profile_id) const;
   void remember(const ResolvedCoachTurn& turn, CoachIntent topic,
                 const CoachResponse& response, const QueryPlan* plan = nullptr,
                 const CandidateMoveSet* candidates = nullptr,

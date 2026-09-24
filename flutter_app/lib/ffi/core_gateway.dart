@@ -72,7 +72,10 @@ abstract interface class CoreGateway {
   Future<List<GameSummary>> queryGames(GameQuery query);
   Future<List<GameSummary>> favoriteGames();
   Future<GameDetail> game(String gameId);
-  Future<BotGameSession> createBotGame(int requestedElo);
+  Future<BotGameSession> createBotGame(
+    int requestedElo, {
+    String playerColor = 'white',
+  });
   Future<BotGameSession?> activeBotGame();
   Future<BotGameSession> botGame(String gameId);
   Future<List<BotGameSummary>> botGames();
@@ -112,6 +115,17 @@ abstract interface class CoreGateway {
   Future<Map<String, Object?>> coachPerformanceDiagnostics();
   Future<Map<String, Object?>> coachContext(Map<String, Object?> request);
   Future<Map<String, Object?>> coachAutomatic(Map<String, Object?> request);
+  Future<Map<String, Object?>> coachSessions(String profileId);
+  Future<Map<String, Object?>> createCoachSession(String profileId);
+  Future<Map<String, Object?>> coachSessionMessages(
+    Map<String, Object?> request,
+  );
+  Future<Map<String, Object?>> renameCoachSession(
+    Map<String, Object?> request,
+  );
+  Future<Map<String, Object?>> deleteCoachSession(
+    Map<String, Object?> request,
+  );
   Future<void> cancelCoachSessionJobs(String sessionId);
   Future<Map<String, Object?>> coachHint(Map<String, Object?> request);
   Future<Map<String, Object?>> knowledgeInspector(Map<String, Object?> request);

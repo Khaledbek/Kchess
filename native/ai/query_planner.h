@@ -6,8 +6,6 @@
 
 namespace kchess::ai {
 
-class TinyContextPlannerModel;
-
 // -----------------------------------------------------------------------------
 // Section: Evidence and budget planning
 // -----------------------------------------------------------------------------
@@ -15,8 +13,7 @@ class TinyContextPlannerModel;
 class QueryPlanner {
  public:
   [[nodiscard]] QueryPlan plan(
-      const CoachRequest& request, const DomainRoute& route,
-      const TinyContextPlannerModel* model = nullptr) const;
+      const CoachRequest& request, const DomainRoute& route) const;
 };
 
 }  // namespace kchess::ai

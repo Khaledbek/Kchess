@@ -16,6 +16,12 @@ std::string_view RemoteProvider::id() const noexcept {
   return config_.provider_id;
 }
 
+std::string RemoteProvider::cache_identity() const {
+  // Provider id alone is insufficient: switching the configured model while
+  // KChess remains open must invalidate exact validated-response cache hits.
+  return config_.provider_id + ":" + config_.model_id;
+}
+
 bool RemoteProvider::available() const noexcept {
   return static_cast<bool>(completion_);
 }
@@ -28,6 +34,7 @@ LLMProviderResult RemoteProvider::complete(
         .provider_id = config_.provider_id,
         .model_id = config_.model_id,
         .error_code = "remote_transport_unavailable",
+        .failure_kind = LLMProviderFailureKind::unavailable,
     };
   }
 

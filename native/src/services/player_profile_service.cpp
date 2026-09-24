@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <chrono>
+#include <iomanip>
+#include <sstream>
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -20,6 +23,7 @@
 #include "ai/profile/sample_builder.h"
 #include "diagnostics/logger.h"
 #include "knowledge/knowledge_runtime.h"
+#include "persistence/sqlite_write_priority.h"
 #include "services/provider_service.h"
 
 namespace kchess {
@@ -46,6 +50,35 @@ constexpr std::int64_t kProfileSafetyResyncSeconds = 300;
 // before profile maintenance starts competing for CPU and SQLite. Native wake
 // events are retained during the grace period and are processed afterwards.
 constexpr std::int64_t kProfileStartupGraceMs = 4000;
+
+
+std::string graph_source_signature(
+    const std::vector<PlayerProfileGameSourceRow>& sources) {
+  std::uint64_t hash = 1469598103934665603ULL;
+  auto mix = [&](const std::string_view value) {
+    for (const unsigned char byte : value) {
+      hash ^= static_cast<std::uint64_t>(byte);
+      hash *= 1099511628211ULL;
+    }
+    hash ^= 0xffU;
+    hash *= 1099511628211ULL;
+  };
+  for (const auto& source : sources) {
+    mix(source.game_id);
+    mix(std::to_string(source.source_version));
+    mix(std::to_string(source.move_count));
+    mix(std::to_string(source.played_at));
+    mix(source.opening_eco);
+    mix(source.opening_name);
+    mix(source.result);
+    mix(source.provider_outcome);
+    mix(source.player_color);
+    mix(source.time_control_type);
+  }
+  std::ostringstream out;
+  out << "fnv1a64:" << std::hex << std::setfill('0') << std::setw(16) << hash;
+  return out.str();
+}
 
 ai::ProfileGameObservation observation_from_source(
     const PlayerProfileGameSourceRow& row,
@@ -1394,10 +1427,24 @@ void PlayerProfileService::refresh_profile(
   // graph as the active retrieval layer. It projects the learned profile plus
   // existing statistics/games/analysis sources, refreshes quality/conflicts,
   // materializes semantic chunks, and updates active-learning gaps.
+  // Derived knowledge is background-only work. Never begin the expensive graph
+  // projection while foreground analysis is active or already waiting for the
+  // shared SQLite writer. Requeue the refresh instead; the worker will resume it
+  // after foreground work releases priority.
+  const auto write_priority = persistence::sqlite_write_priority_gate().snapshot();
+  if (write_priority.foreground_sessions != 0 ||
+      write_priority.foreground_waiters != 0) {
+    profile_refresh_requested_ = true;
+    set_worker_activity(
+        "profile_refresh", "knowledge_refresh_deferred",
+        "foreground_analysis_has_priority_over_derived_knowledge", profile_id);
+    return;
+  }
   set_worker_activity(
       "profile_refresh", "knowledge_refresh",
       "project_changed_profile_sources_into_shared_knowledge_runtime", profile_id);
-  (void)knowledge_runtime_.refresh_active_profile(now_seconds * 1000);
+  (void)knowledge_runtime_.refresh_active_profile(
+      now_seconds * 1000, graph_source_signature(sources));
 }
 
 bool PlayerProfileService::run_engine_request(

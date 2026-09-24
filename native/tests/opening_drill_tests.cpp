@@ -34,6 +34,19 @@ struct Core {
         std::filesystem::temp_directory_path() / "kchess_opening_drill_tests";
     std::filesystem::remove_all(directory);
     std::filesystem::create_directories(directory);
+
+    // Opening drills now require the immutable KCL graph at native startup.
+    // Keep this ABI regression test self-contained by installing the same
+    // bundled assets that Flutter copies into application support storage.
+    const auto repo_root = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
+    const auto assets = repo_root / "flutter_app" / "assets";
+    for (const char* name : {"opening_lines.kcl", "opening_names.kco", "opening_book.kcb"}) {
+      const auto source = assets / name;
+      expect(std::filesystem::exists(source), std::string("Bundled opening asset missing: ") + name);
+      std::filesystem::copy_file(
+          source, directory / name, std::filesystem::copy_options::overwrite_existing);
+    }
+
     handle = kc_core_create(directory.string().c_str());
     expect(handle != nullptr, "Core handle must be created");
     expect(kc_core_initialize(handle) == KC_STATUS_OK, "Core must initialize");

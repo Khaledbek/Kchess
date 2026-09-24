@@ -1,0 +1,12 @@
+KChess Opening Trainer Diagnostic Hotfix 1/1
+
+Cause:
+- Diagnostics had been added to OpeningScenarioList, but start failures occur inside OpeningTrainerScreen.
+- OpeningTrainerScreen still used catch (_) for start/move and discarded the native/FFI exception details.
+
+Fix:
+- Preserve CoreGatewayException.message for start/move failures.
+- Render the exact error below the generic localized banner as selectable text.
+- Reset stale error details on restart.
+
+No build/test/flutter analyze/flutter run executed.

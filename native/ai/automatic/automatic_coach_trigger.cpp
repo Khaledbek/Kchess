@@ -63,6 +63,29 @@ bool has_new_motif(const AutomaticCoachEvent& event) {
   });
 }
 
+bool has_reason(const AutomaticCoachDecision& decision,
+                const AutomaticCoachReason reason) {
+  return std::find(decision.reasons.begin(), decision.reasons.end(), reason) !=
+         decision.reasons.end();
+}
+
+bool has_primary_reason(const AutomaticCoachDecision& decision) {
+  return has_reason(decision, AutomaticCoachReason::inaccuracy) ||
+         has_reason(decision, AutomaticCoachReason::mistake) ||
+         has_reason(decision, AutomaticCoachReason::blunder) ||
+         has_reason(decision, AutomaticCoachReason::missed_tactic) ||
+         has_reason(decision, AutomaticCoachReason::large_wdl_shift) ||
+         has_reason(decision, AutomaticCoachReason::repeated_personal_mistake) ||
+         has_reason(decision, AutomaticCoachReason::brilliant);
+}
+
+bool has_critical_override(const AutomaticCoachDecision& decision,
+                           const double loss) {
+  return has_reason(decision, AutomaticCoachReason::blunder) ||
+         has_reason(decision, AutomaticCoachReason::missed_tactic) ||
+         loss >= 0.22;
+}
+
 }  // namespace
 
 // -----------------------------------------------------------------------------
@@ -82,9 +105,9 @@ AutomaticCoachDecision AutomaticCoachTrigger::decide(
     add_reason(decision, AutomaticCoachReason::mistake, 0.90);
   } else if (event.classification == "miss") {
     add_reason(decision, AutomaticCoachReason::missed_tactic, 0.88);
-  } else if (event.classification == "okay" && loss >= 0.065) {
-    // KChess has no separate Inaccuracy label. A materially weaker Okay move
-    // is the narrow automatic-coach equivalent without changing classification.
+  } else if (event.classification == "inaccuracy") {
+    // Inaccuracy is now an authoritative native move category. It remains a
+    // low-priority teaching signal and does not justify an interruption alone.
     add_reason(decision, AutomaticCoachReason::inaccuracy, 0.68);
   }
 
@@ -124,19 +147,30 @@ AutomaticCoachDecision AutomaticCoachTrigger::decide(
   decision.practice_relevance =
       std::clamp(event.due_practice_relevance, 0.0, 1.0);
 
-  // Repeated unsolicited interruptions should be rarer than one-off teaching
-  // events. A severe objective event still clears the gate; weaker events can
-  // be deferred when the Coach spoke very recently. The state is supplied by
-  // CoachService and is intentionally process/session local.
+  // Motifs and phase changes are supporting context, not standalone reasons
+  // to interrupt the user. At least one move-quality, large-shift, personal or
+  // exceptional positive signal must be present before recency is considered.
+  decision.primary_reason_present = has_primary_reason(decision);
+  decision.critical_override = has_critical_override(decision, loss);
+
+  // Repeated unsolicited interruptions are deliberately expensive. The gate
+  // has no timer thread: CoachService supplies the age of the last successfully
+  // delivered unsolicited turn. Very recent turns are a hard quiet period for
+  // ordinary events; only a blunder, missed tactic or exceptionally large WDL
+  // loss may break it.
   if (event.seconds_since_last_automatic) {
-    const auto seconds = std::max<std::int64_t>(0,
-        *event.seconds_since_last_automatic);
-    if (seconds < 15) {
-      decision.interruption_cost = 0.20;
-    } else if (seconds < 45) {
+    const auto seconds = std::max<std::int64_t>(
+        0, *event.seconds_since_last_automatic);
+    if (seconds < 30) {
+      decision.interruption_cost = 0.18;
+      decision.minimum_teaching_value = 0.68;
+      decision.recency_blocked = !decision.critical_override;
+    } else if (seconds < 75) {
       decision.interruption_cost = 0.12;
-    } else if (seconds < 120) {
+      decision.minimum_teaching_value = 0.82;
+    } else if (seconds < 180) {
       decision.interruption_cost = 0.06;
+      decision.minimum_teaching_value = 0.76;
     }
   }
 
@@ -147,9 +181,13 @@ AutomaticCoachDecision AutomaticCoachTrigger::decide(
           decision.interruption_cost,
       0.0, 1.0);
   decision.priority = decision.teaching_value;
-  decision.trigger = event.previous_fen.has_value() &&
-                     event.current_fen.has_value() &&
-                     decision.teaching_value >= 0.62;
+
+  const bool has_position_transition = event.previous_fen.has_value() &&
+                                       event.current_fen.has_value();
+  decision.trigger = has_position_transition &&
+                     decision.primary_reason_present &&
+                     !decision.recency_blocked &&
+                     decision.teaching_value >= decision.minimum_teaching_value;
   return decision;
 }
 

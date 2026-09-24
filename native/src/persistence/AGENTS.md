@@ -224,3 +224,36 @@ No schema migration is introduced. The historical `ai_coach_skill_progress.motif
 - `native/ai/teaching/spaced_repetition_scheduler.*` owns interval and due-policy. Scheduling metadata expresses when to revisit a verified exercise, never a measured player rating or proof of mastery.
 - Only natively verified quiz attempts update the schedule. An independent success advances the interval; a natively verified weak move resets the streak and schedules a near-term revisit. Ungraded legal alternatives still do not become attempts.
 - Historical coarse motif rows remain compatible cold-start priors. New namespaced skill IDs share the same table and scheduling contract.
+
+## Coach Series 2 Update 4 - durable Coach sessions
+
+Schema migration 43 adds `ai_coach_sessions`, `ai_coach_session_messages` and the profile-local `ai_coach_session_counters` sequence to the existing `kchess.sqlite3`. Coach sessions are owned by a KChess profile and are deleted with it. Default names are allocated monotonically as `Sitzung N`; deleting an older session never reuses its number. `created_at`, `updated_at` and `last_opened_at` are persistence-facing timestamps.
+
+The message table is the durable user-visible transcript. Assistant rows may also retain the serialized native response payload so deterministic/native answers can be reconstructed and localized later without inventing prose. `compact_state_json` is a separate bounded continuation snapshot for `CoachSessionMemory`; never use the full transcript as planner evidence or duplicate it into another database. Session rename/delete/list APIs belong to `Database`; Flutter must reach them only through the native service/FFI boundary.
+
+## Coach Series 2 Update 5 - session creation authority
+
+`Database::create_coach_session(...)` is the native allocation entry point for user-created Coach sessions. It generates the opaque ID and delegates to the existing transactional monotonic `Sitzung N` allocator. Flutter must never calculate the next number or reuse deleted numbers. Session list/message reads remain profile-scoped; transcript payload corruption must not make plain stored message text unreadable.
+
+
+## Coach Series 2 Update 6 - knowledge maintenance checkpoint
+
+Schema migration 44 adds `ai_knowledge_maintenance_state`. It stores only profile-local derived-maintenance metadata: the last successfully projected game-graph source signature, last full-maintenance timestamp, and update timestamp. It contains no PGN, provider secret, Coach transcript or engine payload. The row is cascade-deleted with the owning profile. This checkpoint exists to prevent redundant opening/position/transition graph rebuilds across profile switches and process restarts.
+
+## Classification/Arrow Coherence Series - Update 7/9
+
+Persisted engine analysis and derived classification have separate validity. `analysis_runs`/`engine_lines` remain reusable raw evidence across classifier updates, while statistics/profile/general game reads accept classification-derived fields only when the run matches `analysis/classifier_contract.h`. Do not regress to `classifier_version>0` as a validity test. `statistics_games_missing_move_accuracy(...)` also selects stale classifier generations so `AnalysisService` can rebuild from the saved slots with zero engine work. A final classification commit advances statistics-source revision and requeues the owning profile evidence; partial classification remains non-current.
+## Best-Move / Reclassification Series — Update 3/6
+
+- Maximum-depth refinement reclassifies each move as soon as both deeper adjacent position slots are available. A shallow completed category remains visible only until that deeper move becomes decidable; deeper analysis may then replace it in either direction.
+- Move-level classifier currentness is checked from the move row itself, independently of the run-level final summary version. This permits progressive categories while game-wide accuracy/counters remain atomic until the final rebuild.
+- `pending` is only a temporary state when neither a deeper category nor a previously published shallow category exists. Flutter does not preserve old labels or choose between depths.
+
+## Best-Move / Reclassification Series — Update 4/6
+
+- SF18 and SF19 are strict Analysis truth namespaces. The selected engine owns its live worker, final best move, WDL/PV evidence, classification/reclassification and reusable game analysis. No completed run may prune or substitute the other Stockfish generation's persisted analysis for the same game.
+- `Database::prune_game_analyses_except(...)` is engine-scoped: a newer run supersedes only rows with the same `engine_version`. Switching SF18 -> SF19 -> SF18 therefore preserves each engine's compatible game cache instead of destructively deleting the inactive engine's truth.
+- Live engine changes remain fail-safe: `Core::set_engine_id()` validates the candidate before persisting the setting, then `AnalysisService::prepare_for_engine_change()` cancels/joins main-line, refinement and variation work from the previous engine. The next request is created from the newly selected engine only.
+- Position-cache and sideline reuse remain isolated by `ChessEngine::cache_identity()` / `position_cache_engine_identity(...)`; the in-memory sideline cache is cleared when its engine changes. Flutter contains no SF18/SF19 reconciliation policy.
+- No ABI or SQLite schema migration is introduced by this update. No builds or tests are executed by the assistant.
+

@@ -38,6 +38,12 @@ std::vector<std::string> legal_promotion_choices(
     const std::string& source,
     const std::string& target);
 
+// Returns every legal move in canonical UCI form for a standalone FEN.
+// Ordering follows Stockfish's native legal-move enumeration and carries no
+// strength/ranking meaning. This is intentionally a chess primitive so higher
+// layers can evaluate the complete move set without reimplementing legality.
+std::vector<std::string> legal_uci_moves(const std::string& fen);
+
 // Detects terminal no-move states and the fifty-move rule from a standalone FEN.
 // Repetition claims require full history and are intentionally not inferred here.
 PositionOutcome position_outcome(const std::string& fen);

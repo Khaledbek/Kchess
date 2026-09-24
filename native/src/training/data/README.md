@@ -29,3 +29,23 @@ Die eingebetteten Daten werden von der nativen Trainingspipeline ausgewertet. L√
 ## Dateischnitt
 
 Die `.inc`-Dateien sind Inhaltsdaten, kein handgeschriebener Algorithmus. Die Opening-Aufteilung folgt den ECO-Gruppen A bis E; Studien bleiben in einem separaten Katalog. Vendorte/erzeugte Inhaltszeilen werden nicht nur f√ºr Stilregeln umformatiert.
+
+
+## Training-Arena role
+
+`openings_a.inc` bis `openings_e.inc` sind seit der KCL-Migration **kein
+Fortsetzungs-/Antwortbuch** mehr. Sie bleiben als stabile Katalog-/ID-/Hierarchie-
+und Setup-Quelle erhalten, damit bestehende `opening_<id>`-Fortschritte und die
+UI-Auswahl kompatibel bleiben.
+
+KCL1 speichert pro sortiertem Terminal-Positionsschluessel eine komplette
+Zugfolge von der Standardstellung bis zu dieser Position. Diese gespeicherten
+Move-Ranges sind **keine ausgehenden Kanten**. Native `opening_line_graph.*`
+replayt die Linien beim Laden und leitet daraus einen positionsbasierten Graphen
+ab, in dem gemeinsame Praefixe und Transpositionen zusammenlaufen.
+
+Sobald ein Opening-Drill an seiner benannten Startstellung angekommen ist, ist
+dieser abgeleitete KCL-Graph die einzige erlaubte Topologie fuer weitere Zuege.
+`opening_book.kcb` gewichtet die abgeleiteten KCL-Kanten statistisch, und
+`opening_names.kco` benennt erreichte Positionen. Der fruehere PolyGlot-Fallback
+ist fuer die produktive Training-Arena entfernt.

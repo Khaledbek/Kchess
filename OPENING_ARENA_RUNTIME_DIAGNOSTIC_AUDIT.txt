@@ -1,0 +1,35 @@
+KChess Opening Arena Runtime Diagnostic Series — Final Audit
+Date: 2026-09-19
+
+Scope
+- Diagnose the misleading "opening not in database" training-arena failure after KCL integration.
+- Do not run builds, tests, flutter analyze, flutter run, or app execution.
+
+Static asset verification
+- opening_lines.kcl: KCL1, 3,810 nodes, 36,925 edges, maxPly 36.
+- opening_names.kco: 3,810 entries.
+- KCL and KCO contain the exact same ordered 3,810 position-key set in the bundled project state.
+- The legacy opening catalogue contains 3,810 rows and the same ECO/name/ply multiset as KCO.
+
+Root architectural defect corrected
+- Core initialization previously treated KCL/KCO coverage/fingerprint equality as a hard gate for KCL.
+- That made optional naming metadata (KCO) capable of disabling the authoritative training topology (KCL).
+- KCL now loads independently. KCO coverage differences produce diagnostics only; graph training remains enabled.
+
+Diagnostic contract corrected
+- UnavailableOpeningLineGraph now retains the concrete availability/load error.
+- Missing opening_lines.kcl records a precise missing-file reason.
+- KCL parser failures preserve their exception reason.
+- Practice command openingStatus reports graph availability, node/edge/max-ply metadata, KCL source, concrete graph error, KCO metadata, and whether bundled coverage is identical.
+- Opening start errors now include the concrete graph availability reason.
+- Opening scenario UI preflights native openingStatus and displays native details instead of reducing every failure to a guessed database diagnosis.
+- Opening trainer/deep-link errors preserve CoreGatewayException details.
+
+Authority after fix
+- KCL = training topology / legal training continuations.
+- KCO = optional ECO/name labeling only.
+- KCB = statistical weighting only.
+- Flutter = presentation and native-status display only.
+
+Execution
+- No builds or tests were executed by ChatGPT, per project rules.

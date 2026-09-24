@@ -25,7 +25,7 @@ typedef void* kc_core_handle;
 
 // Increment only when the C ABI changes incompatibly. Additive exports may
 // keep the same ABI version. Flutter validates this before creating Core.
-#define KCHESS_CORE_ABI_VERSION 9
+#define KCHESS_CORE_ABI_VERSION 11
 
 typedef enum kc_status {
   KC_STATUS_OK = 0,
@@ -128,10 +128,6 @@ KCHESS_API char* kc_import_fen_json(
     const char* fen_utf8,
     const char* display_name_utf8);
 KCHESS_API char* kc_start_provider_profile_json(
-    kc_core_handle handle,
-    int32_t profile_type,
-    const char* username_utf8);
-KCHESS_API char* kc_start_scout_json(
     kc_core_handle handle,
     int32_t profile_type,
     const char* username_utf8);
@@ -241,7 +237,10 @@ KCHESS_API kc_status kc_cancel_variation_analysis(
     kc_core_handle handle,
     const char* job_id_utf8);
 
-KCHESS_API char* kc_create_bot_game_json(kc_core_handle handle, int32_t requested_elo);
+KCHESS_API char* kc_create_bot_game_json(
+    kc_core_handle handle,
+    int32_t requested_elo,
+    const char* player_color_utf8);
 KCHESS_API char* kc_active_bot_game_json(kc_core_handle handle);
 KCHESS_API char* kc_bot_game_json(kc_core_handle handle, const char* game_id_utf8);
 KCHESS_API char* kc_bot_games_json(kc_core_handle handle);
@@ -304,6 +303,21 @@ KCHESS_API char* kc_start_coach_hint_json(
 KCHESS_API char* kc_coach_job_status_json(
     kc_core_handle handle,
     const char* job_id_utf8);
+KCHESS_API char* kc_coach_sessions_json(
+    kc_core_handle handle,
+    const char* profile_id_utf8);
+KCHESS_API char* kc_create_coach_session_json(
+    kc_core_handle handle,
+    const char* profile_id_utf8);
+KCHESS_API char* kc_coach_session_messages_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_rename_coach_session_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
+KCHESS_API char* kc_delete_coach_session_json(
+    kc_core_handle handle,
+    const char* request_json_utf8);
 KCHESS_API kc_status kc_cancel_coach_job(
     kc_core_handle handle,
     const char* job_id_utf8);

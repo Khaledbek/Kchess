@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "../coach_types.h"
+#include "chess_verdict.h"
 
 namespace kchess::ai {
 
@@ -44,6 +45,10 @@ struct CoachClaim {
   // Exact excerpt from answer/follow_up_question containing this assertion.
   // Native validation checks the excerpt and the typed source independently.
   std::string answer_quote;
+  // Stable native reference for move-bound provider claims. Provider adapters
+  // resolve this ID to subject (UCI) before validation; free-form provider move
+  // strings are not authoritative.
+  std::string candidate_id;
   std::string subject;
   std::string value;
   std::vector<std::string> evidence_ids;
@@ -65,6 +70,9 @@ struct CoachConceptReference {
 };
 
 struct CoachRecommendation {
+  // Stable native candidate reference selected by the provider. move_uci is
+  // resolved natively from exact provider-visible candidate evidence.
+  std::string candidate_id;
   std::string move_uci;
   std::string text;
   std::vector<std::string> evidence_ids;
@@ -76,10 +84,25 @@ enum class CoachSegmentKind { factual, general, uncertainty, dialogue };
 struct CoachAnswerSegment {
   std::string text;
   CoachSegmentKind kind{CoachSegmentKind::dialogue};
+  // Native chess fact references selected from provider-visible
+  // coach.chess_facts.v1 evidence. The provider never authors the payload
+  // behind these IDs; native validation owns their meaning.
+  std::vector<std::string> fact_ids;
   std::vector<std::size_t> claim_indices;
 };
 
+struct CoachVerdictLockAck {
+  bool active{false};
+  std::string position_verdict{"unknown"};
+  std::string move_verdict{"unknown"};
+  std::string review_outcome{"none"};
+};
+
 struct StructuredCoachContent {
+  // Short localized lead sentence for an authoritative native chess verdict.
+  // Empty when no authoritative verdict is active. The provider may phrase it,
+  // but native verdict_lock owns the judgment it must express.
+  std::string verdict_summary;
   std::string answer;
   std::string follow_up_question;
   std::vector<CoachAnswerSegment> answer_segments;
@@ -88,6 +111,10 @@ struct StructuredCoachContent {
   std::vector<CoachConceptReference> concepts;
   std::vector<CoachRecommendation> recommendations;
   std::vector<std::string> evidence_ids;
+  // Provider echo of the native verdict lock. The schema constrains these
+  // values to the exact native verdict/review and ResponseValidator checks the
+  // echo again before any prose can cross the trust boundary.
+  CoachVerdictLockAck verdict_lock;
 
   // Explicit provider declaration for personal grounding. Values:
   // not_used, grounded, insufficient_evidence. Empty remains compatible with

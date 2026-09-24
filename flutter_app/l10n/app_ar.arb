@@ -103,6 +103,7 @@
   "critical": "نقلة رائعة",
   "best": "الأفضل",
   "excellent": "ممتازة",
+  "inaccuracy": "عدم دقة",
   "okay": "جيدة",
   "miss": "فرصة ضائعة",
   "mistake": "خطأ",
@@ -134,6 +135,14 @@
   "openAnalysis": "فتح التحليل",
   "bestMoveText": "{move} هي أفضل نقلة.",
   "@bestMoveText": {
+    "placeholders": {
+      "move": {
+        "type": "String"
+      }
+    }
+  },
+  "worstMoveText": "{move} هي أسوأ نقلة.",
+  "@worstMoveText": {
     "placeholders": {
       "move": {
         "type": "String"
@@ -584,11 +593,21 @@
   "coachDepthBalanced": "متوازن",
   "coachDepthDeep": "متعمق",
   "coachUnavailable": "نموذج اللغة الخاص بالمدرب غير متاح بعد.",
+  "coachProviderError": "تعذر على خدمة المدرب إكمال هذا الطلب.",
+  "coachProviderResponseInvalid": "أعاد نموذج اللغة استجابة غير صالحة للاستخدام، لذلك لم يعرضها KChess.",
+  "coachEvidenceUnavailable": "لا تتوفر بعد أدلة موثقة كافية عن الوضعية لهذا الطلب التدريبي.",
+  "coachRateLimited": "تم بلوغ حد طلبات المدرب مؤقتًا. حاول مرة أخرى بعد قليل.",
+  "coachDailyLimit": "بلغ المدرب الحد اليومي لاستخدام نموذج اللغة.",
+  "coachDeferred": "تم تأجيل طلب المدرب هذا للحفاظ على السعة للأسئلة التفاعلية.",
   "coachOffTopic": "يمكن للمدرب الإجابة عن الأسئلة المتعلقة بالشطرنج فقط.",
   "coachValidationFailed": "تعذر التحقق من إجابة المدرب بشكل آمن.",
   "coachSafeQuizFallbackAnswer": "وضعية التدريب جاهزة.",
   "coachSafeQuizFallbackQuestion": "ما النقلة التي ستلعبها هنا؟",
+  "coachQuizQuestionPending": "سؤال التدريب الحالي ما زال مفتوحًا. العب نقلتك على الرقعة، أو استخدم التلميح إذا أردت المساعدة.",
   "coachSafeHintFallbackAnswer": "ابدأ بالنقلات القسرية: الكشوف والأخذ والتهديدات المباشرة. أي قطعة لديك يمكن أن تصبح أكثر نشاطًا فورًا؟",
+  "coachSafePositionFallbackAnswer": "تعذر التحقق بأمان من الشرح المُنشأ. تعرض الرقعة مرشحًا واحدًا فقط تم التحقق منه بواسطة المحرك، ولن يخترع KChess نقلة أخرى.",
+  "coachVerdictGroundingUnavailable": "لا يمكنني إصدار حكم شطرنجي موثوق على هذا السؤال الآن لأن دليل المحرك الأصلي المطلوب غير متاح. لن يخمّن KChess ولن يستبدل التحليل المفقود برأي من نموذج لغوي.",
+  "coachSafeComparisonFallbackAnswer": "تعذر التحقق بأمان من المقارنة التفصيلية. تعرض الرقعة فقط مرشحات المحرك التي تم التحقق منها لهذه الوضعية.",
   "coachHintRequest": "أعطني تلميحًا لهذه الوضعية.",
   "coachFen": "FEN",
   "coachPgn": "PGN",
@@ -834,5 +853,15 @@
         "type": "int"
       }
     }
-  }
+  },
+  "coachSafeWorstMoveFallbackAnswer": "تعذر التحقق بأمان من الشرح المُنشأ. تعرض الرقعة فقط أسوأ نقلة تحققت منها التحليلات الأصلية لهذه الوضعية؛ وهي ليست توصية.",
+  "coachSafeFastestLossFallbackAnswer": "تعذر التحقق بأمان من الشرح المُنشأ. تعرض الرقعة فقط التركيز الأصلي لتحليل أسرع خسارة. لا تُعد الخسارة إجبارية إلا إذا أثبتها المحرك.",
+  "coachSessionsTitle": "جلسات المدرب",
+  "coachNewSession": "جلسة جديدة",
+  "coachRenameSession": "إعادة التسمية",
+  "coachDeleteSession": "حذف",
+  "coachDeleteSessionConfirm": "هل تريد حذف جلسة المدرب هذه نهائيًا؟",
+  "coachSessionCancel": "إلغاء",
+  "coachSessionSave": "حفظ",
+  "coachSessionEmpty": "لا توجد جلسات مدرب محفوظة بعد."
 }

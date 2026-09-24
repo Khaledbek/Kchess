@@ -261,6 +261,7 @@ String? _classificationAsset(MoveClassification classification) =>
       MoveClassification.excellent => 'assets/analysis_img/move_excellent.png',
       MoveClassification.good => 'assets/analysis_img/move_okay.png',
       MoveClassification.okay => 'assets/analysis_img/move_okay.png',
+      MoveClassification.inaccuracy => 'assets/analysis_img/move_inaccuracy.png',
       MoveClassification.miss => 'assets/analysis_img/move_miss.png',
       MoveClassification.mistake => 'assets/analysis_img/move_mistake.png',
       MoveClassification.blunder => 'assets/analysis_img/move_blunder.png',

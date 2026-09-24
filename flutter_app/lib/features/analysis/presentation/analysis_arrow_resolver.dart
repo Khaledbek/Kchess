@@ -7,29 +7,21 @@ import '../../../shared/models/models.dart';
 bool _usableArrowMove(String move) =>
     move.length >= 4 && move != '0000' && move != '(none)';
 
-EngineLine? _rankOneLine(List<EngineLine> lines) {
-  for (final line in lines) {
-    if (line.rank == 1) return line;
-  }
-  return null;
-}
-
-/// Resolves the position-bound rank-1 move drawn by the analysis arrow.
+/// Resolves the native, position-bound best-move arrow contract.
+///
+/// Flutter deliberately does not infer rank 1 from visible PV lines.  The
+/// native AnalysisService owns whether a completed engine snapshot is coherent
+/// enough to publish an arrow and transports the exact move/FEN provenance.
 String resolveAnalysisArrowMove({
-  required List<EngineLine> lines,
-  required String resultBestMove,
+  required AnalysisArrowContract? contract,
   required String boardFen,
-  required String analysisFen,
 }) {
-  // Keep the arrow tied to the analyzed board position and rank-1 PV.
-  if (analysisFen.isNotEmpty && boardFen.isNotEmpty && analysisFen != boardFen) {
+  if (contract == null || !contract.renderable) return '';
+  if (contract.schema != 'analysis.arrow.v1' || contract.snapshotId.isEmpty) {
     return '';
   }
-
-  final rankOneMove = _rankOneLine(lines)?.bestMove ?? '';
-  if (_usableArrowMove(rankOneMove)) return rankOneMove;
-
-  // Terminal/partial snapshots can lack a PV. In that narrow case the native
-  // result-level bestMove remains a safe fallback.
-  return _usableArrowMove(resultBestMove) ? resultBestMove : '';
+  if (contract.fen.isEmpty || boardFen.isEmpty || contract.fen != boardFen) {
+    return '';
+  }
+  return _usableArrowMove(contract.move) ? contract.move : '';
 }

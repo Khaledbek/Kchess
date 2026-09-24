@@ -1,0 +1,54 @@
+KChess Best-Move / Reclassification Series — Final Audit (6/6)
+
+Scope
+-----
+Static source audit of the six-update correction series. No build or test command
+was executed.
+
+Resolved contracts
+------------------
+1. Best-Move Authority
+   Running search uses complete MultiPV rank 1 provisionally. Completed search
+   uses the selected Stockfish engine final bestmove. Service presentation no
+   longer replaces a usable final bestmove with lines.front().
+
+2. Classification Always Contract
+   Completed legal moves keep a normal native class. Stability/depth/budget
+   diagnostics no longer convert a finished move to unknown. Current classifier
+   generations are SF18 v15 and SF19 v1907.
+
+3. Progressive Depth Reclassification
+   Maximum-depth refinement publishes a deeper per-move category once both
+   adjacent deep slots are available. The final rebuild remains the atomic
+   game-summary/accuracy commit.
+
+4. SF18/SF19 Isolation
+   Persisted game-analysis pruning is engine-scoped. Switching engines stops old
+   live workers but keeps each engine's compatible persisted analysis. Position
+   caches remain tied to exact engine/cache identity.
+
+5. Cache/Persistence/UI Reconciliation
+   Stale classifier generations reuse persisted engine slots and rebuild labels
+   without unnecessary Stockfish work. Flutter performs the terminal adjacent
+   position refresh so final bestmove/reclassification cannot remain hidden
+   behind the penultimate running snapshot.
+
+6. Regression/Audit Cleanup
+   Regression source now covers completed classification, cache reuse, exact
+   MultiPV snapshots, rapid sideline supersession and SF18->SF19->SF18 isolation.
+   Existing classifier-quality coverage retains exchange/net-material semantics.
+   Old tests that required completed bestMove == lines.front() were corrected.
+   The dead SF19 historical-PV promotion helper and its auxiliary rank maps were
+   removed; the exact snapshot accumulator is the only SF19 line-coherence path.
+
+Static reference audit
+----------------------
+- No production reference remains to coherent_stockfish19_ranked_lines.
+- No live_lines_by_move historical promotion map remains.
+- No test/document contract requires final bestmove to equal captured MultiPV
+  rank 1.
+- pending remains only a temporary analysis/UI transport state where no current
+  completed move classification exists yet.
+- No ABI change and no SQLite migration were introduced by this series.
+- No cleanup script is required because this series removes code paths, not
+  repository files.

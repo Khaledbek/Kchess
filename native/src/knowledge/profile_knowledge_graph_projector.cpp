@@ -291,7 +291,7 @@ std::optional<std::pair<KnowledgeNodeKind, std::string>> explicit_motif(
 }
 
 bool major_error(std::string_view classification) {
-  return classification == "miss" || classification == "mistake" ||
+  return classification == "inaccuracy" || classification == "miss" || classification == "mistake" ||
          classification == "blunder";
 }
 

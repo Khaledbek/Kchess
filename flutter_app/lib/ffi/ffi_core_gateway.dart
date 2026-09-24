@@ -24,8 +24,16 @@ typedef _StatusNoArgsNative = Int32 Function(Pointer<Void>);
 typedef _StatusNoArgsDart = int Function(Pointer<Void>);
 typedef _StringNoArgsNative = Pointer<Utf8> Function(Pointer<Void>);
 typedef _StringNoArgsDart = Pointer<Utf8> Function(Pointer<Void>);
-typedef _StringIntNative = Pointer<Utf8> Function(Pointer<Void>, Int32);
-typedef _StringIntDart = Pointer<Utf8> Function(Pointer<Void>, int);
+typedef _StringIntStringNative = Pointer<Utf8> Function(
+  Pointer<Void>,
+  Int32,
+  Pointer<Utf8>,
+);
+typedef _StringIntStringDart = Pointer<Utf8> Function(
+  Pointer<Void>,
+  int,
+  Pointer<Utf8>,
+);
 typedef _StringArgNative = Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>);
 typedef _StringArgDart = Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>);
 typedef _StringTwoArgsNative = Pointer<Utf8> Function(
@@ -183,7 +191,7 @@ typedef _FreeStringNative = Void Function(Pointer<Utf8>);
 typedef _FreeStringDart = void Function(Pointer<Utf8>);
 
 class FfiCoreGateway implements CoreGateway {
-  static const int _supportedAbiVersion = 9;
+  static const int _supportedAbiVersion = 11;
 
   FfiCoreGateway._(this._library, this._dataDirectory) {
     try {
@@ -346,9 +354,10 @@ class FfiCoreGateway implements CoreGateway {
         .lookupFunction<_ResolveBoardMoveNative, _ResolveBoardMoveDart>(
           'kc_resolve_board_move_json',
         );
-    _createBotGame = _library.lookupFunction<_StringIntNative, _StringIntDart>(
-      'kc_create_bot_game_json',
-    );
+    _createBotGame = _library.lookupFunction<
+      _StringIntStringNative,
+      _StringIntStringDart
+    >('kc_create_bot_game_json');
     _activeBotGame = _library
         .lookupFunction<_StringNoArgsNative, _StringNoArgsDart>(
           'kc_active_bot_game_json',
@@ -426,6 +435,21 @@ class FfiCoreGateway implements CoreGateway {
     );
     _coachJobStatus = _library.lookupFunction<_StringArgNative, _StringArgDart>(
       'kc_coach_job_status_json',
+    );
+    _coachSessions = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_coach_sessions_json',
+    );
+    _createCoachSession = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_create_coach_session_json',
+    );
+    _coachSessionMessages = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_coach_session_messages_json',
+    );
+    _renameCoachSession = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_rename_coach_session_json',
+    );
+    _deleteCoachSession = _library.lookupFunction<_StringArgNative, _StringArgDart>(
+      'kc_delete_coach_session_json',
     );
     _cancelCoachJob = _library.lookupFunction<_StatusStringNative, _StatusStringDart>(
       'kc_cancel_coach_job',
@@ -600,6 +624,13 @@ class FfiCoreGateway implements CoreGateway {
     );
 
     stopwatch = Stopwatch()..start();
+    await _installBundledAsset(directory.path, 'opening_lines.kcl');
+    diagnostics.recordFfiGatewayDuration(
+      'openingLinesAssetSyncMs',
+      stopwatch.elapsedMilliseconds,
+    );
+
+    stopwatch = Stopwatch()..start();
     final gateway = FfiCoreGateway._(library, directory.path);
     diagnostics.recordFfiGatewayDuration(
       'bindingLookupMs',
@@ -670,7 +701,7 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringNoArgsDart _favoriteGames;
   late final _StringArgDart _game;
   late final _ResolveBoardMoveDart _resolveBoardMove;
-  late final _StringIntDart _createBotGame;
+  late final _StringIntStringDart _createBotGame;
   late final _StringNoArgsDart _activeBotGame;
   late final _StringArgDart _botGame;
   late final _StringNoArgsDart _botGames;
@@ -694,6 +725,11 @@ class FfiCoreGateway implements CoreGateway {
   late final _StringArgDart _startCoachAutomatic;
   late final _StringArgDart _startCoachHint;
   late final _StringArgDart _coachJobStatus;
+  late final _StringArgDart _coachSessions;
+  late final _StringArgDart _createCoachSession;
+  late final _StringArgDart _coachSessionMessages;
+  late final _StringArgDart _renameCoachSession;
+  late final _StringArgDart _deleteCoachSession;
   late final _StatusStringDart _cancelCoachJob;
   late final _StringArgDart _knowledgeInspector;
   late final _StringNoArgsDart _trainingOverview;
@@ -1056,11 +1092,14 @@ class FfiCoreGateway implements CoreGateway {
   });
 
   @override
-  Future<BotGameSession> createBotGame(int requestedElo) async {
-    final json = _readJson(_createBotGame(_handle, requestedElo))!
+  Future<BotGameSession> createBotGame(
+    int requestedElo, {
+    String playerColor = 'white',
+  }) => _withNativeString(playerColor, (color) {
+    final json = _readJson(_createBotGame(_handle, requestedElo, color))!
         as Map<String, Object?>;
     return BotGameSession.fromJson(json);
-  }
+  });
 
   @override
   Future<BotGameSession?> activeBotGame() async {
@@ -1268,6 +1307,44 @@ class FfiCoreGateway implements CoreGateway {
       sessionId: request['sessionId'] as String?,
     );
   }
+
+  @override
+  Future<Map<String, Object?>> coachSessions(String profileId) =>
+      _withNativeString(profileId, (value) {
+        final result = _readJson(_coachSessions(_handle, value));
+        return result! as Map<String, Object?>;
+      });
+
+  @override
+  Future<Map<String, Object?>> createCoachSession(String profileId) =>
+      _withNativeString(profileId, (value) {
+        final result = _readJson(_createCoachSession(_handle, value));
+        return result! as Map<String, Object?>;
+      });
+
+  @override
+  Future<Map<String, Object?>> coachSessionMessages(
+    Map<String, Object?> request,
+  ) => _withNativeString(jsonEncode(request), (value) {
+    final result = _readJson(_coachSessionMessages(_handle, value));
+    return result! as Map<String, Object?>;
+  });
+
+  @override
+  Future<Map<String, Object?>> renameCoachSession(
+    Map<String, Object?> request,
+  ) => _withNativeString(jsonEncode(request), (value) {
+    final result = _readJson(_renameCoachSession(_handle, value));
+    return result! as Map<String, Object?>;
+  });
+
+  @override
+  Future<Map<String, Object?>> deleteCoachSession(
+    Map<String, Object?> request,
+  ) => _withNativeString(jsonEncode(request), (value) {
+    final result = _readJson(_deleteCoachSession(_handle, value));
+    return result! as Map<String, Object?>;
+  });
 
   @override
   Future<Map<String, Object?>> coachHint(Map<String, Object?> request) async {

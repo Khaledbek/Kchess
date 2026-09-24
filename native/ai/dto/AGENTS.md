@@ -48,3 +48,39 @@
 ## Update 175 - answer segment DTO
 
 `StructuredCoachContent` carries ordered `answer_segments` and `follow_up_segments` with machine-only `claim_indices`. Production native validation joins these into visible text and requires each factual segment to link one matching non-general claim. Keep the existing flat answer fields for downstream UI/ABI compatibility; do not create a second response-rendering policy in Flutter.
+
+## Update 177 - native-only segment linkage
+
+`CoachAnswerSegment::claim_indices` and `CoachClaim::answer_quote` remain in the provider-neutral DTO for deterministic validation and downstream compatibility, but Gemini no longer authors either field. The provider adapter derives both from an inline factual segment in `coach_response.v5`. Do not re-expose provider-authored numeric claim cross-references in a vendor schema.
+
+## Update 178 - candidate reference metadata
+
+`CandidateMove::candidate_id`, `CoachClaim::candidate_id` and `CoachRecommendation::candidate_id` are native/provider grounding metadata. `move_uci` remains the resolved native chess value consumed by existing response/UI paths. DTO fields do not resolve IDs themselves and must not start chess work.
+
+## Update 190 - structured native chess facts
+
+- `chess_facts.h` defines provider-neutral verified chess truth-units. Every `ChessFact` has a stable `fact_id`; providers may reference that ID but never author or mutate its chess payload.
+- Candidate facts use deterministic IDs such as `fact.candidate.best.move`, `fact.candidate.worst.evaluation_cp` and `fact.candidate.best.critical_reply`.
+- Concrete move notation, PVs, evaluation values, mate distance, expected score and analysis focus remain native data attached to the fact ID. The DTO performs no chess calculation.
+- `engine.candidates.v1` remains the compatibility evidence item; its payload now advertises `coach.chess_facts.v1` and includes a `facts` array. Do not create a parallel engine cache for these facts.
+
+## Update 192 - grounded response segments v7
+
+`CoachAnswerSegment::fact_ids` carries provider-selected references to exact native `coach.chess_facts.v1` truth-units. The provider no longer classifies a segment as factual/general; rhetorical purpose and grounding are separate concerns. Internal `CoachSegmentKind` remains a native compatibility/rendering detail and is derived by the provider adapter from fact/claim references plus rhetorical purpose. Fact IDs never carry authored chess payload and must resolve against exact supplied candidate evidence.
+
+## LLM Interaction Series 1 - Update 2 client actions
+
+`CoachResponse::client_actions` carries bounded machine-only product commands selected by native C++. Current game actions use canonical IDs (`open_bot_game_setup`, `open_bot_game`, `resume_bot_game`, `resign_active_bot_game`) plus optional typed parameters such as Elo. This transport is not evidence and not provider-authored content; provider output must never populate it.
+
+## LLM Interaction Series 1 - Update 3 provider interaction metadata
+
+`LLMProviderRequest::interaction` is provider-visible metadata copied only from the resolved native interaction plan. It is not accepted from Flutter/provider input. Keep product/session action IDs separate from `answerIntent`; a provider language call must not become authority for action execution.
+
+### Deterministic native answer presentation
+
+`CoachResponse::native_answer_kind` is a machine-only presentation hint for successful deterministic answers that intentionally skip the remote provider. Supported deterministic values include `best_move` and `worst_move`. The chess fact remains native in `board_moves`; Flutter may only localize the visible sentence using ARB and must not recompute or infer the move. An empty provider `answer` plus a valid native answer kind is therefore a successful response, not `provider_unavailable`.
+
+
+## Coach Answer Quality Series 3 - verdict DTO
+
+`chess_verdict.h` is a transport-only native judgment DTO. It contains stable position/move verdict enums, optional native evaluation/loss metadata and provenance. DTO code must not perform engine work or infer verdicts from prose; construction belongs to `ai/verdict/`.

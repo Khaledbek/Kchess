@@ -20,6 +20,31 @@ namespace {
 // Section: Evidence helpers
 // -----------------------------------------------------------------------------
 
+
+bool candidate_reference_supported(std::string_view candidate_id,
+                                   std::string_view move_uci,
+                                   const std::vector<EvidenceItem>& evidence) {
+  if (candidate_id.empty() || move_uci.empty()) return false;
+  const auto matches = [&](const nlohmann::json& candidate) {
+    return candidate.is_object() &&
+        candidate.value("candidate_id", "") == candidate_id &&
+        candidate.value("move_uci", "") == move_uci;
+  };
+  for (const auto& item : evidence) {
+    if (item.kind != EvidenceKind::candidate_moves) continue;
+    const auto payload = nlohmann::json::parse(item.payload, nullptr, false);
+    if (!payload.is_object()) continue;
+    if (payload.contains("best") && matches(payload["best"])) return true;
+    if (payload.contains("focus") && matches(payload["focus"])) return true;
+    if (payload.contains("alternatives") && payload["alternatives"].is_array()) {
+      for (const auto& candidate : payload["alternatives"])
+        if (matches(candidate)) return true;
+    }
+    if (payload.contains("user_move") && matches(payload["user_move"])) return true;
+  }
+  return false;
+}
+
 bool engine_value_supported(const CoachClaim& claim, const std::vector<EvidenceItem>& evidence) {
   for (const auto& item : evidence) {
     if (item.kind != EvidenceKind::candidate_moves) continue;
@@ -27,6 +52,7 @@ bool engine_value_supported(const CoachClaim& claim, const std::vector<EvidenceI
       const auto payload = nlohmann::json::parse(item.payload);
       auto candidates = payload.value("alternatives", nlohmann::json::array());
       if (payload.contains("best")) candidates.push_back(payload["best"]);
+      if (payload.contains("focus")) candidates.push_back(payload["focus"]);
       if (payload.contains("user_move")) candidates.push_back(payload["user_move"]);
       for (const auto& candidate : candidates) {
         if (candidate.value("move_uci", "") == claim.subject &&
@@ -101,8 +127,13 @@ bool piece_matches(const std::string& fen,
 }
 
 ChessValidationResult validate_move_fact(const CoachClaim& claim,
-                                         const std::string& fen) {
+                                         const std::string& fen,
+                                         const std::vector<EvidenceItem>& evidence) {
   if (claim.subject.empty()) return {false, "claim_move_missing"};
+  if (!claim.candidate_id.empty() &&
+      !candidate_reference_supported(claim.candidate_id, claim.subject, evidence)) {
+    return {false, "claim_candidate_reference_invalid"};
+  }
   try {
     const auto applied = kchess::apply_legal_uci_move(fen, claim.subject);
     if (claim.kind == CoachClaimKind::legal_move) return {};
@@ -156,7 +187,7 @@ ChessValidationResult ChessValidator::validate_claim(
       case CoachClaimKind::legal_move:
       case CoachClaimKind::gives_check:
       case CoachClaimKind::gives_mate:
-        return validate_move_fact(claim, fen);
+        return validate_move_fact(claim, fen, evidence);
       case CoachClaimKind::material_cp:
         return validate_material(claim, fen);
       case CoachClaimKind::piece_on_square:
@@ -191,11 +222,20 @@ ChessValidationResult ChessValidator::validate_recommendation(
     const std::string& fen,
     const std::vector<EvidenceItem>& evidence) const {
   if (recommendation.move_uci.empty()) return {};
+  if (!recommendation.candidate_id.empty() &&
+      !candidate_reference_supported(recommendation.candidate_id,
+                                     recommendation.move_uci, evidence)) {
+    return {false, "recommendation_candidate_reference_invalid"};
+  }
   try {
     (void)kchess::apply_legal_uci_move(fen, recommendation.move_uci);
   } catch (...) {
     return {false, "recommendation_move_illegal"};
   }
+  // Provider-originated recommendations carry a candidate_id and are already
+  // exact-matched above. Keep the legacy move-only lookup for native/local
+  // callers that predate the candidate-reference contract.
+  if (!recommendation.candidate_id.empty()) return {};
   for (const auto& item : evidence) {
     if (item.kind != EvidenceKind::candidate_moves) continue;
     try {
@@ -203,6 +243,8 @@ ChessValidationResult ChessValidator::validate_recommendation(
       if (!payload.is_object()) continue;
       if (payload.contains("best") && payload["best"].is_object() &&
           payload["best"].value("move_uci", "") == recommendation.move_uci) return {};
+      if (payload.contains("focus") && payload["focus"].is_object() &&
+          payload["focus"].value("move_uci", "") == recommendation.move_uci) return {};
       for (const auto& candidate : payload.value("alternatives", nlohmann::json::array())) {
         if (candidate.is_object() &&
             candidate.value("move_uci", "") == recommendation.move_uci) return {};

@@ -26,6 +26,8 @@ class CoachScreen extends StatefulWidget {
     this.onPlayMove,
     this.onCopyConversation,
     this.onDiagnostics,
+    this.sessionTitle,
+    this.onManageSessions,
     this.onCompare,
     this.onQuiz,
     this.onPersonalTraining,
@@ -68,6 +70,8 @@ class CoachScreen extends StatefulWidget {
   final ValueChanged<CoachUiMessage>? onPlayMove;
   final VoidCallback? onCopyConversation;
   final VoidCallback? onDiagnostics;
+  final String? sessionTitle;
+  final VoidCallback? onManageSessions;
   final VoidCallback? onCompare;
   final VoidCallback? onQuiz;
   final VoidCallback? onPersonalTraining;
@@ -131,7 +135,18 @@ class _CoachScreenState extends State<CoachScreen> {
                       onPressed: widget.onExit,
                       icon: const Icon(Icons.arrow_back_rounded),
                     ),
-              title: Text(strings.coach),
+              title: Text(widget.sessionTitle?.isNotEmpty == true
+                  ? widget.sessionTitle!
+                  : strings.coach),
+              actions: widget.onManageSessions == null
+                  ? null
+                  : [
+                      IconButton(
+                        onPressed: widget.onManageSessions,
+                        tooltip: strings.coachSessionsTitle,
+                        icon: const Icon(Icons.forum_outlined),
+                      ),
+                    ],
             )
           : null,
       body: LayoutBuilder(
@@ -167,6 +182,33 @@ class _CoachScreenState extends State<CoachScreen> {
           );
           final trainer = Column(
             children: [
+              if (!showBar && widget.onManageSessions != null)
+                Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: InkWell(
+                    onTap: widget.onManageSessions,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.forum_outlined, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.sessionTitle?.isNotEmpty == true
+                                  ? widget.sessionTitle!
+                                  : strings.coach,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ),
+                          const Icon(Icons.expand_more_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: CoachOutputPanel(
                   messages: widget.messages,

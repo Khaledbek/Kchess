@@ -8,7 +8,6 @@
 
 #include "conversation/coach_session.h"
 #include "domain_router_terms.h"
-#include "models/small_models.h"
 
 namespace kchess::ai {
 namespace {
@@ -87,40 +86,6 @@ double score_confidence(int score, bool contextual) {
   return contextual ? 0.72 : 0.0;
 }
 
-DomainRoute refine_with_tiny_model(DomainRoute route, const CoachRequest& request,
-                                   const TinyIntentModel* model) {
-  if (model == nullptr || !model->available() || request.user_text.empty()) {
-    return route;
-  }
-  const bool ambiguous = route.intent == CoachIntent::unknown ||
-                         route.intent == CoachIntent::off_topic ||
-                         route.confidence < 0.80;
-  if (!ambiguous) return route;
-
-  const auto prediction = model->predict(
-      request.user_text, request.position_fen.has_value() || request.game_pgn.has_value());
-  if (!prediction.has_value() || prediction->confidence < 0.82) return route;
-
-  if (!prediction->chess_domain || prediction->intent == CoachIntent::off_topic) {
-    if (route.confidence < 0.65 && prediction->confidence >= 0.90) {
-      return {CoachIntent::off_topic, prediction->confidence, false, false,
-              CoachIntent::unknown};
-    }
-    return route;
-  }
-  if (prediction->intent == CoachIntent::unknown ||
-      prediction->intent == CoachIntent::follow_up) {
-    return route;
-  }
-  if (route.intent == CoachIntent::off_topic && prediction->confidence < 0.94) {
-    return route;
-  }
-
-  route.intent = prediction->intent;
-  route.chess_domain = true;
-  route.confidence = std::max(route.confidence, prediction->confidence);
-  return route;
-}
 
 }  // namespace
 
@@ -129,8 +94,7 @@ DomainRoute refine_with_tiny_model(DomainRoute route, const CoachRequest& reques
 // -----------------------------------------------------------------------------
 
 DomainRoute ChessDomainRouter::route(const CoachRequest& request,
-                                     const CoachSessionState* session,
-                                     const TinyIntentModel* model) const {
+                                     const CoachSessionState* session) const {
   const std::string text = normalize(request.user_text);
   const bool has_session_context = session && !session->empty();
   const bool has_context = request.position_fen || request.game_pgn ||
@@ -151,9 +115,9 @@ DomainRoute ChessDomainRouter::route(const CoachRequest& request,
   DomainRoute route;
   if (text.empty()) {
     route = request.position_fen || request.game_pgn
-                ? DomainRoute{CoachIntent::position, 0.72, true, false,
+                ? DomainRoute{CoachIntent::position, 0.72, true, false, false,
                               CoachIntent::unknown}
-                : DomainRoute{CoachIntent::unknown, 0.0, false, false,
+                : DomainRoute{CoachIntent::unknown, 0.0, false, false, false,
                               CoachIntent::unknown};
     return route;
   }
@@ -165,7 +129,7 @@ DomainRoute ChessDomainRouter::route(const CoachRequest& request,
   if (follow_matches > 0 && has_context && (scored.score == 0 || refines_scope)) {
     const CoachIntent context_intent =
         has_session_context ? session->current_topic : CoachIntent::unknown;
-    route = {CoachIntent::follow_up, 0.90, true, true, context_intent};
+    route = {CoachIntent::follow_up, 0.90, true, true, false, context_intent};
     if (has_session_context) {
       route.inherited_query_family = session->query_family;
       route.inherited_profile_scope = session->profile_scope;
@@ -175,8 +139,8 @@ DomainRoute ChessDomainRouter::route(const CoachRequest& request,
   }
 
   if (!chess_domain) {
-    route = {CoachIntent::off_topic, 0.86, false, false, CoachIntent::unknown};
-    return refine_with_tiny_model(route, request, model);
+    route = {CoachIntent::off_topic, 0.86, false, false, false, CoachIntent::unknown};
+    return route;
   }
 
   const CoachIntent intent = scored.score > 0 ? scored.intent :
@@ -184,11 +148,23 @@ DomainRoute ChessDomainRouter::route(const CoachRequest& request,
       personal_library_question ? CoachIntent::player_development :
       CoachIntent::chess_concept;
   const bool follow_up = follow_matches > 0 && has_session_context;
+  // Update 210: a concrete current question keeps its own intent, but any
+  // established session may still contribute compact conversational context.
+  // context_intent is continuity metadata only; QueryPlanner inherits it as the
+  // effective intent exclusively for an elliptical CoachIntent::follow_up.
+  // This lets questions such as "can you name one?" or a rephrased request on
+  // the same board see the immediately preceding goal/answer without turning
+  // that prior prose into current-board evidence.
   const CoachIntent context_intent =
-      follow_up ? session->current_topic : CoachIntent::unknown;
+      has_session_context ? session->current_topic : CoachIntent::unknown;
   route = {intent, score_confidence(scored.score, has_context || chess_matches > 0),
-           true, follow_up, context_intent};
-  return refine_with_tiny_model(route, request, model);
+           true, follow_up, scored.score > 0, context_intent};
+  if (route.intent != CoachIntent::follow_up &&
+      route.intent != CoachIntent::unknown &&
+      route.intent != CoachIntent::off_topic && !request.user_text.empty()) {
+    route.explicit_current_intent = true;
+  }
+  return route;
 }
 
 }  // namespace kchess::ai

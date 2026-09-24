@@ -3,37 +3,15 @@
 // -----------------------------------------------------------------------------
 #include "training/practice_service.h"
 #include <algorithm>
-#include <filesystem>
 #include <sstream>
 #include <stdexcept>
 #include "chess/move.h"
+#include "core/weighted_choice.h"
 #include "chess/position_view.h"
 #include "training/practice_position.h"
 
 namespace kchess {
 namespace {
-// The drill book is a ~170 MB PolyGlot file that is not in version control and
-// is not bundled into the app yet, so it is searched for from the working
-// directory upwards: that finds the checkout's copy whether the process was
-// started in the repository root, in native/build, in flutter_app or in a
-// Flutter desktop runner directory (flutter_app/build/windows/x64/runner/...).
-std::filesystem::path locate_polyglot_book() {
-  std::error_code error;
-  auto directory = std::filesystem::current_path(error);
-  if (error) return {};
-  for (int level = 0; level < 8 && !directory.empty(); ++level) {
-    for (const char* suffix : {"native/src/training/data/Cerebellum3Merge.bin",
-                               "training/data/Cerebellum3Merge.bin",
-                               "data/Cerebellum3Merge.bin"}) {
-      const auto candidate = directory / suffix;
-      if (std::filesystem::exists(candidate, error)) return candidate;
-    }
-    if (!directory.has_parent_path() || directory.parent_path() == directory) break;
-    directory = directory.parent_path();
-  }
-  return {};
-}
-
 // The move number a FEN is at, for naming the reply the drill just played.
 int full_move_number(const std::string& fen) {
   std::istringstream input(fen);
@@ -47,49 +25,70 @@ int full_move_number(const std::string& fen) {
 }
 }  // namespace
 
-PolyglotBook* PracticeService::book() {
-  if (polyglot_book_) return polyglot_book_.get();
-  if (polyglot_missing_) return nullptr;
-  const auto path = locate_polyglot_book();
-  try {
-    if (path.empty()) throw std::runtime_error("No opening book on disk");
-    polyglot_book_ = std::make_unique<PolyglotBook>(path);
-  } catch (const std::exception&) {
-    // Without the book there is no theory to drill, but every other kind of
-    // practice still works, so this must not take the whole service down.
-    polyglot_missing_ = true;
-    return nullptr;
-  }
-  return polyglot_book_.get();
+
+void PracticeService::set_opening_sources(
+    const OpeningLineGraph& lines,
+    const OpeningNameIndex& names,
+    const OpeningTheoryProvider& theory) {
+  opening_lines_ = &lines;
+  opening_names_ = &names;
+  opening_theory_ = &theory;
 }
 
-std::vector<PracticeService::DrillMove> PracticeService::book_replies(
-    const std::string& fen) {
-  auto* source = book();
-  if (source == nullptr) return {};
+std::vector<PracticeService::DrillMove> PracticeService::graph_replies(
+    const std::string& fen) const {
+  if (opening_lines_ == nullptr || !opening_lines_->available()) return {};
+
   std::vector<DrillMove> replies;
-  for (const auto& entry : source->ranked_moves(fen)) {
-    try {
-      const auto played = apply_legal_uci_move(fen, entry.uci);
-      replies.push_back({played.uci, played.san, played.fen_after, entry.weight});
-    } catch (const std::invalid_argument&) {
-      // A book key collision decodes to a move that is not legal here. It is
-      // not a reply, so it is neither asked for nor played.
+  const auto continuations = opening_lines_->continuations(fen);
+  replies.reserve(continuations.size());
+  for (const auto& continuation : continuations) {
+    const TheoryMoveInfo theory = opening_theory_ == nullptr
+        ? TheoryMoveInfo{}
+        : opening_theory_->lookup(fen, continuation.uci);
+    DrillMove move{
+        .uci = continuation.uci,
+        .san = continuation.san,
+        .fen_after = continuation.fen_after,
+        // A graph edge can legitimately be absent from a filtered KCB build.
+        // Keep it trainable, but make any statistically observed edge dominate
+        // it when the opponent reply is sampled.
+        .weight = theory.games == 0 ? 1ULL : static_cast<std::uint64_t>(theory.games),
+        .games = theory.games,
+        .white_wins = theory.white_wins,
+        .draws = theory.draws,
+        .black_wins = theory.black_wins,
+    };
+    if (opening_names_ != nullptr) {
+      if (auto name = opening_names_->lookup(continuation.destination_key); name.has_value()) {
+        move.destination_eco = name->eco;
+        move.destination_name = name->name;
+      }
     }
+    replies.push_back(std::move(move));
   }
+
+  std::stable_sort(replies.begin(), replies.end(), [](const DrillMove& left, const DrillMove& right) {
+    if (left.games != right.games) return left.games > right.games;
+    return left.uci < right.uci;
+  });
   return replies;
 }
 
-bool PracticeService::play_book_reply(Session& session) {
-  const auto* reply = pick_weighted(session.book, random_);
+bool PracticeService::play_graph_reply(Session& session) {
+  const auto* reply = pick_weighted(session.continuations, random_);
   if (reply == nullptr) return false;
   session.opponent_uci = reply->uci;
   session.opponent_san = reply->san;
   session.opponent_side = white_to_move(session.fen) ? "white" : "black";
   session.opponent_number = full_move_number(session.fen);
-  // How wide the book was here: the same drill can come back a different way.
-  session.opponent_alternatives = static_cast<int>(session.book.size());
+  // How wide the graph was here: the same drill can continue a different way.
+  session.opponent_alternatives = static_cast<int>(session.continuations.size());
   session.fen = reply->fen_after;
+  if (!reply->destination_name.empty()) {
+    session.opening_eco = reply->destination_eco;
+    session.opening_name = reply->destination_name;
+  }
   session.history.push_back(session.fen);
   ++session.ply;
   return true;
@@ -100,6 +99,17 @@ nlohmann::json PracticeService::start(const nlohmann::json& request) {
   session.id = "practice-" + std::to_string(next_id_++);
   session.kind = request.at("kind").get<std::string>();
   if (session.kind == "opening") {
+    if (opening_lines_ == nullptr) {
+      throw std::runtime_error(
+          "Opening training has no KCL graph provider attached to PracticeService");
+    }
+    if (!opening_lines_->available()) {
+      const auto reason = opening_lines_->availability_error();
+      throw std::runtime_error(
+          reason.empty()
+              ? "Opening training KCL graph is unavailable for an unspecified reason"
+              : "Opening training KCL graph unavailable: " + reason);
+    }
     const int id = request.at("id").get<int>();
     const auto& game = content_.line(id);
     session.key = "opening_" + std::to_string(id);
@@ -109,11 +119,17 @@ nlohmann::json PracticeService::start(const nlohmann::json& request) {
     }
     // The catalogue line is the scenario's setup, not its answer key: it is
     // replayed once to reach the position the opening is named after, and
-    // every move past it comes from the book instead.
+    // every move past it comes from the KCL graph instead.
     session.initial_fen =
         game.moves.empty() ? game.initial_fen : game.moves.back().fen_after;
     for (const auto& move : game.moves) session.opening_moves.push_back(move.san);
     session.fen = session.initial_fen;
+    if (opening_names_ != nullptr) {
+      if (auto name = opening_names_->lookup(stockfish_position_key(session.fen)); name.has_value()) {
+        session.opening_eco = name->eco;
+        session.opening_name = name->name;
+      }
+    }
     session.budget = std::clamp(request.value("depth", kDrillDepth), 1, 40);
   } else if (session.kind == "drill") {
     const auto id = request.at("id").get<std::string>();
@@ -162,11 +178,11 @@ void PracticeService::opponent(Session& session) {
   }
 }
 
-// The opening drill has no script. The book answers for the opponent, the user
-// has to find the book answer in reply, and the loop stops only when the target
-// depth is reached or the book runs out of theory. Every position on the way is
-// whatever the last weighted draw produced, which is what makes one opening
-// drill the whole tree below it instead of a single line.
+// The opening drill has no answer script. KCL is the authoritative topology:
+// the opponent draws one graph edge (weighted by KCB statistics), the user must
+// answer with a permitted graph edge, and transpositions naturally converge on
+// the same keyed position. The legacy catalogue line is used only to set up the
+// named scenario; it never constrains continuation play.
 void PracticeService::advance_drill(Session& session) {
   while (true) {
     if (session.played >= session.budget) {
@@ -177,8 +193,8 @@ void PracticeService::advance_drill(Session& session) {
       finish(session, true);
       return;
     }
-    session.book = book_replies(session.fen);
-    if (session.book.empty()) {
+    session.continuations = graph_replies(session.fen);
+    if (session.continuations.empty()) {
       session.book_exhausted = true;
       // Nothing was ever asked here, so there is no attempt worth recording.
       if (session.played == 0) session.recorded = true;
@@ -186,9 +202,9 @@ void PracticeService::advance_drill(Session& session) {
       return;
     }
     const bool solver_turn = white_to_move(session.fen) == (session.solver == "white");
-    // The user is on move: move() judges whatever comes back against the book.
+    // The user is on move: move() judges the reply against KCL continuations.
     if (solver_turn) return;
-    if (!play_book_reply(session)) {
+    if (!play_graph_reply(session)) {
       session.book_exhausted = true;
       finish(session, true);
       return;
@@ -239,23 +255,24 @@ nlohmann::json PracticeService::move(Session& session, const nlohmann::json& req
     auto result = snapshot(session); result["accepted"] = false; return result;
   }
   if (session.kind == "opening") {
-    // The verdict is passed before the board moves: a guess outside the book
-    // leaves the position exactly as it was, so the same question can be asked
-    // again with the answer now showing.
+    // The verdict is passed before the board moves: every KCL edge is a valid
+    // training continuation. KCB statistics sort/weight those edges for hints
+    // and opponent sampling, but never make a graph-valid move invalid. A move
+    // outside KCL leaves the board untouched so the same question can be retried.
     const auto found = std::find_if(
-        session.book.begin(), session.book.end(),
+        session.continuations.begin(), session.continuations.end(),
         [&](const DrillMove& candidate) { return candidate.uci == played->uci; });
-    const int rank = found == session.book.end()
+    const int rank = found == session.continuations.end()
         ? -1
-        : static_cast<int>(found - session.book.begin());
-    if (rank < 0 || rank >= kAcceptedRanks) {
+        : static_cast<int>(found - session.continuations.begin());
+    if (rank < 0) {
       session.clean = false;
       ++session.attempts;
       // The previous answer's tick would read as approval of this miss.
       session.answer_uci.clear();
       session.answer_san.clear();
-      session.hint = session.book.front().uci;
-      session.hint_san = session.book.front().san;
+      session.hint = session.continuations.front().uci;
+      session.hint_san = session.continuations.front().san;
       auto result = snapshot(session);
       result["accepted"] = false;
       return result;
@@ -263,6 +280,10 @@ nlohmann::json PracticeService::move(Session& session, const nlohmann::json& req
     session.answer_uci = played->uci;
     session.answer_san = played->san;
     session.answer_rank = rank + 1;
+    if (!found->destination_name.empty()) {
+      session.opening_eco = found->destination_eco;
+      session.opening_name = found->destination_name;
+    }
     session.attempts = 0;
     session.hint.clear();
     session.hint_san.clear();

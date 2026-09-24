@@ -75,7 +75,15 @@ std::string summarize_session(const CoachSessionState* session,
       append_field(out, "original_question_candidate_opponent_reply", session->expected_reply);
   }
   append_field(out, "goal", session->current_goal);
-  append_field(out, "previous_answer_not_authoritative_evidence", session->last_claim);
+  if (!session->recent_dialogue.empty()) {
+    out << "recent_dialogue_non_authoritative:\n";
+    for (const auto& entry : session->recent_dialogue) {
+      if (!entry.empty()) out << "- " << entry << '\n';
+    }
+  } else {
+    append_field(out, "previous_answer_not_authoritative_evidence",
+                 session->last_claim);
+  }
   append_field(out, "last_recommendation", session->last_recommendation);
   append_field(out, "concept", session->referenced_concept);
   return trim_to_tokens(out.str(), max_tokens);

@@ -1,0 +1,40 @@
+KChess Analysis Authority / Classification Contracts
+
+Historical note:
+The former 9-update Classification/Arrow Coherence series has been superseded
+where it attempted to keep classifications artificially stable or reconcile a
+final SF19 bestmove by rewriting MultiPV rank ordering.
+
+Current contracts after Best-Move / Reclassification Series 1-6:
+- SF18 classifier: v15
+- SF19 classifier: v1907
+- analysis.arrow.v1
+- analysis.classification.v1
+- analysis.snapshot.v1
+- ABI 11 unchanged
+- SQLite schema 44 unchanged
+
+Final authority rules:
+- Running search: newest complete MultiPV rank-1 PV is provisional.
+- Completed search: selected Stockfish engine final bestmove is authoritative.
+- Exact MultiPV lines remain score/WDL/PV snapshot evidence; do not synthesize a
+  reordered line set merely to make rank 1 equal the final callback.
+- Every completed legal move has a normal native class. pending/unknown/stability
+  diagnostics are transient only.
+- Deeper analysis may reclassify a move and may change the visible arrow.
+- SF18 and SF19 truth/cache/persistence remain strictly namespaced.
+- Complete compatible engine evidence is reused across classifier-generation
+  changes and reclassified without unnecessary Stockfish work.
+
+Final static audit coverage:
+- completed classification / no durable unknown
+- shallow-to-deep reclassification
+- final arrow = completed engine bestmove
+- SF18/SF19 switch isolation and persisted cache separation
+- exact MultiPV snapshot coherence
+- exchange/net-material classifier semantics
+- rapid sideline supersession
+- complete cache reuse
+
+No builds, CTest, Flutter tests, flutter analyze, flutter run, or application
+execution were performed by the assistant for this series.

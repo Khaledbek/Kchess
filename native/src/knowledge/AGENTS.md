@@ -132,12 +132,10 @@ Read this file plus `native/AGENTS.md` before changing this folder. Extend the e
 
 ## Update 116 text embeddings and semantic reranking
 
-- `text_semantic_retrieval.*` owns Knowledge-Graph text-vector ingestion and semantic chunk search. It reuses the existing provider-neutral `ai::EmbeddingModel`; do not create a second embedding-model contract under `src/knowledge/`.
 - `ChunkTextEmbeddingWriter` embeds only current concise `KnowledgeChunk::content` and persists through `VectorIndex`. The active vector inherits the chunk `source_version`, player scope, exact model ID/version and dimensions; changing the chunk makes the previous vector stale through the Update-115 contract.
 - Query embeddings are ephemeral and are never persisted as Knowledge Graph truth.
-- `TextReranker` is an optional candidate-scoring interface. A reranker may only reorder/score candidates already returned by text-vector retrieval; unknown IDs, non-finite scores and missing scores are ignored/fall back to vector order. It may never broaden player scope or invent graph/chunk evidence.
 - Semantic chunk search is deliberately narrow in Update 116: text vector candidates are capped at 100 and returned semantic hits at 40. Hybrid exact/statistics/graph/lexical retrieval and the final cross-channel ranking/query planner remain owned by Updates 119-120.
-- No concrete model vendor, Python runtime or model binary is required by this layer. Candidate evaluation/export lives under `tools/ai/embeddings/`; a selected ONNX encoder still needs a native adapter before product use.
+- No concrete model vendor, Python runtime or model binary is required by this layer. Semantic/graph retrieval must remain native and deterministic; local encoder/reranker model runtimes are retired.
 
 ## Update 117 chess-position similarity
 
@@ -167,14 +165,12 @@ Read this file plus `native/AGENTS.md` before changing this folder. Extend the e
 - Canonical position vectors are global, but personal position-similarity retrieval must intersect matches with positions actually reached by a game owned by the requested player. Similarity remains a retrieval signal only and never materializes graph truth.
 - Hybrid candidates retain channel-specific signals (`exact_statistics`, graph distance, lexical score, vector score, position score) for Update 120. Update 119 must not collapse these into an opaque final score.
 
-
 ## Update 120 hybrid ranking and Knowledge query planning
 
 - `retrieval_ranking.*` owns final cross-channel ranking after `HybridRetrievalEngine` candidate collection. Ranking is retrieval policy only and must never become a source of chess/profile truth.
 - `KnowledgeQueryPlanner` refines the already-authoritative Update-118 `KnowledgeQueryRoute` into bounded retrieval/ranking policy. It may tighten budgets and weights for exact, causal, trend, evidence, similarity or current-position questions, but it must never reclassify Coach intent/query family or re-enable a disabled retrieval channel.
 - Ranking remains explainable through separate query-relevance, exact/statistical, graph-distance, lexical, text-vector, position-similarity, confidence, coverage, freshness, source-quality and importance components. Missing quality metadata is omitted from the weighted mean rather than treated as negative evidence.
 - Node quality comes only from Update-113 `KnowledgeQualityStore`; chunk quality comes from the existing chunk metadata contract. Confidence, coverage and freshness remain distinct signals and ranking must not write them back to authoritative sources.
-- Optional final text reranking reuses Update-116 `TextReranker`, is capped by the Update-119 20-candidate ceiling and may only reorder already collected chunks. Arbitrary finite reranker score scales are normalized within that bounded candidate set; unknown IDs and invalid scores are ignored.
 - Default final chunk output remains token-oriented (normally at most 8 before Update-122 token-budget assembly). Evidence-packet construction, answerability and final Coach integration remain Updates 122-123.
 
 ## Update 121 knowledge gaps and active learning
@@ -206,11 +202,9 @@ Der Coach bezieht persönliche Evidenz ausschließlich über `KnowledgeRuntime::
 
 `QueryTraceStore` persistiert nur begrenzte Routing-/Retrievaldiagnostik (IDs, Scores, Quellenpfade, Budgets/Counts). Providerprompts, vollständige PGNs und Enginepayloads dürfen dort nicht landen. `KnowledgeRuntime::inspector_json(...)` ist der read-only Diagnosevertrag für Graph Inspector und Live Query Traces.
 
-
 ## Cleanup Update 124 - single graph runtime
 
 The legacy profile-only graph/resolver source files and SQLite tables are removed. `KnowledgeRuntime`, `GraphStore`, the evidence registry and authoritative profile/analysis sources are the only supported path. Do not add compatibility writes back to the retired tables.
-
 
 ## Fix Update 126 - non-blocking Knowledge Inspector
 
@@ -260,7 +254,6 @@ Position-family quiz routes with a required board may use the current-position c
 - Incremental maintenance remains derived Knowledge work only. Authoritative Games/Analysis/Statistics/Profile stores are unchanged, no second scheduler/cache/database is introduced, and Coach retrieval continues using `try_lock` fallback behavior while refresh owns the runtime mutex.
 - `knowledge.performance.v1` exposes full-vs-incremental refresh counts plus changed-entry, quality-entry and chunk-node work so the optimization can be measured without Flutter-derived telemetry.
 
-
 ## Cleanup Update 145 - final Knowledge maintenance boundary
 
 - Normal profile refresh keeps one shared projection pipeline and performs quality/chunk maintenance only for dirty graph/dependency entries. The periodic/restart full pass is the safety fallback for freshness and legacy/out-of-band state, not a second refresh architecture.
@@ -270,3 +263,12 @@ Position-family quiz routes with a required board may use the current-position c
 
 - `runtimeActivity` exposes phase detail, operation/phase elapsed time, progress-known state, last completed phase duration and the fact that active refreshes own the KnowledgeRuntime mutex while fine-grained SQLite writes still yield through the shared foreground-priority gate.
 - A diagnostic `status=busy` means the graph runtime lock is occupied, not that profile preparation is incomplete. `profileBackground.status` and `workerActivity` remain separate native states.
+
+- Text-semantic retrieval backed by a local embedding model was removed with the abandoned local-model stack. Knowledge retrieval remains exact/statistical + graph + lexical + position-similarity based.
+
+
+## Coach Series 2 Update 6 - derived-knowledge CPU budget
+
+`KnowledgeRuntime::refresh_active_profile(observed_at_ms, graph_source_signature)` receives a deterministic signature of the already-loaded profile game sources. The successfully projected signature is persisted by `Database` per profile. When it matches, the expensive game-derived `OpeningGraphProjector`, `PositionStructureGraphProjector`, and `ResultTransitionGraphProjector` passes must be skipped; statistics/profile-knowledge and normal quality/gap maintenance may still run. A changed signature must still perform the authoritative projections.
+
+`PositionStructureGraphProjector` is background maintenance and cooperatively yields CPU after small game batches. The yield must never change projection ordering, identities, provenance, or output content. Keep `gameGraphProjectionSkips`, `backgroundYieldCount`, and `backgroundYieldMs` visible in `knowledge.performance.v1` so fan/CPU regressions can be diagnosed without timing guesses.

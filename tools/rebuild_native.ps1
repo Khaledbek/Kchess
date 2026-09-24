@@ -203,22 +203,118 @@ function Get-ChangedNativeInputs([System.IO.FileInfo[]]$Files, [hashtable]$Curre
     return @($changes | Sort-Object -Unique)
 }
 
-function Invoke-CMakeQuiet([string]$Phase, [string[]]$Arguments) {
-    $output = @(& $cmakeExe @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        $output | ForEach-Object { Write-Host $_ }
-        throw "Native CMake $Phase failed with exit code $exitCode"
+$script:progressLineWidth = 0
+
+function Format-ChangedNativeInputs([string[]]$ChangedInputs) {
+    if (-not $ChangedInputs -or $ChangedInputs.Count -eq 0) {
+        return 'changed: none'
     }
 
-    # Keep warnings/errors visible, but hide the normal full-rebuild file spam.
-    $important = @($output | Where-Object {
-        $line = $_.ToString()
-        $line -match '(?i)(warning\s+[A-Z]*[0-9]+|:\s*warning\b|:\s*error\b|fatal error|cmake warning|cmake error)'
+    $display = @($ChangedInputs | Select-Object -First 3 | ForEach-Object {
+        $name = [IO.Path]::GetFileName(($_ -replace ' \(deleted\)$', ''))
+        if ($_ -like '* (deleted)') { "$name-" } else { $name }
     })
-    if ($important.Count -gt 0) {
-        Write-Host "Native $Phase diagnostics:"
-        $important | ForEach-Object { Write-Host $_ }
+    $suffix = if ($ChangedInputs.Count -gt 3) { ", +$($ChangedInputs.Count - 3)" } else { '' }
+    return "changed: $($display -join ', ')$suffix"
+}
+
+function Write-NativeProgressLine(
+    [int]$Percent,
+    [string]$Phase,
+    [string]$CurrentFile,
+    [string]$ChangedSummary
+) {
+    $bounded = [Math]::Max(0, [Math]::Min(100, $Percent))
+    $current = if ([string]::IsNullOrWhiteSpace($CurrentFile)) { '-' } else { $CurrentFile }
+    $line = ('[{0,3}%] {1} | {2} | {3}' -f $bounded, $Phase, $current, $ChangedSummary)
+    $padding = [Math]::Max(0, $script:progressLineWidth - $line.Length)
+    [Console]::Write("`r$line$(' ' * $padding)")
+    $script:progressLineWidth = $line.Length
+}
+
+function Complete-NativeProgressLine {
+    if ($script:progressLineWidth -gt 0) {
+        [Console]::WriteLine()
+        $script:progressLineWidth = 0
+    }
+}
+
+function Get-BuildCompileUnitCount {
+    $project = Get-ChildItem -LiteralPath $nativeBuildDir -Filter 'kchess_core.vcxproj' -File -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $project) { return 0 }
+    try {
+        [xml]$xml = Get-Content -LiteralPath $project.FullName -Raw
+        $nodes = @($xml.Project.ItemGroup.ClCompile | Where-Object { $_.Include })
+        return $nodes.Count
+    }
+    catch {
+        return 0
+    }
+}
+
+function Invoke-CMakeStreaming(
+    [string]$Phase,
+    [string[]]$Arguments,
+    [int]$StartPercent,
+    [int]$EndPercent,
+    [string]$ChangedSummary,
+    [switch]$TrackCompileUnits
+) {
+    $diagnostics = New-Object System.Collections.Generic.List[string]
+    $seenUnits = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $totalUnits = if ($TrackCompileUnits) { Get-BuildCompileUnitCount } else { 0 }
+    $lastCurrent = '-'
+    Write-NativeProgressLine -Percent $StartPercent -Phase $Phase -CurrentFile $lastCurrent -ChangedSummary $ChangedSummary
+
+    # Windows PowerShell 5.1 can promote native stderr records to terminating
+    # errors while the script-wide ErrorActionPreference is Stop. CMake emits
+    # ordinary warnings on stderr, so stream them without aborting and decide
+    # success from the native process exit code below.
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $cmakeExe @Arguments 2>&1 | ForEach-Object {
+            $line = $_.ToString()
+            if ($line -match '(?i)(warning\s+[A-Z]*[0-9]+|:\s*warning\b|:\s*error\b|fatal error|cmake warning|cmake error)') {
+                $diagnostics.Add($line)
+            }
+
+            if ($TrackCompileUnits) {
+                $matches = [regex]::Matches($line, '(?i)([^\\/:*?"<>|\s]+\.(?:c|cc|cpp|cxx))')
+                foreach ($match in $matches) {
+                    $name = $match.Groups[1].Value
+                    if ($seenUnits.Add($name)) {
+                        $lastCurrent = $name
+                        if ($totalUnits -gt 0) {
+                            $fraction = [Math]::Min(1.0, $seenUnits.Count / [double]$totalUnits)
+                            $percent = $StartPercent + [int][Math]::Floor(($EndPercent - $StartPercent) * $fraction)
+                        }
+                        else {
+                            # Visual Studio project discovery can occasionally fail on a first configure.
+                            # Keep the display monotonic without pretending an exact denominator exists.
+                            $percent = [Math]::Min($EndPercent - 1, $StartPercent + $seenUnits.Count)
+                        }
+                        Write-NativeProgressLine -Percent $percent -Phase $Phase -CurrentFile $lastCurrent -ChangedSummary $ChangedSummary
+                    }
+                }
+            }
+        }
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    Write-NativeProgressLine -Percent $EndPercent -Phase $Phase -CurrentFile $lastCurrent -ChangedSummary $ChangedSummary
+
+    if ($diagnostics.Count -gt 0) {
+        Complete-NativeProgressLine
+        $diagnostics | ForEach-Object { Write-Host $_ }
+        Write-NativeProgressLine -Percent $EndPercent -Phase $Phase -CurrentFile $lastCurrent -ChangedSummary $ChangedSummary
+    }
+    if ($exitCode -ne 0) {
+        Complete-NativeProgressLine
+        throw "Native CMake $Phase failed with exit code $exitCode"
     }
 }
 
@@ -269,8 +365,10 @@ if (Test-Path -LiteralPath $nativeCacheRoot) {
 # Reconfigure and build only kchess_core. Do not invoke Flutter here: this
 # command is intentionally a native-only recovery path. Stable SF18/SF19
 # prebuilt libraries and their separate cache are not removed.
-Write-Host "Configuring native kchess_core ($Configuration)..."
-Invoke-CMakeQuiet -Phase 'configure' -Arguments @(
+$changedSummary = Format-ChangedNativeInputs -ChangedInputs $changedNativeInputs
+Write-NativeProgressLine -Percent 0 -Phase 'prepare' -CurrentFile '-' -ChangedSummary $changedSummary
+
+Invoke-CMakeStreaming -Phase 'configure' -Arguments @(
     '-S', $nativeDir,
     '-B', $nativeBuildDir,
     '-G', $generator,
@@ -278,25 +376,16 @@ Invoke-CMakeQuiet -Phase 'configure' -Arguments @(
     '-DKCHESS_BUILD_TESTS=OFF',
     '-DKCHESS_WITH_STOCKFISH=ON',
     '-DKCHESS_PERSISTENT_WINDOWS_BUILD=ON'
-)
+) -StartPercent 2 -EndPercent 10 -ChangedSummary $changedSummary
 
-Write-Host 'Rebuilding native kchess_core...'
-Invoke-CMakeQuiet -Phase 'build' -Arguments @(
+Invoke-CMakeStreaming -Phase 'build' -Arguments @(
     '--build', $nativeBuildDir,
     '--config', $Configuration,
     '--target', 'kchess_core',
     '--parallel',
     '--', '/nologo', '/verbosity:minimal'
-)
+) -StartPercent 10 -EndPercent 98 -ChangedSummary $changedSummary -TrackCompileUnits
 
 Write-NativeSourceManifest -Snapshot $currentSourceSnapshot
-
-Write-Host ''
-if ($changedNativeInputs.Count -gt 0) {
-    Write-Host 'Changed native source/build inputs since the previous successful native build:'
-    $changedNativeInputs | ForEach-Object { Write-Host "  $_" }
-}
-else {
-    Write-Host 'Changed native source/build inputs: none detected.'
-}
-Write-Host "Native kchess_core rebuild completed ($Configuration)."
+Write-NativeProgressLine -Percent 100 -Phase 'complete' -CurrentFile 'kchess_core' -ChangedSummary $changedSummary
+Complete-NativeProgressLine

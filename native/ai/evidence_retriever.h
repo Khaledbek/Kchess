@@ -10,20 +10,19 @@
 #include "dto/evidence.h"
 #include "dto/query_plan.h"
 #include "engine_budget.h"
+#include "experts/existing_analysis_expert.h"
 #include "practicality/player_practicality.h"
 
 namespace kchess::ai {
-
-class EmbeddingModel;
 
 // -----------------------------------------------------------------------------
 // Section: Existing-system source hooks
 // -----------------------------------------------------------------------------
 
-using EvidenceSource = std::function<std::optional<EvidenceItem>(
+using EvidenceSourceHook = std::function<std::optional<EvidenceItem>(
     const CoachRequest&, const QueryPlan&)>;
 using ProfileEvidenceSource = std::function<std::optional<EvidenceItem>(
-    const CoachRequest&, const QueryPlan&, const EmbeddingModel*)>;
+    const CoachRequest&, const QueryPlan&)>;
 
 struct EngineCandidateBundle {
   EvidenceItem engine_evidence;
@@ -41,15 +40,15 @@ using PracticalityPlayerSource =
         const CoachRequest&, const QueryPlan&)>;
 
 struct EvidenceSources {
-  EvidenceSource cache;
-  EvidenceSource existing_analysis;
+  EvidenceSourceHook cache;
+  EvidenceSourceHook existing_analysis;
   CandidateSnapshotSource existing_candidates;
   CompletedMoveAnalysisSource completed_move_analysis;
-  EvidenceSource theory;
-  EvidenceSource opening;
+  EvidenceSourceHook theory;
+  EvidenceSourceHook opening;
   ProfileEvidenceSource user_profile;
   PracticalityPlayerSource practicality_player;
-  EvidenceSource engine;
+  EvidenceSourceHook engine;
   EngineCandidateSource engine_candidates;
 };
 
@@ -61,6 +60,7 @@ struct RetrievedEvidence {
   std::vector<EvidenceItem> items;
   std::optional<CandidateMoveSet> candidate_moves;
   std::optional<PracticalityPlayerContext> practicality_player;
+  ExistingAnalysisCoverage existing_analysis_coverage;
   EngineBudgetDecision engine_budget;
 };
 
@@ -71,8 +71,7 @@ class EvidenceRetriever {
   [[nodiscard]] RetrievedEvidence retrieve(
       const CoachRequest& request,
       const QueryPlan& plan,
-      const CoachContext& context,
-      const EmbeddingModel* embeddings = nullptr) const;
+      const CoachContext& context) const;
   [[nodiscard]] std::optional<EvidenceItem> completed_move_analysis(
       const CoachRequest& request, const std::string& original_fen) const;
 
